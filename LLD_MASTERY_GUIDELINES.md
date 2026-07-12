@@ -71,7 +71,7 @@ If your brain "blanks" during a mock or practice session:
 
 Look at your **DASHBOARD** and **INTELLIGENCE REPORT** to adjust your plan:
 *   **High Freeze Rate?** If you freeze on Behavioral patterns, dedicate next week to ONLY coding "Behavioral Anti-Freeze" starters.
-*   **Messy Code?** Audit your practice files against the **[Code Quality Checklist](./lld/TEMPLATE_MODIFICATIONS.md)**.
+*   **Messy Code?** Audit your practice files against the **[Code Quality Checklist](./lld/006-TEMPLATE_MODIFICATIONS.md)**.
 *   **Wrong Patterns?** Re-read the **"CONFUSES WITH"** sections in the pattern READMEs.
 
 ---

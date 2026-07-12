@@ -142,7 +142,9 @@ Use this curriculum sequentially to build system design intuition from fundament
 
 ## 📚 Reference Handbooks 
 1.  [🚀 LLD Delivery Framework: The 90-Minute Strategy](./000-LLD_DELIVERY_FRAMEWORK.md) — *Refer to this framework first to practice pacing yourself within the 90-minute mock timeline.*
-2.  [🤖 2025 LLD Interview Master Guide](./2025_LLD_INTERVIEW_MASTER_GUIDE.md) — *Read this to understand modern SDE-2/SDE-3 expectations (concurrency, compilable code, AI pairing).*
-3.  [🗣️ Interview Tips & OCP/ISP Defense](./INTERVIEW_TIPS.md) — *Review this to master FAANG-style design communication and OCP/ISP trade-off defense.*
-4.  [🎯 LLD Practice Questions](./001-LLD_PRACTICE_QUESTIONS.md) — *The backlog of practice questions categorized by difficulty.*
-5.  [✅ LLD Mastery Checklist](./002-LLD_MASTERY_CHECKLIST.md) — *The checklist to track your mastery of design patterns and concepts.*
+2.  [🤖 2025 LLD Interview Master Guide](./001-2025_LLD_INTERVIEW_MASTER_GUIDE.md) — *Read this to understand modern SDE-2/SDE-3 expectations (concurrency, compilable code, AI pairing).*
+3.  [🗣️ Interview Tips & OCP/ISP Defense](./002-INTERVIEW_TIPS.md) — *Review this to master FAANG-style design communication and OCP/ISP trade-off defense.*
+4.  [🧠 Senior LLD Practice](./003-SENIOR_LLD_PRACTICE.md) — *Analyze a production-grade, decomposed, thread-safe LRU Cache implementation with concurrency analysis.*
+5.  [🎯 LLD Practice Questions](./004-LLD_PRACTICE_QUESTIONS.md) — *The backlog of practice questions categorized by difficulty.*
+6.  [✅ LLD Mastery Checklist](./005-LLD_MASTERY_CHECKLIST.md) — *The checklist to track your mastery of design patterns and concepts.*
+7.  [🛠️ Template Modifications](./006-TEMPLATE_MODIFICATIONS.md) — *Guidelines and starter markdown blocks for modifying LLD pattern documentation.*

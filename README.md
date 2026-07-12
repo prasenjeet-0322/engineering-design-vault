@@ -24,7 +24,7 @@ The repository is organized into five core pillars:
 - **Foundations & SOLID Principles:** Writing clean, maintainable, and decoupled code.
 - **Design Patterns:** Comprehensive guides with code examples for Creational, Structural, and Behavioral patterns.
 - **Machine Coding Guides:** Best practices and structures for timed coding rounds.
-- **Resources:** [2025 LLD Master Guide](./lld/2025_LLD_INTERVIEW_MASTER_GUIDE.md) and [Senior LLD Practice](./lld/SENIOR_LLD_PRACTICE.md).
+- **Resources:** [2025 LLD Master Guide](./lld/001-2025_LLD_INTERVIEW_MASTER_GUIDE.md) and [Senior LLD Practice](./lld/003-SENIOR_LLD_PRACTICE.md).
 
 ### 3. ⚡ [Core Insights & Language Mastery](./core-insights/)
 *Language-specific internals, performance optimizations, and idiomatic engineering.*
