@@ -10,6 +10,7 @@
 | # | Case Study | Patterns Combined | Real-World Analogy |
 |---|---|---|---|
 | [01](./01-notification-system/README.md) | **Notification System** | Singleton + Factory Method + Builder | Twilio / SendGrid / Firebase internals |
+| [02](./02-payment-system/README.md) | **Payment System** | Strategy + Simple Factory | Stripe / PayPal checkout integrations |
 
 ---
 
