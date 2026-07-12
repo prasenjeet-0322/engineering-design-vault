@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/03-Data-Access-Patterns/03-Dependency-Injection/JAVA/"
+cd "04-Advanced_Architectural/05-Dependency Injection/JAVA/"
 javac container/*.java manager/*.java service/*.java Main.java
 java Main
 ```
