@@ -3,10 +3,10 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/03-Data-Access-Patterns/02-Unit-Of-Work/JAVA/"
+cd "04-Advanced_Architectural/04-Unit of Work/JAVA/"
 # Point to shared models and DAOs as needed
-javac -cp ".;../../01-Repository-DAO/JAVA/" model/*.java dao/*.java repository/*.java uow/*.java Main.java
-java -cp ".;../../01-Repository-DAO/JAVA/" Main
+javac -cp ".;../../02-DAO and Repository Patterns/JAVA/" model/*.java dao/*.java repository/*.java uow/*.java Main.java
+java -cp ".;../../02-DAO and Repository Patterns/JAVA/" Main
 ```
 
 *(Note: In this simple demo, I've duplicated some files or simplified the classpath for ease of execution)*
