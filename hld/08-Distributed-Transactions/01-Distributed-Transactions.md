@@ -26,11 +26,11 @@
 | Pattern | Consistency Model | Performance | Recovery Mechanism |
 | :--- | :--- | :--- | :--- |
 | **Two-Phase Commit (2PC)** | Strong Consistency (ACID). | Slow. Blocks resources across databases during consensus. | Automatic rollback handled by coordinator. |
-| **Saga Pattern** | Eventual Consistency (BASE). | Fast. No resource locking; local commits run sequentially. | Requires writing custom **Compensating Transactions** (Undo operations). |
+| [Saga Pattern](02-Saga-Pattern.md) | Eventual Consistency (BASE). | Fast. No resource locking; local commits run sequentially. | Requires writing custom **Compensating Transactions** (Undo operations). |
 | **Try-Confirm-Cancel (TCC)** | Eventual/Soft Consistency. | Medium. Explicitly reserves resources before commits. | Custom application cancel logic. |
 
 *   **Ideal Use Cases:**
-    *   Saga: Multi-service booking flows (Flight + Hotel booking).
+    *   Saga: Multi-service booking flows (Flight + Hotel booking). See [Saga Pattern](02-Saga-Pattern.md) details.
     *   TCC: E-commerce order inventory reservations where stock must be "held" transiently before credit card approval.
 *   **Anti-Patterns / When NOT to use:**
     *   Using 2PC in high-throughput cloud environments (if a single database node is slow or undergoes network partitioning, the entire transaction blocks indefinitely, crashing the API tier).
@@ -51,7 +51,7 @@
     *   Suggesting 2PC for microservices without explaining its latency and blocking lock issues (2PC is highly anti-scalable).
     *   Forgetting that Saga compensating transactions can fail too (you need a Dead Letter Queue or manual reconciliation task).
 *   **Interview Tip (The "Strong Hire" Signal):**
-    *   Recommend Saga Orchestration: *"For transactional checkouts, I will use the **Saga Orchestrator** pattern over Choreography. A central coordinator makes it simple to trace the checkout state machine, handle complex compensating transaction logic, and prevents circular event loops."*
+    *   Recommend Saga Orchestration: *"For transactional checkouts, I will use the [Saga Orchestrator](02-Saga-Pattern.md) pattern over Choreography. A central coordinator makes it simple to trace the checkout state machine, handle complex compensating transaction logic, and prevents circular event loops."*
 
 ---
 

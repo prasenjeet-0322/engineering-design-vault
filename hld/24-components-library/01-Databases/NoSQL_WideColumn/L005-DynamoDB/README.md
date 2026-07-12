@@ -20,6 +20,7 @@ Amazon DynamoDB is a fully managed, serverless, proprietary NoSQL database servi
 | **Max Scale** | Petabytes |
 | **Consistency Model** | Eventual / Strong (Read option) |
 | **CAP Choice** | AP |
+| **PACELC Profile** | PA/EL (Tunable to PC/EC using `ConsistentRead=true`. See [PACELC Theorem](../../../../10-Consistency-Models/04-PACELC-Theorem.md)) |
 | **Understanding** | [ ] None / [ ] Conceptual / [x] Applied |
 | **Internals Known** | [x] Yes / [ ] No |
 | **Interview Ready** | [x] Yes / [ ] No |

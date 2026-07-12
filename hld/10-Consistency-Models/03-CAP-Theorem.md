@@ -67,6 +67,7 @@ In any real-world distributed network, packets will occasionally be delayed or d
 ### Common Mistakes (The "Junior" Signals)
 *   Claiming a system is "CA" (Consistent + Available). Inform the interviewer that "CA" is a myth in distributed networks—you cannot control physical wire cuts or network switch crashes. If there is no partition, CAP does not apply; if there is a partition, CA is impossible.
 *   Confusing CAP Consistency (Linearizability) with ACID Consistency (Schema constraints).
+*   Ignoring what happens when there is no partition. CAP only applies during active network splits. Under normal operations, the latency vs. consistency trade-off is governed by the [PACELC Theorem](04-PACELC-Theorem.md).
 
 ### Interview Tip (The "Strong Hire" Signal)
 > *"We recognize that network partitions are an unavoidable physical reality, meaning we must design for either CP or AP. For our payment processing pipeline, we configure a CP architecture using Etcd to ensure we never double-spend, accepting temporary write rejections during network drops. For our user notifications database, we choose an AP architecture using Cassandra, ensuring users can always retrieve their alerts immediately, accepting brief replication lags."*

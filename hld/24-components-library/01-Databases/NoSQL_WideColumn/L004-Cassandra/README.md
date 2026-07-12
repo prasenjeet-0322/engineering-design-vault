@@ -20,6 +20,7 @@ Apache Cassandra is a distributed, masterless NoSQL wide-column store designed t
 | **Max Scale** | Petabytes |
 | **Consistency Model** | Tunable Eventual |
 | **CAP Choice** | AP |
+| **PACELC Profile** | PA/EL (Tunable to PC/EC via quorums. See [PACELC Theorem](../../../../10-Consistency-Models/04-PACELC-Theorem.md)) |
 | **Understanding** | [ ] None / [ ] Conceptual / [x] Applied |
 | **Internals Known** | [x] Yes / [ ] No |
 | **Interview Ready** | [x] Yes / [ ] No |

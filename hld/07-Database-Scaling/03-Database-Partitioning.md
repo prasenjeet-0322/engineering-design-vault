@@ -47,7 +47,7 @@
 
 ## 🚫 4. Interview Playbook
 *   **Common Mistakes:**
-    *   Confusing Database Partitioning (splitting tables inside one DB server instance) with **Database Sharding** (splitting tables across multiple physical DB server nodes).
+    *   Confusing Database Partitioning (splitting tables inside one DB server instance) with [Database Sharding](04-Database-Sharding.md) (splitting tables across multiple physical DB server nodes).
     *   Not accounting for index partitioning (Local indices exist per partition; Global indices span the entire table, creating write bottlenecks).
 *   **Interview Tip (The "Strong Hire" Signal):**
     *   Explain time-series optimization: *"We partition our events table by Range (Date). This allows us to perform **Partition Pruning** during queries, scanning only active dates, and trivially archive old years by executing a fast partition metadata drop instead of a slow, lock-heavy DELETE query."*

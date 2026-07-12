@@ -56,7 +56,7 @@ The fatal flaw of 2PC is that it is a **blocking protocol**:
 *   Not knowing what happens when the coordinator node crashes mid-transaction.
 
 ### Interview Tip (The "Strong Hire" Signal)
-> *"While 2PC provides strong distributed consistency, it is a blocking protocol. If the coordinator crashes, database row locks remain active, degrading scale. For high-scale services, I will trade strong consistency for eventual consistency using the **Saga Pattern** or the **TCC (Try-Confirm-Cancel)** pattern."*
+> *"While 2PC provides strong distributed consistency, it is a blocking protocol. If the coordinator crashes, database row locks remain active, degrading scale. For high-scale services, I will trade strong consistency for eventual consistency using the [Saga Pattern](02-Saga-Pattern.md) or the **TCC (Try-Confirm-Cancel)** pattern."*
 
 ---
 

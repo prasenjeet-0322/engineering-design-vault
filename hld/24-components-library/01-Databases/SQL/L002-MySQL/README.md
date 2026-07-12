@@ -23,6 +23,7 @@ MySQL is the world's most popular open-source relational database management sys
 | **Max Scale** |  |
 | **Consistency Model** |  |
 | **CAP Choice** | CA |
+| **PACELC Profile** | PC/EL (Default, async replication), PC/EC (Synchronous replication. See [PACELC Theorem](../../../../10-Consistency-Models/04-PACELC-Theorem.md)) |
 | **Understanding** | [🔴 None / 🟡 Conceptual / 🟢 Applied] |
 | **Internals Known** | [ ] Yes / [ ] No |
 | **Interview Ready** | [ ] Yes / [ ] No |

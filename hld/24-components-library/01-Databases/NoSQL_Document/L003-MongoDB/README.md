@@ -20,6 +20,7 @@ MongoDB is the leading NoSQL Document Database. It stores data in flexible, JSON
 | **Max Scale** | Petabytes |
 | **Consistency Model** | Strong (Primary) / Eventual (Secondaries) |
 | **CAP Choice** | CP |
+| **PACELC Profile** | PC/EL (Tunable to PC/EC via write concern `w:majority` / read preference `primary`. See [PACELC Theorem](../../../../10-Consistency-Models/04-PACELC-Theorem.md)) |
 | **Understanding** | [ ] None / [ ] Conceptual / [x] Applied |
 | **Internals Known** | [x] Yes / [ ] No |
 | **Interview Ready** | [x] Yes / [ ] No |
