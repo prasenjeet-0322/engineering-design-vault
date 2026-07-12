@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/04-Domain-Architecture-Patterns/04-Saga-Orchestrator/JAVA/"
+cd "04-Advanced_Architectural/06-Domain-Architecture-Patterns/04-Saga-Orchestrator/JAVA/"
 javac service/*.java orchestrator/*.java Main.java
 java Main
 ```

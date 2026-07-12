@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/04-Domain-Architecture-Patterns/01-Domain-Driven-Design/JAVA/"
+cd "04-Advanced_Architectural/06-Domain-Architecture-Patterns/01-Domain-Driven-Design/JAVA/"
 javac domain/valueobject/*.java domain/entity/*.java domain/aggregate/*.java Main.java
 java Main
 ```

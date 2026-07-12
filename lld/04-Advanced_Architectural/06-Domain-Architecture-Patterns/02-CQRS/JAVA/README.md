@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/04-Domain-Architecture-Patterns/02-CQRS/JAVA/"
+cd "04-Advanced_Architectural/06-Domain-Architecture-Patterns/02-CQRS/JAVA/"
 javac command/*.java handler/*.java query/*.java Main.java
 java Main
 ```
