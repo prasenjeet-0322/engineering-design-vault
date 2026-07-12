@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/02-Resiliency-Patterns/02-Retry-Backoff/JAVA/"
+cd "04-Advanced_Architectural/03-Resiliency-Patterns/02-Retry-Backoff/JAVA/"
 javac service/*.java retry/*.java Main.java
 java Main
 ```

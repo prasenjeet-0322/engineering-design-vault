@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/02-Resiliency-Patterns/01-Circuit-Breaker/JAVA/"
+cd "04-Advanced_Architectural/03-Resiliency-Patterns/01-Circuit-Breaker/JAVA/"
 javac state/*.java service/*.java breaker/*.java Main.java
 java Main
 ```

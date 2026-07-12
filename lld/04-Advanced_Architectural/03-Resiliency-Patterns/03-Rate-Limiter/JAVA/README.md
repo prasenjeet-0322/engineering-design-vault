@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/02-Resiliency-Patterns/03-Rate-Limiter/JAVA/"
+cd "04-Advanced_Architectural/03-Resiliency-Patterns/03-Rate-Limiter/JAVA/"
 javac limiter/*.java service/*.java Main.java
 java Main
 ```
