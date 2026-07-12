@@ -3,7 +3,7 @@
 Ensure you are in the `JAVA` folder.
 
 ```bash
-cd "04-Advanced_Architectural/03-Data-Access-Patterns/01-Repository-DAO/JAVA/"
+cd "04-Advanced_Architectural/02-DAO and Repository Patterns/JAVA/"
 javac model/*.java dao/*.java repository/*.java Main.java
 java Main
 ```
