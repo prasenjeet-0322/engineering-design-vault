@@ -23,6 +23,10 @@
     1.  
     2.  
     3.  
+*   **Srikar's Draft**:
+    1.  **Instrumented OpenTelemetry:** I migrated our applications to use standard OpenTelemetry SDKs, Prometheus metrics, and Grafana dashboarding.
+    2.  **Configured Tail-Based Sampling:** I set up an OpenTelemetry Collector cluster and configured a tail-sampling strategy. Instead of sampling at the entry point, the collector buffered trace spans and checked their final status: successful traces were sampled at a 10% rate, but any trace containing a 5xx error, DB timeout, or span error was retained at **100%**.
+    3.  **Defined SLO Dashboarding:** I built Grafana alerts linked to our service-level objectives (SLOs), notifying developers only when error rates or p99 latencies exceeded set thresholds.
 
 ### [R] Result (The Metrics)
 *   **Prompt**: Quantifiable gains (e.g., latency reduction %, resource savings in dollars).
@@ -47,6 +51,19 @@
 > *Finally, I refactored the background job to execute updates in batches during off-peak hours and partitioned the checkout tables.*
 > 
 > *As a result, database lock saturation dropped from 12% to less than 0.1%, and checkout transaction failure rate dropped to zero. This taught me that you cannot optimize what you do not measure, and dashboard metrics are the only source of truth in production systems."*
+
+---
+
+> **Srikar's Spoken Draft Script:**
+> *At Saavik Solutions, as our transactional volume grew, our CloudWatch logging and OpenTelemetry trace storage costs skyrocketed, eating up 25% of our monthly infrastructure budget. Even worse, our head-based sampling mechanism, which randomly sampled 15% of all requests at start, meant we were capturing millions of redundant successful spans but missing rare, intermittent 5xx error traces that occurred in downstream payment steps.*
+> 
+> *I was tasked with reducing our cloud telemetry bills by at least 50% without losing visibility into production issues.*
+> 
+> *I decided to re-architect our telemetry pipeline using the OpenTelemetry Collector. First, I migrated us from simple head-based sampling to a parent-based tail-sampling strategy. Instead of sampling requests at the start, the collector evaluated the entire trace lifecycle at its end. I configured it to retain a 10% baseline of successful HTTP requests, but capture 100% of traces that encountered a 5xx error, DB exception, or span-timeout. Second, I linked Prometheus metrics to Grafana, designing dashboard SLOs that measured p99 latencies and error rates per domain.*
+> 
+> *As a result, we reduced our telemetry ingestion and storage costs by 90%, saving the company thousands of dollars monthly. More importantly, we improved our production debugging since engineers were guaranteed that any system failure would have its complete, un-sampled trace tree preserved. This taught me that observability is not just about logging everything; it's about setting up cost-effective, data-driven filters that guarantee high-signal debug data when things fail.*
+
+
 
 ---
 

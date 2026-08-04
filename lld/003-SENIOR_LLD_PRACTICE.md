@@ -25,6 +25,49 @@ As an SDE-2/Senior candidate, your solution must address the following:
 
 ---
 
+## 📊 Class Architecture & Interactions
+
+```mermaid
+classDiagram
+    class Cache {
+        <<interface>>
+        +get(K key) V
+        +put(K key, V value) void
+    }
+    class LRUCache {
+        -int capacity
+        -ConcurrentHashMap~K, Node~ map
+        -DoublyLinkedList list
+        -ReentrantReadWriteLock rwl
+        +get(K key) V
+        +put(K key, V value) void
+    }
+    class DoublyLinkedList {
+        -Node head
+        -Node tail
+        -int size
+        +addToHead(Node node) void
+        +removeNode(Node node) void
+        +moveToHead(Node node) void
+        +removeTail() Node
+    }
+    class Node {
+        +K key
+        +V value
+        +Node prev
+        +Node next
+        +boolean active
+        +long expiryTime
+    }
+    Cache <|.. LRUCache
+    LRUCache --> DoublyLinkedList : manages
+    LRUCache --> ConcurrentHashMap : references
+    DoublyLinkedList --> Node : links
+    ConcurrentHashMap --> Node : indexes
+```
+
+---
+
 ## Implementation Skeleton (Java)
 
 Here is the complete, production-grade, thread-safe, and decomposed LRU Cache implementation.
@@ -55,11 +98,13 @@ class Node<K, V> {
     volatile Node<K, V> prev;
     volatile Node<K, V> next;
     volatile boolean active; // Safety flag for eviction race conditions
+    volatile long expiryTime; // Expiry timestamp in milliseconds
 
     Node(K key, V value) {
         this.key = key;
         this.value = value;
         this.active = true;
+        this.expiryTime = -1; // -1 means no expiry
     }
 }
 
@@ -184,6 +229,20 @@ public class LRUCache<K, V> implements Cache<K, V> {
             return null; // Cache Miss: 100% Lock-Free path
         }
 
+        // Passive Expiry Check
+        if (node.expiryTime != -1 && System.currentTimeMillis() > node.expiryTime) {
+            writeLock.lock();
+            try {
+                if (node.active && map.get(key) == node) {
+                    list.removeNode(node);
+                    map.remove(key);
+                }
+            } finally {
+                writeLock.unlock();
+            }
+            return null; // Expired
+        }
+
         // Phase 2: Cache Hit. Safely update recency
         writeLock.lock();
         try {
@@ -201,6 +260,10 @@ public class LRUCache<K, V> implements Cache<K, V> {
 
     @Override
     public void put(K key, V value) {
+        put(key, value, -1);
+    }
+
+    public void put(K key, V value, long ttlMs) {
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
@@ -211,8 +274,11 @@ public class LRUCache<K, V> implements Cache<K, V> {
         writeLock.lock();
         try {
             Node<K, V> existingNode = map.get(key);
+            long expiry = (ttlMs <= 0) ? -1 : System.currentTimeMillis() + ttlMs;
+
             if (existingNode != null) {
                 existingNode.value = value;
+                existingNode.expiryTime = expiry;
                 list.moveToHead(existingNode);
             } else {
                 // Evict if cache is full
@@ -224,6 +290,7 @@ public class LRUCache<K, V> implements Cache<K, V> {
                 }
                 
                 Node<K, V> newNode = new Node<>(key, value);
+                newNode.expiryTime = expiry;
                 list.addToHead(newNode);
                 map.put(key, newNode);
             }
@@ -255,6 +322,8 @@ public class LRUCache<K, V> implements Cache<K, V> {
 }
 ```
 
+---
+
 ### Senior Design & Concurrency Analysis
 
 #### 1. Eviction Race Condition Prevention
@@ -284,8 +353,41 @@ If the hit rate $H \approx 1.0$ (typical for warmed-up caches), then $\lambda_{l
 To scale throughput:
 - **Cache Segmentation / Key Striping:** Partition the cache into $N$ independent segments (each with its own lock and DLL). The collision probability on a single segment lock drops to $\frac{1}{N}$, scaling concurrent throughput linearly up to the physical core capacity of the machine.
 
+---
 
-## Bonus "Senior" Questions
-1. How would you handle **Cache Expiry** (TTL)?
-2. How would you implement a **Distributed LRU Cache** (e.g., Redis)?
-3. How does the **Double-Checked Locking** pattern apply here if we use a Singleton for the Cache Manager?
+## 🏢 SDE-3 Follow-Up Architecture Questions
+
+### 1. How do you handle Cache Expiry (TTL)?
+We combine two strategies to clean up expired keys efficiently:
+*   **Passive Eviction (Checked On-Read):** When `get(key)` is invoked, we check the node's expiry timestamp. If `System.currentTimeMillis() > node.expiryTime`, we acquire the write lock, unlink it, remove it from the map, and return `null`. This prevents returning stale data.
+*   **Active Eviction (Background Sweeper):** A scheduled background thread pool (`ScheduledExecutorService`) sweeps a random sample of keys periodically. Sweeping the entire map can cause latency spikes, so sampling (e.g., checking 20 random keys every 100ms and evicting expired ones) keeps CPU bounds low.
+
+### 2. How do you implement a Distributed LRU Cache (e.g., Redis)?
+*   **Consistent Hashing:** Partition keys across nodes using a ring structure (Consistent Hashing) with virtual nodes. This ensures even distribution and minimizes key relocation when scaling nodes up or down.
+*   **Eviction Coordination:** In a distributed setup, memory-level eviction is localized to the node. If a key is updated, we broadcast invalidation events across nodes using Redis Pub/Sub or a dedicated event bus.
+*   **Distributed Mutex (Redlock):** To prevent multiple nodes from running database queries during a cache miss (cache stampede), we acquire a distributed lock on the key. Only the lock winner queries the DB and repopulates the distributed cache, while others wait/retry.
+
+### 3. How does the Double-Checked Locking pattern apply to a Singleton Cache Manager?
+Double-Checked Locking allows us to initialize a shared cache manager instance in a thread-safe way while avoiding synchronization overhead on subsequent reads. The reference **must** be marked `volatile` to prevent instruction reordering (where the JVM allocates memory and writes a reference before the object constructor runs):
+
+```java
+public class CacheManager {
+    private static volatile CacheManager instance;
+    private final Cache<?, ?> defaultCache;
+
+    private CacheManager() {
+        this.defaultCache = new LRUCache<>(1000);
+    }
+
+    public static CacheManager getInstance() {
+        if (instance == null) { // Check 1: Lock-free fast path
+            synchronized (CacheManager.class) {
+                if (instance == null) { // Check 2: Thread-safe slow path
+                    instance = new CacheManager();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```

@@ -15,20 +15,21 @@ When discussing behavioral patterns, you must demonstrate:
 
 ---
 
-## 📈 Behavioral Patterns: Numerical Order Analysis
+## 📈 Behavioral Patterns: Pedagogical Learning Order
 
 | # | Pattern | Pragmatic Use-Case | 🏗️ Senior "Strong Hire" Insight |
 | :--- | :--- | :--- | :--- |
 | **01** | **Strategy** | **Dynamic Algorithms.** Swap pricing or tax rules at runtime. | *"I use Strategy to eliminate `if-else` blocks for business logic. It's the cleanest implementation of OCP."* |
 | **02** | **Observer** | **Event-Driven Systems.** Notify 10 services of a state change. | *"The foundation of EDA. Use `CopyOnWriteArrayList` for thread-safety and be wary of memory leaks from 'Lapsed Listeners'."* |
-| **03** | **Command** | **Undo/Redo & Queuing.** Encapsulate actions as objects. | *"Essential for CQRS and Saga patterns. It turns method calls into serializable data that can be queued in Kafka."* |
-| **04** | **State** | **Workflow Engines.** Finite State Machines (FSM). | *"Mathematically guarantees valid transitions. I let the State classes manage the 'Next Step' to keep the Context clean."* |
-| **05** | **CoR** | **Middleware Pipelines.** Auth -> Rate Limit -> Validation. | *"I use CoR for Fail-Fast processing. It allows me to build dynamic pipelines from config without changing core logic."* |
+| **03** | **State** | **Workflow Engines.** Finite State Machines (FSM). | *"Mathematically guarantees valid transitions. I let the State classes manage the 'Next Step' to keep the Context clean."* |
+| **04** | **CoR** | **Middleware Pipelines.** Auth -> Rate Limit -> Validation. | *"I use CoR for Fail-Fast processing. It allows me to build dynamic pipelines from config without changing core logic."* |
+| **05** | **Command** | **Undo/Redo & Queuing.** Encapsulate actions as objects. | *"Essential for CQRS and Saga patterns. It turns method calls into serializable data that can be queued in Kafka."* |
 | **06** | **Template** | **Framework Skeleton.** Standardize 'Validate -> Pay -> Notify'. | *"The 'Hollywood Principle' in action. I make the template `final` to ensure the business sequence is never altered."* |
 | **07** | **Iterator** | **Traversal Abstraction.** Lazy pagination for 1B rows. | *"Decouples looping from data storage. Enables cursor-based pagination and infinite streams for high-load APIs."* |
-| **08** | **Memento** | **State Snapshots.** Save/Restore state before a boss fight. | *"Provides snapshots without breaking encapsulation. Pair with Command for robust undo/redo systems."* |
-| **09** | **Mediator** | **Air Traffic Control.** Decouple N-to-N peer chatter. | *"Turns spaghetti into a Hub-and-Spoke model. Essential for complex UI state (Redux) and microservice event buses."* |
+| **08** | **Mediator** | **Air Traffic Control.** Decouple N-to-N peer chatter. | *"Turns spaghetti into a Hub-and-Spoke model. Essential for complex UI state (Redux) and microservice event buses."* |
+| **09** | **Memento** | **State Snapshots.** Save/Restore state before a boss fight. | *"Provides snapshots without breaking encapsulation. Pair with Command for robust undo/redo systems."* |
 | **10** | **Visitor** | **Algorithm Extraction.** Export AST to XML/JSON. | *"The only way to achieve Double Dispatch in Java. Separates algorithms from stable object hierarchies."* |
+
 
 ---
 

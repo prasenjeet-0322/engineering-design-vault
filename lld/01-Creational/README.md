@@ -43,16 +43,16 @@ In a 45-min interview, you have ~30 mins to code. **Speed + Working Solution = S
 
 ---
 
-## 📈 Creational Patterns: Numerical Order Analysis
+## 📈 Creational Patterns: Pedagogical Learning Order
 
 | # | Pattern | Pragmatic Use-Case | 🏗️ Senior "Strong Hire" Insight |
 | :--- | :--- | :--- | :--- |
-| **01** | **Singleton** | **Global, Stateful Resources** (e.g., DB Connection Pool, Config Manager). | *"Don't just use Singleton; use **Dependency Injection**. It provides the same 'exactly one instance' guarantee while maintaining **Testability** via mocks."* |
+| **01** | **Simple Factory** | **The '80% Solution'** for centralizing basic creation logic. | *"Start here. Don't over-engineer to a full Factory Method unless you actually need polymorphism."* |
 | **02** | **Factory Method** | **Plug-in Architectures** where you want to add new types without changing existing code. | *"Use it when you need to follow the **Open/Closed Principle**, but watch out for 'Class Explosion'—sometimes a simple Registry is cleaner."* |
 | **03** | **Abstract Factory** | **Suites of Related Products** (e.g., UI Themes, Multi-DB Connectors). | *"The goal isn't just 'creation'; it is **Consistency Enforcement**. It makes adding new families easy but adding new product types very rigid."* |
 | **04** | **Builder** | **Objects with >3 Optional Fields** or complex validation. | *"Replace **Telescoping Constructors** and ensure **Immutability**. Perform all cross-field validation in the `.build()` method before the object is 'born'."* |
 | **05** | **Prototype** | **Expensive Object Creation** (e.g., objects requiring DB/Network calls). | *"Use it as a performance cache for pre-configured objects. **Avoid Java's `Cloneable`**; use **Copy Constructors** or **Serialization** for a safe deep-copy."* |
-| **07** | **Simple Factory** | **The '80% Solution'** for centralizing basic creation logic. | *"Start here. Don't over-engineer to a full Factory Method unless you actually need polymorphism."* |
+| **06** | **Singleton** | **Global, Stateful Resources** (e.g., DB Connection Pool, Config Manager). | *"Don't just use Singleton; use **Dependency Injection**. It provides the same 'exactly one instance' guarantee while maintaining **Testability** via mocks."* |
 | **08** | **Object Pool** | **Expensive, Limited Resources** (DB Connections, Sockets). | *"Use a BlockingQueue to manage a pool of pre-warmed resources. It's the key to scaling 10k users against a limited DB."* |
 
 ---
@@ -76,14 +76,15 @@ In a 45-min interview, you have ~30 mins to code. **Speed + Working Solution = S
 
 ---
 
-## 📂 Navigation (Follow the Numerical Order)
+## 📂 Navigation (Follow the Pedagogical Learning Order)
 
-1.  [**01-Singleton**](./01-Singleton%20Design%20Pattern/README.md) — The thread-safety and testability trade-off.
+1.  [**01-Simple Factory**](./01-Simple%20Factory%20Design%20Pattern/README.md) — The pragmatic starting point for centralized creation.
 2.  [**02-Factory Method**](./02-Factory%20Method%20Design%20Pattern/README.md) — Decentralized creation for plug-in systems.
 3.  [**03-Abstract Factory**](./03-Abstract%20Factory%20Design%20Pattern/README.md) — Enforcing consistency across product families.
 4.  [**04-Builder**](./04-Builder%20Design%20Pattern/README.md) — Solving "Constructor Hell" and ensuring immutability.
 5.  [**05-Prototype**](./05-Prototype%20Design%20Pattern/README.md) — Performance-optimized cloning for expensive objects.
-6.  [**06-Simple Factory**](./06-Simple%20Factory%20Design%20Pattern/README.md) — The pragmatic starting point for centralized creation.
+6.  [**06-Singleton**](./06-Singleton%20Design%20Pattern/README.md) — The thread-safety, memory, and testability trade-off.
+
 
 ---
 

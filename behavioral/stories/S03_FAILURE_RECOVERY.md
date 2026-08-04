@@ -23,6 +23,10 @@
     1.  
     2.  
     3.  
+*   **Srikar's Draft**:
+    1.  **Event-Loop Profiling:** I ran Node.js CPU profiling under load and analyzed flame graphs. This revealed that the single-threaded event loop was blocked by synchronous CPU-bound cryptographic operations.
+    2.  **Offloading with Argon2id & libuv:** I replaced the pure-JavaScript synchronous `bcryptjs` library with native asynchronous `Argon2id`. This successfully offloaded the CPU-bound password hashing to the background thread pool managed by `libuv`, freeing the main loop to process other event requests.
+    3.  **Token Caching with Redis:** I set up an active session token cache in Redis. Instead of querying the database and verifying credentials on every high-frequency API call, session tokens were validated in-memory, avoiding redundant hashing operations.
 
 ### [R] Result (The Metrics)
 *   **Prompt**: What was the recovery timeline? What permanent system changes were instituted to prevent recurrence?
@@ -47,6 +51,19 @@
 > *Finally, I worked with the DevOps team to set up staging environment parity for testing migrations.*
 > 
 > *The database was fully recovered within 2 hours with zero permanent data loss, and we successfully executed the migration 3 days later. This failure taught me to never execute schema migrations without dynamic validation and to test migration scripts against production-replica data in staging first."*
+
+---
+
+> **Srikar's Spoken Draft Script:**
+> *At Saavik Solutions, during a launch event on our sports venue booking platform Kridaz, our login endpoints choked under peak load. The p95 authentication latency spiked to 1.5 seconds, CPU usage hit 98%, and users were seeing connection timeouts.*
+> 
+> *As the founding engineer, I set out to diagnose the performance bottleneck. I ran a CPU profiler under simulated load and compiled flame graphs. The analysis showed that the single-threaded Node.js event loop was being blocked for hundreds of milliseconds at a time. The blocker was our synchronous password hashing library, bcryptjs, which ran entirely on the main JavaScript thread. *
+> 
+> *To resolve this, I did two things. First, I migrated our hashing to asynchronous native Argon2id bindings. This offloaded the cryptographic computations from the single-threaded event loop to the background threads managed by Node's libuv. Second, I implemented a Redis caching layer for active session tokens, eliminating the need to repeatedly run password verifications for active API calls, which cut database lookups by 90%.*
+> 
+> *This dropped our p95 login latency from 1.5 seconds to 300ms, and our systems comfortably handled the peak load of 1,200 requests per minute. This experience hammered home the lesson that you must never block the single thread in Node.js, and CPU-intensive operations must always be offloaded or cached.*
+
+
 
 ---
 

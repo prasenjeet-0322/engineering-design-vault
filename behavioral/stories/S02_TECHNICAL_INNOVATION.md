@@ -23,6 +23,10 @@
     1.  
     2.  
     3.  
+*   **Srikar's Draft**:
+    1.  **Context Tracking with AsyncLocalStorage:** I utilized Node's `AsyncLocalStorage` to maintain request-scoped execution contexts, allowing the backend to identify if a write query had been executed in the current request thread.
+    2.  **Transparent Routing with ES6 Proxies:** Instead of forcing developers to manually call `db.read()` or `db.write()`, I built an abstraction using ES6 Proxies to wrap database connections. The Proxy intercepted all queries and dynamically routed writes to the primary, and reads to the replicas.
+    3.  **Implemented Sticky Reads:** I built a temporal pinning mechanism. If a user session executed a write command, the Proxy pinned their session's read queries exclusively to the primary for a 5-second window, bypassing replicas until sync was guaranteed.
 
 ### [R] Result (The Metrics)
 *   **Prompt**: Performance metrics (e.g., throughput increased by 200%, p99 latency dropped from 2s to 150ms).
@@ -46,6 +50,17 @@
 > *I refactored our data pipeline to compile associations asynchronously using CDC (Change Data Capture) with Kafka. I also batch-loaded records in our application layer using the DataLoader pattern.*
 > 
 > *As a result, CPU utilization during peak hours dropped from 98% to 35%, and search latency dropped from 2.2 seconds to 80ms under a load of 15k QPS. This taught me to always analyze database access patterns before attempting to scale compute."*
+
+---
+
+> **Srikar's Spoken Draft Script:**
+> *At Saavik Solutions, on our EdTech marketplace EA Overseas, we scaled PostgreSQL using read replicas. However, we immediately ran into replica lag. When users updated their records and refreshed the page, the subsequent read routed to a replica that hadn't synchronized, causing the UI to display stale information. This led to users resubmitting their data, creating database duplicate rows.*
+> 
+> *Instead of forcing the team to manually specify primary or replica databases in their code, I designed a transparent database routing layer. First, I used Node's AsyncLocalStorage to track the request lifecycle. When a write query was detected, the request context was marked. Second, I wrapped our ORM and DB connection pools in an ES6 Proxy. This proxy intercepted every SQL query. If it detected a write command, or if the user's session had executed a write in the last 5 seconds, the proxy pinned the session's traffic to the primary database. All other standard read traffic was routed to the replicas.*
+> 
+> *This transparent read-after-write routing resolved all replica lag consistency bugs without requiring any modifications to our application services. This taught me that meta-programming and context-based proxies are extremely powerful tools to keep architectural concerns cleanly separated from business logic.*
+
+
 
 ---
 

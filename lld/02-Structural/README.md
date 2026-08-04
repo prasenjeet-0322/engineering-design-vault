@@ -49,17 +49,18 @@ In a Structural LLD interview, the trap is over-complicating the "Wrapper" logic
 
 ---
 
-## 📈 Structural Patterns: Numerical Order Analysis
+## 📈 Structural Patterns: Pedagogical Learning Order
 
 | # | Pattern | Pragmatic Use-Case | 🏗️ Senior "Strong Hire" Insight |
 | :--- | :--- | :--- | :--- |
 | **01** | **Adapter** | **Anti-Corruption Layer (ACL).** Wrap 3rd party SDKs (Stripe, Twilio). | *"I use Adapter to define a clean domain boundary. It makes my core code vendor-agnostic and 100% unit-testable."* |
-| **02** | **Facade** | **API Gateways / BFF.** Simplify microservice orchestration. | *"Facade reduces 'Chatty' network calls. It's the foundation of an API Gateway that aggregates 10 microservices into 1 client response."* |
-| **03** | **Decorator** | **Middleware.** Add Auth, Logging, or Caching dynamically. | *"Decorator is the OOD implementation of Middleware. It follows 'Composition over Inheritance' to add cross-cutting concerns without class explosion."* |
+| **02** | **Decorator** | **Middleware.** Add Auth, Logging, or Caching dynamically. | *"Decorator is the OOD implementation of Middleware. It follows 'Composition over Inheritance' to add cross-cutting concerns without class explosion."* |
+| **03** | **Facade** | **API Gateways / BFF.** Simplify microservice orchestration. | *"Facade reduces 'Chatty' network calls. It's the foundation of an API Gateway that aggregates 10 microservices into 1 client response."* |
 | **04** | **Proxy** | **Interception.** Security, Lazy Loading, and Rate Limiting. | *"Proxy controls the lifecycle and access to an object. It's how Spring handles Transactions and how Hibernate handles Lazy Loading."* |
 | **05** | **Composite** | **Hierarchies.** UI Trees, Org Charts, Expression Parsers. | *"Composite enables 'Recursive Uniformity.' I can treat a single object and a tree of objects identically, simplifying client rendering logic."* |
 | **06** | **Bridge** | **Platform Agnostic.** Separate 'What' from 'How'. | *"Bridge is the 'Cartesian Killer.' It stops class explosion by decoupling abstractions from their implementation platforms."* |
 | **07** | **Flyweight** | **Memory Optimization.** Shared immutable state for 10k+ objects. | *"Flyweight is OOD Value Interning. It saves gigabytes of RAM by sharing 'Intrinsic' state across thousands of instances."* |
+
 
 ---
 

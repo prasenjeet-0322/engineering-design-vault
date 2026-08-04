@@ -25,11 +25,11 @@
 ## ⚖️ 2. Trade-offs & Deep Dive
 | Index Type | Internal Structure | Best For | Trade-off | Found In |
 | :--- | :--- | :--- | :--- | :--- |
-| **B-Tree / B+Tree** | Self-balancing tree. Leaf nodes contain data (clustered) or pointers (non-clustered). | Range queries, exact matches, sorting. | Read-optimized. High write penalty (page splits). | [PostgreSQL](../24-components-library/01-Databases/SQL/L001-PostgreSQL/README.md), [MySQL](../24-components-library/01-Databases/SQL/L002-MySQL/README.md) |
-| **LSM-Tree** | MemTable in RAM, immutable SSTables on disk. | Massive write velocity, append-only logs. | Write-optimized. Slower reads due to scanning multiple SSTables. | [Cassandra](../24-components-library/01-Databases/NoSQL_WideColumn/L004-Cassandra/README.md), [DynamoDB](../24-components-library/01-Databases/NoSQL_WideColumn/L005-DynamoDB/README.md) |
+| **B+Tree** | Self-balancing tree. Keys only in internal nodes; data/pointers in leaves linked sequentially. | Range queries, exact matches, sorting. | Read-optimized. High write penalty (page splits). | [PostgreSQL](../24-components-library/01-Databases/SQL/L001-PostgreSQL/README.md), [MySQL](../24-components-library/01-Databases/SQL/L002-MySQL/README.md) |
+| **LSM-Tree** | MemTable in RAM, immutable SSTables on disk. Sorted via background Compaction. | Massive write velocity, append-only logs. | Write-optimized. Slower reads due to scanning multiple SSTables. | [Cassandra](../24-components-library/01-Databases/NoSQL_WideColumn/L004-Cassandra/README.md), [DynamoDB](../24-components-library/01-Databases/NoSQL_WideColumn/L005-DynamoDB/README.md) |
 | **Hash Index** | Hash function maps key to specific memory bucket. | Ultra-fast exact match lookups (`=`). | Cannot perform range queries (`<`, `>`) or sorting. | [Redis](../24-components-library/01-Databases/NoSQL_KV/L006-Redis/README.md) |
 | **Inverted Index (GIN)** | Maps terms/words to a list of Document IDs. | Full-text search, JSONB document querying. | Extremely high write amplification on update. | [Elasticsearch](../24-components-library/09-Search_Engines/L007-Elasticsearch/README.md) |
-| **Geospatial (R-Tree)** | Bounding boxes containing spatial data points. | Finding nearby points (e.g., Uber matching). | Complex to update as bounding boxes overlap. | [PostGIS](../24-components-library/01-Databases/Geospatial/L067-PostGIS/README.md) |
+| **Geospatial (R-Tree / Grids)** | Bounding boxes (R-Tree) or 1D-mapped space curves (Geohash, Google S2 Cells). | Finding nearby points (e.g., Uber matching). | Complex coordinates projection and overlaps. | [PostGIS](../24-components-library/01-Databases/Geospatial/L067-PostGIS/README.md) |
 
 ---
 
@@ -51,6 +51,30 @@ If you create an index on `(last_name, first_name)`:
 
 ### 4. Bloom Filters (LSM-Tree Secret Weapon)
 Because LSM-Trees (Cassandra, [RocksDB](../24-components-library/01-Databases/Embedded/L068-RocksDB/README.md)) must check multiple disk files (SSTables) for a read, they use Bloom Filters in memory. A Bloom filter can answer "Is this key in this file?" with "Definitely No" or "Probably Yes." This prevents unnecessary disk reads.
+
+### 5. Partial / Filtered Indexes
+Instead of indexing the entire table, a partial index contains entries only for rows that satisfy a specific conditional predicate (e.g., `CREATE INDEX ON jobs (created_at) WHERE status = 'PENDING'`). This dramatically reduces index size, update overhead, and write amplification for inactive/completed data (ideal for job queues).
+
+### 6. Expression / Functional Indexes
+Built on the output of an expression or function rather than direct column values (e.g., `CREATE INDEX ON users (LOWER(email))`). Without this, running `WHERE LOWER(email) = 'abc'` forces a full table scan because standard column indexes are case-sensitive and match the raw values.
+
+### 7. Selectivity & Cardinality Math
+Selectivity is a primary metric query plan optimizers use to decide if they should scan an index or do a full table scan:
+$$\text{Selectivity} = \frac{\text{Number of Unique Values}}{\text{Total Number of Rows}}$$
+*   **High Selectivity (Close to 1):** Unique identifiers, emails. Perfect for indexing.
+*   **Low Selectivity (Close to 0):** Enums (e.g., gender, status). Indexing these is an anti-pattern. Random disk seeks to fetch scattered pages for 50% of the table is slower than a sequential heap scan.
+
+### 8. B-Tree vs. B+Tree Structural Differences
+Relational engines (Postgres, MySQL/InnoDB) default to B+Trees rather than standard B-Trees:
+*   **B-Tree:** Stores keys and data/pointers at all levels (internal and leaf nodes).
+*   **B+Tree:** Stores data/pointers *only* at the leaf level. Internal nodes only store routing keys. This allows internal nodes to fit more keys, increasing the branching factor (fan-out) and reducing tree height. Leaves are linked sequentially (doubly-linked list), enabling $O(1)$ range scans instead of slow tree traversals.
+
+### 9. Column Order in Composite Indexes (The Range Trap)
+When constructing composite indexes like `(A, B)`, if the query applies an inequality/range to the first column (`WHERE A > 10 AND B = 5`), the sorting on `B` is broken past the first inequality match. The engine must scan all entries matching `A > 10` to filter `B`.
+*   *Design Rule:* Place exact match (`=`) columns *first* in composite declarations, and range filter (`>`, `<`, `LIKE`) columns *last*.
+
+### 10. LSM-Tree Compaction & Write Amplification
+LSM-trees write sequentially to RAM (MemTable) and flush immutably to disk (SSTables). To keep reads fast and remove deleted keys (tombstones), a background process called **Compaction** continuously merges and sorts SSTables (Size-Tiered or Leveled). This incurs high write amplification (re-writing the same data multiple times to disk), trading background IO/CPU for constant-time sequential write latency.
 
 ---
 

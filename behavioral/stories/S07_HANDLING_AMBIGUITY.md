@@ -23,6 +23,10 @@
     1.  
     2.  
     3.  
+*   **Srikar's Draft**:
+    1.  **Mapped Leak Vectors:** I analyzed our systems and identified logs (ELK Stack) and outbound webhook payloads as the primary risks for accidental PII leaks.
+    2.  **Built Platform-Level Sanitization:** Instead of relying on developers to manually hide data, I implemented an automated sanitization framework. Using model decorators, I tagged sensitive PII fields, and wrote middleware to intercept outgoing logs/webhooks and automatically redact matched patterns.
+    3.  **Centralized Consent Manager:** I designed a state-machine module to track user consent states and coordinate cascading erasures across Postgres and MongoDB databases on user deletion requests.
 
 ### [R] Result (The Metrics)
 *   **Prompt**: What was the resulting system specification? What were the launch metrics?
@@ -47,6 +51,19 @@
 > *Finally, I wrote a 3-page RFC document detailing a simplified verification flow, got alignment from stakeholders, and built a staging prototype.*
 > 
 > *We implemented the new onboarding flow, which increased user completion rates from 55% to 78% in the first month. This taught me that when faced with ambiguity, the best approach is to query the data first to identify the right problems to solve."*
+
+---
+
+> **Srikar's Spoken Draft Script:**
+> *At Saavik Solutions, during the build of our student platform EA Overseas, our legal team requested that the platform align with GDPR and the new DPDP data privacy guidelines. The request was extremely abstract: they just asked us to ensure student PII was secure, logs and webhooks were sanitized, and data deletion requests were supported. There were no technical blueprints or design specs.*
+> 
+> *As the founding backend engineer, I was responsible for turning these ambiguous policies into a working system. I realized that asking developers to manually redact logs would inevitably lead to human error. Instead, I proposed building PII masking as a core platform capability.*
+> 
+> *First, I created custom TypeScript decorators on our user models to tag sensitive attributes like passports, phone numbers, and emails. Second, I wrote middleware for our logging library and outgoing webhook client. The middleware intercepted data payloads, checked the model metadata, and automatically ran regex masking on any tagged fields before writing logs or firing webhooks. Finally, I built a state-machine based consent manager to coordinate user erasure flows across our Postgres and MongoDB databases on deletion requests.*
+> 
+> *We achieved full compliance and passed audits without requiring our product developers to write a single line of custom sanitization code. This taught me that when dealing with vague mandates, a senior engineer's job is to define the technical bounds and design automated, system-level safety nets to prevent human error.*
+
+
 
 ---
 

@@ -23,6 +23,10 @@
     1.  
     2.  
     3.  
+*   **Srikar's Draft**:
+    1.  **Immediate Load Shedding:** I isolated the incoming payment webhooks by enqueueing them rather than processing them synchronously, reducing database transaction load immediately.
+    2.  **Configured Transaction Timeouts:** I replaced standard queries with PostgreSQL `SELECT FOR UPDATE NOWAIT` row-level locks on the slots table. This prevented database transactions from stalling and blocking the pool.
+    3.  **Deployed Saga Orchestration:** I re-engineered the checkout logic to process booking confirmations asynchronously. If slot validation failed after a payment hold, a background Saga worker initiated an automated refund compensation.
 
 ### [R] Result (The Metrics)
 *   **Prompt**: What was the recovery time? What did you build post-incident to prevent it from happening again?
@@ -47,6 +51,19 @@
 > *Finally, I set up a read-replica database specifically for our analytics traffic to isolate read queries from write transactions.*
 > 
 > *The site was fully functional in 18 minutes, and we implemented index validation on all query changes in the pipeline. This taught me that keeping a calm, structured approach is essential during production incident management."*
+
+---
+
+> **Srikar's Spoken Draft Script:**
+> *At Saavik Solutions, during a major tournament launch on Kridaz, our booking engine suffered database lock deadlocks due to heavy concurrent traffic. Our database transactions timed out, which meant the third-party gateway charged our users, but our database failed to confirm the slot booking. Our customer support channels flooded with double-charge complaints.*
+> 
+> *With the platform in crisis, I was responsible for fixing the system immediately. First, I shielded the database by intercepting the payment callbacks and placing them into a message queue, transforming the synchronous write pipeline into an asynchronous worker pool. *
+> 
+> *Second, I went to the database query layer and refactored our slot checks to use PostgreSQL row-level locks with strict timeouts, specifically SELECT FOR UPDATE NOWAIT. This immediately stopped transactions from stacking up and crashing our application pool. Finally, I implemented a Saga flow. If a booking slot hold couldn't be finalized within two minutes, the orchestrator automatically triggered a compensating transaction to initiate a payment refund and release the slot.*
+> 
+> *We stabilized the platform within a few hours and completely resolved the double-booking issues. This experience taught me that under high-pressure outages, you must isolate the write pipeline first, set tight timeouts on all database locks, and always design self-healing compensation logic for distributed steps.*
+
+
 
 ---
 

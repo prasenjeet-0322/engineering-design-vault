@@ -23,6 +23,10 @@
     1.  
     2.  
     3.  
+*   **Srikar's Draft**:
+    1.  **Authored Monolith Standards:** I wrote an architectural specification detailing modular monolith standards, mapping out 31 bounded contexts and defining how domains should communicate.
+    2.  **Introduced Anti-Corruption Layers (ACL):** I designed and built Anti-Corruption Layers to isolate domain models, ensuring that changes in one backend module didn't break downstream services.
+    3.  **Enforced Automated Boundary Rules:** I configured Nx lint rules using project tags to programmatically block developers from importing files across invalid boundaries, catching violations at compile-time.
 
 ### [R] Result (The Metrics)
 *   **Prompt**: Team metrics (e.g., test coverage increased by 30%, deployment time reduced by 50%).
@@ -47,6 +51,19 @@
 > *Finally, I mentored two teammates on how to write integration workflows, distributing the knowledge across the team.*
 > 
 > *The automation was adopted, saving our team 22 hours per week in developer time and reducing production deployment incidents by 40%. This taught me that leadership is defined by ownership and initiative, not titles."*
+
+---
+
+> **Srikar's Spoken Draft Script:**
+> *At Saavik Solutions, as we scaled our codebase inside a 72-project Nx monorepo, we ran into a classic architecture decay. Because we had no automated boundaries, developers started importing code directly between isolated domain boundaries. For example, booking logic would directly query payment tables, resulting in circular dependencies, fragile deployments, and regular regression bugs.*
+> 
+> *Although I did not hold a formal lead title, I knew we needed systematic guardrails. First, I authored our company's 'Modular Monolith Architectural Standards', mapping out 31 bounded contexts and establishing clear API boundaries. I introduced Anti-Corruption Layers so modules could exchange data without leaking their internal models. *
+> 
+> *Second, instead of just sharing a document that people would forget, I configured automated boundaries using Nx project tags and ESLint constraints. If a developer tried to import code across unauthorized boundaries, the linter blocked their commit immediately, giving them instant feedback. Finally, I held walkthrough sessions for our 5 junior developers and interns to align them on the new workflow.*
+> 
+> *As a result of this initiative, we eliminated circular dependencies completely and prevented modular degradation in our monorepo. This taught me that the most effective way to lead is by inventing automated guardrails that guide the team toward clean architecture by default.*
+
+
 
 ---
 

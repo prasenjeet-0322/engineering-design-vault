@@ -1,6 +1,19 @@
-# 🚀 LLD Delivery Framework: The 90-Minute Interview Strategy
+# 🚀 LLD Delivery Framework: The 90-Minute Strategy
 
 This is the exact framework to follow during a Machine Coding or Low-Level Design interview. It ensures you cover all bases without getting bogged down in implementation details before your class contracts are solidified.
+
+---
+
+## 📊 LLD Design Lifecycle
+
+```mermaid
+graph TD
+    A["1. Clarify Requirements & Scope"] -->|Define Invariants| B["2. Identify Core Entities & Nouns"]
+    B -->|Define Contracts First| C["3. Write Interfaces & DTO Records"]
+    C -->|HashMap & Happy Path| D["4. Implement INTERVIEW_MVP"]
+    D -->|ConcurrentHashMap & Locks| E["5. Apply Thread Safety & Concurrency"]
+    E -->|Edge Cases & Design Patterns| F["6. Verify & Walkthrough"]
+```
 
 ---
 
@@ -16,12 +29,60 @@ This is the exact framework to follow during a Machine Coding or Low-Level Desig
 
 ---
 
+## 🎯 The LLD Pattern Selection Matrix
+
+Use this matrix during Phase 2 to map interview requirements directly to core design patterns:
+
+| Requirement / Trigger | Primary Design Pattern | Key Benefit |
+| :--- | :--- | :--- |
+| Swappable behaviors / algorithms at runtime | **Strategy** | Open-Closed Principle (OCP) compliance |
+| System behavior changes based on internal state | **State** | Eliminates cluttered nested `if/else` checks |
+| Dynamic, nested behavior addition without inheritance | **Decorator** | Flexible extension at runtime |
+| Process sequence/pipeline with chainable steps | **Chain of Responsibility** | Decoupled handlers (auth, rate-limiting, logging) |
+| Event broadcast / publisher-subscriber notification | **Observer** | Loose coupling between subject and observers |
+| Step-by-step construction of complex objects | **Builder** | Prevents telescoping constructors |
+
+---
+
 ## 🧠 The LLD "Anti-Freeze" Protocol
 
 If you blank out during an LLD mock, execute these steps immediately:
 1. **The Architecture Freeze (Where to start?):** Stop overthinking the perfect pattern. Define the `Main` or `Orchestrator` class and the `Models`. The dependencies will naturally emerge.
-2. **The Concurrency Freeze (How to make it thread-safe?):** If unsure about complex locks, default to `ConcurrentHashMap` for state management and Atomic variables (`AtomicInteger`) for counters. Say: *"I'll use a ConcurrentHashMap to handle multithreaded writes to the user cache safely."*
+2. **The Concurrency Freeze (How to make it thread-safe?):** If unsure about complex locks, default to `ConcurrentHashMap` for state management and Atomic variables (`AtomicInteger`) for counters. Say: *"I'll use a ConcurrentHashMap to handle multithreaded writes safely."*
 3. **The Extensibility Freeze (Which pattern?):** If you see an `if-else` or `switch` statement based on a type, use the **Strategy Pattern**. If you see an object changing its behavior based on its internal state, use the **State Pattern**.
+
+---
+
+## 🔒 The Thread-Safety Verification Blueprint
+
+To verify concurrency during verification (Phase 5), use this quick concurrent test harness:
+
+```java
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class ConcurrencyTest {
+    public static void main(String[] args) throws InterruptedException {
+        int threadsCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadsCount);
+        CountDownLatch latch = new CountDownLatch(threadsCount);
+        
+        for (int i = 0; i < threadsCount; i++) {
+            executor.submit(() -> {
+                try {
+                    // Test concurrent mutations here (e.g., booking seats, updating balances)
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+        latch.await();
+        executor.shutdown();
+        // Assert/print final thread-safe state
+    }
+}
+```
 
 ---
 
@@ -32,6 +93,22 @@ If you blank out during an LLD mock, execute these steps immediately:
 *   **SRP:** "I'm moving this logic to a separate service to ensure this class only has one reason to change."
 *   **LSP:** "I'm ensuring this subclass fulfills the behavioral contract of the parent to prevent runtime surprises."
 *   **During Concurrency:** "I chose `ReentrantReadWriteLock` over `synchronized` because our application is highly read-heavy, and this avoids blocking concurrent readers."
+
+---
+
+## 🛠️ Modern SDE-3 Java Features
+
+Keep your code clean, concise, and modern during the interview:
+*   **Java Records (Java 17+):** Use them for immutable DTOs/Value Objects (automatically generates constructors, getters, equals, hashCode, and toString):
+    ```java
+    public record User(String id, String email, AccountStatus status) {}
+    ```
+*   **Sealed Classes/Interfaces:** Limit inheritance to a specific set of classes for safer pattern matching and type hierarchies:
+    ```java
+    public sealed interface PaymentResult permits Success, Failed {}
+    public final class Success implements PaymentResult {}
+    public final class Failed implements PaymentResult {}
+    ```
 
 ---
 
