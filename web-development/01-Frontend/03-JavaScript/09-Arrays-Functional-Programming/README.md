@@ -17,12 +17,14 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | Foundations, Pure Functions & Referential Transparency | [01-functional-foundations-pure-functions-side-effects.md](./01-functional-foundations-pure-functions-side-effects.md) | Pure function rules ($f(x) = y$), side-effect anatomy, referential transparency, `const` mutation fallacy, and Functional Core/Imperative Shell | 🟢 Complete |
+| **Part 2** | Immutability, Structural Sharing & State Updates | [02-immutability-structural-sharing-state-updates.md](./02-immutability-structural-sharing-state-updates.md) | In-place mutation vs value projection, nested shallow spread trap, structural sharing, ES2023 immutable array methods, and React reducers | 🟢 Complete |
 
 ---
 
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-functional-foundations-pure-functions-side-effects.js`](./examples/01-functional-foundations-pure-functions-side-effects.js): Demonstrates the in-place `.sort()` mutation trap vs pure `.toSorted()` projections, object argument mutation avoidance, dependency injection for deterministic clocks, referential transparency substitution, and functional core checkout engines.
+- [`examples/02-immutability-structural-sharing-state-updates.js`](./examples/02-immutability-structural-sharing-state-updates.js): Demonstrates the nested shallow spread mutation trap, structural sharing integrity on unchanged branches, ES2023 non-mutating array methods, `structuredClone` deep isolation, and workspace state reducers.
 
 ---
 
