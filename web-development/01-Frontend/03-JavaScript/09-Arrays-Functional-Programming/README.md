@@ -22,6 +22,7 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 | **Part 4** | Declarative Data Transformation (`map`, `filter`, `reduce`) | [04-declarative-data-transformation-map-filter-reduce.md](./04-declarative-data-transformation-map-filter-reduce.md) | Semantic method matrix, $O(N^2)$ spread in `reduce` trap vs $O(N)$ local mutation, vacuous truth in `every()`, `flatMap()`, and pipelines | 🟢 Complete |
 | **Part 5** | Function Composition, `compose()` & `pipe()` | [05-function-composition-pipelines.md](./05-function-composition-pipelines.md) | Unary arity rules, `pipe` vs `compose`, `tap` spying combinator, `pipeAsync` async flow, and API $\to$ ViewModel normalization pipelines | 🟢 Complete |
 | **Part 6** | Currying, Partial Application & Function Specialization | [06-currying-partial-application.md](./06-currying-partial-application.md) | Staged argument configuration, Data-Last conventions, generic `curry()` arity tracking, and enterprise RBAC permission engines | 🟢 Complete |
+| **Part 7** | Advanced Functional Concepts (Lazy, Memoize, Recursion & Monads) | [07-advanced-functional-concepts-memoization-error-handling.md](./07-advanced-functional-concepts-memoization-error-handling.md) | Lazy thunks, bounded LRU memoization caches, recursive tree processing, `Result<T, E>` monadic error flows, and Functional Core/Imperative Shell | 🟢 Complete |
 
 ---
 
@@ -33,6 +34,7 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 - [`examples/04-declarative-data-transformation-map-filter-reduce.js`](./examples/04-declarative-data-transformation-map-filter-reduce.js): Demonstrates $O(N^2)$ accumulator spread benchmark vs $O(N)$ local mutation, vacuous truth in `[].every()`, pipeline stage ordering optimization, `flatMap()` normalization, and financial transaction aggregators.
 - [`examples/05-function-composition-pipelines.js`](./examples/05-function-composition-pipelines.js): Demonstrates multi-argument function arity failures inside `pipe()` without unary currying, `compose()` vs `pipe()` execution order, `tap()` debugging interceptors, `pipeAsync()` async execution, and product search pipelines.
 - [`examples/06-currying-partial-application.js`](./examples/06-currying-partial-application.js): Demonstrates Data-First vs Data-Last pipeline composition, progressive multi-stage currying evaluation, generic `curry()` utility arity reflection, `fn.length` parameter quirks, and enterprise RBAC permission authorization engines.
+- [`examples/07-advanced-functional-concepts-memoization-error-handling.js`](./examples/07-advanced-functional-concepts-memoization-error-handling.js): Demonstrates bounded LRU cache memoization vs unbounded leaks, lazy thunk evaluation, recursive tree calculations, monadic `Result` short-circuit chaining, and trampolined tail recursion.
 
 ---
 
