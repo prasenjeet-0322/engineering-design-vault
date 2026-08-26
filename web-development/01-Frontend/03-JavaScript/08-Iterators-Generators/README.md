@@ -18,6 +18,7 @@ This module provides an exhaustive breakdown of the iteration machinery: `Symbol
 |---|---|---|---|---|
 | **Part 1** | Iteration Protocols, `Symbol.iterator` & `for...of` Internals | [01-iteration-protocols-symbol-iterator.md](./01-iteration-protocols-symbol-iterator.md) | Iterable vs Iterator protocols, `IteratorResult` (`{ value, done }`), Unicode string traversal, restartable iterables, and `take(n)` bounded streams | 🟢 Complete |
 | **Part 2** | Iterator Lifecycle, `IteratorClose`, `break`, `return()` & Cleanup | [02-iterator-lifecycle-return-cleanup.md](./02-iterator-lifecycle-return-cleanup.md) | Normal vs abrupt completions, `IteratorClose` algorithm, `.return()` teardown hook, destructuring truncation, and safe resource management | 🟢 Complete |
+| **Part 3** | Generator Functions, `yield`, Suspension & Two-Way Coroutines | [03-generator-functions-yield-coroutines.md](./03-generator-functions-yield-coroutines.md) | `function*` execution state machine, `yield` outbound/inbound mechanics, `.next(val)` input injection, `return` completion omissions, and wizard sagas | 🟢 Complete |
 
 ---
 
@@ -25,6 +26,7 @@ This module provides an exhaustive breakdown of the iteration machinery: `Symbol
 
 - [`examples/01-iteration-protocols-symbol-iterator.js`](./examples/01-iteration-protocols-symbol-iterator.js): Demonstrates stateful iterator exhaustion, restartable collection allocation, `undefined` yielding, Unicode emoji surrogate pair iteration, Map destructuring, and lazy paginated virtual feed engines.
 - [`examples/02-iterator-lifecycle-return-cleanup.js`](./examples/02-iterator-lifecycle-return-cleanup.js): Demonstrates `break` and `return` triggering `iterator.return()` cleanup, destructuring truncation teardowns, post-closure `.next()` latching, and managed telemetry stream iterators.
+- [`examples/03-generator-functions-yield-coroutines.js`](./examples/03-generator-functions-yield-coroutines.js): Demonstrates first `.next(arg)` value ignoring rules, interleaved suspension/resumption logging, two-way arithmetic coroutine pipelines, spread discarding return values, and interactive onboarding wizard sagas.
 
 ---
 
