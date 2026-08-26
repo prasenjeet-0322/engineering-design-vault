@@ -21,6 +21,7 @@ This module provides an exhaustive breakdown of the iteration machinery: `Symbol
 | **Part 3** | Generator Functions, `yield`, Suspension & Two-Way Coroutines | [03-generator-functions-yield-coroutines.md](./03-generator-functions-yield-coroutines.md) | `function*` execution state machine, `yield` outbound/inbound mechanics, `.next(val)` input injection, `return` completion omissions, and wizard sagas | 🟢 Complete |
 | **Part 4** | `yield*`, Generator Delegation, `return()`, `throw()` & `finally` | [04-yield-star-delegation-error-handling.md](./04-yield-star-delegation-error-handling.md) | Recursive tree traversals via `yield*`, capturing inner completion values, external termination via `.return()`, error injection via `.throw()`, and `finally` guarantees | 🟢 Complete |
 | **Part 5** | Async Iterators, Async Generators & `for await...of` Streaming | [05-async-iterators-async-generators-streaming.md](./05-async-iterators-async-generators-streaming.md) | `Symbol.asyncIterator`, `async function*`, `for await...of` loops, Web Streams API, AI token streaming, backpressure, and async `try...finally` teardowns | 🟢 Complete |
+| **Part 6** | Production Patterns, Lazy Pipelines, Architecture & Performance | [06-production-patterns-performance-architecture.md](./06-production-patterns-performance-architecture.md) | Lazy pipeline composition, avoiding accidental stream materialization, high-throughput AI token batching, controlled concurrency pools, and senior decision matrices | 🟢 Complete |
 
 ---
 
@@ -31,6 +32,7 @@ This module provides an exhaustive breakdown of the iteration machinery: `Symbol
 - [`examples/03-generator-functions-yield-coroutines.js`](./examples/03-generator-functions-yield-coroutines.js): Demonstrates first `.next(arg)` value ignoring rules, interleaved suspension/resumption logging, two-way arithmetic coroutine pipelines, spread discarding return values, and interactive onboarding wizard sagas.
 - [`examples/04-yield-star-delegation-error-handling.js`](./examples/04-yield-star-delegation-error-handling.js): Demonstrates capturing `yield*` return values, recursive tree traversal, `gen.return()` forcing `finally` cleanup, `gen.throw()` error injection and recovery, and hierarchical file system tree walkers.
 - [`examples/05-async-iterators-async-generators-streaming.js`](./examples/05-async-iterators-async-generators-streaming.js): Demonstrates sequential async iteration latency, synchronous iterable promotion in `for await`, async `finally` teardown on loop break, and AI token streaming pipelines.
+- [`examples/06-production-patterns-performance-architecture.js`](./examples/06-production-patterns-performance-architecture.js): Demonstrates lazy pipeline upstream halting, controlled concurrency pool execution, and high-throughput telemetry batching pipelines.
 
 ---
 
