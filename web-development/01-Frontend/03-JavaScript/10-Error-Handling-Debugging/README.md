@@ -8,7 +8,7 @@
 
 Error handling and debugging are core engineering disciplines that separate brittle software from resilient, enterprise-grade applications.
 
-This master curriculum provides an exhaustive deep dive into JavaScript Failure Taxonomies (Programmer vs. Runtime vs. System), Exception Lifecycle Mechanics (`throw`, `try`, `catch`, `finally`), Built-in vs. Custom Domain Error Hierarchies (`Error.cause`), Call Stack Unwinding, Unhandled Rejection Traps, Browser DevTools Mastery (Conditional Breakpoints, Logpoints, Source Maps), Asynchronous Event Loop Debugging, and Production Telemetry Monitoring.
+This master curriculum provides an exhaustive deep dive into JavaScript Failure Taxonomies (Programmer vs. Runtime vs. System), Exception Lifecycle Mechanics (`throw`, `try`, `catch`, `finally`), Built-in vs. Custom Domain Error Hierarchies (`Error.cause`), Call Stack Unwinding, Unhandled Rejection Traps, Browser DevTools Mastery (Conditional Breakpoints, Logpoints, Source Maps), Asynchronous Event Loop Debugging, Production Telemetry Monitoring, and Automated Error Path Testing.
 
 ---
 
@@ -20,7 +20,8 @@ This master curriculum provides an exhaustive deep dive into JavaScript Failure 
 | **Part 2** | Custom Errors, Error Taxonomy, `cause` & Rethrowing | [02-error-objects-custom-errors-cause.md](./02-error-objects-custom-errors-cause.md) | Subclassing `AppError`, prototype chain restoration (`Object.setPrototypeOf`), `Error.cause` chaining, and telemetry serialization (`toJSON`) | 🟢 Complete |
 | **Part 3** | Asynchronous Error Handling & Network Resilience | [03-async-error-handling-network-resilience.md](./03-async-error-handling-network-resilience.md) | `fetch()` resolution semantics, `response.ok`, search race conditions, `AbortController`, and exponential backoff with jitter | 🟢 Complete |
 | **Part 4** | Browser DevTools & Systematic Debugging | [04-devtools-breakpoints-logpoints-sourcemaps.md](./04-devtools-breakpoints-logpoints-sourcemaps.md) | Conditional breakpoints, logpoints, call stack frame inspection, DOM mutation breakpoints, and source maps | 🟢 Complete |
-| **Part 5** | Production Error Monitoring & Telemetry Architecture | [05-production-monitoring-telemetry-sentry.md](./05-production-monitoring-telemetry-sentry.md) | Sentry / Datadog telemetry, global unhandled traps, circuit breakers, and fault-tolerant UI degradation | 🟡 Upcoming |
+| **Part 5** | Production Error Architecture & Telemetry | [05-production-monitoring-telemetry-sentry.md](./05-production-monitoring-telemetry-sentry.md) | Sentry / Datadog telemetry, non-recursive dispatchers, PII sanitization, error fingerprinting, and circuit breakers | 🟢 Complete |
+| **Part 6** | Testing Error Paths & Master KPI Architecture | [06-testing-error-paths-complete-architecture.md](./06-testing-error-paths-complete-architecture.md) | Unit testing thrown exceptions, rejected promise assertions, chaos engineering, and complete KPI architecture | 🟡 Upcoming |
 
 ---
 
@@ -30,6 +31,7 @@ This master curriculum provides an exhaustive deep dive into JavaScript Failure 
 - [`examples/02-error-objects-custom-errors-cause.js`](./examples/02-error-objects-custom-errors-cause.js): Demonstrates enterprise base `AppError` subclassing, prototype chain restoration, V8 stack trimming (`Error.captureStackTrace`), `Error.cause` causal chaining, non-enumerable JSON serialization (`toJSON`), and polymorphic error routing.
 - [`examples/03-async-error-handling-network-resilience.js`](./examples/03-async-error-handling-network-resilience.js): Demonstrates `fetch()` HTTP 500 resolution vs network error rejection, search query race condition cancellation with `AbortController`, `Promise.all` vs `Promise.allSettled`, and resilient exponential backoff with jitter.
 - [`examples/04-devtools-breakpoints-logpoints-sourcemaps.js`](./examples/04-devtools-breakpoints-logpoints-sourcemaps.js): Demonstrates advanced console diagnostics (`console.table`, `console.group`, `console.trace`, `console.time`), call stack origin tracing, invariant assertion engines, and state telemetry engines.
+- [`examples/05-production-monitoring-telemetry-sentry.js`](./examples/05-production-monitoring-telemetry-sentry.js): Demonstrates non-recursive telemetry dispatching, PII metadata sanitization, client-side error fingerprinting and deduplication, and Circuit Breaker state machines (`CLOSED` $\to$ `OPEN` $\to$ `HALF_OPEN`).
 
 ---
 
