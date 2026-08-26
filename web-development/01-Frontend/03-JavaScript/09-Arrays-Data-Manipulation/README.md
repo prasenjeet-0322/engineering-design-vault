@@ -24,8 +24,8 @@ This 10-part master curriculum provides an exhaustive, senior-level deep dive in
 | **Part 6** | `sort()` — In-Place Mutation, Comparators & `toSorted()` | [06-sort-comparators-stable-ordering.md](./06-sort-comparators-stable-ordering.md) | ASCII string coercion trap, TimSort stability, ES2023 `toSorted()`, `Intl.Collator`, and multi-column table sorting | 🟢 Complete |
 | **Part 7** | `flat()` & `flatMap()` — Nested Structural Transformations | [07-flat-flatmap-nested-structures.md](./07-flat-flatmap-nested-structures.md) | 1-to-many projections, infinite query flattening, parent context preservation, and command palette search indexing | 🟢 Complete |
 | **Part 8** | Method Chaining & Functional Data Pipelines | [08-method-chaining-data-pipelines.md](./08-method-chaining-data-pipelines.md) | Canonical pipeline ordering, filter-early rule, top-N sorting vs slicing, ViewModel projection, and selector architecture | 🟢 Complete |
-| **Part 9** | Complex Immutable Updates & State Transformations | [09-complex-immutable-updates-state-architecture.md](./09-complex-immutable-updates-state-architecture.md) | Deep nested updates, structural sharing, Redux/Zustand slice updates, and Immer comparison | 🟡 In Progress |
-| **Part 10** | Senior-Level Array Decisions, Performance & Master KPI Architecture | [10-senior-array-decisions-performance-profiling.md](./10-senior-array-decisions-performance-profiling.md) | Large dataset benchmarks ($>10^5$ items), TypedArrays (`Uint8Array`), and complete KPI architecture | 🟡 Upcoming |
+| **Part 9** | Complex Immutable Updates & State Transformations | [09-complex-immutable-updates-state-architecture.md](./09-complex-immutable-updates-state-architecture.md) | Structural sharing, shallow spread pitfalls, multi-tier nested `.map()`, normalized stores (`byId`/`allIds`), and optimistic rollbacks | 🟢 Complete |
+| **Part 10** | Senior-Level Array Decisions, Performance & Master KPI Architecture | [10-senior-array-decisions-performance-profiling.md](./10-senior-array-decisions-performance-profiling.md) | Large dataset benchmarks ($>10^5$ items), TypedArrays (`Uint8Array`), and complete KPI architecture | 🟡 In Progress |
 
 ---
 
@@ -39,6 +39,7 @@ This 10-part master curriculum provides an exhaustive, senior-level deep dive in
 - [`examples/06-sort-comparators-stable-ordering.js`](./examples/06-sort-comparators-stable-ordering.js): Demonstrates `sort()` in-place mutation vs immutable `toSorted()`, lexicographical number sort fix, TimSort stability, multi-field composite sorting, `Intl.Collator` natural alphanumeric comparison, and dynamic data table sorting engines.
 - [`examples/07-flat-flatmap-nested-structures.js`](./examples/07-flat-flatmap-nested-structures.js): Demonstrates `flat()` on object property myth vs `flatMap()`, parent context preservation during 1-to-many unrolling, depth levels (`1`, `2`, `Infinity`), 0/1/M element expansion, recursive category tree walker, and command palette search indexing.
 - [`examples/08-method-chaining-data-pipelines.js`](./examples/08-method-chaining-data-pipelines.js): Demonstrates global sort $\to$ slice vs local slice $\to$ sort ordering invariant, property stripping pre-filter bug fix, type and shape flow tracking, invariant normalization extraction, and paginated e-commerce catalog pipelines.
+- [`examples/09-complex-immutable-updates-state-architecture.js`](./examples/09-complex-immutable-updates-state-architecture.js): Demonstrates shallow spread mutation trap vs structural sharing, reference preservation in single-item updates, multi-tier nested updates, normalized store cascade deletions, optimistic rollbacks, and atomic Kanban transitions.
 
 ---
 
