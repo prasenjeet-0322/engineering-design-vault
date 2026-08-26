@@ -24,6 +24,7 @@ The Execution Context and Call Stack constitute the core synchronous execution e
 | **Part 8** | Scope, Hoisting, TDZ & Binding Initialization Internals | [08-scope-hoisting-tdz-initialization-internals.md](./08-scope-hoisting-tdz-initialization-internals.md) | Binding Creation vs Initialization, `var` early initialization vs `let`/`const` TDZ, TDZ shadowing traps, Class TDZ, loop per-iteration environments, circular imports | 🟢 Complete |
 | **Part 9** | The Event Loop, Web APIs, Tasks, Microtasks & Async | [09-event-loop-microtasks-macro-tasks.md](./09-event-loop-microtasks-macro-tasks.md) | Call Stack vs Event Loop, Task vs Microtask queues, `async/await` continuations, `AbortController` cancellation, async race condition guards, INP metrics | 🟢 Complete |
 | **Part 10** | Closures, Memory Retention & Lexical Lifetime | [10-closures-memory-retention-lexical-lifetime.md](./10-closures-memory-retention-lexical-lifetime.md) | Closures as live binding retainers, V8 Heap Context lifting, React stale closure anatomy, `useRef` mutable pointers, GC reachability & `WeakMap` | 🟢 Complete |
+| **Part 11** | Recursion, Recursive Call Frames & Stack Overflow | [11-recursion-call-frames-stack-overflow.md](./11-recursion-call-frames-stack-overflow.md) | Recursive Execution Contexts, Base Case invariants, Call Stack frame suspension/unwinding, Trampolining, Explicit Heap Stacks, React Fiber linked list | 🟢 Complete |
 
 ---
 
@@ -39,6 +40,7 @@ The Execution Context and Call Stack constitute the core synchronous execution e
 - [`examples/08-scope-hoisting-tdz-initialization-internals.js`](./examples/08-scope-hoisting-tdz-initialization-internals.js): Demonstrates `var` initialization to undefined vs `let` TDZ ReferenceError, TDZ shadowing traps, loop closures (`var` vs `let`), default parameter TDZ order, class TDZ, and module dependency pipelines.
 - [`examples/09-event-loop-microtasks-macro-tasks.js`](./examples/09-event-loop-microtasks-macro-tasks.js): Demonstrates Promise microtask priority over `setTimeout(0)`, mixed task vs microtask interleaving, async/await synchronous start vs resumption, and race-free async pipelines with `AbortController`.
 - [`examples/10-closures-memory-retention-lexical-lifetime.js`](./examples/10-closures-memory-retention-lexical-lifetime.js): Demonstrates independent factory closure environments, async closures reading mutated bindings, React render snapshot simulations, WeakMap GC lifecycle integration, and leak-proof subscription managers.
+- [`examples/11-recursion-call-frames-stack-overflow.js`](./examples/11-recursion-call-frames-stack-overflow.js): Demonstrates Call Stack unwinding order, separate local activation states per invocation, indirect mutual recursion cycles, trampolined deep recursion, and safe heap-backed tree flatteners.
 
 ---
 
