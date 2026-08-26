@@ -18,7 +18,7 @@ This master curriculum provides an exhaustive deep dive into JavaScript Failure 
 |---|---|---|---|---|
 | **Part 1** | Error Mental Model, Failure Taxonomy & `try`/`catch`/`finally` | [01-error-mental-model-taxonomy-try-catch-finally.md](./01-error-mental-model-taxonomy-try-catch-finally.md) | Failure taxonomy, async `try/catch` disconnect traps, `finally` control flow hijacking, and layered error translation | 🟢 Complete |
 | **Part 2** | Custom Errors, Error Taxonomy, `cause` & Rethrowing | [02-error-objects-custom-errors-cause.md](./02-error-objects-custom-errors-cause.md) | Subclassing `AppError`, prototype chain restoration (`Object.setPrototypeOf`), `Error.cause` chaining, and telemetry serialization (`toJSON`) | 🟢 Complete |
-| **Part 3** | Stack Traces, Propagation & Global Error Traps | [03-stack-traces-propagation-global-traps.md](./03-stack-traces-propagation-global-traps.md) | Call stack unwinding, `window.onerror`, `unhandledrejection`, and centralized telemetry pipelines | 🟡 Upcoming |
+| **Part 3** | Asynchronous Error Handling & Network Resilience | [03-async-error-handling-network-resilience.md](./03-async-error-handling-network-resilience.md) | `fetch()` resolution semantics, `response.ok`, search race conditions, `AbortController`, and exponential backoff with jitter | 🟢 Complete |
 | **Part 4** | Browser DevTools Mastering & Breakpoints | [04-devtools-breakpoints-logpoints-sourcemaps.md](./04-devtools-breakpoints-logpoints-sourcemaps.md) | Conditional breakpoints, logpoints, DOM mutation breakpoints, watch expressions, and source maps | 🟡 Upcoming |
 | **Part 5** | Debugging Asynchronous Code & Event Loop Failures | [05-debugging-async-event-loop-failures.md](./05-debugging-async-event-loop-failures.md) | Microtask queue rejections, async stack traces, un-awaited promises, and race condition debugging | 🟡 Upcoming |
 | **Part 6** | Production Error Monitoring & Telemetry Architecture | [06-production-monitoring-telemetry-sentry.md](./06-production-monitoring-telemetry-sentry.md) | Sentry / Datadog integration, error sanitization, circuit breakers, and fault-tolerant UI degradation | 🟡 Upcoming |
@@ -29,6 +29,7 @@ This master curriculum provides an exhaustive deep dive into JavaScript Failure 
 
 - [`examples/01-error-mental-model-taxonomy-try-catch-finally.js`](./examples/01-error-mental-model-taxonomy-try-catch-finally.js): Demonstrates async callback `try/catch` disconnect vs async/await fixes, `finally` return hijack hazard, `finally` execution guarantees, conditional catch re-throwing, and resilient HTTP client architectures.
 - [`examples/02-error-objects-custom-errors-cause.js`](./examples/02-error-objects-custom-errors-cause.js): Demonstrates enterprise base `AppError` subclassing, prototype chain restoration, V8 stack trimming (`Error.captureStackTrace`), `Error.cause` causal chaining, non-enumerable JSON serialization (`toJSON`), and polymorphic error routing.
+- [`examples/03-async-error-handling-network-resilience.js`](./examples/03-async-error-handling-network-resilience.js): Demonstrates `fetch()` HTTP 500 resolution vs network error rejection, search query race condition cancellation with `AbortController`, `Promise.all` vs `Promise.allSettled`, and resilient exponential backoff with jitter.
 
 ---
 
