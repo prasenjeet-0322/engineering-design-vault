@@ -21,6 +21,7 @@ This module provides an exhaustive, senior-level breakdown across all invocation
 | **Part 3** | Object Methods, Receiver Evaluation & Context Loss | [03-object-methods-receiver-context-loss.md](./03-object-methods-receiver-context-loss.md) | Method invocation vs property access, Reference Records, destructuring extraction traps, nested receivers, and comma operator stripping | 🟢 Complete |
 | **Part 4** | Arrow Functions, Lexical `this` & Closure Boundaries | [04-arrow-functions-lexical-this.md](./04-arrow-functions-lexical-this.md) | Lexical `this` resolution, immunity to `.call()`/`.bind()`, object literal arrow traps, lack of `[[Construct]]`, and class field arrow tradeoffs | 🟢 Complete |
 | **Part 5** | Constructor Functions, Classes & `new` Binding | [05-constructors-classes-new-binding.md](./05-constructors-classes-new-binding.md) | 5-step `new` construction protocol, prototype method sharing vs arrow fields, `new.target`, derived class `super()` TDZ, and V8 Maps | 🟢 Complete |
+| **Part 6** | `call()`, `apply()`, `bind()`, Explicit Binding & Function Identity | [06-explicit-binding-call-apply-bind.md](./06-explicit-binding-call-apply-bind.md) | Immediate vs delayed execution, Exotic Bound Functions, function identity traps, `removeEventListener` leaks, `useCallback`, and chained `.bind()` | 🟢 Complete |
 
 ---
 
@@ -31,6 +32,7 @@ This module provides an exhaustive, senior-level breakdown across all invocation
 - [`examples/03-object-methods-receiver-context-loss.js`](./examples/03-object-methods-receiver-context-loss.js): Demonstrates destructuring method context loss, nested property receiver resolution, method reassignment between objects, comma operator Reference Record stripping, and auto-bound notification stream clients.
 - [`examples/04-arrow-functions-lexical-this.js`](./examples/04-arrow-functions-lexical-this.js): Demonstrates `.call()`/`.bind()` immunity in arrow functions, lexical `this` preservation inside methods, object literal arrow traps, nested arrow pipelines, and metrics auto-poller engines.
 - [`examples/05-constructors-classes-new-binding.js`](./examples/05-constructors-classes-new-binding.js): Demonstrates constructor return overrides, prototype method sharing vs per-instance arrow fields, `new.target` guards, derived class `this` TDZ before `super()`, and multi-tenant cache managers.
+- [`examples/06-explicit-binding-call-apply-bind.js`](./examples/06-explicit-binding-call-apply-bind.js): Demonstrates `call()` vs `bind()` timing, function identity disconnects, immutable chained `.bind()`, `new` overriding bound `this`, partial application currying, and leak-proof event subscription managers.
 
 ---
 
