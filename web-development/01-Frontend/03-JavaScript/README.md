@@ -23,9 +23,9 @@ To ensure **zero compromise on technical depth and quality**, every KPI in this 
 | **04** | `04-Execution-Context-Call-Stack` | [README.md](./04-Execution-Context-Call-Stack/README.md) | Creation vs Execution phase, Stack frames, Recursion limit | 🟡 Ready for Content |
 | **05** | `05-This-Keyword-Binding` | [README.md](./05-This-Keyword-Binding/README.md) | Implicit/Explicit binding, `call()`, `apply()`, `bind()`, Arrow `this` | 🟡 Ready for Content |
 | **06** | `06-Objects-Internals` | [README.md](./06-Objects-Internals/README.md) | Property Descriptors, Hidden Classes, Shallow vs Deep Copy | 🟡 Ready for Content |
-| **07** | `07-Prototypes-Chain` | [README.md](./07-Prototypes-Chain/README.md) | `__proto__`, `prototype`, Prototype Delegation, `Object.create` | 🟡 Ready for Content |
-| **08** | `08-Closures-Lexical-Environments` | [README.md](./08-Closures-Lexical-Environments/README.md) | Heap Environment Records, Data Privacy, Memory Retainers | 🟡 Ready for Content |
-| **09** | `09-Arrays-Functional-Programming` | [README.md](./09-Arrays-Functional-Programming/README.md) | Immutability, `reduce`, `flatMap`, Transducers, Mutation traps | 🟡 Ready for Content |
+| **08** | `08-Iterators-Generators` | [README.md](./08-Iterators-Generators/README.md) | Protocols, Generators, `yield*`, Async Streams, Coroutines | 🟢 Complete |
+| **08-FP** | `09-Arrays-Functional-Programming` | [README.md](./09-Arrays-Functional-Programming/README.md) | Pure Functions, Immutability, HOFs, Currying, Monads, Architecture | 🟢 Complete |
+| **09** | `09-Arrays-Data-Manipulation` | [README.md](./09-Arrays-Data-Manipulation/README.md) | `map`, `filter`, `reduce`, `sort`, `flatMap`, Method Chaining, Immutability | 🟡 In Progress |
 | **10** | `10-Error-Handling-Debugging` | [README.md](./10-Error-Handling-Debugging/README.md) | Error boundaries, Stack traces, Breakpoints, Async errors | 🟡 Ready for Content |
 | **11** | `11-Async-Foundations` | [README.md](./11-Async-Foundations/README.md) | Non-blocking I/O, Web APIs, Timers, Callback queue | 🟡 Ready for Content |
 | **12** | `12-Promises-Concurrency` | [README.md](./12-Promises-Concurrency/README.md) | Promise lifecycle, Microtasks, `all`, `allSettled`, `race`, `any` | 🟡 Ready for Content |
