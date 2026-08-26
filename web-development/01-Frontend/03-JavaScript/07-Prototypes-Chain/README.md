@@ -17,12 +17,14 @@ This module covers the prototype chain delegation pipeline, `[[Prototype]]` vs `
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | Prototype Fundamentals, `[[Prototype]]`, Delegation & Lookup | [01-prototype-fundamentals-delegation-lookup.md](./01-prototype-fundamentals-delegation-lookup.md) | Internal `[[Prototype]]` slot, `Object.hasOwn` vs inherited properties, property shadowing, `Object.create(null)`, and prototype lookup algorithms | 🟢 Complete |
+| **Part 2** | Function `.prototype`, Constructor Functions, `new` & Instance Linking | [02-function-prototype-constructors-new.md](./02-function-prototype-constructors-new.md) | Function `.prototype` vs `[[Prototype]]`, 5-step `new` construction algorithm, `instanceof` prototype chain traversal, and cross-realm array checks | 🟢 Complete |
 
 ---
 
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-prototype-fundamentals-delegation-lookup.js`](./examples/01-prototype-fundamentals-delegation-lookup.js): Demonstrates property lookup delegation, property shadowing, prototype method execution with dynamic `this`, shared mutable prototype traps, null-prototype dictionary safety, and secure plugin registries.
+- [`examples/02-function-prototype-constructors-new.js`](./examples/02-function-prototype-constructors-new.js): Demonstrates shared prototype method equality, `instanceof` invalidation after prototype reassignment, constructor return overrides, cross-realm `Array.isArray()` verification, and session entity managers.
 
 ---
 
