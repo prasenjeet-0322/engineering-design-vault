@@ -1,63 +1,97 @@
 #include <iostream>
+#include <mutex>
 
 using namespace std;
 
-class PaymentGatewayManager
+/**
+ * Modern C++11+ (Meyers' Singleton)
+ * Guaranteed thread-safe by ISO C++11 standard (§6.7 [stmt.dcl]) via "Magic Statics".
+ */
+class ModernPaymentGatewayManager
 {
-
 private:
-    PaymentGatewayManager()
+    ModernPaymentGatewayManager()
     {
-        cout << "Payment Gateway Manager initialized." << endl;
+        cout << "Modern Payment Gateway Manager initialized." << endl;
+    }
+    ~ModernPaymentGatewayManager() = default;
+
+public:
+    // Prevent copying and moving
+    ModernPaymentGatewayManager(const ModernPaymentGatewayManager&) = delete;
+    ModernPaymentGatewayManager& operator=(const ModernPaymentGatewayManager&) = delete;
+    ModernPaymentGatewayManager(ModernPaymentGatewayManager&&) = delete;
+    ModernPaymentGatewayManager& operator=(ModernPaymentGatewayManager&&) = delete;
+
+    static ModernPaymentGatewayManager& getInstance()
+    {
+        static ModernPaymentGatewayManager instance; // Thread-safe lazy init
+        return instance;
     }
 
-    static PaymentGatewayManager *instance;
+    void processPayment(double amount)
+    {
+        cout << "[Modern] Processing payment of $" << amount << " through payment gateway." << endl;
+    }
+};
 
+/**
+ * Traditional C++ (Double-Checked Locking with Mutex)
+ */
+class LegacyPaymentGatewayManager
+{
+private:
+    LegacyPaymentGatewayManager()
+    {
+        cout << "Legacy Payment Gateway Manager initialized." << endl;
+    }
+
+    static LegacyPaymentGatewayManager *instance;
     static mutex mtx;
 
 public:
-    static PaymentGatewayManager *getInstance()
+    static LegacyPaymentGatewayManager *getInstance()
     {
         if (instance == nullptr)
         {
-            mtx.lock();
+            lock_guard<mutex> lock(mtx);
             if (instance == nullptr)
             {
-                instance = new PaymentGatewayManager();
+                instance = new LegacyPaymentGatewayManager();
             }
-            mtx.unlock();
         }
         return instance;
     }
 
     void processPayment(double amount)
     {
-        cout << "Processing payment of $" << amount << " through the payment gateway." << endl;
+        cout << "[Legacy] Processing payment of $" << amount << " through payment gateway." << endl;
     }
 };
 
-PaymentGatewayManager *PaymentGatewayManager::instance = nullptr;
-
-mutex PaymentGatewayManager::mtx;
+LegacyPaymentGatewayManager *LegacyPaymentGatewayManager::instance = nullptr;
+mutex LegacyPaymentGatewayManager::mtx;
 
 int main()
 {
+    // Test Modern Meyers' Singleton
+    ModernPaymentGatewayManager &pg1 = ModernPaymentGatewayManager::getInstance();
+    pg1.processPayment(100.0);
+    ModernPaymentGatewayManager &pg2 = ModernPaymentGatewayManager::getInstance();
 
-    PaymentGatewayManager *paymentGateway = PaymentGatewayManager::getInstance();
-
-    paymentGateway->processPayment(100.0);
-
-    // Attempt to create another instance (should return the existing instance)
-    PaymentGatewayManager *anotherPaymentGateway = PaymentGatewayManager::getInstance();
-
-    // Check if both instances are the same.
-    if (paymentGateway == anotherPaymentGateway)
+    if (&pg1 == &pg2)
     {
-        cout << "Both instances are the same. Singleton pattern is working" << endl;
+        cout << "✅ Modern Meyers' Singleton verified: Both references point to same address (&pg1 == &pg2)." << endl;
     }
-    else
+
+    // Test Legacy DCL Singleton
+    LegacyPaymentGatewayManager *legacy1 = LegacyPaymentGatewayManager::getInstance();
+    LegacyPaymentGatewayManager *legacy2 = LegacyPaymentGatewayManager::getInstance();
+
+    if (legacy1 == legacy2)
     {
-        cout << "Singleton pattern is not working correctly" << endl;
+        cout << "✅ Legacy DCL Singleton verified." << endl;
     }
+
     return 0;
 }

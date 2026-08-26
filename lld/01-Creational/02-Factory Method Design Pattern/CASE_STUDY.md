@@ -1,41 +1,49 @@
-# 📎 Factory Method — In the Wild (Case Studies)
+# 💼 Factory Method Case Studies — In Production Systems
 
-This file shows how the Factory Method pattern appears **inside larger system designs**, often combined with other patterns.
+[🏠 Back to Master Guide](./README.md) &nbsp; | &nbsp; [Previous: 🌍 Cross-Language Patterns](./05-CROSS_LANGUAGE_PATTERNS.md) &nbsp; | &nbsp; [Java Code Benchmarks](./JAVA/README.md)
 
 ---
 
-## Case Study 1: Notification System — Channel Factory
-**Location:** [`07-Combined-Patterns/01-notification-system`](../../07-Combined-Patterns/01-notification-system/README.md)
+## 🎯 Executive Overview
 
-**Role of Factory Method here:**
+This document illustrates how the Factory Method pattern appears inside larger production-grade system architectures, frequently working in tandem with the **Singleton**, **Builder**, and **Strategy** patterns.
+
+---
+
+## 🏢 Case Study 1: Multi-Channel Notification Dispatcher
+**Source Code Reference:** [`07-Combined-Patterns/01-notification-system`](../../07-Combined-Patterns/01-notification-system/README.md)
+
+```mermaid
+graph TD
+    Registry[ChannelRegistry: EnumMap Dispatcher] -->|ChannelType.EMAIL| EmailFactory[EmailChannelFactory]
+    Registry -->|ChannelType.SMS| SmsFactory[SmsChannelFactory]
+    Registry -->|ChannelType.PUSH| PushFactory[PushChannelFactory]
+
+    EmailFactory -->|creates| EmailChannel[EmailChannel Product]
+    SmsFactory -->|creates| SmsChannel[SmsChannel Product]
+    PushFactory -->|creates| PushChannel[PushChannel Product]
 ```
-IChannelFactory (Creator Interface)
-  ├── EmailChannelFactory  → creates EmailChannel
-  ├── SmsChannelFactory    → creates SmsChannel
-  └── PushChannelFactory   → creates PushChannel
 
-ChannelRegistry dispatches via EnumMap<ChannelType, IChannelFactory>
-```
+### The OCP Win:
+Adding a brand new channel (e.g. `WhatsAppChannel`):
+1. Create `WhatsAppChannel.java` (Implements `INotificationChannel`).
+2. Create `WhatsAppChannelFactory.java` (Implements `IChannelFactory`).
+3. Register into `ChannelRegistry` at startup.
+4. **Zero modifications** to existing email, SMS, or push codebase!
 
-**The OCP win:**
+---
+
+## 🏢 Case Study 2: Spring Framework `FactoryBean<T>`
+
+Spring's `org.springframework.beans.factory.FactoryBean<T>` is the quintessential enterprise implementation of the Factory Method pattern:
+
 ```java
-// Adding WhatsApp — touch ZERO existing classes:
-// 1. Create WhatsAppChannel.java   (product)
-// 2. Create WhatsAppChannelFactory.java   (creator)
-// 3. Register in ChannelRegistry static block
+public interface FactoryBean<T> {
+    T getObject() throws Exception; // ⭐ Factory Method
+    Class<?> getObjectType();
+    default boolean isSingleton() { return true; }
+}
 ```
 
-**Patterns it works with:** Singleton (config consumed during channel init), Builder (message constructed before passing to channel).
-
----
-
-## Case Study 2: Spring `FactoryBean<T>`
-*(Conceptual — no code needed)*
-
-Spring's `FactoryBean<T>` is textbook Factory Method. You implement `getObject()` and Spring calls it to create your custom bean. The Spring container is the *client* — your `FactoryBean` is the *concrete creator*.
-
----
-
-## 📚 See Also
-- [Individual Pattern README](../README.md)
-- [Full Combined Patterns Index](../../07-Combined-Patterns/README.md)
+* **How it works:** When a bean definition implements `FactoryBean`, Spring does not inject the factory itself; it executes `getObject()` and injects the resulting product into client components.
+* **Real-World Examples:** `ProxyFactoryBean` (Spring AOP), `LocalSessionFactoryBean` (Hibernate integration), and `Jackson2ObjectMapperFactoryBean`.

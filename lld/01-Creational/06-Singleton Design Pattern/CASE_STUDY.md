@@ -1,13 +1,36 @@
-# 📎 Singleton — In the Wild (Case Studies)
+# 💼 Singleton Case Studies — In Production Systems
 
-This file shows how the Singleton pattern appears **inside larger system designs**, often combined with other patterns.
+[🏠 Back to Master Guide](./README.md) &nbsp; | &nbsp; [Previous: 🌍 Cross-Language Patterns](./05-CROSS_LANGUAGE_PATTERNS.md) &nbsp; | &nbsp; [Java Code Benchmarks](./JAVA/README.md)
 
 ---
 
-## Case Study 1: Notification System Config
-**Location:** [`07-Combined-Patterns/01-notification-system`](../../07-Combined-Patterns/01-notification-system/README.md)
+## 🎯 Executive Overview
 
-**Role of Singleton here:**
+This document illustrates how the Singleton pattern is composed inside larger, production-grade system architectures, frequently working in tandem with the **Object Pool** and **Factory Method** design patterns.
+
+---
+
+## 🏢 Case Study 1: Notification System Configuration Registry
+**Source Code Reference:** [`07-Combined-Patterns/01-notification-system`](../../07-Combined-Patterns/01-notification-system/README.md)
+
+### Architectural Composition:
+```mermaid
+graph TD
+    A[NotificationConfig: Bill Pugh Singleton] -->|Read .env/Disk ONCE on boot| B(Memory Cache)
+    B -->|Supplies Config to| C[EmailChannel]
+    B -->|Supplies Config to| D[SmsChannel]
+    B -->|Supplies Config to| E[PushChannel]
+```
+
+**Role of Singleton:**
+* Holds: `smtpHost`, `smsApiKey`, and `pushServiceUrl`.
+* Consumed by: `EmailChannel`, `SmsChannel`, and `PushChannel`.
+* Guarantees: Configuration parsing (disk I/O and JSON parsing) occurs **strictly once** across all channel types.
+
+> [!TIP]
+> **Key Interview Insight:** Singleton is not merely about having "one instance." It is about ensuring **one expensive initialization is shared across the entire system**. Reading configuration files from disk takes ~100ms; serving it from an in-memory singleton takes **0.0001ms**.
+
+---
 ```
 NotificationConfig (Bill Pugh Singleton)
   └── Holds: smtpHost, smsApiKey, pushServiceUrl

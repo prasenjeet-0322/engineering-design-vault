@@ -1,42 +1,64 @@
 import publisher.OnlineStore;
+import publisher.StockMarket;
 import subscriber.EmailService;
 import subscriber.LogisticsDepartment;
 import subscriber.MobileApp;
+import subscriber.StockObserver;
 
 /**
- * <h1>Observer Pattern Demonstration</h1>
+ * <h1>Observer Pattern Master Demo</h1>
  * 
- * <p>Notice how we dynamically add and remove subscribers at runtime.
- * When the store's state changes, all subscribers are instantly notified 
- * without the store needing to hardcode method calls for Emails or Apps.
+ * Demonstrates 2 Scenarios:
+ * 1. E-Commerce Order Notification System (Classic Pub/Sub).
+ * 2. High-Frequency Stock Ticker (SDE-2 Thread-Safe CopyOnWriteArrayList Pub/Sub).
  */
 public class Main {
     public static void main(String[] args) {
         System.out.println("==================================================");
-        System.out.println("   Observer Pattern: E-Commerce Pub/Sub Demo      ");
+        System.out.println("   Observer Pattern: Comprehensive Java Master Demo");
         System.out.println("==================================================\n");
 
-        // 1. Create the Publisher
+        // --- DEMO 1: E-COMMERCE ORDER NOTIFICATION SYSTEM ---
+        System.out.println("=== 🛒 DEMO 1: E-Commerce Order Notification System ===");
         OnlineStore store = new OnlineStore("ORD-999X");
 
-        // 2. Create Subscribers
         EmailService emailSub = new EmailService("alice@example.com");
         MobileApp pushSub = new MobileApp("Device_iPhone_14");
         LogisticsDepartment warehouseSub = new LogisticsDepartment();
 
-        // 3. Subscribe them to the Publisher
         store.subscribe(emailSub);
         store.subscribe(pushSub);
         store.subscribe(warehouseSub);
 
-        // 4. Trigger State Changes
-        System.out.println("--- Scenario 1: Payment Cleared ---");
+        System.out.println("--- Scenario 1.1: Payment Cleared ---");
         store.setStatus("PAYMENT_SUCCESS");
 
-        System.out.println("\n--- Scenario 2: User unsubscribes from annoying Push notifications ---");
-        store.unsubscribe(pushSub); // User turns off notifications
+        System.out.println("\n--- Scenario 1.2: User unsubscribes from Push Notifications ---");
+        store.unsubscribe(pushSub);
         
-        System.out.println("\n--- Scenario 3: Order Shipped ---");
-        store.setStatus("SHIPPED"); // Email & Warehouse will trigger, Mobile will NOT trigger
+        System.out.println("\n--- Scenario 1.3: Order Shipped ---");
+        store.setStatus("SHIPPED");
+
+        // --- DEMO 2: REAL-TIME STOCK TICKER (SDE-2 CONCURRENCY SAFE) ---
+        System.out.println("\n==================================================");
+        System.out.println("=== 📈 DEMO 2: SDE-2 Pragmatic Stock Market Ticker ===");
+        System.out.println("==================================================");
+
+        StockMarket appleStock = new StockMarket("AAPL", 150.0);
+
+        // Dynamic Lambdas as Observers
+        StockObserver mobileTrader = (ticker, price) -> 
+            System.out.println("   [📱 Mobile Alert] " + ticker + " target price reached: $" + price);
+
+        StockObserver algorithmicTrader = (ticker, price) -> 
+            System.out.println("   [🤖 Algo Trader] Automated BUY order executed for " + ticker + " at $" + price);
+
+        appleStock.register(mobileTrader);
+        appleStock.register(algorithmicTrader);
+
+        appleStock.updatePrice(155.50);
+        appleStock.updatePrice(160.00);
+
+        System.out.println("\n✅ All Observer Pattern Demos Executed Successfully!");
     }
 }

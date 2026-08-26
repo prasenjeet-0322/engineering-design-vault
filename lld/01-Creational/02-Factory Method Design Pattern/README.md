@@ -1,292 +1,202 @@
-# 🏭 Factory Method Design Pattern
+# 🏭 Factory Method Design Pattern — The Architectural Master Guide
 
-## 📖 1. The Core Concept (The "Why")
-The **Factory Method** pattern is a creational design pattern that provides an interface for creating objects in a superclass, but allows subclasses to alter the type of objects that will be created.
-
-### ⚠️ The Problem: Simple Factory goes wrong (Open/Closed Violation)
-A Simple Factory (`LoggerFactory.java` with a big `switch` statement) is a great starting point. But what happens when you have a massive application and need to add 5 new loggers? Every time you add a new logger, you have to open the centralized `LoggerFactory` and add another `case` or `else if` branch. 
-
-This violates the **Open/Closed Principle (OCP)**. The factory class is open for *modification* every time a new product is added. In highly concurrent or large team environments, modifying a centralized factory constantly causes merge conflicts and instability.
-
-### ✅ The Solution: Factory Method
-Instead of one massive factory, we completely decentralize object creation.
-We define a **Creator Interface** (`ILoggerFactory`) with a method `createLogger()`. Then, we create specific **Concrete Creators** (`DebugLoggerFactory`, `ErrorLoggerFactory`) that implement this interface and instantiate only their corresponding product.
-
-Now, to add a `CloudLogger`, you never touch existing code. You simply create `CloudLogger.java` and `CloudLoggerFactory.java`. The system is closed for modification, but open for extension.
+> **Authoritative Guide for Senior Engineers & Technical Interview Prep**  
+> *A comprehensive deep-dive into the virtual constructor pattern, parallel hierarchies, dependency inversion, and dynamic supplier registries.*
 
 ---
 
-### 🌱 Beginner's 5-Second Mental Models
+## 📑 Table of Contents
 
-> **1. The Specialty Restaurant Kitchen:**
-> * **Simple Factory:** One single overwhelmed head chef standing in the middle of the kitchen with a giant 50-item menu trying to make everything (Steak, Sushi, Pizza). If you add Tacos to the menu, the head chef has to learn a new recipe.
-> * **Factory Method:** You have specialized stations! The Sushi Station has a `SushiChef` (Factory) that makes `Sushi` (Product). The Pizza Station has a `PizzaChef` (Factory) that makes `Pizza`. Adding Tacos just means hiring a `TacoChef` without disturbing the other chefs!
-
-> **2. The Bank Loan Approval Metaphor:**
-> * `MortgageLoanFactory` creates `MortgageLoan` (checks property value).
-> * `AutoLoanFactory` creates `AutoLoan` (checks vehicle VIN).
-> * The core `LoanProcessor` just calls `factory.createLoan()`—it doesn't care which type of loan it is!
-
----
-
-### 🌳 Decision Tree: "Which Factory Variant Should I Use?"
-
-```
-                         Do you have a small, fixed number of products (2-3) 
-                         that rarely change (e.g., LogLevel.DEBUG, INFO, ERROR)?
-                                             │
-                   ┌─────────────────────────┴─────────────────────────┐
-                   ▼                                                   ▼
-                【 YES 】                                            【 NO 】
-                   │                                                   │
-  Use a SIMPLE FACTORY                              Will you add new product types dynamically 
- (Single class with static Map or switch)          at runtime or across different teams/plugins?
-                                                                       │
-                                                   ┌───────────────────┴───────────────────┐
-                                                   ▼                                       ▼
-                                           【 YES 】                               【 NO 】
-                                                   │                                       │
-                                       Do you need to create                       Use standard 
-                                       a SINGLE Product type,                      Factory Method 
-                                       or a SUITE of related                       (Interface + Creator
-                                       Products (Mac Button + Mac Checkbox)?       subclasses)
-                                                   │
-                                     ┌─────────────┴─────────────┐
-                                     ▼                           ▼
-                             【 SINGLE PRODUCT 】         【 SUITE OF PRODUCTS 】
-                                     │                           │
-                            Factory Method              Abstract Factory
-```
+1. [Executive Summary & Core Intent](#-executive-summary--core-intent)
+2. [Mental Models for Fast Intuition](#-mental-models-for-fast-intuition)
+3. [Architecture Blueprint & Parallel Hierarchies](#-architecture-blueprint--parallel-hierarchies)
+4. [Architecture Decision Framework](#-architecture-decision-framework)
+5. [Modular Deep-Dive Reading Tracks](#-modular-deep-dive-reading-tracks)
+6. [L4/Senior Interview Articulation Flashcards](#-l4senior-interview-articulation-flashcards)
+7. [Cross-Repository Interlinking](#-cross-repository-interlinking)
 
 ---
 
+## 🧭 Executive Summary & Core Intent
 
-The Factory Method pattern generally consists of two parallel hierarchies:
-1. **The Product Hierarchy**: `ILogger` (Interface) -> `DebugLogger`, `InfoLogger`
-2. **The Creator Hierarchy**: `ILoggerFactory` (Interface) -> `DebugLoggerFactory`, `InfoLoggerFactory`
+The **Factory Method Pattern** (also known as the **Virtual Constructor**) is a creational design pattern that provides an interface for creating objects in a superclass, but allows subclasses to alter the type of objects that will be created.
+
+It solves the primary flaw of Simple Factory (violating the **Open/Closed Principle**) and enforces the **Dependency Inversion Principle (DIP)** by ensuring high-level workflows depend only on abstract product interfaces rather than concrete classes.
 
 ```mermaid
 classDiagram
-    class ILogger {
+    class IProduct {
         <<interface>>
-        +log(String message)
-    }
-    class DebugLogger {
-        ~DebugLogger()
-        +log(String)
-    }
-    class InfoLogger {
-        ~InfoLogger()
-        +log(String)
-    }
-    
-    class ILoggerFactory {
-        <<interface>>
-        +createLogger() ILogger
-    }
-    class DebugLoggerFactory {
-        +createLogger() ILogger
-    }
-    class InfoLoggerFactory {
-        +createLogger() ILogger
+        +execute()
     }
 
-    ILoggerFactory ..> ILogger : Creates
-    DebugLoggerFactory ..> DebugLogger : Instantiates
-    InfoLoggerFactory ..> InfoLogger : Instantiates
-    
-    ILogger <|.. DebugLogger
-    ILogger <|.. InfoLogger
-    ILoggerFactory <|.. DebugLoggerFactory
-    ILoggerFactory <|.. InfoLoggerFactory
+    class ConcreteProductA {
+        +execute()
+    }
+
+    class ConcreteProductB {
+        +execute()
+    }
+
+    class Creator {
+        <<abstract>>
+        +createProduct()* IProduct
+        +someOperation()
+    }
+
+    class ConcreteCreatorA {
+        +createProduct() IProduct
+    }
+
+    class ConcreteCreatorB {
+        +createProduct() IProduct
+    }
+
+    IProduct <|.. ConcreteProductA : implements
+    IProduct <|.. ConcreteProductB : implements
+    Creator <|-- ConcreteCreatorA : extends
+    Creator <|-- ConcreteCreatorB : extends
+    ConcreteCreatorA ..> ConcreteProductA : creates
+    ConcreteCreatorB ..> ConcreteProductB : creates
 ```
 
 ---
 
-## 💻 3. Implementation Deep Dive (Java)
+## 🧠 Mental Models for Fast Intuition
 
-Our implementation is split into two evolutionary stages to demonstrate the "Why":
-
-### Stage 0: The Simple Factory Violation (00-Before-Factory-Method)
-Run it: `java before.Main`
-This package demonstrates the anti-pattern:
-```java
-public static ILogger createLogger(String type) {
-    if (type.equalsIgnoreCase("DEBUG")) return new DebugLogger();
-    else if (type.equalsIgnoreCase("INFO")) return new InfoLogger();
-    // VIOLATION: Adding a new logger forces modifying this method!
-}
+```
+  ┌───────────────────────────────────────────────┬───────────────────────────────────────────────┐
+  │      1. The Specialty Restaurant Kitchen      │         2. The Bank Loan Approval Desk        │
+  ├───────────────────────────────────────────────┼───────────────────────────────────────────────┤
+  │ • Simple Factory: One overwhelmed head chef   │ • `MortgageLoanFactory`: Creates `Mortgage`   │
+  │   with a 50-item menu. Adding Tacos forces    │   (verifies property deed and deed valuation).│
+  │   the head chef to learn a new recipe.        │ • `AutoLoanFactory`: Creates `AutoLoan`       │
+  │ • Factory Method: Specialized stations!       │   (verifies vehicle VIN and registration).    │
+  │   `SushiChef` makes Sushi; `PizzaChef` makes  │ • The core `LoanProcessor` just calls         │
+  │   Pizza. Adding Tacos means hiring a          │   `factory.createLoan()` — it doesn't care    │
+  │   `TacoChef` without disturbing other chefs.  │   which loan type is being approved!          │
+  └───────────────────────────────────────────────┴───────────────────────────────────────────────┘
 ```
 
-### Stage 1: The Factory Method (logger package)
-Run it: `java Main`
-By completely abstracting the factory into an interface, we rely purely on polymorphism:
+---
 
-```java
-// The Creator Interface
-public interface ILoggerFactory {
-    ILogger createLogger();
-}
+## 🌳 Architecture Decision Framework
 
-// The Concrete Creator - CLOSED for modification!
-public class ErrorLoggerFactory implements ILoggerFactory {
-    @Override
-    public ILogger createLogger() {
-        return new ErrorLogger();
-    }
-}
+```mermaid
+flowchart TD
+    A[Do you need to encapsulate object creation?] -->|Yes| B{How many product types are being created?}
+    B -->|A family of related products\ne.g., Button + Checkbox + Scrollbar| C[Use Abstract Factory Pattern]
+    B -->|A single product type\ne.g., ILogger or IPaymentGateway| D{Will new product types be added dynamically\nby plugins or across teams?}
+    D -->|Yes| E[Use Factory Method Pattern\nor Supplier Registry]
+    D -->|No, fixed 2-3 types| F[Use Simple Factory Idiom]
 ```
 
-The Client (`Main.java`) never calls `new` on the product directly, nor does it pass strings to a giant switch statement. It receives an `ILoggerFactory` (often via Dependency Injection) and simply asks it to create the logger.
+---
+
+## 🗂️ Modular Deep-Dive Reading Tracks
+
+For targeted interview prep and production mastery, navigate to the specialized sub-modules below:
+
+```
+                                📂 FACTORY METHOD MASTER VAULT
+                                              │
+         ┌───────────────────┬────────────────┼───────────────────┬───────────────────┐
+         ▼                   ▼                ▼                   ▼                   ▼
+   ⚡ [Module 01]       🛡️ [Module 02]    ⚖️ [Module 03]      🎙️ [Module 04]     🌍 [Module 05]
+    Parallel Hierarchies Factory Registry   Factory Triad       Interview          Cross-Language
+      & DIP Inversion    & Supplier Lambdas  Comparison          Playbook           Patterns
+```
+
+* ⚡ **[01. Parallel Hierarchies & Dependency Inversion (DIP)](./01-PARALLEL_HIERARCHIES_AND_DIP.md)**:
+  * Deconstructing the Product and Creator parallel inheritance trees.
+  * Inverting high-level service dependencies to abstractions.
+  * GoF polymorphic Factory Method vs. Java Static Factory Methods (`Optional.of()`).
+
+* 🛡️ **[02. Factory Registry, Suppliers & Reflection](./02-FACTORY_REGISTRY_AND_REFLECTION.md)**:
+  * Eliminating the "Class Explosion" problem ($2N$ classes).
+  * Modern Java 8+ `Map<String, Supplier<Product>>` dynamic registry.
+  * Plugin discovery via Java `ServiceLoader` SPI and JDBC `DriverManager`.
+
+* ⚖️ **[03. The Factory Triad Comparison](./03-FACTORY_METHOD_VS_SIMPLE_FACTORY_VS_ABSTRACT_FACTORY.md)**:
+  * Complete comparison matrix: Simple Factory vs. Factory Method vs. Abstract Factory.
+  * Structural diagrams and decision trees.
+
+* 🎙️ **[04. L4/Senior Interview Playbook & Articulation](./04-INTERVIEW_PLAYBOOK_AND_ARTICULATION.md)**:
+  * **5 Verbatim 30-Second Interview Scripts** for high-stakes hiring loops.
+  * Rapid-fire 1-sentence FAANG answers and common interviewer traps.
+  * Candidate self-assessment rubric.
+
+* 🌍 **[05. Cross-Language Implementations](./05-CROSS_LANGUAGE_PATTERNS.md)**:
+  * C++ `std::unique_ptr`, Go constructor factory functions, TypeScript discriminated registries, Python `@classmethod`.
+
+* 💼 **[Case Studies: Production Systems](./CASE_STUDY.md)**:
+  * Multi-Channel Notification Dispatcher (`IChannelFactory`).
+  * Spring Framework `FactoryBean<T>` (`getObject()`).
+
+* ☕ **[Java Runnable Source Code](./JAVA/README.md)**:
+  * Complete before-and-after evolutionary runnable Java suite.
 
 ---
 
-## 🧩 4. Factory Method vs. SOLID Principles (The Senior Perspective)
+## 🎙️ L4/Senior Interview Articulation Flashcards
 
-The Factory Method pattern is a fundamental enabler for SOLID principles, specifically OCP and SRP.
+> [!TIP]
+> Deliver these concise, high-impact statements during your technical interviews to immediately signal Senior (L4/L5) proficiency.
 
-- **S - Single Responsibility Principle (SRP): ✅ Adheres**
-  It delegates the responsibility of *instantiating* an object away from the class that *uses* it. The creator class only creates; the client class only consumes.
-- **O - Open/Closed Principle (OCP): ✅ Adheres**
-  This is the pattern's superpower. You can introduce new product types into the program without breaking existing client code (you just add a new `ConcreteCreator` and `ConcreteProduct`).
-- **L - Liskov Substitution Principle (LSP): ✅ Adheres**
-  As long as all `ConcreteProducts` strictly adhere to the `Product` interface contracts, clients can blindly substitute them.
-- **I - Interface Segregation Principle (ISP): ✅ Unaffected**
-  Depends on how the `Product` interface is designed, but the pattern itself doesn't force fat interfaces.
-- **D - Dependency Inversion Principle (DIP): ✅ Adheres**
-  Clients depend on the abstract `Creator` and `Product` interfaces, completely decoupling them from concrete classes.
-
----
-
-## 🎭 5. Junior vs. Senior Implementation
-
-| Feature | Junior Developer | Senior Developer |
-|---|---|---|
-| **Product Constructors** | `public DebugLogger()` | **`package-private`** — Forces the client to use the factory! If constructors are public, the pattern is easily bypassed. |
-| **Client Decoupling** | Client instantiates the specific factory `new DebugLoggerFactory().createLogger()` | Client receives `ILoggerFactory` via **Dependency Injection** `@Inject ILoggerFactory factory;` |
-| **When to use** | Uses Factory Method for everything, resulting in "Class Explosion" (100 products = 100 factories). | Starts with Simple Factory. Upgrades to Factory Method ONLY when OCP violations become painful or frameworks demand it. |
-
----
-
-## 🏢 6. Real-World System Design
-
-The Factory Method pattern is overwhelmingly common in frameworks and libraries where the framework defines the *wiring* but the developer defines the *products*.
-
-1. **Spring Framework (`FactoryBean`)**: 
-   Spring’s `FactoryBean<T>` interface is exactly a Factory Method. You implement `getObject()` to tell Spring how to instantiate your complex, custom objects.
-2. **Java `Iterable<T>`**:
-   Every collection in Java implements `Iterable`, which has the method `iterator()`. This is a Factory Method! `ArrayList` returns an `Itr`, while `LinkedList` returns a `ListItr`.
-3. **Database Connectors (JDBC)**:
-   You don't instantiate MySQL connections directly. You configure a proxy or a factory, and it hands you an implementation of the `Connection` interface.
+```
+┌───────────────────────────────────────────────┬───────────────────────────────────────────────┐
+│ Question                                      │ 30-Second Verbatim Senior Articulation        │
+├───────────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ "Why is Factory Method preferred over Simple  │ 'Simple Factory uses switch-case logic, which │
+│  Factory?"                                    │  violates the Open/Closed Principle. Factory  │
+│                                               │  Method decentralizes creation into creator   │
+│                                               │  subclasses, allowing us to add new products  │
+│                                               │  without touching any existing source code.'  │
+├───────────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ "What is the difference between Factory Method│ 'Factory Method uses inheritance to create a  │
+│  and Abstract Factory?"                       │  single product; Abstract Factory uses object │
+│                                               │  composition to produce an entire suite of    │
+│                                               │  related, compatible products without coupling│
+│                                               │  clients to concrete classes.'                │
+├───────────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ "How do you solve Class Explosion in Factory  │ 'In modern Java, we avoid creating 2N creator │
+│  Method?"                                     │  subclasses by using a dynamic Supplier Map:  │
+│                                               │  Map<String, Supplier<Product>>. Products     │
+│                                               │  register constructor references (Class::new) │
+│                                               │  maintaining OCP with zero boilerplate.'      │
+├───────────────────────────────────────────────┼───────────────────────────────────────────────┤
+│ "How does Spring implement Factory Method?"   │ 'Spring provides the FactoryBean<T> interface.│
+│                                               │  When Spring encounters a FactoryBean, it     │
+│                                               │  calls getObject() to dynamically construct   │
+│                                               │  and inject complex beans like AOP proxies.'  │
+└───────────────────────────────────────────────┴───────────────────────────────────────────────┘
+```
 
 ---
 
-## 🧠 7. FAANG Interview Q&A
+## 🔗 Cross-Repository Interlinking
 
-**Q: What is the exact difference between Simple Factory, Factory Method, and Abstract Factory?**
-* **Simple Factory**: A single class with an `if/else` block creating products. Not an official GoF pattern. Violates OCP.
-* **Factory Method**: An interface defining a creation method. Subclasses (Concrete Creators) decide which actual product to instantiate. (Focuses on one product family).
-* **Abstract Factory**: An interface containing *multiple* Factory Methods, designed to create a *suite* of related objects (e.g., MacButton, MacCheckbox vs WinButton, WinCheckbox).
-
-**Q: Isn't creating a whole new Factory class for every single Product class a massive overkill? (Class Explosion)**
-* **A:** Yes! It is the biggest drawback of the Factory Method pattern. If you don't actually intend to leverage polymorphism (i.e. if clients always hardcode `new DebugLoggerFactory()`), the pattern is useless boilerplate. Senior developers usually start with a **Simple Factory** or strict **Constructors** and refactor to **Factory Method** only when required by framework architecture or serious OCP pain.
-
----
-
-## ✅ SDE-2+ Readiness Check
-*   [ ] Can you explain how Factory Method solves the "Open/Closed" violation of a Simple Factory?
-*   [ ] What is the "Class Explosion" problem and how do you decide when the pattern is overkill?
-*   [ ] Why is it a best practice to make the Product constructors package-private?
+* **[Open/Closed Principle (OCP)](../../00-SOLID_Principles/02-Open_Closed/README.md)**: Extensibility without modifying existing factory code.
+* **[Dependency Inversion Principle (DIP)](../../00-SOLID_Principles/05-Dependency_Inversion/README.md)**: High-level modules depending on product abstractions.
+* **[Abstract Factory Design Pattern](../03-Abstract%20Factory%20Design%20Pattern/README.md)**: Scaling from single products to product suites.
+* **[Singleton Design Pattern](../06-Singleton%20Design%20Pattern/README.md)**: Factory instances commonly implemented as Singletons.
 
 ---
 
 ## 🧠 Tracker Integration
 
-*   **Trigger Phrases:** "Let subclasses decide which object to create", "Decentralize object creation", "Plug-in architecture", "Open for extension, closed for modification".
-*   **SOLID Connection:** Primarily addresses **OCP** (add new product = new creator subclass) and **SRP** (separates the logic of object creation from the logic of object use).
-*   **Confuses With:** 
-    *   **Simple Factory:** (Hook: Simple Factory is a single class with a `switch` statement; Factory Method is an interface/abstract class with multiple creator subclasses).
-    *   **Abstract Factory:** (Hook: Factory Method creates ONE product type; Abstract Factory creates a **family** of related products).
-*   **Anti-Freeze Starter Code:** 
-    ```java
-    public interface Creator { Product createProduct(); }
-    public class ConcreteCreator implements Creator {
-        public Product createProduct() { return new ConcreteProduct(); }
-    }
-    ```
-*   **Self-Assessment Prompts:** 
-    1. How do you prevent a client from bypassing your factory and using `new` directly (constructor visibility)?
-    2. When is a "Simple Factory" (switch statement) actually a better choice than a "Factory Method"?
-    3. Can you explain the "Parallel Hierarchy" between Products and Creators?
-
----
-
-## 🌍 8. Cross-Language: Factory Method in Python, TypeScript, and Go
-
-### 🐍 Python
-Because Python classes are first-class objects (you can pass the class itself as a variable), the Factory Method pattern is rarely needed in Python. You just pass the class you want to instantiate!
-```python
-# In Python, the "Factory" is just passing the class reference
-def client_code(logger_class):
-    logger = logger_class()
-    logger.log("Hello")
-
-client_code(DebugLogger)
-```
-
-### 🟦 TypeScript
-TypeScript supports traditional OOP Java-style Factory Methods. However, thanks to structural typing and functional paradigms, TypeScript developers often just pass a factory function instead of a heavy class hierarchy:
-```typescript
-type LoggerFactory = () => ILogger;
-
-const debugLoggerFactory: LoggerFactory = () => new DebugLogger();
-
-function useLogger(factory: LoggerFactory) {
-    const logger = factory();
-    logger.log("Hello");
-}
-```
-
-### 🐹 Go
-Go does not have inheritance or classes, so the classical Factory Method pattern doesn't strictly exist. However, Go uses interfaces and functions to achieve the exact same decoupling:
-```go
-type Logger interface { Log(string) }
-
-// The "Factory Interface" equivalent
-type LoggerFactory interface { Create() Logger }
-
-// Alternatively, just inject a func()
-func ProcessData(factory func() Logger) {
-    logger := factory()
-    logger.Log("Processing...")
-}
-```
-> **The Senior Insight**: Languages with first-class functions (Python, TS, Go) heavily diminish the need for dedicated "Factory Classes." A simple function reference or class reference does the exact same job with 1/10th the boilerplate. In Java, prior to Lambdas, the Factory Method class hierarchy was mandatory to pass behavior around.
-
----
-
-## 🔗 10. Vault Interlinking Map & Cross-References
-
-```
-                          ┌──────────────────────────────────────────┐
-                          │     Factory Method Pattern (Creational)  │
-                          └────────────────────┬─────────────────────┘
-                                               │
-           ┌───────────────────────────────────┼───────────────────────────────────┐
-           ▼                                   ▼                                   ▼
- 🏛️ SOLID Foundations                  🛠️ Related Creational Patterns       🌐 HLD Architecture
- ├─ Open/Closed Principle (OCP)        ├─ Simple Factory (Switch variant)   ├─ Plugin System Addon
- ├─ Single Responsibility (SRP)        ├─ Abstract Factory (Suite variant)  ├─ JDBC Driver Registration
- └─ Dependency Inversion (DIP)         └─ Singleton (Factories as Singletons)└─ Dynamic Gateway Routers
-```
-
-### 1️⃣ Foundational Rules & SOLID Principles
-* **[Open/Closed Principle (OCP)](../../00-SOLID_Principles/02-Open_Closed/README.md)**: Factory Method is the primary pattern used to achieve OCP—adding new product types requires zero changes to existing creator code.
-* **[Dependency Inversion Principle (DIP)](../../00-SOLID_Principles/05-Dependency_Inversion/README.md)**: High-level callers depend on `ILoggerFactory` and `ILogger` interfaces rather than concrete `DebugLogger` classes.
-* **[Constructors & Object Integrity](../../00-Foundations/01-OOP_Basics/03-Constructors/README.md)**: Explains package-private constructor visibility to prevent callers from bypassing the factory.
-
-### 2️⃣ Creational & Structural Pattern Connections
-* **[Simple Factory Pattern](../06-Simple%20Factory%20Design%20Pattern/README.md)**: Compares single-class `switch` statements with decentralized Factory Method creators.
-* **[Abstract Factory Pattern](../03-Abstract%20Factory%20Design%20Pattern/README.md)**: Scales Factory Method from creating *one* product type to creating a *family/suite* of related products.
-* **[Plugin System Addon](../../06-Addons/03-Plugin-System/README.md)**: Shows how Factory Methods allow third-party developers to dynamically register custom plugin creators at runtime.
-
+* **Trigger Phrases:** *"Virtual Constructor"*, *"Decouple object creation from business workflow"*, *"Parallel creator/product hierarchies"*.
+* **Confuses With:** 
+  * **Simple Factory:** (Simple Factory is a single class with a switch statement; Factory Method uses polymorphic subclasses).
+  * **Abstract Factory:** (Factory Method creates 1 product; Abstract Factory creates a family of related products).
+* **Anti-Freeze Starter Code:** 
+  ```java
+  public interface Product { void use(); }
+  public abstract class Creator {
+      public abstract Product createProduct();
+      public void execute() {
+          Product p = createProduct();
+          p.use();
+      }
+  }
+  ```
