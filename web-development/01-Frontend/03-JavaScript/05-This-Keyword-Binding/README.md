@@ -18,6 +18,7 @@ This module provides an exhaustive, senior-level breakdown across all invocation
 |---|---|---|---|---|
 | **Part 1** | Fundamental Mental Model: How `this` Is Determined | [01-this-fundamental-mental-model-determination.md](./01-this-fundamental-mental-model-determination.md) | Call-site receiver resolution, method extraction traps, arrow lexical `this`, constructor `new` binding, and SDK callback auto-binding | 🟢 Complete |
 | **Part 2** | Regular Function Invocation, Default `this` & Strict Mode | [02-regular-functions-global-strict-mode.md](./02-regular-functions-global-strict-mode.md) | Plain function calls, strict mode `undefined` vs sloppy global coercion, ES Module isolation, nested function `this` reset, and `globalThis` | 🟢 Complete |
+| **Part 3** | Object Methods, Receiver Evaluation & Context Loss | [03-object-methods-receiver-context-loss.md](./03-object-methods-receiver-context-loss.md) | Method invocation vs property access, Reference Records, destructuring extraction traps, nested receivers, and comma operator stripping | 🟢 Complete |
 
 ---
 
@@ -25,6 +26,7 @@ This module provides an exhaustive, senior-level breakdown across all invocation
 
 - [`examples/01-this-fundamental-mental-model-determination.js`](./examples/01-this-fundamental-mental-model-determination.js): Demonstrates multiple receivers for identical functions, method extraction context loss, object literal arrow scope traps, asynchronous timer receiver preservation, and auto-bound telemetry broadcaster classes.
 - [`examples/02-regular-functions-global-strict-mode.js`](./examples/02-regular-functions-global-strict-mode.js): Demonstrates strict mode plain function `undefined` returns, nested regular function `this` reset, array method callback context loss with `thisArg`, and environment-safe multi-runtime configuration managers.
+- [`examples/03-object-methods-receiver-context-loss.js`](./examples/03-object-methods-receiver-context-loss.js): Demonstrates destructuring method context loss, nested property receiver resolution, method reassignment between objects, comma operator Reference Record stripping, and auto-bound notification stream clients.
 
 ---
 
