@@ -23,6 +23,7 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 | **Part 5** | Function Composition, `compose()` & `pipe()` | [05-function-composition-pipelines.md](./05-function-composition-pipelines.md) | Unary arity rules, `pipe` vs `compose`, `tap` spying combinator, `pipeAsync` async flow, and API $\to$ ViewModel normalization pipelines | 🟢 Complete |
 | **Part 6** | Currying, Partial Application & Function Specialization | [06-currying-partial-application.md](./06-currying-partial-application.md) | Staged argument configuration, Data-Last conventions, generic `curry()` arity tracking, and enterprise RBAC permission engines | 🟢 Complete |
 | **Part 7** | Advanced Functional Concepts (Lazy, Memoize, Recursion & Monads) | [07-advanced-functional-concepts-memoization-error-handling.md](./07-advanced-functional-concepts-memoization-error-handling.md) | Lazy thunks, bounded LRU memoization caches, recursive tree processing, `Result<T, E>` monadic error flows, and Functional Core/Imperative Shell | 🟢 Complete |
+| **Part 8** | Production Architecture & Senior Functional Decisions | [08-production-architecture-performance-senior-decisions.md](./08-production-architecture-performance-senior-decisions.md) | Pragmatic multi-paradigm design, derived vs stored state, API normalization boundaries, Finite State Machines, and zero-mock testing | 🟢 Complete |
 
 ---
 
@@ -35,6 +36,7 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 - [`examples/05-function-composition-pipelines.js`](./examples/05-function-composition-pipelines.js): Demonstrates multi-argument function arity failures inside `pipe()` without unary currying, `compose()` vs `pipe()` execution order, `tap()` debugging interceptors, `pipeAsync()` async execution, and product search pipelines.
 - [`examples/06-currying-partial-application.js`](./examples/06-currying-partial-application.js): Demonstrates Data-First vs Data-Last pipeline composition, progressive multi-stage currying evaluation, generic `curry()` utility arity reflection, `fn.length` parameter quirks, and enterprise RBAC permission authorization engines.
 - [`examples/07-advanced-functional-concepts-memoization-error-handling.js`](./examples/07-advanced-functional-concepts-memoization-error-handling.js): Demonstrates bounded LRU cache memoization vs unbounded leaks, lazy thunk evaluation, recursive tree calculations, monadic `Result` short-circuit chaining, and trampolined tail recursion.
+- [`examples/08-production-architecture-performance-senior-decisions.js`](./examples/08-production-architecture-performance-senior-decisions.js): Demonstrates stored duplicated state vs pure derived state, API DTO normalization boundaries, discriminated union state machines, and zero-mock unit test assertions for e-commerce checkout engines.
 
 ---
 
