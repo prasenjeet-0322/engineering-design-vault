@@ -20,6 +20,7 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 | **Part 2** | Immutability, Structural Sharing & State Updates | [02-immutability-structural-sharing-state-updates.md](./02-immutability-structural-sharing-state-updates.md) | In-place mutation vs value projection, nested shallow spread trap, structural sharing, ES2023 immutable array methods, and React reducers | 🟢 Complete |
 | **Part 3** | First-Class Functions, HOFs & Closures | [03-higher-order-functions-closures-functional-design.md](./03-higher-order-functions-closures-functional-design.md) | Function references vs immediate invocation, callback inversion of control, function factories, predicate combinators, and validation engines | 🟢 Complete |
 | **Part 4** | Declarative Data Transformation (`map`, `filter`, `reduce`) | [04-declarative-data-transformation-map-filter-reduce.md](./04-declarative-data-transformation-map-filter-reduce.md) | Semantic method matrix, $O(N^2)$ spread in `reduce` trap vs $O(N)$ local mutation, vacuous truth in `every()`, `flatMap()`, and pipelines | 🟢 Complete |
+| **Part 5** | Function Composition, `compose()` & `pipe()` | [05-function-composition-pipelines.md](./05-function-composition-pipelines.md) | Unary arity rules, `pipe` vs `compose`, `tap` spying combinator, `pipeAsync` async flow, and API $\to$ ViewModel normalization pipelines | 🟢 Complete |
 
 ---
 
@@ -29,6 +30,7 @@ This module provides an exhaustive, senior-level deep dive into Pure Functions, 
 - [`examples/02-immutability-structural-sharing-state-updates.js`](./examples/02-immutability-structural-sharing-state-updates.js): Demonstrates the nested shallow spread mutation trap, structural sharing integrity on unchanged branches, ES2023 non-mutating array methods, `structuredClone` deep isolation, and workspace state reducers.
 - [`examples/03-higher-order-functions-closures-functional-design.js`](./examples/03-higher-order-functions-closures-functional-design.js): Demonstrates function reference vs invocation timing in event handlers, function factory lexical isolation, pure strategy pattern calculators, function identity in Sets, and validation rule engines.
 - [`examples/04-declarative-data-transformation-map-filter-reduce.js`](./examples/04-declarative-data-transformation-map-filter-reduce.js): Demonstrates $O(N^2)$ accumulator spread benchmark vs $O(N)$ local mutation, vacuous truth in `[].every()`, pipeline stage ordering optimization, `flatMap()` normalization, and financial transaction aggregators.
+- [`examples/05-function-composition-pipelines.js`](./examples/05-function-composition-pipelines.js): Demonstrates multi-argument function arity failures inside `pipe()` without unary currying, `compose()` vs `pipe()` execution order, `tap()` debugging interceptors, `pipeAsync()` async execution, and product search pipelines.
 
 ---
 
