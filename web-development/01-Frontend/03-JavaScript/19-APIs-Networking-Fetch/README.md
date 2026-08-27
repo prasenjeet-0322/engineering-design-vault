@@ -17,7 +17,7 @@ This master module provides an exhaustive, production-grade guide to HTTP method
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | HTTP, Requests, Responses & API Fundamentals | [01-http-requests-responses-fundamentals.md](./01-http-requests-responses-fundamentals.md) | Request/Response anatomy, HTTP Methods, Idempotency, Status code taxonomy, `URLSearchParams`, `fetch()` `response.ok` checks, `204 No Content` | 🟢 Complete |
-| **Part 2** | Fetch API, Request Construction & Error Handling | [02-fetch-request-construction-error-handling.md](./02-fetch-request-construction-error-handling.md) | `Request` & `Response` objects, Header management, JSON streaming, Content negotiation, Error normalization | 🟡 Upcoming |
+| **Part 2** | Fetch API, Request Construction & Error Handling | [02-fetch-request-construction-error-handling.md](./02-fetch-request-construction-error-handling.md) | Request options, JSON wire serialization vs in-memory objects, Content-Type sniffing (JSON vs HTML 502), Safe 204 parsing, Unified `request()` pipeline, Domain API services | 🟢 Complete |
 | **Part 3** | AbortController, Cancellation & Race Conditions | [03-abortcontroller-cancellation-race-conditions.md](./03-abortcontroller-cancellation-race-conditions.md) | `AbortController`, `AbortSignal.timeout()`, Search-as-you-type race condition elimination, React `useEffect` teardown | 🟡 Upcoming |
 | **Part 4** | Building a Production API Client Layer | [04-production-api-client-architecture.md](./04-production-api-client-architecture.md) | Interceptors, Automated 401 token refresh queues, Exponential backoff retries with jitter, Request deduplication | 🟡 Upcoming |
 
@@ -26,6 +26,7 @@ This master module provides an exhaustive, production-grade guide to HTTP method
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-http-requests-responses-fundamentals.js`](./examples/01-http-requests-responses-fundamentals.js): Demonstrates `fetch()` `response.ok` verification, safe `204 No Content` body parsing, `URLSearchParams` encoding, and a centralized HTTP client with an automated status code router.
+- [`examples/02-fetch-request-construction-error-handling.js`](./examples/02-fetch-request-construction-error-handling.js): Demonstrates defensive Content-Type sniffing (JSON vs HTML 502 proxy errors), optional query parameter URL builder, and a unified `request()` pipeline with domain resource services.
 
 ---
 
