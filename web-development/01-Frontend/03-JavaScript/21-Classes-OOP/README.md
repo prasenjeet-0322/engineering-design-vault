@@ -17,7 +17,7 @@ This master module provides an exhaustive, production-grade guide to class bluep
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | Why Classes Exist, Constructors & Instances | [01-why-classes-exist-constructors-instances.md](./01-why-classes-exist-constructors-instances.md) | Prototypal syntactic sugar, 4-step `new` lifecycle, Constructors, Instance properties vs Prototype methods, Arrow function memory traps, TDZ | 🟢 Complete |
-| **Part 2** | Static Methods, Private Fields `#`, Getters & Setters | [02-static-methods-private-fields-getters-setters.md](./02-static-methods-private-fields-getters-setters.md) | Static members, Hard private fields (`#`), Encapsulation, Accessors (`get`/`set`), Validation | 🟡 Upcoming |
+| **Part 2** | Static Members, Private Fields `#`, Getters, Setters & Encapsulation | [02-static-methods-private-fields-getters-setters.md](./02-static-methods-private-fields-getters-setters.md) | Static methods & properties, Static factory constructors, Hard private fields (`#`), Private methods (`#method`), Getters/setters, Invariant protection | 🟢 Complete |
 | **Part 3** | Inheritance, `extends`, `super()` & Polymorphism | [03-inheritance-extends-super-polymorphism.md](./03-inheritance-extends-super-polymorphism.md) | Prototype chain delegation in `extends`, `super()` constructor calls, Method overriding, Polymorphism | 🟡 Upcoming |
 | **Part 4** | Composition vs Inheritance & Senior OOP Architecture | [04-composition-vs-inheritance-oop-architecture.md](./04-composition-vs-inheritance-oop-architecture.md) | Fragile base class problem, Composition over inheritance, Classes vs Factory functions, Decision matrix | 🟡 Upcoming |
 
@@ -26,6 +26,7 @@ This master module provides an exhaustive, production-grade guide to class bluep
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-why-classes-exist-constructors-instances.js`](./examples/01-why-classes-exist-constructors-instances.js): Demonstrates prototype method sharing vs arrow function field memory allocation, extracted method `this` context loss in class strict mode, constructor return object overrides, and a stateful WebSocket manager class.
+- [`examples/02-static-methods-private-fields-getters-setters.js`](./examples/02-static-methods-private-fields-getters-setters.js): Demonstrates hard `#private` field runtime privacy protection, static method lookup failure on instances, static shared counters, validated setter invariant protection, and an encapsulated `SecureApiClient` with static factories.
 
 ---
 
