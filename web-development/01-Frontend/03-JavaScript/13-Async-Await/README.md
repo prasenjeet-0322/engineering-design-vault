@@ -17,7 +17,7 @@ This master module provides an exhaustive, production-grade guide to `async` fun
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | The Mental Model, `async` Functions & `await` Mechanics | [01-async-await-mental-model.md](./01-async-await-mental-model.md) | Coroutine mental model, synchronous entry boundary, suspension vs non-blocking thread, waterfall elimination | 🟢 Complete |
-| **Part 2** | Error Handling with `try` / `catch` / `finally` | [02-async-await-error-handling.md](./02-async-await-error-handling.md) | `try/catch` boundaries, rejection-to-throw conversion, `return await` nuances, cleanup invariants | 🟡 Upcoming |
+| **Part 2** | Error Handling with `try` / `catch` / `finally` | [02-async-await-error-handling.md](./02-async-await-error-handling.md) | `try/catch` boundaries, rejection-to-throw conversion, `return await` nuances, cleanup invariants | 🟢 Complete |
 | **Part 3** | Sequential vs Concurrent Execution & Waterfalls | [03-sequential-vs-concurrent-waterfalls.md](./03-sequential-vs-concurrent-waterfalls.md) | Dependency graphs, `Promise.all` with `await`, `Promise.allSettled`, bounded worker queues | 🟡 Upcoming |
 | **Part 4** | Async Iteration, Loops & `for await...of` | [04-async-iteration-loops.md](./04-async-iteration-loops.md) | `for...of` vs `Promise.all(map)` vs `forEach` async bugs, Async Iterators, streams | 🟡 Upcoming |
 | **Part 5** | Advanced Patterns, Top-Level `await` & Architecture | [05-advanced-patterns-toplevel-await.md](./05-advanced-patterns-toplevel-await.md) | Top-level `await` module graphs, cancellation via `AbortController`, telemetry profiling | 🟡 Upcoming |
@@ -27,6 +27,7 @@ This master module provides an exhaustive, production-grade guide to `async` fun
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-async-await-mental-model.js`](./examples/01-async-await-mental-model.js): Demonstrates synchronous entry execution before the first `await` vs post-`await` microtask continuations, parallel `Promise.all` execution eliminating async waterfalls, `await 42` primitive unboxing, and a standalone generator-to-async coroutine runner (`asyncToGenerator`).
+- [`examples/02-async-await-error-handling.js`](./examples/02-async-await-error-handling.js): Demonstrates `return await` inside `try/catch` vs raw Promise return (bypassing local catch), silent `undefined` error swallowing vs explicit typed fallbacks, `finally` return override hazards, and a Go-style result tuple adapter (`toAsync`).
 
 ---
 
