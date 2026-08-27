@@ -1,14 +1,14 @@
-# KPI 17 / 23 — Advanced JavaScript Patterns & Code Architecture
+# KPI 23 — Advanced JavaScript Patterns & Code Architecture
 
-[⬅️ KPI 16 — Browser APIs & Web Platform](../16-Events-Delegation/README.md) | [📚 JavaScript Index](../README.md) | [KPI 18 — Browser Storage & Security ➡️](../18-Browser-Storage-Security/README.md)
+[⬅️ KPI 22 — Asynchronous JavaScript](../22-Asynchronous-JavaScript/README.md) | [📚 JavaScript Index](../README.md) | [KPI 24 — Performance Profiling ➡️](../24-Performance-Profiling/README.md)
 
 ---
 
 ## Overview
 
-Writing working JavaScript is only the beginning of senior frontend engineering. As applications grow in complexity, scale, and team size, codebases must be architected to remain **maintainable, testable, composable, decoupled, performant, and resilient to change**.
+Writing working JavaScript is only the beginning of senior frontend engineering. As applications scale in complexity, team size, and data velocity, codebases must be structured to remain **maintainable, testable, composable, decoupled, performant, and resilient to change**.
 
-This master module provides an exhaustive, production-grade guide to modular system design, separation of concerns (UI $\to$ Application Services $\to$ Domain Rules $\to$ Infrastructure), classical and functional design patterns (Factory, Strategy, Observer, Adapter, Command), pure functional architecture, state machines and reducers, event-driven systems, error normalization, and performance and abstraction governance.
+This master module provides an exhaustive, production-grade guide to core design patterns in JavaScript and TypeScript: Factory functions, Module encapsulation, Observer & Pub/Sub event messaging, Strategy patterns, Composition vs Inheritance architectures, Debouncing & Throttling rate limiters, and Memoization performance strategies.
 
 ---
 
@@ -16,19 +16,18 @@ This master module provides an exhaustive, production-grade guide to modular sys
 
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
-| **Part 1** | Code Organization, Separation of Concerns & Composition | [01-code-organization-separation-of-concerns-composition.md](./01-code-organization-separation-of-concerns-composition.md) | Separation of concerns, High Cohesion, Low Coupling, Public API contracts, Orchestration vs Implementation, Dependency Injection | 🟢 Complete |
-| **Part 2** | Design Patterns & Functional Architecture | [02-design-patterns-functional-architecture.md](./02-design-patterns-functional-architecture.md) | Factory, Strategy, Observer, Adapter, Command, Pure Functions, Immutability, Higher-Order Functions, Overengineering avoidance | 🟢 Complete |
-| **Part 3** | State Architecture, State Machines, Reducers & Event-Driven Systems | [03-state-architecture-observability-performance.md](./03-state-architecture-observability-performance.md) | State taxonomy (UI, Server, URL, Persistent), Discriminated Union FSMs, Pure Reducers, Async Race Condition tracking | 🟢 Complete |
-| **Part 4** | Error Architecture, Performance & Senior Decisions | [04-error-architecture-performance-senior-decisions.md](./04-error-architecture-performance-senior-decisions.md) | Error normalization layers, Performance profiling & budgets, Cache invalidation lifecycles, Complexity budget management | 🟢 Complete |
+| **Part 1** | Factory Pattern & Module Pattern | [01-factory-pattern-module-pattern.md](./01-factory-pattern-module-pattern.md) | Object creation, DTO normalization, Closure-based privacy, Revealing module pattern, Native ES modules, Dependency injection | 🟢 Complete |
+| **Part 2** | Observer Pattern & Pub/Sub Architecture | [02-observer-pattern-pub-sub.md](./02-observer-pattern-pub-sub.md) | 1-to-N subscriptions, Event bus, Channel topics, Memory leaks, Reactive state synchronization | 🟡 Upcoming |
+| **Part 3** | Strategy Pattern & Dynamic Algorithms | [03-strategy-pattern.md](./03-strategy-pattern.md) | Algorithm interchangeability, Replacing monolithic `switch/case`, Validation strategies, Payment gateways | 🟡 Upcoming |
+| **Part 4** | Composition vs Inheritance Architecture | [04-composition-vs-inheritance.md](./04-composition-vs-inheritance.md) | Fragile base class problem, "Has-A" vs "Is-A", Mixins vs Functional pipes, React compound component composition | 🟡 Upcoming |
+| **Part 5** | Debouncing & Throttling Mechanics | [05-debouncing-throttling.md](./05-debouncing-throttling.md) | High-frequency event control, Leading vs Trailing edge, Search inputs, Scroll/Resize performance | 🟡 Upcoming |
+| **Part 6** | Memoization & Senior Pattern Selection | [06-memoization-pattern-selection.md](./06-memoization-pattern-selection.md) | Pure function caching, Cache key serialization, Memory overhead profiling, 6-pattern architectural decision matrix | 🟡 Upcoming |
 
 ---
 
 ## 📁 Runnable Code Examples (`examples/`)
 
-- [`examples/01-code-organization-composition-di.js`](./examples/01-code-organization-composition-di.js): Demonstrates private class field encapsulation isolation (`#`), functional composition pipelines, and a modular e-commerce checkout engine with Dependency Injection.
-- [`examples/02-design-patterns-functional-architecture.js`](./examples/02-design-patterns-functional-architecture.js): Demonstrates the Strategy pattern dictionary vs monolithic `switch/case`, pure functions with structural sharing, and a composable email masking pipeline.
-- [`examples/03-state-architecture-observability-performance.js`](./examples/03-state-architecture-observability-performance.js): Demonstrates Finite State Machine (FSM) transition modeling with invalid state rejection, and asynchronous search race condition protection using request sequence IDs.
-- [`examples/04-error-architecture-performance-senior-decisions.js`](./examples/04-error-architecture-performance-senior-decisions.js): Demonstrates error normalization and telemetry separation, memoization overhead profiling, and query caching with mutation invalidation lifecycles.
+- [`examples/01-factory-pattern-module-pattern.js`](./examples/01-factory-pattern-module-pattern.js): Demonstrates factory closure variable vs object property desync, revealing module pattern IIFE encapsulation, independent closure counters, and a modular Todo/Analytics service factory with dependency injection.
 
 ---
 
