@@ -6,7 +6,7 @@
 
 ## Overview
 
-Promises represent the foundational turning point in modern JavaScript asynchronous control flow. By transitioning from inverted callback continuations to first-class, immutable outcome containers, Promises provide standardized state lifecycles (`pending`, `fulfilled`, `rejected`), deterministic settlement guarantees, composable method chaining (`.then`, `.catch`, `.finally`), centralized error propagation, high-performance concurrency combinators (`Promise.all`, `allSettled`, `race`, `any`), and microtask-level Event Loop scheduling.
+Promises represent the foundational turning point in modern JavaScript asynchronous control flow. By transitioning from inverted callback continuations to first-class, immutable outcome containers, Promises provide standardized state lifecycles (`pending`, `fulfilled`, `rejected`), deterministic settlement guarantees, composable method chaining (`.then`, `.catch`, `.finally`), centralized error propagation, high-performance concurrency combinators (`Promise.all`, `allSettled`, `race`, `any`), microtask-level Event Loop scheduling, and robust Promise resolution procedures.
 
 This master module provides an exhaustive, production-grade guide to the Promise state machine, Microtask scheduling semantics, thenable assimilation, chain flattening, error propagation channels, unhandled rejection diagnostics, and enterprise concurrency architectures.
 
@@ -23,6 +23,8 @@ This master module provides an exhaustive, production-grade guide to the Promise
 | **Part 5** | Promise Combinators & Concurrency Coordination | [05-promise-combinators-concurrency.md](./05-promise-combinators-concurrency.md) | `Promise.all`, `allSettled`, `race`, `any`, fail-fast vs resilient inspection, and concurrency limiting | 🟢 Complete |
 | **Part 6** | Promise Timing, Microtasks & Event Loop Scheduling | [06-promise-microtasks-scheduling-advanced-patterns.md](./06-promise-microtasks-scheduling-advanced-patterns.md) | Microtask queue drain, priority over macrotasks, `async` synchronous boundary, and starvation prevention | 🟢 Complete |
 | **Part 7** | Real-World Patterns, Anti-Patterns & Telemetry | [07-promise-patterns-antipatterns-telemetry.md](./07-promise-patterns-antipatterns-telemetry.md) | Layered error architecture, `Error.cause`, fire-and-forget guarding, retry with jitter, and production telemetry | 🟢 Complete |
+| **Part 8** | Advanced Patterns, Thenables & Promise Resolution | [08-advanced-promise-patterns-resolution.md](./08-advanced-promise-patterns-resolution.md) | Promise resolution algorithm, thenable assimilation, `Promise.withResolvers`, flattening, and API design rules | 🟢 Complete |
+| **Part 9** | Real-World Frontend Integration & Fetch Patterns | [09-real-world-frontend-fetch-patterns.md](./09-real-world-frontend-fetch-patterns.md) | `fetch()`, HTTP error status boundaries, JSON streaming, deduplication, and `AbortController` cancellation | 🟡 Upcoming |
 
 ---
 
@@ -35,6 +37,7 @@ This master module provides an exhaustive, production-grade guide to the Promise
 - [`examples/05-promise-combinators-concurrency.js`](./examples/05-promise-combinators-concurrency.js): Demonstrates `Promise.all()` fail-fast vs `Promise.allSettled()` resilient inspection, `Promise.race()` vs `Promise.any()`, input index preservation, and a standalone concurrency pool throttler.
 - [`examples/06-promise-microtasks-scheduling-advanced-patterns.js`](./examples/06-promise-microtasks-scheduling-advanced-patterns.js): Demonstrates microtask queue drain exhaustion before macrotasks, `async` function synchronous beginning boundary vs deferred `await` continuations, `queueMicrotask` FIFO order, and a standalone microtask state batcher.
 - [`examples/07-promise-patterns-antipatterns-telemetry.js`](./examples/07-promise-patterns-antipatterns-telemetry.js): Demonstrates root-cause preservation via `Error.cause`, guarding fire-and-forget background promises, error bubbling through pipelines, and a resilient exponential backoff retry client with randomized jitter.
+- [`examples/08-advanced-promise-patterns-resolution.js`](./examples/08-advanced-promise-patterns-resolution.js): Demonstrates missing `return` bugs in chained tasks causing `undefined` states, ES2024 `Promise.withResolvers()` external triggers, multi-level Promise flattening, and duck-typed Thenable assimilation.
 
 ---
 
