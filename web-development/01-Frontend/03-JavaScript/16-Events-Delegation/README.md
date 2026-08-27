@@ -6,9 +6,9 @@
 
 ## Overview
 
-JavaScript as a core language specification (ECMAScript) provides syntax, objects, and asynchronous primitives, but lacks native I/O, rendering, and networking capabilities. The **Browser Web Platform** bridges this boundary by injecting powerful host APIs (`window`, `document`, `fetch`, `localStorage`, `WebSocket`, `history`, `navigator`). A senior frontend engineer must master the execution mechanics of Web APIs, manage the event-driven browser loop, prevent memory leaks in event listener lifecycles, eliminate polling overlap storms, and adaptively optimize performance across the Page Lifecycle.
+JavaScript as a core language specification (ECMAScript) provides syntax, objects, and asynchronous primitives, but lacks native I/O, rendering, and networking capabilities. The **Browser Web Platform** bridges this boundary by injecting powerful host APIs (`window`, `document`, `fetch`, `localStorage`, `sessionStorage`, `Cookies`, `IndexedDB`, `WebSocket`, `history`, `navigator`). A senior frontend engineer must master the execution mechanics of Web APIs, manage client-side storage hierarchies and XSS/CSRF security, structure URLs as reactive application state, control navigation history stacks, and safely interact with device hardware APIs.
 
-This master module provides an exhaustive, production-grade guide to Web Platform host environments, event delegation patterns, timer and frame scheduling (`setTimeout`, `rAF`, `requestIdleCallback`), page visibility state transitions, and server-side rendering (SSR) safety boundaries.
+This master module provides an exhaustive, production-grade guide to Web Platform host environments, event delegation patterns, storage selection models, Fetch API stream semantics, History & `URLSearchParams` routing, device hardware capabilities, and client-side security architecture.
 
 ---
 
@@ -17,14 +17,15 @@ This master module provides an exhaustive, production-grade guide to Web Platfor
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | The Browser as a Platform, Web APIs & Page Lifecycle | [01-browser-platform-web-apis-lifecycle.md](./01-browser-platform-web-apis-lifecycle.md) | JS vs Web APIs, `globalThis`/`window`, event delegation, recursive polling, debounce/throttle, Page Visibility API | 🟢 Complete |
-| **Part 2** | Storage, Networking, Navigation & Device APIs | [02-storage-networking-navigation-device-apis.md](./02-storage-networking-navigation-device-apis.md) | Storage trade-offs (`localStorage` vs `IndexedDB`), History/URL routing, Clipboard, Permissions & Security | 🟡 Upcoming |
-| **Part 3** | Events, Delegation, Custom Events & Performance | [03-events-delegation-custom-events-performance.md](./03-events-delegation-custom-events-performance.md) | Event phases (Capturing/Target/Bubbling), `passive` listeners, custom event dispatching, 60fps interaction | 🟡 Upcoming |
+| **Part 2** | Storage, Networking, Navigation, URLs & Device APIs | [02-storage-networking-navigation-device-apis.md](./02-storage-networking-navigation-device-apis.md) | `localStorage` vs `Cookies` (XSS/CSRF), `IndexedDB`, `URLSearchParams` as state, `pushState`/`replaceState`, Device APIs | 🟢 Complete |
+| **Part 3** | Web Workers, Service Workers, WebSockets & Security | [03-web-workers-service-workers-websockets.md](./03-web-workers-service-workers-websockets.md) | Multi-threading with Web Workers, Service Workers & Offline PWAs, WebSockets, CSP & Sandboxing | 🟡 Upcoming |
 
 ---
 
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-browser-platform-web-apis-lifecycle.js`](./examples/01-browser-platform-web-apis-lifecycle.js): Demonstrates `setInterval` async overlap concurrency bugs vs guaranteed sequential recursive `setTimeout`, debounce trailing-edge execution, throttle rate-limiting, and an adaptive polling engine respecting tab visibility states.
+- [`examples/02-storage-networking-navigation-device-apis.js`](./examples/02-storage-networking-navigation-device-apis.js): Demonstrates safe client-side storage with corrupt JSON fallback resilience, URL search parameter query serialization, and a standalone URL state synchronizer engine.
 
 ---
 
