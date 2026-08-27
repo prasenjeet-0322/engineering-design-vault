@@ -6,7 +6,7 @@
 
 ## Overview
 
-Promises represent the foundational turning point in modern JavaScript asynchronous control flow. By transitioning from inverted callback continuations to first-class, immutable outcome containers, Promises provide standardized state lifecycles (`pending`, `fulfilled`, `rejected`), deterministic settlement guarantees, composable method chaining (`.then`, `.catch`, `.finally`), centralized error propagation, high-performance concurrency combinators (`Promise.all`, `allSettled`, `race`, `any`), microtask-level Event Loop scheduling, robust Promise resolution procedures, and frontend lifecycle coordination (`fetch()`, `AbortController`, race conditions, and deduplication).
+Promises represent the foundational turning point in modern JavaScript asynchronous control flow. By transitioning from inverted callback continuations to first-class, immutable outcome containers, Promises provide standardized state lifecycles (`pending`, `fulfilled`, `rejected`), deterministic settlement guarantees, composable method chaining (`.then`, `.catch`, `.finally`), centralized error propagation, high-performance concurrency combinators (`Promise.all`, `allSettled`, `race`, `any`), microtask-level Event Loop scheduling, robust Promise resolution procedures, and frontend lifecycle coordination (`fetch()`, `AbortController`, race conditions, deduplication, and bounded worker pools).
 
 This master module provides an exhaustive, production-grade guide to the Promise state machine, Microtask scheduling semantics, thenable assimilation, chain flattening, error propagation channels, unhandled rejection diagnostics, and enterprise concurrency architectures.
 
@@ -25,7 +25,7 @@ This master module provides an exhaustive, production-grade guide to the Promise
 | **Part 7** | Real-World Patterns, Anti-Patterns & Telemetry | [07-promise-patterns-antipatterns-telemetry.md](./07-promise-patterns-antipatterns-telemetry.md) | Layered error architecture, `Error.cause`, fire-and-forget guarding, retry with jitter, and production telemetry | 🟢 Complete |
 | **Part 8** | Advanced Patterns, Thenables & Promise Resolution | [08-advanced-promise-patterns-resolution.md](./08-advanced-promise-patterns-resolution.md) | Promise resolution algorithm, thenable assimilation, `Promise.withResolvers`, flattening, and API design rules | 🟢 Complete |
 | **Part 9** | Real-World Frontend Integration & Fetch Patterns | [09-real-world-frontend-fetch-patterns.md](./09-real-world-frontend-fetch-patterns.md) | `fetch()`, HTTP error status boundaries, JSON streaming, deduplication, and `AbortController` cancellation | 🟢 Complete |
-| **Part 10** | Promise Mastery, Performance & Architecture | [10-promise-mastery-synthesis-antipatterns.md](./10-promise-mastery-synthesis-antipatterns.md) | Master synthesis, unbounded concurrency pooling, memory retention leaks, and Staff review rules | 🟡 Upcoming |
+| **Part 10** | Promise Mastery, Performance & Architecture | [10-promise-mastery-synthesis-antipatterns.md](./10-promise-mastery-synthesis-antipatterns.md) | Master synthesis, unbounded concurrency pooling, memory retention leaks, and Staff review rules | 🟢 Complete |
 
 ---
 
@@ -40,6 +40,7 @@ This master module provides an exhaustive, production-grade guide to the Promise
 - [`examples/07-promise-patterns-antipatterns-telemetry.js`](./examples/07-promise-patterns-antipatterns-telemetry.js): Demonstrates root-cause preservation via `Error.cause`, guarding fire-and-forget background promises, error bubbling through pipelines, and a resilient exponential backoff retry client with randomized jitter.
 - [`examples/08-advanced-promise-patterns-resolution.js`](./examples/08-advanced-promise-patterns-resolution.js): Demonstrates missing `return` bugs in chained tasks causing `undefined` states, ES2024 `Promise.withResolvers()` external triggers, multi-level Promise flattening, and duck-typed Thenable assimilation.
 - [`examples/09-real-world-frontend-fetch-patterns.js`](./examples/09-real-world-frontend-fetch-patterns.js): Demonstrates `fetch()` non-rejection on HTTP 500 without `response.ok`, search race conditions with monotonic sequence IDs, in-flight request deduplication via Promise sharing, and `AbortController` timeouts.
+- [`examples/10-promise-mastery-synthesis-antipatterns.js`](./examples/10-promise-mastery-synthesis-antipatterns.js): Demonstrates floating promise rejection hazards, async waterfall parallelization benchmarks, missing return value losses, and a bounded concurrency pool worker queue.
 
 ---
 
