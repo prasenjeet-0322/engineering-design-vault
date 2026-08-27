@@ -19,7 +19,7 @@ This master module provides an exhaustive, production-grade guide to core design
 | **Part 1** | Factory Pattern & Module Pattern | [01-factory-pattern-module-pattern.md](./01-factory-pattern-module-pattern.md) | Object creation, DTO normalization, Closure-based privacy, Revealing module pattern, Native ES modules, Dependency injection | 🟢 Complete |
 | **Part 2** | Observer Pattern & Pub/Sub Architecture | [02-observer-pattern-pub-sub.md](./02-observer-pattern-pub-sub.md) | 1-to-N subscriptions, Event bus, Channel topics, Memory leaks, Defensive snapshots, Error isolation | 🟢 Complete |
 | **Part 3** | Strategy Pattern & Dynamic Algorithms | [03-strategy-pattern.md](./03-strategy-pattern.md) | Algorithm interchangeability, Replacing monolithic `switch/case`, Validation strategies, Payment gateways, Open/Closed Principle | 🟢 Complete |
-| **Part 4** | Composition vs Inheritance Architecture | [04-composition-vs-inheritance.md](./04-composition-vs-inheritance.md) | Fragile base class problem, "Has-A" vs "Is-A", Mixins vs Functional pipes, React compound component composition | 🟡 Upcoming |
+| **Part 4** | Composition vs Inheritance Architecture | [04-composition-vs-inheritance.md](./04-composition-vs-inheritance.md) | Fragile base class problem, "Has-A" vs "Is-A", Mixins vs Functional pipes, React compound component composition | 🟢 Complete |
 | **Part 5** | Debouncing & Throttling Mechanics | [05-debouncing-throttling.md](./05-debouncing-throttling.md) | High-frequency event control, Leading vs Trailing edge, Search inputs, Scroll/Resize performance | 🟡 Upcoming |
 | **Part 6** | Memoization & Senior Pattern Selection | [06-memoization-pattern-selection.md](./06-memoization-pattern-selection.md) | Pure function caching, Cache key serialization, Memory overhead profiling, 6-pattern architectural decision matrix | 🟡 Upcoming |
 
@@ -30,6 +30,7 @@ This master module provides an exhaustive, production-grade guide to core design
 - [`examples/01-factory-pattern-module-pattern.js`](./examples/01-factory-pattern-module-pattern.js): Demonstrates factory closure variable vs object property desync, revealing module pattern IIFE encapsulation, independent closure counters, and a modular Todo/Analytics service factory with dependency injection.
 - [`examples/02-observer-pattern-pub-sub.js`](./examples/02-observer-pattern-pub-sub.js): Demonstrates defensive snapshot iteration during broadcasts, observer error isolation, `once()` auto-unsubscribing listeners, and a decoupled E-commerce checkout system using an Observer store and Pub/Sub Event Bus.
 - [`examples/03-strategy-pattern.js`](./examples/03-strategy-pattern.js): Demonstrates uniform validation contract normalization, dynamic strategy registry with fallback handling, higher-order discount strategies, multi-criteria table sorting, and an extensible multi-payment checkout engine.
+- [`examples/04-composition-vs-inheritance.js`](./examples/04-composition-vs-inheritance.js): Demonstrates fragile base class regressions vs explicit composed services, mixin property name collisions, left-to-right data transformation via `pipe()`, and multi-capability domain user assembly.
 
 ---
 
