@@ -17,7 +17,7 @@ This master module provides an exhaustive, production-grade guide to module scop
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | The Module System, Scope, `import` & `export` | [01-module-system-scope-import-export.md](./01-module-system-scope-import-export.md) | Module scope, named vs default exports, read-only live bindings, top-level side effects | 🟢 Complete |
-| **Part 2** | Dynamic `import()`, Code Splitting & Tree Shaking | [02-module-loading-dynamic-imports-tree-shaking.md](./02-module-loading-dynamic-imports-tree-shaking.md) | Static AST analysis, dynamic on-demand loading, route splitting, tree-shaking dead code | 🟡 Upcoming |
+| **Part 2** | Dynamic `import()`, Code Splitting & Tree Shaking | [02-module-loading-dynamic-imports-tree-shaking.md](./02-module-loading-dynamic-imports-tree-shaking.md) | Static AST analysis, dynamic on-demand loading, route splitting, tree-shaking dead code | 🟢 Complete |
 | **Part 3** | Circular Dependencies, Module Resolution & Monorepos | [03-circular-dependencies-resolution-monorepos.md](./03-circular-dependencies-resolution-monorepos.md) | Cyclic module graphs, `TDZ` crashes during import, package resolution, barrel pitfalls | 🟡 Upcoming |
 | **Part 4** | Feature-Based Architecture & Enterprise Boundaries | [04-feature-based-architecture-boundaries.md](./04-feature-based-architecture-boundaries.md) | Feature-Sliced Design (FSD), public API facades, lint boundary enforcement, monorepo packages | 🟡 Upcoming |
 
@@ -27,6 +27,8 @@ This master module provides an exhaustive, production-grade guide to module scop
 
 - [`examples/01-module-system-scope-import-export.mjs`](./examples/01-module-system-scope-import-export.mjs): Demonstrates live bindings mutation reflection across module boundaries, read-only imported variable constraints, private encapsulated scope isolation, and a feature-based public API facade.
 - [`examples/01-counter-helper.mjs`](./examples/01-counter-helper.mjs): Supporting ESM helper providing live binding mutations and encapsulated private variables.
+- [`examples/02-dynamic-imports-tree-shaking.mjs`](./examples/02-dynamic-imports-tree-shaking.mjs): Demonstrates dynamic `import()` module namespace inspection, eliminating dynamic import waterfalls with `Promise.all`, and a predictive prefetch cache loader.
+- [`examples/02-lazy-math-plugin.mjs`](./examples/02-lazy-math-plugin.mjs): Supporting lazy plugin module loaded dynamically at runtime.
 
 ---
 
