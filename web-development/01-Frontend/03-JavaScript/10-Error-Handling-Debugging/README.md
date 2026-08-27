@@ -8,7 +8,7 @@
 
 Error handling and debugging are core engineering disciplines that separate brittle software from resilient, enterprise-grade applications.
 
-This master curriculum provides an exhaustive deep dive into JavaScript Failure Taxonomies (Programmer vs. Runtime vs. System), Exception Lifecycle Mechanics (`throw`, `try`, `catch`, `finally`), Built-in vs. Custom Domain Error Hierarchies (`Error.cause`), Call Stack Unwinding, Unhandled Rejection Traps, Browser DevTools Mastery (Conditional Breakpoints, Logpoints, Source Maps), Asynchronous Event Loop Debugging, Production Telemetry Monitoring, Automated Error Path Testing, Advanced Concurrency Debugging (Stale Closures, Race Conditions), Enterprise Debugging Architecture, and Frontend Observability.
+This master curriculum provides an exhaustive deep dive into JavaScript Failure Taxonomies (Programmer vs. Runtime vs. System), Exception Lifecycle Mechanics (`throw`, `try`, `catch`, `finally`), Built-in vs. Custom Domain Error Hierarchies (`Error.cause`), Call Stack Unwinding, Unhandled Rejection Traps, Browser DevTools Mastery (Conditional Breakpoints, Logpoints, Source Maps), Asynchronous Event Loop Debugging, Production Telemetry Monitoring, Automated Error Path Testing, Advanced Concurrency Debugging (Stale Closures, Race Conditions), Enterprise Debugging Architecture, Frontend Observability, and Hands-on Practical Scenarios.
 
 ---
 
@@ -24,7 +24,8 @@ This master curriculum provides an exhaustive deep dive into JavaScript Failure 
 | **Part 6** | Testing Error Paths & Failure Scenarios | [06-testing-error-paths-complete-architecture.md](./06-testing-error-paths-complete-architecture.md) | Unit testing thrown exceptions, rejected promise assertions, state reset invariants, and regression workflows | 🟢 Complete |
 | **Part 7** | Advanced Debugging Scenarios & Stale State | [07-advanced-debugging-race-conditions-closures.md](./07-advanced-debugging-race-conditions-closures.md) | Stale closures, mutable ref pointer patterns, out-of-order race conditions, memory leak retainers, and Heisenbugs | 🟢 Complete |
 | **Part 8** | Debugging Architecture & Production Postmortems | [08-debugging-architecture-postmortems-systemic-quality.md](./08-debugging-architecture-postmortems-systemic-quality.md) | Debuggable system design, diagnostic assertions, reproducible bug reports, code review for failure paths, and 5-Whys postmortems | 🟢 Complete |
-| **Part 9** | Frontend Observability & Signal-to-Noise | [09-frontend-observability-breadcrumbs-alert-design.md](./09-frontend-observability-breadcrumbs-alert-design.md) | Real-user monitoring (RUM), breadcrumbs, session context, alert design, and signal-to-noise management | 🟡 Upcoming |
+| **Part 9** | Frontend Observability & Signal-to-Noise | [09-frontend-observability-breadcrumbs-alert-design.md](./09-frontend-observability-breadcrumbs-alert-design.md) | Real-user monitoring (RUM), breadcrumb ring buffers, P95 latency distributions, and actionable alert design | 🟢 Complete |
+| **Part 10** | Testing Error Paths & Debugging Practice | [10-testing-error-paths-debugging-practice.md](./10-testing-error-paths-debugging-practice.md) | Hands-on production debugging scenarios, chaos engineering, edge-case unit suites, and senior competency framework | 🟡 Upcoming |
 
 ---
 
@@ -38,6 +39,7 @@ This master curriculum provides an exhaustive deep dive into JavaScript Failure 
 - [`examples/06-testing-error-paths-complete-architecture.js`](./examples/06-testing-error-paths-complete-architecture.js): Demonstrates synchronous thrown exception assertion, awaited async rejection validation, state invariant guarantees (preventing stuck loading flags), and multi-step retry recovery workflows.
 - [`examples/07-advanced-debugging-race-conditions-closures.js`](./examples/07-advanced-debugging-race-conditions-closures.js): Demonstrates stale closures in async callbacks vs mutable ref pointer fixes, uncleared interval retainer graphs vs teardown cleanups, microtask vs macrotask event loop execution orders, and sequence ID concurrency protection.
 - [`examples/08-debugging-architecture-postmortems-systemic-quality.js`](./examples/08-debugging-architecture-postmortems-systemic-quality.js): Demonstrates structured JSON logging with recursive PII sanitization, fail-fast state invariant assertion guards, error code machine grouping, and deterministic finite state machines.
+- [`examples/09-frontend-observability-breadcrumbs-alert-design.js`](./examples/09-frontend-observability-breadcrumbs-alert-design.js): Demonstrates bounded breadcrumb ring buffer memory management, P95 percentile latency distribution calculations vs misleading averages, deterministic error grouping signatures, and dynamic telemetry sampling.
 
 ---
 
