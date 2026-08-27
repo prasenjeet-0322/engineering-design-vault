@@ -1,6 +1,6 @@
 # KPI 24 — JavaScript Performance & Profiling Architecture
 
-[⬅️ KPI 23 — Advanced Design Patterns](../23-Advanced-Design-Patterns/README.md) | [📚 JavaScript Index](../README.md) | [🏁 KPI 25 — Graduation Project ➡️](../25-Graduation-Project/README.md)
+[⬅️ KPI 23 — Advanced Design Patterns](../23-Advanced-Design-Patterns/README.md) | [📚 JavaScript Index](../README.md) | [🏁 KPI 25 — Error Handling & Reliability ➡️](../25-Error-Handling-Reliability/README.md)
 
 ---
 
@@ -8,7 +8,7 @@
 
 High-performance JavaScript engineering is not simply about micro-optimizing algorithms; it requires a deep, mechanical understanding of the **Browser Rendering Pipeline**, Main-Thread scheduling budgets, C++ DOM engine crossing, Forced Synchronous Layouts, Long Tasks ($>50\text{ms}$), Web Workers, and DevTools CPU/Memory profiling.
 
-This master module provides an exhaustive, production-grade guide to diagnosing, measuring, and eliminating frontend performance bottlenecks, layout thrashing, frame drops, and memory leaks.
+This master module provides an exhaustive, production-grade guide to diagnosing, measuring, and eliminating frontend performance bottlenecks, layout thrashing, frame drops, memory leaks, and profiling diagnostics.
 
 ---
 
@@ -23,6 +23,7 @@ This master module provides an exhaustive, production-grade guide to diagnosing,
 | **Part 5** | Long Tasks & Main-Thread Non-Blocking Execution | [05-long-tasks-main-thread-blocking.md](./05-long-tasks-main-thread-blocking.md) | Total Blocking Time (TBT), Interaction to Next Paint (INP), Time-slicing (`scheduler.yield()`), Cooperative chunking | 🟢 Complete |
 | **Part 6** | Web Workers & Off-Main-Thread Multi-Threading | [06-web-workers-multi-threading.md](./06-web-workers-multi-threading.md) | Dedicated workers, Structured clone tax, Transferable Objects (`ArrayBuffer`), Request ID versioning, Lifecycle | 🟢 Complete |
 | **Part 7** | Memory Performance, Garbage Collection & JavaScript Memory Leaks | [07-performance-profiling-diagnostics.md](./07-performance-profiling-diagnostics.md) | Mark-and-Sweep GC, Detached DOM node leaks, Anonymous listener identity traps, `WeakMap`, Heap snapshots | 🟢 Complete |
+| **Part 8** | Performance Measurement, Profiling & Debugging | [08-performance-profiling-debugging.md](./08-performance-profiling-debugging.md) | `performance.now()`, User Timing API (`mark`/`measure`), Flamecharts, Self vs Total time, `PerformanceObserver` | 🟢 Complete |
 
 ---
 
@@ -35,6 +36,7 @@ This master module provides an exhaustive, production-grade guide to diagnosing,
 - [`examples/05-long-tasks-main-thread-blocking.js`](./examples/05-long-tasks-main-thread-blocking.js): Demonstrates the `async` CPU-blocking misconception benchmark, Total Blocking Time (TBT) calculations, and a standalone time-sliced array chunk processor.
 - [`examples/06-web-workers-multi-threading.js`](./examples/06-web-workers-multi-threading.js): Demonstrates Structured Clone serialization copy overhead vs Transferable `ArrayBuffer` zero-copy transfer, monotonic Request ID race condition resolution, and a standalone Worker RPC gateway engine.
 - [`examples/07-performance-profiling-diagnostics.js`](./examples/07-performance-profiling-diagnostics.js): Demonstrates detached DOM subtree retention simulation, anonymous event listener teardown failures vs named cleanup, `Map` vs `WeakMap` ephemeral metadata retention, and a standalone resource lifecycle registry.
+- [`examples/08-performance-profiling-debugging.js`](./examples/08-performance-profiling-debugging.js): Demonstrates microbenchmark traps vs flamechart bottlenecks, User Timing API (`mark`/`measure`) lifecycle, Self Time vs Total Time calculations, and a standalone performance profiler harness.
 
 ---
 
