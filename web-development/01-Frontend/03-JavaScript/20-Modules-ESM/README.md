@@ -19,7 +19,7 @@ This master module provides an exhaustive, production-grade guide to module scop
 | **Part 1** | Why Modules Exist, ES Modules & Module Scope | [01-why-modules-exist-esm-module-scope.md](./01-why-modules-exist-esm-module-scope.md) | Module scope vs Global scope, Public vs Private APIs, `<script type="module">` deferral & strict mode, Single-evaluation singletons, Module-level state | 🟢 Complete |
 | **Part 2** | `export`, Named Exports & Designing a Module's Public API | [02-export-declarations-named-exports.md](./02-export-declarations-named-exports.md) | Inline named exports, Export lists, Export renaming (`as`), Live bindings, Read-only import constraints, Defensive copying, Public facades | 🟢 Complete |
 | **Part 3** | `export default`, Import Patterns & Choosing the Right Module API | [03-export-default-imports-live-bindings.md](./03-export-default-imports-live-bindings.md) | Default vs Named exports, Default import syntax, Namespace imports (`* as`), Side-effect imports, Dynamic `import()` code splitting | 🟢 Complete |
-| **Part 4** | Dependency Structure & Production Module Architecture | [04-dependency-structure-production-architecture.md](./04-dependency-structure-production-architecture.md) | Circular dependencies, Feature-sliced architecture, Tree-shaking, Monorepo package boundaries, Barrel files | 🟡 Upcoming |
+| **Part 4** | Dependency Structure & Production Module Architecture | [04-dependency-structure-production-architecture.md](./04-dependency-structure-production-architecture.md) | Circular dependencies, Feature-sliced architecture, Barrel self-import cycles, Layer extraction, Change surface blast radius | 🟢 Complete |
 
 ---
 
@@ -28,6 +28,7 @@ This master module provides an exhaustive, production-grade guide to module scop
 - [`examples/01-why-modules-exist-esm-module-scope.mjs`](./examples/01-why-modules-exist-esm-module-scope.mjs): Demonstrates module scope encapsulation, private unexported variables, module-level singleton state evaluation, top-level `this === undefined`, and a feature service with private encapsulated caching.
 - [`examples/02-export-declarations-named-exports.mjs`](./examples/02-export-declarations-named-exports.mjs): Demonstrates live binding mutation reflection, read-only imported binding re-assignment rejection, object mutability leak vs defensive copy isolation, and feature public API facades.
 - [`examples/03-export-default-imports-live-bindings.mjs`](./examples/03-export-default-imports-live-bindings.mjs): Demonstrates default export local renaming freedom and renaming drift, namespace import (`* as`) aggregation, combined default + named unpacking, and dynamic on-demand module loading simulation.
+- [`examples/04-dependency-structure-production-architecture.mjs`](./examples/04-dependency-structure-production-architecture.mjs): Demonstrates circular dependency elimination via layer extraction, barrel self-import cycle prevention, and 4-tier unidirectional feature-sliced architecture.
 
 ---
 
