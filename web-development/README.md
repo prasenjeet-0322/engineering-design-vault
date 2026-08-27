@@ -6,6 +6,15 @@ This vault follows a strict, layered learning methodology to transition from "kn
 
 ---
 
+## 👨‍💻 Authorship & Engineering Credits
+
+| Role | Engineer | Profiles | Scope |
+|---|---|---|---|
+| **Repository Owner & Lead System Architect** | **Srikar Kudurmalla** | [LinkedIn](https://www.linkedin.com/in/kudurmallasrikar/) | **Full Stack Developer \| Founding Engineer** — Core Architecture, Technical Mentorship & Guidance |
+| **Engineering Co-Author & Contributor** | **Prasanjeet Yadav** | [GitHub](https://github.com/prasenjeet-0322) • [LinkedIn](https://www.linkedin.com/in/prasenjeet-yadav-2277a6258/) | **Mid-Level Full Stack Engineer** — Web Development Scaffolding, CSS & JavaScript Documentation |
+
+---
+
 ## 🏗️ Vault Architecture
 
 This module is split into foundational tiers, moving from client-side UI engineering up to full-stack architectures and deployments.

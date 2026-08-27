@@ -1,5 +1,8 @@
 # 🎨 01 - Frontend Engineering Knowledge Vault & Master Roadmap
 
+> **Repository Owner & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer \| Founding Engineer)  
+> **Co-Author & Contributor:** [Prasanjeet Yadav](https://www.linkedin.com/in/prasenjeet-yadav-2277a6258/) ([GitHub](https://github.com/prasenjeet-0322)) (Mid-Level Full Stack Engineer)
+
 Welcome to the **Frontend Engineering Master Vault**. This comprehensive curriculum transitions engineers from foundational browser execution to architecting high-scale enterprise frontend systems, design systems, and multi-package monorepo workspaces.
 
 ---
