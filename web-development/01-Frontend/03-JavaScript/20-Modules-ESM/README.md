@@ -17,15 +17,16 @@ This master module provides an exhaustive, production-grade guide to module scop
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | Why Modules Exist, ES Modules & Module Scope | [01-why-modules-exist-esm-module-scope.md](./01-why-modules-exist-esm-module-scope.md) | Module scope vs Global scope, Public vs Private APIs, `<script type="module">` deferral & strict mode, Single-evaluation singletons, Module-level state | 🟢 Complete |
-| **Part 2** | `export` Declarations & Named Exports | [02-export-declarations-named-exports.md](./02-export-declarations-named-exports.md) | Inline exports, Export lists, Renaming (`as`), Re-exporting & Barrel files, Public interface design | 🟡 Upcoming |
-| **Part 3** | `export default`, `import`, Named Imports & Live Bindings | [03-export-default-imports-live-bindings.md](./03-export-default-imports-live-bindings.md) | Default vs Named exports, Live bindings mechanics, Read-only imported variables, Dynamic `import()` | 🟡 Upcoming |
-| **Part 4** | Dependency Structure & Production Module Architecture | [04-dependency-structure-production-architecture.md](./04-dependency-structure-production-architecture.md) | Circular dependencies, Feature-sliced architecture, Tree-shaking, Monorepo package boundaries | 🟡 Upcoming |
+| **Part 2** | `export`, Named Exports & Designing a Module's Public API | [02-export-declarations-named-exports.md](./02-export-declarations-named-exports.md) | Inline named exports, Export lists, Export renaming (`as`), Live bindings, Read-only import constraints, Defensive copying, Public facades | 🟢 Complete |
+| **Part 3** | `export default`, `import`, Named Imports & Live Bindings | [03-export-default-imports-live-bindings.md](./03-export-default-imports-live-bindings.md) | Default vs Named exports, Default import syntax, Namespace imports (`* as`), Side-effect imports, Live binding mechanics | 🟡 Upcoming |
+| **Part 4** | Dependency Structure & Production Module Architecture | [04-dependency-structure-production-architecture.md](./04-dependency-structure-production-architecture.md) | Circular dependencies, Feature-sliced architecture, Tree-shaking, Monorepo package boundaries, Barrel files | 🟡 Upcoming |
 
 ---
 
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-why-modules-exist-esm-module-scope.mjs`](./examples/01-why-modules-exist-esm-module-scope.mjs): Demonstrates module scope encapsulation, private unexported variables, module-level singleton state evaluation, top-level `this === undefined`, and a feature service with private encapsulated caching.
+- [`examples/02-export-declarations-named-exports.mjs`](./examples/02-export-declarations-named-exports.mjs): Demonstrates live binding mutation reflection, read-only imported binding re-assignment rejection, object mutability leak vs defensive copy isolation, and feature public API facades.
 
 ---
 
