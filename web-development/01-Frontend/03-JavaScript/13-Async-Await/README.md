@@ -8,7 +8,7 @@
 
 The `async` / `await` syntax provides declarative, synchronous-like ergonomics for authoring asynchronous JavaScript code without compromising non-blocking performance. While `async` / `await` significantly simplifies asynchronous control flow, it does **not** replace the underlying Promise abstraction. Under the hood, `async` functions operate as Generator Coroutines compiled over Promises and scheduled via the Event Loop's Microtask Queue.
 
-This master module provides an exhaustive, production-grade guide to `async` function execution mechanics, `await` suspension and continuation scheduling, structured `try` / `catch` / `finally` error boundaries, async iterations (`for await...of`), async waterfalls vs concurrent orchestration, and enterprise error architecture.
+This master module provides an exhaustive, production-grade guide to `async` function execution mechanics, `await` suspension and continuation scheduling, structured `try` / `catch` / `finally` error boundaries, async iterations (`for await...of`), async waterfalls vs concurrent orchestration, in-flight request deduplication, exponential backoff retries with randomized jitter, and enterprise data-layer architecture.
 
 ---
 
@@ -21,7 +21,7 @@ This master module provides an exhaustive, production-grade guide to `async` fun
 | **Part 3** | Sequential vs Concurrent Execution & Waterfalls | [03-sequential-vs-concurrent-waterfalls.md](./03-sequential-vs-concurrent-waterfalls.md) | Dependency graphs, `Promise.all` with `await`, `Promise.allSettled`, bounded worker queues | 🟢 Complete |
 | **Part 4** | Async Iteration, Loops & `for await...of` | [04-async-iteration-loops.md](./04-async-iteration-loops.md) | `for await...of`, `async function*`, `ReadableStream`, pull backpressure, cursor pagination | 🟢 Complete |
 | **Part 5** | Real-World Fetch, Cancellation, Timeouts & Race Conditions | [05-real-world-fetch-cancellation-race-conditions.md](./05-real-world-fetch-cancellation-race-conditions.md) | `fetch()`, `response.ok`, `AbortController`, search race conditions, timeouts, React unmount | 🟢 Complete |
-| **Part 6** | Advanced Async Patterns, Retries, Deduplication & Architecture | [06-advanced-async-patterns-retries-deduplication.md](./06-advanced-async-patterns-retries-deduplication.md) | Retry with exponential backoff & jitter, in-flight request deduplication, telemetry profiler | 🟡 Upcoming |
+| **Part 6** | Advanced Async Patterns, Retries, Deduplication & Architecture | [06-advanced-async-patterns-retries-deduplication.md](./06-advanced-async-patterns-retries-deduplication.md) | Retry with exponential backoff & jitter, in-flight request deduplication, telemetry profiler | 🟢 Complete |
 
 ---
 
@@ -32,6 +32,7 @@ This master module provides an exhaustive, production-grade guide to `async` fun
 - [`examples/03-sequential-vs-concurrent-waterfalls.js`](./examples/03-sequential-vs-concurrent-waterfalls.js): Demonstrates `forEach(async)` callback ignoring traps vs `for...of` vs `Promise.all(map)`, array order preservation in `Promise.all`, and a standalone bounded concurrency pool (`mapConcurrent`).
 - [`examples/04-async-iteration-loops.js`](./examples/04-async-iteration-loops.js): Demonstrates direct `await generator()` trap vs progressive `for await...of`, early loop `break` triggering `try...finally` resource cleanup, and a paginated REST API async generator.
 - [`examples/05-real-world-fetch-cancellation-race-conditions.js`](./examples/05-real-world-fetch-cancellation-race-conditions.js): Demonstrates `fetch()` 500 error non-rejection trapping, search race conditions with monotonic sequence IDs, and true timeout cancellation via `AbortController`.
+- [`examples/06-advanced-async-patterns-retries-deduplication.js`](./examples/06-advanced-async-patterns-retries-deduplication.js): Demonstrates cached rejected Promise cache poisoning prevention, in-flight request deduplication, `Promise.any` vs `Promise.race`, and exponential backoff retry with randomized jitter.
 
 ---
 
