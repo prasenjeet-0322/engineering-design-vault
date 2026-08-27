@@ -21,8 +21,8 @@ This master module provides an exhaustive, production-grade guide to diagnosing,
 | **Part 3** | Reflow, Repaint & The Complete Rendering Pipeline | [03-reflow-repaint-rendering-pipeline.md](./03-reflow-repaint-rendering-pipeline.md) | Layout vs Paint vs Compositing, CSS containment (`contain`), `will-change` VRAM tradeoffs, `content-visibility` | 🟢 Complete |
 | **Part 4** | Event Listener Performance & Event Delegation | [04-event-listener-performance-delegation.md](./04-event-listener-performance-delegation.md) | Passive event listeners (`{ passive: true }`), Event delegation (`closest`), Memory leaks, `AbortController` teardown | 🟢 Complete |
 | **Part 5** | Long Tasks & Main-Thread Non-Blocking Execution | [05-long-tasks-main-thread-blocking.md](./05-long-tasks-main-thread-blocking.md) | Total Blocking Time (TBT), Interaction to Next Paint (INP), Time-slicing (`scheduler.yield()`), Cooperative chunking | 🟢 Complete |
-| **Part 6** | Web Workers & Off-Main-Thread Multi-Threading | [06-web-workers-multi-threading.md](./06-web-workers-multi-threading.md) | Dedicated workers, Structured clone algorithm, `postMessage`, Comlink RPC, OffscreenCanvas | 🟡 Upcoming |
-| **Part 7** | Performance Profiling & Diagnosing Slow Features | [07-performance-profiling-diagnostics.md](./07-performance-profiling-diagnostics.md) | Chrome DevTools flamecharts, Heap snapshots, Detached DOM tree leaks, Allocation timelines | 🟡 Upcoming |
+| **Part 6** | Web Workers & Off-Main-Thread Multi-Threading | [06-web-workers-multi-threading.md](./06-web-workers-multi-threading.md) | Dedicated workers, Structured clone tax, Transferable Objects (`ArrayBuffer`), Request ID versioning, Lifecycle | 🟢 Complete |
+| **Part 7** | Performance Profiling, Memory Leaks & Diagnostics | [07-performance-profiling-diagnostics.md](./07-performance-profiling-diagnostics.md) | Chrome DevTools flamecharts, Heap snapshots, Detached DOM tree leaks, Allocation timelines, Memory profiling | 🟡 Upcoming |
 
 ---
 
@@ -33,6 +33,7 @@ This master module provides an exhaustive, production-grade guide to diagnosing,
 - [`examples/03-reflow-repaint-rendering-pipeline.js`](./examples/03-reflow-repaint-rendering-pipeline.js): Demonstrates pipeline stage classification (Layout vs Paint vs Composite), `will-change` VRAM memory allocation calculations, and CSS containment subtree reflow isolation.
 - [`examples/04-event-listener-performance-delegation.js`](./examples/04-event-listener-performance-delegation.js): Demonstrates fragile `matches()` vs robust `closest()` nested target resolution, debounce vs throttle high-frequency burst execution counts, and a standalone event delegation router.
 - [`examples/05-long-tasks-main-thread-blocking.js`](./examples/05-long-tasks-main-thread-blocking.js): Demonstrates the `async` CPU-blocking misconception benchmark, Total Blocking Time (TBT) calculations, and a standalone time-sliced array chunk processor.
+- [`examples/06-web-workers-multi-threading.js`](./examples/06-web-workers-multi-threading.js): Demonstrates Structured Clone serialization copy overhead vs Transferable `ArrayBuffer` zero-copy transfer, monotonic Request ID race condition resolution, and a standalone Worker RPC gateway engine.
 
 ---
 
