@@ -22,7 +22,7 @@ This master module provides an exhaustive, production-grade guide to diagnosing,
 | **Part 4** | Event Listener Performance & Event Delegation | [04-event-listener-performance-delegation.md](./04-event-listener-performance-delegation.md) | Passive event listeners (`{ passive: true }`), Event delegation (`closest`), Memory leaks, `AbortController` teardown | 🟢 Complete |
 | **Part 5** | Long Tasks & Main-Thread Non-Blocking Execution | [05-long-tasks-main-thread-blocking.md](./05-long-tasks-main-thread-blocking.md) | Total Blocking Time (TBT), Interaction to Next Paint (INP), Time-slicing (`scheduler.yield()`), Cooperative chunking | 🟢 Complete |
 | **Part 6** | Web Workers & Off-Main-Thread Multi-Threading | [06-web-workers-multi-threading.md](./06-web-workers-multi-threading.md) | Dedicated workers, Structured clone tax, Transferable Objects (`ArrayBuffer`), Request ID versioning, Lifecycle | 🟢 Complete |
-| **Part 7** | Performance Profiling, Memory Leaks & Diagnostics | [07-performance-profiling-diagnostics.md](./07-performance-profiling-diagnostics.md) | Chrome DevTools flamecharts, Heap snapshots, Detached DOM tree leaks, Allocation timelines, Memory profiling | 🟡 Upcoming |
+| **Part 7** | Memory Performance, Garbage Collection & JavaScript Memory Leaks | [07-performance-profiling-diagnostics.md](./07-performance-profiling-diagnostics.md) | Mark-and-Sweep GC, Detached DOM node leaks, Anonymous listener identity traps, `WeakMap`, Heap snapshots | 🟢 Complete |
 
 ---
 
@@ -34,6 +34,7 @@ This master module provides an exhaustive, production-grade guide to diagnosing,
 - [`examples/04-event-listener-performance-delegation.js`](./examples/04-event-listener-performance-delegation.js): Demonstrates fragile `matches()` vs robust `closest()` nested target resolution, debounce vs throttle high-frequency burst execution counts, and a standalone event delegation router.
 - [`examples/05-long-tasks-main-thread-blocking.js`](./examples/05-long-tasks-main-thread-blocking.js): Demonstrates the `async` CPU-blocking misconception benchmark, Total Blocking Time (TBT) calculations, and a standalone time-sliced array chunk processor.
 - [`examples/06-web-workers-multi-threading.js`](./examples/06-web-workers-multi-threading.js): Demonstrates Structured Clone serialization copy overhead vs Transferable `ArrayBuffer` zero-copy transfer, monotonic Request ID race condition resolution, and a standalone Worker RPC gateway engine.
+- [`examples/07-performance-profiling-diagnostics.js`](./examples/07-performance-profiling-diagnostics.js): Demonstrates detached DOM subtree retention simulation, anonymous event listener teardown failures vs named cleanup, `Map` vs `WeakMap` ephemeral metadata retention, and a standalone resource lifecycle registry.
 
 ---
 

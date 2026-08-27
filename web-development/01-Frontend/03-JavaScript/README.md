@@ -41,7 +41,7 @@ To ensure **zero compromise on technical depth and quality**, every KPI in this 
 | **22** | `22-Asynchronous-JavaScript` | [README.md](./22-Asynchronous-JavaScript/README.md) | Runtime, Call Stack, Event Loop, Microtasks, Promises, async/await | 🟢 Complete |
 | **22-GC** | `22-Memory-Garbage-Collection` | [README.md](./22-Memory-Garbage-Collection/README.md) | Mark-and-Sweep, WeakMap/WeakSet, Memory leak diagnostics | 🟡 Ready for Content |
 | **23** | `23-Advanced-Design-Patterns` | [README.md](./23-Advanced-Design-Patterns/README.md) | Factory, Module, Observer, Pub/Sub, Strategy, Debounce, Throttle | 🟢 Complete |
-| **24** | `24-Performance-Profiling` | [README.md](./24-Performance-Profiling/README.md) | Long Tasks, Web Workers, DOM Batching, DevTools Profiling | 🟢 In Progress |
+| **24** | `24-Performance-Profiling` | [README.md](./24-Performance-Profiling/README.md) | Long Tasks, Web Workers, DOM Batching, DevTools Profiling | 🟢 Complete |
 | 🏁 | `25-Graduation-Project` | [README.md](./25-Graduation-Project/README.md) | Production-Grade Vanilla JS Application Architecture | 🟡 Milestone |
 
 ---
