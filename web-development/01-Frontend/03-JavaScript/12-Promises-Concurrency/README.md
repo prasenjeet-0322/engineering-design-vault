@@ -17,15 +17,17 @@ This master module provides an exhaustive, production-grade guide to the Promise
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | Why Promises Exist & The Promise State Machine | [01-promise-state-machine-fundamentals.md](./01-promise-state-machine-fundamentals.md) | Tri-state lifecycle, single-settlement invariant, synchronous executor execution, and transport vs business failures | 🟢 Complete |
-| **Part 2** | Chaining, Return Values & Error Propagation | [02-promise-chaining-return-values-propagation.md](./02-promise-chaining-return-values-propagation.md) | `.then()`, `.catch()`, `.finally()`, chain unboxing, thenable assimilation, and downstream error bubbling | 🟡 Upcoming |
-| **Part 3** | Promise Combinators & Concurrency Coordination | [03-promise-combinators-concurrency.md](./03-promise-combinators-concurrency.md) | `Promise.all`, `allSettled`, `race`, `any`, fail-fast vs resilient inspection, and concurrency limiting | 🟡 Upcoming |
-| **Part 4** | Advanced Promise Patterns, Anti-Patterns & Debugging | [04-promise-patterns-anti-patterns-debugging.md](./04-promise-patterns-anti-patterns-debugging.md) | Unhandled rejections, explicit resource cleanup, deferred patterns, and enterprise telemetry | 🟡 Upcoming |
+| **Part 2** | `.then()`, Promise Handlers & Promise Chaining | [02-promise-chaining-return-values-propagation.md](./02-promise-chaining-return-values-propagation.md) | Return value rules, thenable assimilation, missing `return` bugs, microtask scheduling, and pipeline composition | 🟢 Complete |
+| **Part 3** | `.catch()`, `.finally()` & Error Propagation | [03-promise-error-handling-catch-finally.md](./03-promise-error-handling-catch-finally.md) | Error bubbling, recovery paths, `.finally()` pass-through semantics, and unhandled rejection diagnostics | 🟡 Upcoming |
+| **Part 4** | Promise Combinators & Concurrency Coordination | [04-promise-combinators-concurrency.md](./04-promise-combinators-concurrency.md) | `Promise.all`, `allSettled`, `race`, `any`, fail-fast vs resilient inspection, and concurrency limiting | 🟡 Upcoming |
+| **Part 5** | Advanced Promise Patterns, Anti-Patterns & Telemetry | [05-promise-patterns-anti-patterns-telemetry.md](./05-promise-patterns-anti-patterns-telemetry.md) | Deferred patterns, sequential reduce chains, memory leaks, and enterprise telemetry | 🟡 Upcoming |
 
 ---
 
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-promise-state-machine-fundamentals.js`](./examples/01-promise-state-machine-fundamentals.js): Demonstrates synchronous executor execution timing vs `.then()` microtask deferral, single-settlement immutability, automatic executor thrown error capture, late handler attachment on pre-settled Promises, and a standalone `LitePromise` state machine.
+- [`examples/02-promise-chaining-return-values-propagation.js`](./examples/02-promise-chaining-return-values-propagation.js): Demonstrates missing `return` bugs causing `undefined` states vs proper Promise returning, `.then(onFulfilled, onRejected)` error trapping vs downstream `.catch()`, microtask queue priority over macrotasks, thenable object assimilation, and a standalone chaining engine.
 
 ---
 
