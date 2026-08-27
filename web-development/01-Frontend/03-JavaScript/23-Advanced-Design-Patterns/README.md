@@ -21,7 +21,7 @@ This master module provides an exhaustive, production-grade guide to core design
 | **Part 3** | Strategy Pattern & Dynamic Algorithms | [03-strategy-pattern.md](./03-strategy-pattern.md) | Algorithm interchangeability, Replacing monolithic `switch/case`, Validation strategies, Payment gateways, Open/Closed Principle | 🟢 Complete |
 | **Part 4** | Composition vs Inheritance Architecture | [04-composition-vs-inheritance.md](./04-composition-vs-inheritance.md) | Fragile base class problem, "Has-A" vs "Is-A", Mixins vs Functional pipes, React compound component composition | 🟢 Complete |
 | **Part 5** | Debouncing & Throttling Mechanics | [05-debouncing-throttling.md](./05-debouncing-throttling.md) | High-frequency event control, Leading vs Trailing edge, Search inputs, Scroll/Resize performance, `AbortController` pairing | 🟢 Complete |
-| **Part 6** | Memoization & Senior Pattern Selection | [06-memoization-pattern-selection.md](./06-memoization-pattern-selection.md) | Pure function caching, Cache key serialization, Memory overhead profiling, 6-pattern architectural decision matrix | 🟡 Upcoming |
+| **Part 6** | Memoization & Senior Pattern Selection | [06-memoization-pattern-selection.md](./06-memoization-pattern-selection.md) | Pure function caching, Cache key serialization, LRU cache eviction, 6-pattern master decision matrix, Overengineering governance | 🟢 Complete |
 
 ---
 
@@ -32,6 +32,7 @@ This master module provides an exhaustive, production-grade guide to core design
 - [`examples/03-strategy-pattern.js`](./examples/03-strategy-pattern.js): Demonstrates uniform validation contract normalization, dynamic strategy registry with fallback handling, higher-order discount strategies, multi-criteria table sorting, and an extensible multi-payment checkout engine.
 - [`examples/04-composition-vs-inheritance.js`](./examples/04-composition-vs-inheritance.js): Demonstrates fragile base class regressions vs explicit composed services, mixin property name collisions, left-to-right data transformation via `pipe()`, and multi-capability domain user assembly.
 - [`examples/05-debouncing-throttling.js`](./examples/05-debouncing-throttling.js): Demonstrates inline debounce re-creation bugs vs stable closure instances, production debounce with `.cancel()` and `.flush()`, and rate-limited throttling with trailing edge guarantees.
+- [`examples/06-memoization-pattern-selection.js`](./examples/06-memoization-pattern-selection.js): Demonstrates key serialization pitfalls in object memoization, LRU cache eviction policies with capacity bounding, deterministic memoization hit/miss tracking, and composite multi-pattern workflow orchestration.
 
 ---
 
