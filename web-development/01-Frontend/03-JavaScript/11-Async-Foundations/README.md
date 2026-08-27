@@ -18,7 +18,8 @@ This master module provides an exhaustive breakdown of Synchronous vs. Asynchron
 |---|---|---|---|---|
 | **Part 1** | The Fundamental Model: Synchronous vs Asynchronous Execution | [01-sync-vs-async-execution-model.md](./01-sync-vs-async-execution-model.md) | Run-to-completion rule, main-thread blocking, Web API boundaries, `setTimeout(0)` turn scheduling, and time-slicing | 🟢 Complete |
 | **Part 2** | Timers, Scheduling, Repetition & Cancellation | [02-timers-callback-scheduling-cancellation.md](./02-timers-callback-scheduling-cancellation.md) | `setTimeout`, `setInterval`, `clearTimeout`, timer drift, recursive `setTimeout` vs `setInterval`, and memory leaks | 🟢 Complete |
-| **Part 3** | Callbacks, Error-First Contracts & Inversion of Control | [03-callbacks-error-first-inversion-of-control.md](./03-callbacks-error-first-inversion-of-control.md) | Callbacks as control flow, error-first patterns, inversion of control, callback hell, and the bridge to Promises | 🟡 Upcoming |
+| **Part 3** | Callbacks, Error-First Contracts & Inversion of Control | [03-callbacks-error-first-inversion-of-control.md](./03-callbacks-error-first-inversion-of-control.md) | Callbacks as control flow, error-first patterns, inversion of control, callback hell, and the bridge to Promises | 🟢 Complete |
+| **Part 4** | Callback Queues, Task Readiness & Returning to Execution | [04-callback-queues-task-readiness-execution.md](./04-callback-queues-task-readiness-execution.md) | Task queues, ready vs executing states, Event Loop coordination, and execution order debugging | 🟡 Upcoming |
 
 ---
 
@@ -26,6 +27,7 @@ This master module provides an exhaustive breakdown of Synchronous vs. Asynchron
 
 - [`examples/01-sync-vs-async-execution-model.js`](./examples/01-sync-vs-async-execution-model.js): Demonstrates `setTimeout(fn, 0)` Call Stack vs Macrotask Queue turn boundary, synchronous callbacks (`forEach`) vs asynchronous callbacks, minimum delay threshold blocking during heavy synchronous loops, multi-timer expiration ordering, and a standalone non-blocking time-sliced batch scheduler.
 - [`examples/02-timers-scheduling-cancellation.js`](./examples/02-timers-scheduling-cancellation.js): Demonstrates `setInterval` overlapping async concurrency hazards vs recursive `setTimeout` serialization, search debouncing with obsolete timer cancellation, timer drift accumulation and clock compensation, and a standalone resilient background poller.
+- [`examples/03-callbacks-error-first-inversion-of-control.js`](./examples/03-callbacks-error-first-inversion-of-control.js): Demonstrates "Releasing Zalgo" timing bugs vs `queueMicrotask()` defensive normalization, `once()` defensive callback guards preventing multiple invocations, manual parallel callback barriers, and a standalone `promisify()` utility.
 
 ---
 
