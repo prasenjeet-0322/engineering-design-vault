@@ -37,8 +37,9 @@ To ensure **zero compromise on technical depth and quality**, every KPI in this 
 | **18** | `18-Browser-Storage-Security` | [README.md](./18-Browser-Storage-Security/README.md) | `localStorage`, `sessionStorage`, Cookies, XSS & CSRF hygiene | 🟡 Ready for Content |
 | **19** | `19-APIs-Networking-Fetch` | [README.md](./19-APIs-Networking-Fetch/README.md) | HTTP, Headers, `fetch()`, `AbortController`, Request pooling | 🟡 Ready for Content |
 | **20** | `20-Modules-ESM` | [README.md](./20-Modules-ESM/README.md) | ES Modules, Static analysis, Tree-shaking, Dynamic imports | 🟡 Ready for Content |
-| **21** | `21-Classes-OOP` | [README.md](./21-Classes-OOP/README.md) | Private fields (`#`), `extends`, `super`, Composition over Inheritance | 🟡 Ready for Content |
-| **22** | `22-Memory-Garbage-Collection` | [README.md](./22-Memory-Garbage-Collection/README.md) | Mark-and-Sweep, WeakMap/WeakSet, Memory leak diagnostics | 🟡 Ready for Content |
+| **21** | `21-Classes-OOP` | [README.md](./21-Classes-OOP/README.md) | Private fields (`#`), `extends`, `super`, Composition over Inheritance | 🟢 Complete |
+| **22** | `22-Asynchronous-JavaScript` | [README.md](./22-Asynchronous-JavaScript/README.md) | Runtime, Call Stack, Event Loop, Microtasks, Promises, async/await | 🟢 In Progress |
+| **22-GC** | `22-Memory-Garbage-Collection` | [README.md](./22-Memory-Garbage-Collection/README.md) | Mark-and-Sweep, WeakMap/WeakSet, Memory leak diagnostics | 🟡 Ready for Content |
 | **23** | `23-Advanced-Design-Patterns` | [README.md](./23-Advanced-Design-Patterns/README.md) | Observer, Pub/Sub, Strategy, Factory, Debounce/Throttle | 🟡 Ready for Content |
 | **24** | `24-Performance-Profiling` | [README.md](./24-Performance-Profiling/README.md) | Long Tasks, Web Workers, DOM Batching, DevTools Profiling | 🟡 Ready for Content |
 | 🏁 | `25-Graduation-Project` | [README.md](./25-Graduation-Project/README.md) | Production-Grade Vanilla JS Application Architecture | 🟡 Milestone |
