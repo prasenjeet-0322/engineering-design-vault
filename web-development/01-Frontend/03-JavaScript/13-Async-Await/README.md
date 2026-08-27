@@ -1,16 +1,38 @@
-# KPI 13 — Async / Await & Error Handling
+# KPI 13 — `async` / `await` & Modern Asynchronous Control Flow
 
-[⬅️ KPI 12 — Promises](../12-Promises-Concurrency/README.md) | [📚 JavaScript Index](../README.md) | [KPI 14 — Event Loop ➡️](../14-Event-Loop-Microtasks/README.md)
+[⬅️ KPI 12 — Promises & Concurrency](../12-Promises-Concurrency/README.md) | [📚 JavaScript Index](../README.md) | [KPI 14 — Event Loop & Microtasks ➡️](../14-Event-Loop-Microtasks/README.md)
 
 ---
 
 ## Overview
-*Status: 🟡 Ready for Master Content & Evaluation.*
+
+The `async` / `await` syntax provides declarative, synchronous-like ergonomics for authoring asynchronous JavaScript code without compromising non-blocking performance. While `async` / `await` significantly simplifies asynchronous control flow, it does **not** replace the underlying Promise abstraction. Under the hood, `async` functions operate as Generator Coroutines compiled over Promises and scheduled via the Event Loop's Microtask Queue.
+
+This master module provides an exhaustive, production-grade guide to `async` function execution mechanics, `await` suspension and continuation scheduling, structured `try` / `catch` / `finally` error boundaries, async iterations (`for await...of`), async waterfalls vs concurrent orchestration, and enterprise error architecture.
 
 ---
 
-## 🎯 Learning Objectives
-- The syntactic sugar of `async`/`await` over Promises and Generators.
-- Sequential waterfall anti-patterns (`await a; await b;`) vs concurrent execution (`Promise.all([a(), b()])`).
-- Error handling with structured `try/catch` blocks and wrapper tuples.
-- Async functions inside loops (`for...of` sequential vs `Promise.all(arr.map())` parallel vs `forEach` async bugs).
+## 🗺️ Module Architecture & Navigation
+
+| Part | Title | Document | Key Architectural Focus | Status |
+|---|---|---|---|---|
+| **Part 1** | The Mental Model, `async` Functions & `await` Mechanics | [01-async-await-mental-model.md](./01-async-await-mental-model.md) | Coroutine mental model, synchronous entry boundary, suspension vs non-blocking thread, waterfall elimination | 🟢 Complete |
+| **Part 2** | Error Handling with `try` / `catch` / `finally` | [02-async-await-error-handling.md](./02-async-await-error-handling.md) | `try/catch` boundaries, rejection-to-throw conversion, `return await` nuances, cleanup invariants | 🟡 Upcoming |
+| **Part 3** | Sequential vs Concurrent Execution & Waterfalls | [03-sequential-vs-concurrent-waterfalls.md](./03-sequential-vs-concurrent-waterfalls.md) | Dependency graphs, `Promise.all` with `await`, `Promise.allSettled`, bounded worker queues | 🟡 Upcoming |
+| **Part 4** | Async Iteration, Loops & `for await...of` | [04-async-iteration-loops.md](./04-async-iteration-loops.md) | `for...of` vs `Promise.all(map)` vs `forEach` async bugs, Async Iterators, streams | 🟡 Upcoming |
+| **Part 5** | Advanced Patterns, Top-Level `await` & Architecture | [05-advanced-patterns-toplevel-await.md](./05-advanced-patterns-toplevel-await.md) | Top-level `await` module graphs, cancellation via `AbortController`, telemetry profiling | 🟡 Upcoming |
+
+---
+
+## 📁 Runnable Code Examples (`examples/`)
+
+- [`examples/01-async-await-mental-model.js`](./examples/01-async-await-mental-model.js): Demonstrates synchronous entry execution before the first `await` vs post-`await` microtask continuations, parallel `Promise.all` execution eliminating async waterfalls, `await 42` primitive unboxing, and a standalone generator-to-async coroutine runner (`asyncToGenerator`).
+
+---
+
+## 🧭 Industry Badges & Evaluation Guide
+
+- 🟢 **[Daily Driver]**: Core mental models used constantly in day-to-day frontend development.
+- 🟡 **[Moderate]**: Intermediate patterns used for specialized SDK configuration, architecture, and code reviews.
+- 🔵 **[Foundational / Engine Internals]**: V8 engine internals, AST scope analysis, memory context lifting, and Staff-level concepts.
+- 🔴 **[Production-Critical]**: High-risk failure modes, race conditions, memory leaks, and fatal runtime crashes.
