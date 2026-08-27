@@ -6,7 +6,7 @@
 
 ## Overview
 
-Promises represent the foundational turning point in modern JavaScript asynchronous control flow. By transitioning from inverted callback continuations to first-class, immutable outcome containers, Promises provide standardized state lifecycles (`pending`, `fulfilled`, `rejected`), deterministic settlement guarantees, composable method chaining (`.then`, `.catch`, `.finally`), centralized error propagation, and high-performance concurrency combinators (`Promise.all`, `allSettled`, `race`, `any`).
+Promises represent the foundational turning point in modern JavaScript asynchronous control flow. By transitioning from inverted callback continuations to first-class, immutable outcome containers, Promises provide standardized state lifecycles (`pending`, `fulfilled`, `rejected`), deterministic settlement guarantees, composable method chaining (`.then`, `.catch`, `.finally`), centralized error propagation, high-performance concurrency combinators (`Promise.all`, `allSettled`, `race`, `any`), and microtask-level Event Loop scheduling.
 
 This master module provides an exhaustive, production-grade guide to the Promise state machine, Microtask scheduling semantics, thenable assimilation, chain flattening, error propagation channels, unhandled rejection diagnostics, and enterprise concurrency architectures.
 
@@ -21,7 +21,8 @@ This master module provides an exhaustive, production-grade guide to the Promise
 | **Part 3** | `.catch()`, `finally()`, Rejection & Recovery | [03-promise-error-handling-catch-finally.md](./03-promise-error-handling-catch-finally.md) | Error bubbling, recovery paths, `.finally()` pass-through semantics, and unhandled rejection diagnostics | 🟢 Complete |
 | **Part 4** | Promise Creation, Static Methods & Anti-Patterns | [04-promise-creation-static-methods.md](./04-promise-creation-static-methods.md) | `Promise.resolve`, `Promise.reject`, thenable assimilation, constructor anti-patterns, and promisification | 🟢 Complete |
 | **Part 5** | Promise Combinators & Concurrency Coordination | [05-promise-combinators-concurrency.md](./05-promise-combinators-concurrency.md) | `Promise.all`, `allSettled`, `race`, `any`, fail-fast vs resilient inspection, and concurrency limiting | 🟢 Complete |
-| **Part 6** | Advanced Patterns, Microtasks & Telemetry | [06-promise-microtasks-scheduling-advanced-patterns.md](./06-promise-microtasks-scheduling-advanced-patterns.md) | Microtask queue scheduling, execution order prediction, memory leaks, and enterprise telemetry | 🟡 Upcoming |
+| **Part 6** | Promise Timing, Microtasks & Event Loop Scheduling | [06-promise-microtasks-scheduling-advanced-patterns.md](./06-promise-microtasks-scheduling-advanced-patterns.md) | Microtask queue drain, priority over macrotasks, `async` synchronous boundary, and starvation prevention | 🟢 Complete |
+| **Part 7** | Real-World Patterns, Anti-Patterns & Telemetry | [07-promise-patterns-antipatterns-telemetry.md](./07-promise-patterns-antipatterns-telemetry.md) | Deferred patterns, sequential reduce chains, memory leaks, unhandled rejections, and master telemetry | 🟡 Upcoming |
 
 ---
 
@@ -32,6 +33,7 @@ This master module provides an exhaustive, production-grade guide to the Promise
 - [`examples/03-promise-error-handling-catch-finally.js`](./examples/03-promise-error-handling-catch-finally.js): Demonstrates accidental `undefined` error recovery vs explicit fallbacks, `.finally()` value transparency vs thrown error override, async error bubbling, intermediate rethrowing, and a standalone multi-tier resilient pipeline.
 - [`examples/04-promise-creation-static-methods.js`](./examples/04-promise-creation-static-methods.js): Demonstrates the `new Promise(async ...)` unhandled rejection and hang hazard, executor `return` value discarding, `Promise.resolve()` identity preservation, thenable object assimilation, and a generic Node.js callback promisifier.
 - [`examples/05-promise-combinators-concurrency.js`](./examples/05-promise-combinators-concurrency.js): Demonstrates `Promise.all()` fail-fast vs `Promise.allSettled()` resilient inspection, `Promise.race()` vs `Promise.any()`, input index preservation, and a standalone concurrency pool throttler.
+- [`examples/06-promise-microtasks-scheduling-advanced-patterns.js`](./examples/06-promise-microtasks-scheduling-advanced-patterns.js): Demonstrates microtask queue drain exhaustion before macrotasks, `async` function synchronous beginning boundary vs deferred `await` continuations, `queueMicrotask` FIFO order, and a standalone microtask state batcher.
 
 ---
 
