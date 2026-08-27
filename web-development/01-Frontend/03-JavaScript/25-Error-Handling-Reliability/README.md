@@ -17,7 +17,7 @@ This master module provides an exhaustive, production-grade guide to JavaScript 
 | Part | Title | Document | Key Architectural Focus | Status |
 |---|---|---|---|---|
 | **Part 1** | Errors, Exceptions & the JavaScript Failure Model | [01-errors-exceptions-failure-model.md](./01-errors-exceptions-failure-model.md) | Error vs Bug vs Exception, Built-in Error taxonomy (`TypeError`, `ReferenceError`), `Error.stack`, Programmer vs Operational errors | 🟢 Complete |
-| **Part 2** | `try`, `catch`, `finally` Mechanics | [02-try-catch-finally-mechanics.md](./02-try-catch-finally-mechanics.md) | Synchronous catch blocks, Scope isolation, `finally` execution guarantees, Re-throwing | 🟡 Upcoming |
+| **Part 2** | `try`, `catch`, `finally` & Synchronous Error Handling | [02-try-catch-finally-mechanics.md](./02-try-catch-finally-mechanics.md) | Synchronous catch blocks, Scope isolation, `finally` execution guarantees, Re-throwing, `Error.cause` | 🟢 Complete |
 | **Part 3** | Error Propagation & Custom Error Hierarchies | [03-error-propagation-custom-errors.md](./03-error-propagation-custom-errors.md) | Unwinding call stacks, Subclassing `Error`, Attaching structured metadata, Domain error modeling | 🟡 Upcoming |
 | **Part 4** | Async Errors, Promise Rejections & Unhandled Handlers | [04-async-errors-promise-rejections.md](./04-async-errors-promise-rejections.md) | `unhandledrejection`, Async/await `try/catch`, Microtask error bubbles, Promise error cascades | 🟡 Upcoming |
 | **Part 5** | API Failure Handling, Fallbacks & Retry Strategies | [05-api-failure-handling-retry-strategies.md](./05-api-failure-handling-retry-strategies.md) | Exponential backoff with jitter, Circuit breakers, Graceful degradation, Offline cache fallbacks | 🟡 Upcoming |
@@ -30,6 +30,7 @@ This master module provides an exhaustive, production-grade guide to JavaScript 
 ## 📁 Runnable Code Examples (`examples/`)
 
 - [`examples/01-errors-exceptions-failure-model.js`](./examples/01-errors-exceptions-failure-model.js): Demonstrates primitive string throw pitfalls vs Error instance stack traces, Programmer vs Operational error classification, call stack unwinding, and a standalone Error Normalizer.
+- [`examples/02-try-catch-finally-mechanics.js`](./examples/02-try-catch-finally-mechanics.js): Demonstrates `return` in `finally` suppressing thrown exceptions, asynchronous `setTimeout` boundary escapes, `Error.cause` root-cause chaining, and a standalone Resilient Pipeline Runner.
 
 ---
 
