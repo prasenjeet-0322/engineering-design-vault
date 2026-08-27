@@ -23,7 +23,7 @@ This master module provides an exhaustive, production-grade guide to JavaScript 
 | **Part 5** | API Failure Handling, Retries & Production-Safe Requests | [05-api-failure-handling-retry-strategies.md](./05-api-failure-handling-retry-strategies.md) | `response.ok` check, Exponential backoff with full jitter, `Idempotency-Key` headers, `AbortController` cancellation | 🟢 Complete |
 | **Part 6** | React Error Boundaries, Recovery & Resilient UI Architecture | [06-react-error-boundaries-recovery.md](./06-react-error-boundaries-recovery.md) | `componentDidCatch`, `getDerivedStateFromError`, Granular feature boundaries, `resetKeys`, Suspense integration | 🟢 Complete |
 | **Part 7** | Logging, Observability & Production Debugging | [07-logging-observability-production-tracing.md](./07-logging-observability-production-tracing.md) | Sentry / Datadog integration, Source map symbolication, Breadcrumbs, PII scrubbing, Correlation IDs | 🟢 Complete |
-| **Part 8** | Systematic Debugging Methodologies & Diagnostic Workflows | [08-systematic-debugging-methodologies.md](./08-systematic-debugging-methodologies.md) | Binary search debugging, Conditional breakpoints, Reproducing heisenbugs, Root-cause analysis | 🟡 Upcoming |
+| **Part 8** | Systematic Debugging Methodologies & Diagnostic Workflows | [08-systematic-debugging-methodologies.md](./08-systematic-debugging-methodologies.md) | Binary search debugging, Conditional breakpoints, Reproducing heisenbugs, Root-cause analysis (5 Whys) | 🟢 Complete |
 
 ---
 
@@ -36,6 +36,7 @@ This master module provides an exhaustive, production-grade guide to JavaScript 
 - [`examples/05-api-failure-handling-retry-strategies.js`](./examples/05-api-failure-handling-retry-strategies.js): Demonstrates `fetch()` `response.ok` checks vs unhandled 503s, `Idempotency-Key` mutation deduplication, full jitter calculations, and a standalone resilient fetch engine.
 - [`examples/06-react-error-boundaries-recovery.js`](./examples/06-react-error-boundaries-recovery.js): Demonstrates event handler crash escapes vs caught render crashes, `resetKeys` boundary recovery, and hierarchical widget containment.
 - [`examples/07-logging-observability-production-tracing.js`](./examples/07-logging-observability-production-tracing.js): Demonstrates recursive PII scrubbing, structured JSON logging, correlation ID header propagation, and breadcrumb ring-buffers.
+- [`examples/08-systematic-debugging-methodologies.js`](./examples/08-systematic-debugging-methodologies.js): Demonstrates defensive patch masking hazards vs invariant assertions, race condition transaction guards, binary search fault isolation, and invariant data pipelines.
 
 ---
 
