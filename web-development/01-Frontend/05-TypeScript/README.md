@@ -2,20 +2,120 @@
 
 [⬅️ Level 04: Browser Internals](../04-Browser-Internals-Web-Platform/README.md) | [📚 Frontend Master Hub](../README.md) | [Level 06: React Fundamentals ➡️](../06-React-Fundamentals/README.md)
 
-> **Lead Architect & Repository Owner:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer \| Founding Engineer)  
+> **Repository Owner & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer \| Founding Engineer)  
 > **Co-Author & Contributor:** [Prasanjeet Yadav](https://www.linkedin.com/in/prasenjeet-yadav-2277a6258/) ([GitHub](https://github.com/prasenjeet-0322)) (Mid-Level Full Stack Engineer)
 
 ---
 
 ## 🎯 Level Goal
 
-Transform an engineer with deep JavaScript foundations into a system architect capable of designing, modeling, maintaining, and scaling type-safe frontend applications. This level focuses on TypeScript as a static type system, compiler tool, and architectural boundary—moving beyond simple syntax annotations to type-safe domain modeling, advanced generics, runtime validation boundaries, compiler performance, and React/Next.js preparation.
+Transform an engineer into a **Senior Full-Stack / Platform Architect** capable of designing, modeling, maintaining, and scaling enterprise type-safe applications. 
+
+This level approaches TypeScript not merely as "JavaScript with syntax annotations," but as a **static type analysis engine, compiler pipeline, and architectural contract system**—moving beyond basic types into algebraic domain modeling, type-safe API boundaries (Zod), compiler performance optimization, and React 19 / Next.js Server Action integration.
 
 ---
 
-## 🗺️ Level 5 KPI Roadmap
+## 🧭 Tiered Mastery Classification
+
+```text
+LEVEL 5 — TYPESCRIPT ENTERPRISE ARCHITECTURE
+│
+├── 🔴 TIER 1: MUST KNOW (Core Senior Full-Stack Competency)
+│   ├── Mental Model, Fundamentals, Objects, Discriminated Unions, Generics, Utility Types,
+│   │   Escape Hatches, Runtime Validation (Zod), tsconfig Architecture, React/Next.js Integration
+│
+├── 🟢 TIER 2: GOOD TO KNOW (Senior Differentiators & SDK/Library Architecture)
+│   ├── Advanced Operators (infer/mapped/conditional), Type-Level Programming, OOP Classes,
+│   │   Ambient Modules (.d.ts), Compiler Diagnostics/Performance, Branded Domain Types
+│
+├── ⚪ TIER 3: TAXONOMY & TYPE REFERENCE MAP
+│   └── Categorized Type System & Utility Operator Cheat Sheet
+│
+└── 🔴 CAPSTONE: ENTERPRISE TYPE-SAFE DOMAIN ENGINE & SDK (KPI 18)
+    └── Production E-Commerce SDK with Branded IDs, Zod Validation, and Zero-Type-Leakage React Client
+```
+
+---
+
+## 🎯 Mastery Level Target Matrix
+
+```text
+RECOGNIZE ───► UNDERSTAND ───► USE ───► DEBUG ───► MASTER
+```
+
+| KPI Module | Tier | Target Mastery Level | Why It Matters for Senior/Founding Full-Stack Engineers |
+|---|---|---|---|
+| **01. TypeScript Mental Model** | 🔴 MUST KNOW | 🔴 **Master** | Prevent false runtime security assumptions and reason about structural subtyping. |
+| **02. Type System Fundamentals** | 🔴 MUST KNOW | 🔴 **Master** | Eliminate `any` pollution; correctly wield `unknown`, `never`, and strict nulls. |
+| **03. Object Type Modeling** | 🔴 MUST KNOW | 🔴 **Master** | Prevent excess property leaks, enforce immutability with `readonly`, choose `interface` vs `type`. |
+| **04. Union Types & Narrowing** | 🔴 MUST KNOW | 🔴 **Master** | Eliminate impossible async states via Discriminated Unions and exhaustiveness with `never`. |
+| **05. Functions & Advanced Typing** | 🔴 MUST KNOW | 🔴 **Master** | Author clean function overloads, contextual typing, and generic higher-order functions. |
+| **06. Generics Deep Dive** | 🔴 MUST KNOW | 🔴 **Master** | Author reusable, flexible component & API abstractions using `extends` constraints. |
+| **07. Advanced Type Operators** | 🟢 GOOD TO KNOW | 🟢 **Understand** | Wield `keyof`, `typeof`, indexed access, mapped types, and conditional `infer`. |
+| **08. Built-In Utility Types** | 🔴 MUST KNOW | 🔴 **Master** | Fluidly transform domain models with `Pick`, `Omit`, `Record`, `ReturnType`, `Awaited`. |
+| **09. Type-Level Programming** | 🟢 GOOD TO KNOW | 🟢 **Use** | Construct deep immutable structures (`DeepReadonly`) and type-safe dot-notation paths. |
+| **10. Type Assertions & Hatches** | 🔴 MUST KNOW | 🔴 **Master** | Control escape hatches safely with `as const` and `@ts-expect-error` instead of `any`. |
+| **11. Runtime Validation (Zod)** | 🔴 MUST KNOW | 🔴 **Master** | Gate the 5 universal trust boundaries (APIs, Storage, Env, Forms) with schema parsers. |
+| **12. Classes & OOP TypeScript** | 🟢 GOOD TO KNOW | 🟢 **Understand** | Structure clean enterprise service layers with abstract classes and access modifiers. |
+| **13. Modules & Ambient `.d.ts`** | 🟢 GOOD TO KNOW | 🟢 **Master** | Author clean declaration files, declaration maps (`.d.ts.map`), and library type definitions. |
+| **14. Compiler Configuration** | 🔴 MUST KNOW | 🔴 **Master** | Configure enterprise `tsconfig.json`, `isolatedModules`, `moduleResolution`, Project References. |
+| **15. Compiler Performance** | 🟢 GOOD TO KNOW | 🟢 **Debug** | Diagnose slow build times using `tsc --extendedDiagnostics` and eliminate `tsserver` lag. |
+| **16. Type-Safe Architecture** | 🟢 GOOD TO KNOW | 🟢 **Master** | Prevent primitive obsession with Branded Types and decouple API DTOs from UI domain models. |
+| **17. React & Next.js Integration**| 🔴 MUST KNOW | 🔴 **Master** | Type generic React 19 components, custom hooks, Server Actions, and RSC boundaries. |
+| **18. Graduation Capstone** | 🔴 CAPSTONE | 🔴 **Master** | Build an enterprise SDK proving 100% end-to-end type safety from database to UI. |
+
+---
+
+## 🗺️ Master Curriculum & KPI Directory (18 KPIs)
+
+### 🏛️ Pillar 1: Type System Foundations & Core Modeling
+| KPI | Module Title | Tier | Core Focus |
+|---|---|---|---|
+| **[KPI 01](./01-TypeScript-Mental-Model/README.md)** | [TypeScript Mental Model](./01-TypeScript-Mental-Model/README.md) | 🔴 MUST KNOW | Static analysis vs runtime memory, structural subtyping ($\text{Source} \supseteq \text{Target}$), 5-stage `tsc` pipeline, type erasure. |
+| **[KPI 02](./02-Type-System-Fundamentals/README.md)** | [Type System Fundamentals](./02-Type-System-Fundamentals/README.md) | 🔴 MUST KNOW | Type inference, widening, literal types, `as const`, tri-state decision matrix (`any` vs `unknown` vs `never`), strict null checks. |
+| **[KPI 03](./03-Object-Type-Modeling/README.md)** | [Object Type Modeling](./03-Object-Type-Modeling/README.md) | 🔴 MUST KNOW | `interface` vs `type`, excess property checks on fresh literals, index signatures, interface merging, `readonly` immutability. |
+| **[KPI 04](./04-Union-Types-Type-Narrowing/README.md)** | [Union Types & Type Narrowing](./04-Union-Types-Type-Narrowing/README.md) | 🔴 MUST KNOW | Control flow analysis, discriminated unions, `typeof`/`instanceof`/`in` narrowing, custom type guards (`is`), `never` exhaustiveness. |
+| **[KPI 05](./05-Functions-Advanced-Function-Typing/README.md)** | [Functions & Advanced Function Typing](./05-Functions-Advanced-Function-Typing/README.md) | 🔴 MUST KNOW | Function signatures, overloads vs union parameters, contextual typing, `this` parameter typing, generic higher-order functions. |
+| **[KPI 06](./06-Generics-Deep-Dive/README.md)** | [Generics Deep Dive](./06-Generics-Deep-Dive/README.md) | 🔴 MUST KNOW | Generic type arguments, constraints (`extends`), default types, generic interfaces/classes, generic factories. |
+
+---
+
+### ⚡ Pillar 2: Type Operators, Utilities & Runtime Boundaries
+| KPI | Module Title | Tier | Core Focus |
+|---|---|---|---|
+| **[KPI 07](./07-Advanced-Type-Operators/README.md)** | [Advanced Type Operators](./07-Advanced-Type-Operators/README.md) | 🟢 GOOD TO KNOW | `keyof`, `typeof`, indexed access (`T[K]`), mapped types (`[P in K]`), conditional types (`T extends U ? X : Y`), `infer` keyword. |
+| **[KPI 08](./08-Built-In-Utility-Types/README.md)** | [Built-In Utility Types](./08-Built-In-Utility-Types/README.md) | 🔴 MUST KNOW | `Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`, `Exclude`, `Extract`, `NonNullable`, `ReturnType`, `Parameters`, `Awaited`. |
+| **[KPI 09](./09-Custom-Utility-Types-Type-Level-Programming/README.md)** | [Custom Utility Types & Type-Level Programming](./09-Custom-Utility-Types-Type-Level-Programming/README.md) | 🟢 GOOD TO KNOW | `DeepReadonly`, `DeepPartial`, Template Literal types, type-safe dot-notation path resolvers (`Paths<T>`), tuple manipulation. |
+| **[KPI 10](./10-Type-Assertions-Escape-Hatches/README.md)** | [Type Assertions & Escape Hatches](./10-Type-Assertions-Escape-Hatches/README.md) | 🔴 MUST KNOW | Type assertions (`as`), double assertions (`as unknown as T`), non-null assertion (`!`), `@ts-expect-error` vs `@ts-ignore`. |
+| **[KPI 11](./11-Runtime-Validation-Type-Safety-Boundaries/README.md)** | [Runtime Validation & Type-Safety Boundaries](./11-Runtime-Validation-Type-Safety-Boundaries/README.md) | 🔴 MUST KNOW | Gating the 5 universal trust boundaries (APIs, Storage, URLs, Forms, Env) with **Zod** / **Valibot**, static inference (`z.infer`). |
+
+---
+
+### 🏢 Pillar 3: Object-Oriented Design, Modules & Tooling Architecture
+| KPI | Module Title | Tier | Core Focus |
+|---|---|---|---|
+| **[KPI 12](./12-Classes-Object-Oriented-TypeScript/README.md)** | [Classes & Object-Oriented TypeScript](./12-Classes-Object-Oriented-TypeScript/README.md) | 🟢 GOOD TO KNOW | Access modifiers (`public`, `private`, `protected`, `#private`), parameter properties, abstract classes, interface implementation. |
+| **[KPI 13](./13-Modules-Declaration-Files-Ambient-Types/README.md)** | [Modules, Declaration Files & Ambient Types](./13-Modules-Declaration-Files-Ambient-Types/README.md) | 🟢 GOOD TO KNOW | `.d.ts` declaration files, `declare module`, `declare global`, `typeRoots`, declaration maps (`.d.ts.map`), `isolatedModules`. |
+| **[KPI 14](./14-TypeScript-Compiler-Configuration/README.md)** | [TypeScript Compiler Configuration](./14-TypeScript-Compiler-Configuration/README.md) | 🔴 MUST KNOW | Enterprise `tsconfig.json`, `strict` flags, `noImplicitAny`, `exactOptionalPropertyTypes`, `moduleResolution`, Project References. |
+| **[KPI 15](./15-TypeScript-Performance-Large-Codebases/README.md)** | [TypeScript Performance & Large Codebases](./15-TypeScript-Performance-Large-Codebases/README.md) | 🟢 GOOD TO KNOW | Diagnosing `tsc` checking latency with `--extendedDiagnostics`, recursive type depth limits, `tsserver` memory optimization. |
+
+---
+
+### 🚀 Pillar 4: Architecture, Framework Integration & Capstone
+| KPI | Module Title | Tier | Core Focus |
+|---|---|---|---|
+| **[KPI 16](./16-Type-Safe-Application-Architecture/README.md)** | [Type-Safe Application Architecture](./16-Type-Safe-Application-Architecture/README.md) | 🟢 GOOD TO KNOW | Domain modeling, Branded/Nominal types (`UserId` vs `OrderId`), Finite State Machines, Decoupling DTOs from UI models. |
+| **[KPI 17](./17-TypeScript-React-Nextjs-Preparation/README.md)** | [TypeScript for React & Next.js Preparation](./17-TypeScript-React-Nextjs-Preparation/README.md) | 🔴 MUST KNOW | Typing component props, polymorphic components (`as`), generic hooks, typing Server Actions, React 19 RSC boundaries. |
+| **[KPI 18](./18-Graduation-Project/README.md)** | [Graduation Project: Enterprise Domain Engine & SDK](./18-Graduation-Project/README.md) | 🔴 CAPSTONE MASTER | Build an end-to-end type-safe E-Commerce SDK with branded types, Zod boundary validation, generic repositories, and React UI. |
+
+---
+
+## 📖 Comprehensive Per-KPI Curriculum Breakdown
+
+---
 
 ### [KPI 1 — TypeScript Mental Model](./01-TypeScript-Mental-Model/README.md)
+* **Tier:** 🔴 MUST KNOW
 * **Purpose:** Understand what TypeScript actually is, what guarantees it provides at compile time vs runtime, structural subtyping, and its soundness tradeoffs.
 * **Core Scope:**
   - Static type checking & type erasure
@@ -29,6 +129,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 2 — Type System Fundamentals](./02-Type-System-Fundamentals/README.md)
+* **Tier:** 🔴 MUST KNOW
 * **Purpose:** Master core annotations, type inference, type widening, literal types, and critical tri-state primitives (`any`, `unknown`, `never`).
 * **Core Scope:**
   - Type annotations & type inference mechanics
@@ -42,6 +143,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 3 — Object Type Modeling](./03-Object-Type-Modeling/README.md)
+* **Tier:** 🔴 MUST KNOW
 * **Purpose:** Model complex object shapes using `interface` and `type` aliases, understanding structural compatibility, index signatures, and excess property checks.
 * **Core Scope:**
   - `interface` vs `type` aliases: structural differences, declaration merging, performance
@@ -55,110 +157,124 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 4 — Union Types & Type Narrowing](./04-Union-Types-Type-Narrowing/README.md)
+* **Tier:** 🔴 MUST KNOW
 * **Purpose:** Master control flow analysis, type guards, discriminated unions, and exhaustiveness checking for robust, safe state modeling.
 * **Core Scope:**
   - Union types & intersections
-  - Control flow analysis & narrowing (`typeof`, `instanceof`, `in`, equality checks)
-  - Discriminated unions & algebraic data types
+  - Control Flow Analysis (CFA) and type narrowing
+  - Type guards: `typeof`, `instanceof`, `in`, and custom type predicates (`is`)
+  - Discriminated Unions (tagged unions) for state machines
   - Exhaustiveness checking using the `never` type
-  - User-defined type guards (`is` predicates) & assertion functions (`asserts`)
-* **Practical Competency:** Model complex UI and API states without raw type assertions by leveraging control flow narrowing and discriminated unions.
-* **Graduation Criteria:** Implement exhaustively checked state machines that trigger compile errors when new union members are added.
+* **Practical Competency:** Replace scattered boolean flags with robust Discriminated Unions and handle all union branches safely.
+* **Graduation Criteria:** Build a state machine with full exhaustiveness checking where adding a new state triggers a compile-time error until handled.
 
 ---
 
 ### [KPI 5 — Functions & Advanced Function Typing](./05-Functions-Advanced-Function-Typing/README.md)
-* **Purpose:** Deeply type functional signatures, overloads, generic callbacks, and `this` contexts without repeating JS function basics.
+* **Tier:** 🔴 MUST KNOW
+* **Purpose:** Type complex functions, callbacks, overloads, and higher-order functions while leveraging contextual typing and `this` annotations.
 * **Core Scope:**
-  - Function parameter & return type annotations/inference
-  - Optional, default, and rest parameter typing
-  - Function overloading vs union return signatures
-  - Typing callbacks, higher-order functions, and generic function signatures
-  - Typing `this` in function contexts
-* **Practical Competency:** Design expressive, type-safe functional APIs and generic utility functions.
-* **Graduation Criteria:** Author clean function overloads and generic callback signatures that preserve type inference for call sites.
+  - Function signatures, parameter types, and return type inference
+  - Optional and default parameters
+  - Rest parameters and tuple rest types
+  - Function overloads vs union parameters (tradeoffs & best practices)
+  - `this` parameter typing in callbacks
+  - Contextual typing and higher-order functions
+* **Practical Competency:** Author expressive function signatures and overloads for library/utility functions without leaky type assertions.
+* **Graduation Criteria:** Write a clean, overloaded utility function with full contextual type inference for consumer callbacks.
 
 ---
 
 ### [KPI 6 — Generics Deep Dive](./06-Generics-Deep-Dive/README.md)
-* **Purpose:** Build reusable, type-safe abstractions using generic parameters, constraints, indexed access, and generic defaults.
+* **Tier:** 🔴 MUST KNOW
+* **Purpose:** Master generic functions, interfaces, classes, constraints, and default type parameters to author reusable, type-safe abstractions.
 * **Core Scope:**
-  - Generic functions, interfaces, classes, and type aliases
-  - Generic constraints (`extends`)
-  - `keyof` and `typeof` operators in type positions
-  - Indexed access types (`T[K]`)
-  - Generic parameter defaults and dependent type relationships
-  - Engineering judgment: balancing generic abstraction vs DX complexity
-* **Practical Competency:** Create flexible, reusable utility components and API abstractions without over-engineering type signatures.
-* **Graduation Criteria:** Build a generic data-fetching abstraction with full constraint checking and key-based type inference.
+  - Generic functions and type parameter inference
+  - Generic interfaces and type aliases
+  - Generic constraints using `extends`
+  - Default generic type parameters
+  - Generics with multiple type parameters
+  - When to use generics vs when they add unnecessary complexity
+* **Practical Competency:** Design reusable, flexible data structures and API helper functions that preserve precise type identity.
+* **Graduation Criteria:** Implement a generic repository or data-fetching wrapper with constrained generic parameters.
 
 ---
 
 ### [KPI 7 — Advanced Type Operators](./07-Advanced-Type-Operators/README.md)
-* **Purpose:** Master type-level manipulation using mapped types, template literal types, conditional types, and the `infer` keyword.
+* **Tier:** 🟢 GOOD TO KNOW
+* **Purpose:** Harness TypeScript's type-level operators (`keyof`, `typeof`, indexed access, mapped types, conditional types, and `infer`).
 * **Core Scope:**
-  - `keyof`, `typeof`, and indexed access operators
-  - Mapped types (`[K in keyof T]`) & key remapping (`as`)
-  - Template literal types for string pattern manipulation
-  - Conditional types (`T extends U ? X : Y`) & distributive conditional types
-  - Type extraction using `infer`
-* **Practical Competency:** Solve complex type transformation problems required for component libraries, design systems, and state managers.
-* **Graduation Criteria:** Construct conditional and mapped type helpers that transform object shapes dynamically based on string patterns.
+  - `keyof` and `typeof` operators
+  - Indexed access types (`T[K]`)
+  - Mapped types (`[P in K]`, key remapping with `as`)
+  - Conditional types (`T extends U ? X : Y`)
+  - The `infer` keyword in conditional types
+  - Distributive conditional types
+* **Practical Competency:** Read, understand, and construct advanced type transformations for complex library and domain requirements.
+* **Graduation Criteria:** Author a custom conditional type that unwraps nested Promises and extracts function return types using `infer`.
 
 ---
 
 ### [KPI 8 — Built-In Utility Types](./08-Built-In-Utility-Types/README.md)
-* **Purpose:** Understand the internal implementation, problem domain, and usage tradeoffs of TypeScript's built-in standard library utilities.
+* **Tier:** 🔴 MUST KNOW
+* **Purpose:** Fluently use TypeScript's standard utility types to transform, mutate, and extract object and function types efficiently.
 * **Core Scope:**
-  - Object shape modifiers: `Partial`, `Required`, `Readonly`, `Pick`, `Omit`, `Record`
-  - Set operations: `Exclude`, `Extract`, `NonNullable`
-  - Function & Promise tools: `Parameters`, `ReturnType`, `Awaited`, `InstanceType`
-  - When to use built-in utilities vs custom type modeling
-* **Practical Competency:** Apply built-in utility types to refactor and transform existing types efficiently without duplication.
-* **Graduation Criteria:** Re-implement key built-in utilities (`Omit`, `ReturnType`, `Awaited`) from scratch using type operators.
+  - Object transformation: `Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`
+  - Union manipulation: `Exclude`, `Extract`, `NonNullable`
+  - Function utilities: `ReturnType`, `Parameters`, `ConstructorParameters`, `InstanceType`
+  - Promise utilities: `Awaited`
+  - Combining utility types to express domain models cleanly
+* **Practical Competency:** Transform existing domain types for different application layers (e.g. Create DTO vs Update DTO vs View Model) without duplication.
+* **Graduation Criteria:** Derive multiple CRUD entity schemas from a single base type using composition of built-in utility types.
 
 ---
 
 ### [KPI 9 — Custom Utility Types & Type-Level Programming](./09-Custom-Utility-Types-Type-Level-Programming/README.md)
-* **Purpose:** Build practical, production-grade custom utility types for state managers, API clients, form systems, and design systems.
+* **Tier:** 🟢 GOOD TO KNOW
+* **Purpose:** Build custom, production-grade utility types (e.g. `DeepReadonly`, `DeepPartial`, path resolvers, template literal types) without falling into over-engineering.
 * **Core Scope:**
-  - Designing reusable domain-specific utility types
-  - Deep mutable/readonly transformations (e.g. `DeepReadonly<T>`, `DeepPartial<T>`)
-  - Recursive type aliases and depth control
-  - Path extraction & nested property lookups (e.g. `NestedKeys<T>`)
-  - Practical type-level programming bounds (avoiding type gymnastics)
-* **Practical Competency:** Implement clean type utilities that empower application developers without causing IDE latency.
-* **Graduation Criteria:** Author a production-grade nested key selector utility (`Path<T>`) used in form state libraries.
+  - Recursive type definitions (`DeepPartial<T>`, `DeepReadonly<T>`)
+  - Template literal types & string manipulation utilities
+  - Dot-notation object path resolvers (`Paths<T>`, `PathValue<T, P>`)
+  - Tuple manipulation types (Push, Pop, Shift, Unshift)
+  - Type-level performance budgets & preventing compiler recursion depth errors
+* **Practical Competency:** Create safe, ergonomic type helpers for form paths, nested state updates, and schema mappers.
+* **Graduation Criteria:** Author a type-safe `get(object, "nested.path.key")` resolver with complete autocomplete and return type inference.
 
 ---
 
 ### [KPI 10 — Type Assertions & Escape Hatches](./10-Type-Assertions-Escape-Hatches/README.md)
-* **Purpose:** Safely evaluate and control type assertions, const assertions, non-null assertions, and unsafe escape hatches.
+* **Tier:** 🔴 MUST KNOW
+* **Purpose:** Understand when and how to safely use type assertions, non-null assertions, `any`, and `@ts-expect-error` without compromising type safety.
 * **Core Scope:**
-  - Type assertions (`as T`) vs Type narrowing vs Type guards
-  - Const assertions (`as const`) & tuple literal inference
-  - Non-null assertions (`!`) and double assertions (`as unknown as T`)
-  - The golden rule: "TypeScript compiler satisfied ≠ Runtime data valid"
-  - Auditing and eliminating `any` and unsafe assertions in codebases
-* **Practical Competency:** Minimize type assertions across applications and enforce safe fallback mechanisms when assertions are unavoidable.
-* **Graduation Criteria:** Refactor a legacy module containing unsafe `as` and `!` assertions into 100% type-safe guarded code.
+  - Type assertions (`as Type`) vs type casting / conversion
+  - Double assertions (`as unknown as T`) and their severe hazards
+  - Non-null assertion operator (`!`) and runtime risks
+  - `const` assertions (`as const`) for deep immutability
+  - `@ts-expect-error` vs `@ts-ignore` (strict compiler comment directives)
+  - Defending against unsafe third-party library typings
+* **Practical Competency:** Audit a codebase for unsafe type assertions and replace them with runtime type guards or safe narrowing.
+* **Graduation Criteria:** Successfully refactor an untyped legacy module using safe narrowing, removing all `as any` and `!` assertions.
 
 ---
 
 ### [KPI 11 — Runtime Validation & Type Safety Boundaries](./11-Runtime-Validation-Type-Safety-Boundaries/README.md)
-* **Purpose:** Establish strict architectural boundaries between unvalidated external data (APIs, LocalStorage, User Input) and typed internal domain models.
+* **Tier:** 🔴 MUST KNOW
+* **Purpose:** Bridge the gap between static types and dynamic external runtime data using schema validation libraries (Zod, Valibot) and type inference.
 * **Core Scope:**
-  - The Type Boundary Pattern: External Data → Validation → Trusted Typed Data
-  - Runtime validation vs Compile-time static checking
-  - Schema validation with Zod / Valibot / ArkType
-  - Inferring TypeScript types from schemas (`z.infer<typeof Schema>`)
-  - Environment variable, API payload, and form validation architecture
-* **Practical Competency:** Build end-to-end type-safe data pipelines that validate runtime data before exposing it to application logic.
-* **Graduation Criteria:** Build an API client that parses raw JSON payloads with Zod, throwing runtime validation errors while inferring strict static types.
+  - Why TypeScript cannot validate external runtime data (APIs, localStorage, user input)
+  - Schema-first validation with Zod / Valibot
+  - Type inference from runtime schemas (`z.infer<typeof Schema>`)
+  - Safe API client wrappers & response validation
+  - Environment variable validation & type-safe configuration loading
+  - Designing resilient boundary architectures
+* **Practical Competency:** Guarantee end-to-end type safety at all I/O boundaries, ensuring unvalidated runtime data never infects internal domain logic.
+* **Graduation Criteria:** Implement a type-safe API client that validates incoming JSON payloads at runtime and infers the static domain type automatically.
 
 ---
 
 ### [KPI 12 — Classes & Object-Oriented TypeScript](./12-Classes-Object-Oriented-TypeScript/README.md)
+* **Tier:** 🟢 GOOD TO KNOW
 * **Purpose:** Apply TypeScript's OOP enhancements (access modifiers, abstract classes, parameter properties) where appropriate vs functional composition.
 * **Core Scope:**
   - Access modifiers (`public`, `private`, `protected`) vs ES `#private` fields
@@ -172,6 +288,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 13 — Modules, Declaration Files & Ambient Types](./13-Modules-Declaration-Files-Ambient-Types/README.md)
+* **Tier:** 🟢 GOOD TO KNOW
 * **Purpose:** Manage `.d.ts` declaration files, declaration merging, module augmentation, ambient types, and untyped third-party packages.
 * **Core Scope:**
   - Declaration files (`.d.ts`) and ambient module declarations (`declare module`)
@@ -185,6 +302,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 14 — TypeScript Compiler & Configuration](./14-TypeScript-Compiler-Configuration/README.md)
+* **Tier:** 🔴 MUST KNOW
 * **Purpose:** Master `tsconfig.json` flags, strictness settings, path aliases, compiler targets, and project references.
 * **Core Scope:**
   - `tsconfig.json` anatomy and inheritance (`extends`)
@@ -198,6 +316,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 15 — TypeScript Performance & Large Codebases](./15-TypeScript-Performance-Large-Codebases/README.md)
+* **Tier:** 🟢 GOOD TO KNOW
 * **Purpose:** Diagnose and optimize slow type-checking compilation times, complex type recursion, and IDE developer experience in large codebases.
 * **Core Scope:**
   - Type checker performance diagnostics (`tsc --extendedDiagnostics`, `--generateTrace`)
@@ -211,6 +330,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 16 — Type-Safe Application Architecture](./16-Type-Safe-Application-Architecture/README.md)
+* **Tier:** 🟢 GOOD TO KNOW
 * **Purpose:** Architect end-to-end type-safe frontend systems using domain models, DTOs, discriminated union state machines, and Result error types.
 * **Core Scope:**
   - Domain models vs Data Transfer Objects (DTOs)
@@ -224,6 +344,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ---
 
 ### [KPI 17 — TypeScript with React & Next.js Preparation Layer](./17-TypeScript-React-Nextjs-Preparation/README.md)
+* **Tier:** 🔴 MUST KNOW
 * **Purpose:** Prepare for React and Next.js by mastering prop typing, event handlers, generic components, hooks typing, and server/client boundaries.
 * **Core Scope:**
   - Component props modeling (`children`, optional props, discriminated prop unions)
@@ -240,6 +361,7 @@ Transform an engineer with deep JavaScript foundations into a system architect c
 ## 🎓 TypeScript Graduation Project
 
 ### [KPI 18 — Enterprise Type-Safe E-Commerce Domain Engine & SDK](./18-Graduation-Project/README.md)
+* **Tier:** 🔴 CAPSTONE MASTER
 
 **Description:**
 Build a headless, fully type-safe E-Commerce Domain Engine & API SDK. The project features a strict state-machine checkout pipeline, typed event bus, runtime Zod API validation layer, custom generic query builder, and clean domain boundaries—configured under strict compiler settings.
@@ -288,3 +410,7 @@ LEVEL 5 — TYPESCRIPT
         ↓
 LEVEL 6 → React Fundamentals
 ```
+
+---
+
+[⬅️ Level 04: Browser Internals](../04-Browser-Internals-Web-Platform/README.md) | [📚 Frontend Master Hub](../README.md) | [Level 06: React Fundamentals ➡️](../06-React-Fundamentals/README.md)

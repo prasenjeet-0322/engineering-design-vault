@@ -2,8 +2,7 @@
 
 [⬅️ Level 03: JavaScript](../03-JavaScript/README.md) | [📚 Frontend Master Hub](../README.md) | [Level 05: TypeScript ➡️](../05-TypeScript/README.md)
 
-> **Repository Owner & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer \| Founding Engineer)  
-> **Co-Author & Contributor:** [Prasanjeet Yadav](https://www.linkedin.com/in/prasenjeet-yadav-2277a6258/) ([GitHub](https://github.com/prasenjeet-0322)) (Mid-Level Full Stack Engineer)
+> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
 
 ---
 
@@ -31,6 +30,31 @@ LEVEL 4 — BROWSER INTERNALS & WEB PLATFORM
 │
 └── 🔴 CAPSTONE: BROWSER ↔ REACT ↔ NEXT.JS EXECUTION MODEL
     └── End-to-End Execution: From Server Component Payload to GPU Composited Pixels
+```
+
+---
+
+## 🧪 Interactive Diagnostic Labs & DevTools Runbooks
+
+Unlike syntax-focused topics, **Browser Internals** cannot be mastered through static code alone. Every KPI in this level is paired with **interactive browser diagnostic labs, DevTools runbooks, and programmatic scripts** located in each module's `examples/` directory:
+
+```text
+               THE 3-TIER BROWSER DIAGNOSTIC COMPANION SYSTEM
+               
+ ┌───────────────────────────────────────┐  Double-click & run in Chrome/Edge
+ │ 1. INTERACTIVE BROWSER LABS (.html)   │  Live visual experiments proving main-thread freezes,
+ │                                       │  layout thrashing, OOPIF isolation, and worker latency.
+ └───────────────────┬───────────────────┘
+                     │
+ ┌───────────────────▼───────────────────┐  Step-by-step diagnostic workflows for Performance flame
+ │ 2. DEVTOOLS DIAGNOSTIC RUNBOOKS (.md) │  charts, Heap Snapshot retainer trees, network waterfall
+ │                                       │  stalls, and `chrome://` internal telemetry consoles.
+ └───────────────────┬───────────────────┘
+                     │
+ ┌───────────────────▼───────────────────┐  Automated Node.js scripts leveraging Chrome DevTools
+ │ 3. HEADLESS CDP & TRACE SCRIPTS (.js) │  Protocol (CDP) and PerformanceObserver to capture
+ │                                       │  process metrics, INP interaction delays, and heap sizes.
+ └───────────────────────────────────────┘
 ```
 
 ---

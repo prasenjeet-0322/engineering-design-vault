@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 04: Page Lifecycle, Navigation Timing & BFCache Inspector</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 10px var(--accent-green);
+    }
+
+    .status-dot.hidden {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 10px var(--accent-yellow);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-container {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 260px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-event {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .log-time {
+      color: var(--text-secondary);
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      margin-top: 0.5rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      color: var(--text-secondary);
+      font-weight: 600;
+      background: var(--bg-card);
+    }
+
+    td.val {
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 04: Page Lifecycle, Navigation Timing & BFCache</h1>
+      <p class="subtitle">Real-time observer for Document Lifecycle Transitions, BFCache Restoration, and Navigation Timing APIs.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Live Lifecycle State -->
+      <div class="card">
+        <h2>🧭 Live Document Lifecycle State</h2>
+        <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+          <div class="status-badge">
+            <span class="status-dot" id="vis-dot"></span>
+            <span id="vis-text">document.visibilityState: visible</span>
+          </div>
+          <div class="status-badge" id="bfcache-badge" style="border-color: rgba(0, 245, 160, 0.3); color: var(--accent-green);">
+            BFCache: Eligible
+          </div>
+        </div>
+
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Switch tabs or minimize your window to trigger <code>visibilitychange</code>. Navigate back/forward to observe BFCache <code>pageshow (persisted)</code> state!
+        </p>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="simulateSPA()">⚡ Simulate SPA Route (pushState)</button>
+          <button class="btn-secondary" onclick="simulateHeavyWork()">⏳ Simulate 500ms Long Task</button>
+          <button class="btn-secondary" onclick="clearLogs()">🧹 Clear Logs</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Lifecycle Event Stream -->
+      <div class="card">
+        <h2>📜 Lifecycle Event Stream</h2>
+        <div class="log-container" id="log-box"></div>
+      </div>
+    </div>
+
+    <!-- Navigation Timing Table -->
+    <div class="card">
+      <h2>⏱️ Navigation Timing Breakdown (PerformanceNavigationTiming)</h2>
+      <div class="table-container">
+        <table id="nav-table">
+          <thead>
+            <tr>
+              <th>Lifecycle Phase</th>
+              <th>Calculation Formula</th>
+              <th>Measured Time</th>
+              <th>Significance</th>
+            </tr>
+          </thead>
+          <tbody id="nav-tbody">
+            <tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">Measuring navigation metrics...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logBox = document.getElementById('log-box');
+    const visDot = document.getElementById('vis-dot');
+    const visText = document.getElementById('vis-text');
+    const navTbody = document.getElementById('nav-tbody');
+
+    function logEvent(name, detail = '') {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const time = (performance.now()).toFixed(1) + 'ms';
+      entry.innerHTML = `<span class="log-event">${name}</span> <span style="color: var(--text-primary);">${detail}</span> <span class="log-time">${time}</span>`;
+      logBox.appendChild(entry);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function clearLogs() {
+      logBox.innerHTML = '';
+      logEvent('SYSTEM', 'Logs cleared');
+    }
+
+    // 1. Initial Synchronous Execution
+    logEvent('INITIAL_SCRIPT', 'Synchronous JS execution started');
+
+    // 2. DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+      logEvent('DOMContentLoaded', 'DOM Tree constructed; deferred scripts executed');
+    });
+
+    // 3. Load
+    window.addEventListener('load', () => {
+      logEvent('load', 'Document and subresources finished loading');
+      populateNavigationMetrics();
+    });
+
+    // 4. pageshow (BFCache detection)
+    window.addEventListener('pageshow', (event) => {
+      logEvent('pageshow', `persisted: ${event.persisted ? 'TRUE (⚡ Restored from BFCache)' : 'FALSE (Fresh Load)'}`);
+    });
+
+    // 5. pagehide
+    window.addEventListener('pagehide', (event) => {
+      logEvent('pagehide', `persisted: ${event.persisted ? 'TRUE (Entering BFCache)' : 'FALSE (Document Terminating)'}`);
+    });
+
+    // 6. visibilitychange
+    document.addEventListener('visibilitychange', () => {
+      const state = document.visibilityState;
+      visText.textContent = `document.visibilityState: ${state}`;
+      if (state === 'visible') {
+        visDot.className = 'status-dot';
+      } else {
+        visDot.className = 'status-dot hidden';
+      }
+      logEvent('visibilitychange', `State changed to "${state}"`);
+    });
+
+    // 7. SPA Simulation
+    function simulateSPA() {
+      const newPath = '/dashboard/' + Math.floor(Math.random() * 1000);
+      history.pushState({ page: newPath }, '', newPath);
+      logEvent('SPA_NAVIGATION', `history.pushState() ──► ${newPath} (No DOMContentLoaded fired)`);
+    }
+
+    // 8. Long Task Simulation
+    function simulateHeavyWork() {
+      logEvent('LONG_TASK_START', 'Locking Main Thread for 500ms...');
+      setTimeout(() => {
+        const start = performance.now();
+        while (performance.now() - start < 500) {
+          // Blocking CPU loop
+        }
+        logEvent('LONG_TASK_END', 'Main thread released after 500ms');
+      }, 50);
+    }
+
+    // 9. Navigation Timing Population
+    function populateNavigationMetrics() {
+      setTimeout(() => {
+        const nav = performance.getEntriesByType('navigation')[0];
+        if (!nav) return;
+
+        const metrics = [
+          { phase: 'DNS Resolution', formula: 'domainLookupEnd - domainLookupStart', val: (nav.domainLookupEnd - nav.domainLookupStart).toFixed(2) + ' ms', note: 'Hostname to IP address resolution' },
+          { phase: 'TCP + TLS Handshake', formula: 'connectEnd - connectStart', val: (nav.connectEnd - nav.connectStart).toFixed(2) + ' ms', note: 'Socket connection and TLS 1.3 cryptographic setup' },
+          { phase: 'TTFB (Time to First Byte)', formula: 'responseStart - requestStart', val: (nav.responseStart - nav.requestStart).toFixed(2) + ' ms', note: 'Server backend processing and initial HTML latency' },
+          { phase: 'HTML Download Time', formula: 'responseEnd - responseStart', val: (nav.responseEnd - nav.responseStart).toFixed(2) + ' ms', note: 'Network transfer time of the HTML document' },
+          { phase: 'DOM Interactive', formula: 'domInteractive - startTime', val: (nav.domInteractive - nav.startTime).toFixed(2) + ' ms', note: 'HTML parsing finished; DOM construction completed' },
+          { phase: 'DOMContentLoaded Event', formula: 'domContentLoadedEventEnd - startTime', val: (nav.domContentLoadedEventEnd - nav.startTime).toFixed(2) + ' ms', note: 'Deferred scripts executed; DOM ready' },
+          { phase: 'Complete Load Event', formula: 'loadEventEnd - startTime', val: (nav.loadEventEnd - nav.startTime).toFixed(2) + ' ms', note: 'All stylesheets, images, and fonts completely downloaded' }
+        ];
+
+        navTbody.innerHTML = metrics.map(m => `
+          <tr>
+            <td style="font-weight: 600; color: var(--text-primary);">${m.phase}</td>
+            <td style="color: var(--text-secondary);">${m.formula}</td>
+            <td class="val">${m.val}</td>
+            <td style="color: var(--text-secondary); font-size: 0.8rem;">${m.note}</td>
+          </tr>
+        `).join('');
+      }, 100);
+    }
+  </script>
+</body>
+</html>

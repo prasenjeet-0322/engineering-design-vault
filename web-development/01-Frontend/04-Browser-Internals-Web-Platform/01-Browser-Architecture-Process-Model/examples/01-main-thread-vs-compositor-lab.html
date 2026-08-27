@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 01: Main Thread Freeze vs. GPU Compositor Independence</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent-green: #238636;
+      --accent-red: #da3633;
+      --accent-blue: #58a6ff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    h1 {
+      color: #f0f6fc;
+      margin-bottom: 0.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      background-color: #21262d;
+      border: 1px solid var(--border);
+      color: var(--accent-blue);
+      margin-bottom: 1.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .spinner-box {
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+
+    /* CSS Compositor Spinner: Promoted to GPU Layer */
+    .css-spinner {
+      width: 70px;
+      height: 70px;
+      border: 6px solid #30363d;
+      border-top: 6px solid #2ea043;
+      border-radius: 50%;
+      will-change: transform;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* JavaScript Main-Thread Spinner: Mutated via JS style */
+    .js-spinner {
+      width: 70px;
+      height: 70px;
+      border: 6px solid #30363d;
+      border-top: 6px solid #f85149;
+      border-radius: 50%;
+    }
+
+    .controls {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      background-color: var(--accent-red);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 1rem;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      background-color: #21262d;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    #status {
+      margin-top: 1rem;
+      font-family: monospace;
+      font-size: 0.95rem;
+      color: var(--accent-blue);
+    }
+
+    .explanation {
+      background-color: #161b22;
+      border-left: 4px solid var(--accent-blue);
+      padding: 1rem 1.5rem;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 01: Main Thread vs. GPU Compositor Independence</h1>
+  <div class="badge">Level 04 — KPI 01: Browser Architecture & Process Model</div>
+
+  <p>
+    This lab visually demonstrates the architectural separation between the <strong>Main Thread</strong> (which executes DOM, CSSOM, and JavaScript) and the <strong>Compositor Thread</strong> (which submits GPU hardware transformation frames).
+  </p>
+
+  <div class="grid">
+    <!-- CSS Compositor Spinner -->
+    <div class="card">
+      <h3>🟢 GPU Compositor Thread Animation</h3>
+      <p style="font-size: 0.85rem; color: #8b949e;">CSS <code>transform: rotate()</code> with <code>will-change: transform</code></p>
+      <div class="spinner-box">
+        <div class="css-spinner"></div>
+      </div>
+      <p style="color: #3fb950; font-size: 0.9rem; font-weight: bold;">Keeps spinning during Main Thread lockups!</p>
+    </div>
+
+    <!-- JS Main Thread Spinner -->
+    <div class="card">
+      <h3>🔴 Main Thread JS Animation</h3>
+      <p style="font-size: 0.85rem; color: #8b949e;">Driven by JavaScript <code>requestAnimationFrame</code> loop</p>
+      <div class="spinner-box">
+        <div id="jsSpinner" class="js-spinner"></div>
+      </div>
+      <p style="color: #f85149; font-size: 0.9rem; font-weight: bold;">Freezes completely when JS blocks!</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <h3>⚙️ Execution Controls</h3>
+    <p>Click the button below to execute a synchronous 5-second blocking computation (simulating an unoptimized synchronous calculation or massive JSON parsing on the Main Thread):</p>
+    
+    <button id="blockBtn" onclick="blockMainThread(5000)">🔥 Block Main Thread for 5 Seconds</button>
+    <button class="btn-secondary" onclick="blockMainThread(2000)">Block 2 Seconds</button>
+
+    <div id="status">Status: Main thread is idle (60 FPS).</div>
+  </div>
+
+  <div class="explanation">
+    <h4>🧠 What to Observe:</h4>
+    <ol>
+      <li>When you click <strong>"Block Main Thread"</strong>, notice that the red <strong>JavaScript Spinner freezes instantly</strong> and the status text stops updating.</li>
+      <li>Notice that the green <strong>CSS Spinner continues spinning at 60 FPS without a single dropped frame!</strong></li>
+      <li><strong>Architectural Reason:</strong> The CSS animation uses <code>transform</code> on a GPU-promoted layer. The <strong>Compositor Thread</strong> updates the transform matrix and communicates with the <strong>GPU Process</strong> completely independently of the locked <strong>Main Thread</strong>.</li>
+    </ol>
+  </div>
+
+  <script>
+    // 1. Run JavaScript Main-Thread Spinner Loop
+    let angle = 0;
+    const jsSpinner = document.getElementById("jsSpinner");
+
+    function animateJsSpinner() {
+      angle = (angle + 6) % 360;
+      jsSpinner.style.transform = `rotate(${angle}deg)`;
+      requestAnimationFrame(animateJsSpinner);
+    }
+    requestAnimationFrame(animateJsSpinner);
+
+    // 2. Synchronous Main-Thread Blocker
+    function blockMainThread(durationMs) {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = `Status: 🔥 Main Thread BLOCKED for ${durationMs / 1000}s! Try clicking anywhere...`;
+      statusEl.style.color = "#f85149";
+
+      // Allow UI to update status text before freezing
+      setTimeout(() => {
+        const start = performance.now();
+        // Synchronous busy-wait loop that saturates the CPU core on the Main Thread:
+        while (performance.now() - start < durationMs) {
+          // Blocking call stack...
+        }
+
+        statusEl.textContent = `Status: ✅ Main Thread unblocked! Yielded back to event loop.`;
+        statusEl.style.color = "#3fb950";
+      }, 50);
+    }
+  </script>
+</body>
+</html>
