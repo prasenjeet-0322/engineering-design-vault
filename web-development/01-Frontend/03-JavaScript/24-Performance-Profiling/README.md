@@ -1,17 +1,48 @@
-# KPI 24 — JavaScript Performance & Profiling
+# KPI 24 — JavaScript Performance & Profiling Architecture
 
-[⬅️ KPI 23 — Design Patterns](../23-Advanced-Design-Patterns/README.md) | [📚 JavaScript Index](../README.md) | [🏁 Graduation Project ➡️](../25-Graduation-Project/README.md)
+[⬅️ KPI 23 — Advanced Design Patterns](../23-Advanced-Design-Patterns/README.md) | [📚 JavaScript Index](../README.md) | [🏁 KPI 25 — Error Handling & Reliability ➡️](../25-Error-Handling-Reliability/README.md)
 
 ---
 
 ## Overview
-*Status: 🟡 Ready for Master Content & Evaluation.*
+
+High-performance JavaScript engineering is not simply about micro-optimizing algorithms; it requires a deep, mechanical understanding of the **Browser Rendering Pipeline**, Main-Thread scheduling budgets, C++ DOM engine crossing, Forced Synchronous Layouts, Long Tasks ($>50\text{ms}$), Web Workers, and DevTools CPU/Memory profiling.
+
+This master module provides an exhaustive, production-grade guide to diagnosing, measuring, and eliminating frontend performance bottlenecks, layout thrashing, frame drops, memory leaks, and profiling diagnostics.
 
 ---
 
-## 🎯 Learning Objectives
-- Understanding Browser Reflows (Layout) and Repaints (Paint) triggered by JS property reads (`offsetWidth`, `getBoundingClientRect`).
-- Layout Thrashing and FastDOM batching architecture.
-- Long Tasks (>50ms) and Main Thread blocking (Total Blocking Time - TBT).
-- Offloading heavy compute to Web Workers via `postMessage` and `Comlink`.
-- Profiling memory allocations and performance CPU profiles in Chrome DevTools.
+## 🗺️ Module Architecture & Navigation
+
+| Part | Title | Document | Key Architectural Focus | Status |
+|---|---|---|---|---|
+| **Part 1** | The Browser Performance Mental Model & Expensive DOM Operations | [01-browser-performance-mental-model-dom-operations.md](./01-browser-performance-mental-model-dom-operations.md) | Main thread budget ($16.67\text{ms}$ / $8.33\text{ms}$), DOM reads vs writes, `DocumentFragment`, DOM as View vs Database | 🟢 Complete |
+| **Part 2** | DOM Batching & Layout Thrashing | [02-dom-batching-layout-thrashing.md](./02-dom-batching-layout-thrashing.md) | Forced synchronous layout, FastDOM architecture, Read/Write phase separation, Reflow triggers, GPU transforms | 🟢 Complete |
+| **Part 3** | Reflow, Repaint & The Complete Rendering Pipeline | [03-reflow-repaint-rendering-pipeline.md](./03-reflow-repaint-rendering-pipeline.md) | Layout vs Paint vs Compositing, CSS containment (`contain`), `will-change` VRAM tradeoffs, `content-visibility` | 🟢 Complete |
+| **Part 4** | Event Listener Performance & Event Delegation | [04-event-listener-performance-delegation.md](./04-event-listener-performance-delegation.md) | Passive event listeners (`{ passive: true }`), Event delegation (`closest`), Memory leaks, `AbortController` teardown | 🟢 Complete |
+| **Part 5** | Long Tasks & Main-Thread Non-Blocking Execution | [05-long-tasks-main-thread-blocking.md](./05-long-tasks-main-thread-blocking.md) | Total Blocking Time (TBT), Interaction to Next Paint (INP), Time-slicing (`scheduler.yield()`), Cooperative chunking | 🟢 Complete |
+| **Part 6** | Web Workers & Off-Main-Thread Multi-Threading | [06-web-workers-multi-threading.md](./06-web-workers-multi-threading.md) | Dedicated workers, Structured clone tax, Transferable Objects (`ArrayBuffer`), Request ID versioning, Lifecycle | 🟢 Complete |
+| **Part 7** | Memory Performance, Garbage Collection & JavaScript Memory Leaks | [07-performance-profiling-diagnostics.md](./07-performance-profiling-diagnostics.md) | Mark-and-Sweep GC, Detached DOM node leaks, Anonymous listener identity traps, `WeakMap`, Heap snapshots | 🟢 Complete |
+| **Part 8** | Performance Measurement, Profiling & Debugging | [08-performance-profiling-debugging.md](./08-performance-profiling-debugging.md) | `performance.now()`, User Timing API (`mark`/`measure`), Flamecharts, Self vs Total time, `PerformanceObserver` | 🟢 Complete |
+
+---
+
+## 📁 Runnable Code Examples (`examples/`)
+
+- [`examples/01-browser-performance-mental-model-dom-operations.js`](./examples/01-browser-performance-mental-model-dom-operations.js): Demonstrates simulated layout thrashing reflow count vs batched read-then-write phase separation, in-memory filtering benchmarks vs DOM traversal, and a standalone microtask batch scheduler.
+- [`examples/02-dom-batching-layout-thrashing.js`](./examples/02-dom-batching-layout-thrashing.js): Demonstrates clean read vs dirty read forced reflow counts, equal-height card loop thrashing vs phase-separated batching, and a FastDOM priority task scheduler.
+- [`examples/03-reflow-repaint-rendering-pipeline.js`](./examples/03-reflow-repaint-rendering-pipeline.js): Demonstrates pipeline stage classification (Layout vs Paint vs Composite), `will-change` VRAM memory allocation calculations, and CSS containment subtree reflow isolation.
+- [`examples/04-event-listener-performance-delegation.js`](./examples/04-event-listener-performance-delegation.js): Demonstrates fragile `matches()` vs robust `closest()` nested target resolution, debounce vs throttle high-frequency burst execution counts, and a standalone event delegation router.
+- [`examples/05-long-tasks-main-thread-blocking.js`](./examples/05-long-tasks-main-thread-blocking.js): Demonstrates the `async` CPU-blocking misconception benchmark, Total Blocking Time (TBT) calculations, and a standalone time-sliced array chunk processor.
+- [`examples/06-web-workers-multi-threading.js`](./examples/06-web-workers-multi-threading.js): Demonstrates Structured Clone serialization copy overhead vs Transferable `ArrayBuffer` zero-copy transfer, monotonic Request ID race condition resolution, and a standalone Worker RPC gateway engine.
+- [`examples/07-performance-profiling-diagnostics.js`](./examples/07-performance-profiling-diagnostics.js): Demonstrates detached DOM subtree retention simulation, anonymous event listener teardown failures vs named cleanup, `Map` vs `WeakMap` ephemeral metadata retention, and a standalone resource lifecycle registry.
+- [`examples/08-performance-profiling-debugging.js`](./examples/08-performance-profiling-debugging.js): Demonstrates microbenchmark traps vs flamechart bottlenecks, User Timing API (`mark`/`measure`) lifecycle, Self Time vs Total Time calculations, and a standalone performance profiler harness.
+
+---
+
+## 🧭 Industry Badges & Evaluation Guide
+
+- 🟢 **[Daily Driver]**: Core mental models used constantly in day-to-day frontend development.
+- 🟡 **[Moderate]**: Intermediate patterns used for specialized SDK configuration, architecture, and code reviews.
+- 🔵 **[Foundational / Engine Internals]**: V8 engine internals, AST scope analysis, memory context lifting, and Staff-level concepts.
+- 🔴 **[Production-Critical]**: High-risk failure modes, race conditions, memory leaks, and fatal runtime crashes.
