@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 08: Form Submission, Constraint Validation & FormData Inspector</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
+      color: var(--text-secondary);
+    }
+
+    input[type="text"], input[type="email"] {
+      width: 100%;
+      padding: 0.6rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-family);
+    }
+
+    input:focus {
+      outline: 1px solid var(--accent-cyan);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 340px;
+      overflow-y: auto;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 08: Form Submission & Constraint Validation Visualizer</h1>
+      <p class="subtitle">Inspect native form submission algorithms, constraint validation checks, FormData serialization, and requestSubmit() vs submit() gotchas.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Interactive Form -->
+      <div class="card">
+        <h2>⚡ Interactive Form Controls</h2>
+        <form id="demo-form" action="/mock-action" method="POST">
+          <div class="form-group">
+            <label for="username">Username (Required, min 3 chars):</label>
+            <input type="text" id="username" name="username" required minlength="3" placeholder="Enter username...">
+          </div>
+
+          <div class="form-group">
+            <label for="email">Work Email (Email pattern):</label>
+            <input type="email" id="email" name="email" required placeholder="user@example.com">
+          </div>
+
+          <div class="btn-group">
+            <button type="submit" class="btn-primary" name="submitter" value="primary_btn">🚀 Native Submit Button</button>
+            <button type="button" class="btn-secondary" onclick="triggerRequestSubmit()">✨ form.requestSubmit()</button>
+            <button type="button" class="btn-secondary" onclick="triggerDirectSubmit()">⚠️ form.submit() (Bypasses Validations)</button>
+            <button type="button" class="btn-secondary" onclick="checkValidityOnly()">🔍 checkValidity()</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Card 2: Submission Event Log -->
+      <div class="card">
+        <h2>📜 Submission Lifecycle & FormData Stream</h2>
+        <div class="log-box" id="form-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('demo-form');
+    const formLog = document.getElementById('form-log');
+
+    function logAction(tag, tagClass, message) {
+      const row = document.createElement('div');
+      row.style.padding = '0.3rem 0';
+      row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+      row.innerHTML = `<span class="tag ${tagClass}">${tag}</span> <span style="font-size: 0.8rem;">${message}</span>`;
+      formLog.appendChild(row);
+      formLog.scrollTop = formLog.scrollHeight;
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault(); // Intercept native navigation for demonstration
+      logAction('SUBMIT EVENT', 'tag-green', `Dispatched on &lt;form&gt; • Submitter: ${e.submitter ? e.submitter.textContent.trim() : 'None (JS)'}`);
+
+      const formData = new FormData(form);
+      const entries = Array.from(formData.entries()).map(([k, v]) => `${k}="${v}"`).join(', ');
+      logAction('FORMDATA BUILT', 'tag-cyan', `Constructed entries: { ${entries} }`);
+      logAction('JS FETCH', 'tag-purple', `Dispatched POST /mock-action via fetch() with multipart/form-data payload.`);
+    });
+
+    form.addEventListener('invalid', (e) => {
+      logAction('CONSTRAINT INVALID', 'tag-red', `Field #${e.target.id} failed validation: "${e.target.validationMessage}"`);
+    }, true);
+
+    function triggerRequestSubmit() {
+      logAction('REQUEST_SUBMIT', 'tag-yellow', 'Invoked form.requestSubmit() $\\to$ Triggers constraint validation & submit event!');
+      form.requestSubmit();
+    }
+
+    function triggerDirectSubmit() {
+      logAction('DIRECT_SUBMIT', 'tag-red', 'Invoked form.submit() 🛑 WARNING: Bypasses constraint validation and submit event listeners!');
+      alert('form.submit() would perform full document navigation without firing "submit" listeners!');
+    }
+
+    function checkValidityOnly() {
+      const isValid = form.checkValidity();
+      logAction('CHECK_VALIDITY', isValid ? 'tag-green' : 'tag-yellow', `form.checkValidity() = ${isValid} (Validation check only, no submission triggered)`);
+      if (!isValid) {
+        form.reportValidity();
+      }
+    }
+  </script>
+</body>
+</html>

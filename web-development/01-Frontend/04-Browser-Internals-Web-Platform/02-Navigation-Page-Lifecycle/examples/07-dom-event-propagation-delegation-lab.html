@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 07: DOM Event Propagation, Delegation & Passive Listeners Visualizer</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 320px;
+      overflow-y: auto;
+    }
+
+    /* Nested DOM box layout */
+    .dom-box {
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 0.5rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .dom-box#outer-box { border-color: var(--accent-purple); background: rgba(192, 132, 252, 0.05); }
+    .dom-box#middle-box { border-color: var(--accent-blue); background: rgba(79, 172, 254, 0.05); }
+    .dom-box#inner-box { border-color: var(--accent-cyan); background: rgba(0, 242, 254, 0.05); }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 07: DOM Event Propagation & Delegation Visualizer</h1>
+      <p class="subtitle">Live interactive sandbox demonstrating 3-phase DOM event propagation (Capture $\to$ Target $\to$ Bubble), event delegation, and stopPropagation vs preventDefault boundaries.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Interactive Nested Tree -->
+      <div class="card">
+        <h2>⚡ Interactive DOM Tree</h2>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Click the innermost button or text to trigger propagation through the nested container hierarchy:
+        </div>
+
+        <div class="dom-box" id="outer-box">
+          <span style="font-size: 0.75rem; color: var(--accent-purple); font-weight: bold;">#outer-container</span>
+          <div class="dom-box" id="middle-box">
+            <span style="font-size: 0.75rem; color: var(--accent-blue); font-weight: bold;">#middle-card</span>
+            <div class="dom-box" id="inner-box">
+              <button class="btn-primary" id="target-btn">
+                <span id="target-span" style="pointer-events: auto;">🎯 Click Inner Target</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem;">
+          <label><input type="checkbox" id="chk-stop-prop"> Call <code>stopPropagation()</code></label>
+          <label><input type="checkbox" id="chk-prev-def"> Call <code>preventDefault()</code></label>
+        </div>
+      </div>
+
+      <!-- Card 2: Event Stream & Target Inspector -->
+      <div class="card">
+        <h2>📜 Event Dispatch & Target Stream</h2>
+        <div class="log-box" id="event-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const eventLog = document.getElementById('event-log');
+    const chkStopProp = document.getElementById('chk-stop-prop');
+    const chkPrevDef = document.getElementById('chk-prev-def');
+
+    function logPhase(phaseName, tagClass, currentId, targetTag) {
+      const row = document.createElement('div');
+      row.style.padding = '0.3rem 0';
+      row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+      row.innerHTML = `
+        <span class="tag ${tagClass}">${phaseName}</span>
+        <span style="color: var(--accent-cyan);">currentTarget: #${currentId}</span>
+        <span style="color: var(--text-secondary); font-size: 0.75rem;">(target: &lt;${targetTag}&gt;)</span>
+      `;
+      eventLog.appendChild(row);
+      eventLog.scrollTop = eventLog.scrollHeight;
+    }
+
+    const elements = ['outer-box', 'middle-box', 'inner-box', 'target-btn'];
+
+    // Register Capture Listeners
+    elements.forEach(id => {
+      document.getElementById(id).addEventListener('click', (e) => {
+        logPhase('1. CAPTURE', 'tag-purple', id, e.target.tagName);
+      }, { capture: true });
+    });
+
+    // Register Target & Bubble Listeners
+    elements.forEach(id => {
+      document.getElementById(id).addEventListener('click', (e) => {
+        if (id === 'target-btn') {
+          logPhase('2. TARGET', 'tag-green', id, e.target.tagName);
+          if (chkStopProp.checked) {
+            e.stopPropagation();
+            const note = document.createElement('div');
+            note.innerHTML = '<span class="tag tag-red">STOPPED</span> <span style="color: var(--accent-red); font-size: 0.75rem;">stopPropagation() invoked • Bubbling halted!</span>';
+            eventLog.appendChild(note);
+          }
+          if (chkPrevDef.checked) {
+            e.preventDefault();
+            const note = document.createElement('div');
+            note.innerHTML = '<span class="tag tag-yellow">CANCELLED</span> <span style="color: var(--accent-yellow); font-size: 0.75rem;">preventDefault() invoked • Default browser action suppressed!</span>';
+            eventLog.appendChild(note);
+          }
+        } else {
+          logPhase('3. BUBBLE', 'tag-cyan', id, e.target.tagName);
+        }
+      }, { capture: false });
+    });
+
+    document.getElementById('target-span').addEventListener('click', () => {
+      eventLog.innerHTML = '<div style="color: var(--accent-yellow); font-size: 0.8rem; margin-bottom: 0.5rem;">⚡ Dispatched click event on &lt;span&gt; target...</div>';
+    });
+  </script>
+</body>
+</html>

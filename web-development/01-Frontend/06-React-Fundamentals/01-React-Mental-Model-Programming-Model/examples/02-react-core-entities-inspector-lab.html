@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 02: React Core Entities & Memory Structure Visualizer</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .entity-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .entity-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.25rem;
+    }
+
+    .json-code {
+      color: var(--accent-cyan);
+      white-space: pre-wrap;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 380px;
+      overflow-y: auto;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+
+    input.demo-input {
+      width: 100%;
+      padding: 0.6rem;
+      border-radius: 6px;
+      border: 1px solid var(--accent-cyan);
+      background: var(--bg-primary);
+      color: #fff;
+      font-family: var(--font-mono);
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 06 — React Fundamentals</div>
+      <h1>🧪 Lab 02: React Core Entities & Memory Anatomy</h1>
+      <p class="subtitle">Inspect how Component Functions, React Elements, Fiber Nodes, and Browser DOM Nodes map in memory, and test the classic focus-loss bug.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Memory Entities -->
+      <div class="card">
+        <h2>🔬 Entity Memory Structure Inspector</h2>
+        
+        <div class="entity-box">
+          <div class="entity-header">
+            <span style="color: var(--accent-yellow); font-weight: bold;">1. React Element Object (Descriptor)</span>
+            <span class="tag tag-cyan">EPHEMERAL JS HEAP</span>
+          </div>
+          <div class="json-code" id="element-inspect">{
+  "$$typeof": "Symbol(react.element)",
+  "type": "UserCard",
+  "props": { "name": "Srikar", "role": "Architect" },
+  "key": null,
+  "ref": null
+}</div>
+        </div>
+
+        <div class="entity-box">
+          <div class="entity-header">
+            <span style="color: var(--accent-purple); font-weight: bold;">2. Fiber Node (Internal Work & State)</span>
+            <span class="tag tag-purple">PERSISTENT REACT TREE</span>
+          </div>
+          <div class="json-code" id="fiber-inspect">{
+  "type": "UserCard",
+  "memoizedProps": { "name": "Srikar" },
+  "memoizedState": { "count": 1, "next": null },
+  "child": "Fiber(article)",
+  "return": "Fiber(App)",
+  "stateNode": null
+}</div>
+        </div>
+
+        <div class="entity-box">
+          <div class="entity-header">
+            <span style="color: var(--accent-green); font-weight: bold;">3. Host DOM Node (Browser C++)</span>
+            <span class="tag tag-green">HOST DOM TREE</span>
+          </div>
+          <div class="json-code" id="dom-inspect">&lt;article class="user-card"&gt;
+  &lt;h2&gt;Srikar&lt;/h2&gt;
+&lt;/article&gt;</div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="simulateRenderPass()">🔄 Simulate Next Render (New Element Objects)</button>
+          <button class="btn-secondary" onclick="simulateNestedComponentBug()">⚠️ Simulate Nested Component Focus Bug</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Interactive Focus Sandbox & Telemetry -->
+      <div class="card">
+        <h2>🔥 Live Focus & Identity Sandbox</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          Type below. In buggy mode (nested component declaration), the DOM node is destroyed and recreated on each keystroke, killing cursor focus!
+        </p>
+        <div id="input-sandbox-container">
+          <input type="text" id="sandbox-input" class="demo-input" placeholder="Type here to test DOM identity preservation..." oninput="handleKeystroke(event)">
+        </div>
+
+        <div class="log-box" id="entity-log" style="margin-top: 1rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const entityLog = document.getElementById('entity-log');
+    let renderIndex = 1;
+    let isBuggyMode = false;
+
+    function logMsg(tag, tagClass, msg) {
+      const now = performance.now().toFixed(1);
+      const row = document.createElement('div');
+      row.style.padding = '0.3rem 0';
+      row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+      row.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.75rem;">${now}ms</span> <span class="tag ${tagClass}">${tag}</span> <span style="font-size: 0.8rem;">${msg}</span>`;
+      entityLog.appendChild(row);
+      entityLog.scrollTop = entityLog.scrollHeight;
+    }
+
+    function simulateRenderPass() {
+      renderIndex++;
+      logMsg('RENDER TRIGGER', 'tag-yellow', `Render #${renderIndex} initiated.`);
+      logMsg('ELEMENT ALLOC', 'tag-cyan', `New ReactElement objects created: element_#${renderIndex} !== element_#${renderIndex - 1}`);
+      logMsg('FIBER MATCH', 'tag-purple', `Reconciliation: Same type & position -> Reusing existing Fiber node! State preserved.`);
+      logMsg('DOM PATCH', 'tag-green', `DOM Node HTMLArticleElement preserved in place; attributes updated without remount.`);
+    }
+
+    function simulateNestedComponentBug() {
+      isBuggyMode = !isBuggyMode;
+      logMsg('MODE CHANGE', isBuggyMode ? 'tag-red' : 'tag-green', `Nested Component Declaration Mode: ${isBuggyMode ? 'ENABLED (BUGGY)' : 'DISABLED (CORRECT)'}`);
+    }
+
+    function handleKeystroke(e) {
+      const char = e.data || e.target.value.slice(-1);
+      if (isBuggyMode) {
+        logMsg('BUGGY RENDER', 'tag-red', `Nested function reference changed! element.type is NEW function.`);
+        logMsg('DOM DESTROY', 'tag-red', `💥 Unmounting old Fiber -> Removing HTMLInputElement from DOM -> Mounting brand-new DOM node!`);
+        
+        // Recreate input node to simulate exact bug in real DOM
+        const val = e.target.value;
+        const container = document.getElementById('input-sandbox-container');
+        container.innerHTML = `<input type="text" id="sandbox-input" class="demo-input" value="${val}" placeholder="Type here..." oninput="handleKeystroke(event)">`;
+        logMsg('FOCUS LOST', 'tag-yellow', `⚠️ Notice: Cursor focus was lost because the DOM node was replaced!`);
+      } else {
+        logMsg('KEYSTROKE', 'tag-green', `Character '${char}' typed. Host input node identity preserved; focus maintained.`);
+      }
+    }
+
+    logMsg('INITIALIZED', 'tag-cyan', 'Lab 02 ready. Component -> Element -> Fiber -> DOM inspector loaded.');
+  </script>
+</body>
+</html>

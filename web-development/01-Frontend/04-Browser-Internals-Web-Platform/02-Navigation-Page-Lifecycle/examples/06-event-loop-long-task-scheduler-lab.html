@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 06: Event Loop, Microtasks & Long Task Scheduling Visualizer</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 320px;
+      overflow-y: auto;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+
+    /* Animated spinner to prove UI freezes during long tasks */
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 06: Event Loop, Tasks & Microtasks Visualizer</h1>
+      <p class="subtitle">Inspect task queue prioritization, microtask checkpoint draining, and live Long Task main-thread freezes (>50ms).</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Controls -->
+      <div class="card">
+        <h2>
+          ⚡ Main Thread Execution
+          <span class="spinner" id="ui-spinner" title="If this stops spinning, Main Thread is blocked!"></span>
+        </h2>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Observe the spinner above. When a <strong>Long Task</strong> or <strong>Microtask loop</strong> executes, the spinner freezes because the Main Thread cannot perform compositing / rendering.
+        </p>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="runEventLoopOrder()">⚡ Run Microtask vs Task Order</button>
+          <button class="btn-secondary" onclick="triggerLongTask()">🛑 Block Main Thread (350ms Long Task)</button>
+          <button class="btn-secondary" onclick="simulateMicrotaskStarvation()">⚠️ Microtask Starvation (50 Chunks)</button>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;">
+          <p>Status: <strong id="loop-status" style="color: var(--accent-green);">Idle (Main Thread Ready)</strong></p>
+        </div>
+      </div>
+
+      <!-- Card 2: Log Stream -->
+      <div class="card">
+        <h2>📜 Execution Order & Telemetry Stream</h2>
+        <div class="log-box" id="loop-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const loopLog = document.getElementById('loop-log');
+    const loopStatus = document.getElementById('loop-status');
+
+    function logItem(tag, tagClass, msg) {
+      const now = performance.now().toFixed(2);
+      const row = document.createElement('div');
+      row.style.padding = '0.3rem 0';
+      row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+      row.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.75rem;">${now}ms</span> <span class="tag ${tagClass}">${tag}</span> <span style="font-size: 0.8rem;">${msg}</span>`;
+      loopLog.appendChild(row);
+      loopLog.scrollTop = loopLog.scrollHeight;
+    }
+
+    function runEventLoopOrder() {
+      loopLog.innerHTML = '';
+      loopStatus.textContent = 'Running synchronous $\\to$ microtask $\\to$ task cycle...';
+
+      logItem('SYNCHRONOUS', 'tag-cyan', '1. Sync Statement A');
+
+      setTimeout(() => {
+        logItem('MACROTASK', 'tag-yellow', '4. setTimeout callback executed (Next Task queue)');
+        loopStatus.textContent = 'Completed (Full cycle verified)';
+      }, 0);
+
+      queueMicrotask(() => {
+        logItem('MICROTASK', 'tag-purple', '3. queueMicrotask drained at checkpoint (Before Task 4)');
+      });
+
+      Promise.resolve().then(() => {
+        logItem('PROMISE', 'tag-purple', '2. Promise.then microtask executed');
+      });
+
+      logItem('SYNCHRONOUS', 'tag-cyan', '1b. Sync Statement B (Call stack draining...)');
+    }
+
+    function triggerLongTask() {
+      loopStatus.textContent = 'Main Thread Blocked! Watch spinner freeze...';
+      logItem('LONG TASK START', 'tag-red', 'Injecting 350ms synchronous while() loop...');
+
+      setTimeout(() => {
+        const start = performance.now();
+        while (performance.now() - start < 350) {
+          // Synchronous heavy work occupying main thread
+        }
+        logItem('LONG TASK END', 'tag-green', `Finished in ${(performance.now() - start).toFixed(2)}ms • Main Thread released!`);
+        loopStatus.textContent = 'Idle (Main Thread Ready)';
+      }, 50);
+    }
+
+    function simulateMicrotaskStarvation() {
+      loopLog.innerHTML = '';
+      loopStatus.textContent = 'Draining 50 recursive microtasks...';
+      logItem('STARVATION START', 'tag-red', 'Queueing 50 chained microtasks without yielding to rendering...');
+
+      let count = 0;
+      function recurseMicrotask() {
+        if (++count <= 50) {
+          if (count % 10 === 0) {
+            logItem(`MICROTASK #${count}`, 'tag-purple', `Microtask queue draining... (Rendering postponed)`);
+          }
+          queueMicrotask(recurseMicrotask);
+        } else {
+          logItem('STARVATION END', 'tag-green', 'Drained all 50 microtasks. Checkpoint cleared $\\to$ Render opportunity reached.');
+          loopStatus.textContent = 'Idle (Checkpoint cleared)';
+        }
+      }
+      recurseMicrotask();
+    }
+  </script>
+</body>
+</html>

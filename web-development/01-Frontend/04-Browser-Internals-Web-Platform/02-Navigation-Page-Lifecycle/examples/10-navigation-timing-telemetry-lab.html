@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 10: PerformanceNavigationTiming Telemetry & Phase Analyzer</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .waterfall-bar {
+      margin-bottom: 0.85rem;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-bottom: 0.25rem;
+      color: var(--text-secondary);
+    }
+
+    .bar-track {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .bg-cyan { background: var(--accent-cyan); }
+    .bg-blue { background: var(--accent-blue); }
+    .bg-yellow { background: var(--accent-yellow); }
+    .bg-green { background: var(--accent-green); }
+    .bg-purple { background: var(--accent-purple); }
+    .bg-red { background: var(--accent-red); }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 340px;
+      overflow-y: auto;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 10: Navigation Timing & Telemetry Analyzer</h1>
+      <p class="subtitle">Live PerformanceNavigationTiming inspector segmenting Redirect, DNS, Connection, TLS, TTFB, Response, and DOM Milestones into actionable telemetry.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Visual Waterfall Breakdown -->
+      <div class="card">
+        <h2>⚡ Navigation Phase Waterfall</h2>
+        <div id="waterfall-container">
+          <div class="waterfall-bar">
+            <div class="bar-label"><span>Redirect Duration</span><span id="txt-redirect">0.00 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bg-red" id="bar-redirect" style="width: 0%;"></div></div>
+          </div>
+          <div class="waterfall-bar">
+            <div class="bar-label"><span>DNS Lookup</span><span id="txt-dns">0.00 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bg-yellow" id="bar-dns" style="width: 0%;"></div></div>
+          </div>
+          <div class="waterfall-bar">
+            <div class="bar-label"><span>TCP + TLS Connect</span><span id="txt-connect">0.00 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bg-purple" id="bar-connect" style="width: 0%;"></div></div>
+          </div>
+          <div class="waterfall-bar">
+            <div class="bar-label"><span>Server Wait (TTFB)</span><span id="txt-ttfb">0.00 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bg-cyan" id="bar-ttfb" style="width: 0%;"></div></div>
+          </div>
+          <div class="waterfall-bar">
+            <div class="bar-label"><span>Content Download</span><span id="txt-response">0.00 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bg-blue" id="bar-response" style="width: 0%;"></div></div>
+          </div>
+          <div class="waterfall-bar">
+            <div class="bar-label"><span>DOM Processing & DCL</span><span id="txt-dom">0.00 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bg-green" id="bar-dom" style="width: 0%;"></div></div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="readLiveTiming()">🔄 Read Live Navigation Timing</button>
+          <button class="btn-secondary" onclick="simulateSlowBackend()">🐢 Simulate 3s Backend TTFB</button>
+          <button class="btn-secondary" onclick="simulateSlowDCL()">📦 Simulate 2s Frontend DCL</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Structured Telemetry JSON -->
+      <div class="card">
+        <h2>📜 Telemetry Payload & Milestone Table</h2>
+        <div class="log-box" id="telemetry-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const telemetryLog = document.getElementById('telemetry-log');
+
+    function renderMetrics(metrics) {
+      const maxTime = Math.max(metrics.totalDuration || 1, 100);
+
+      const updateBar = (id, val, textId) => {
+        const pct = Math.min(100, Math.max(2, (val / maxTime) * 100));
+        document.getElementById(id).style.width = pct + '%';
+        document.getElementById(textId).textContent = val.toFixed(2) + ' ms';
+      };
+
+      updateBar('bar-redirect', metrics.redirect, 'txt-redirect');
+      updateBar('bar-dns', metrics.dns, 'txt-dns');
+      updateBar('bar-connect', metrics.connect, 'txt-connect');
+      updateBar('bar-ttfb', metrics.ttfb, 'txt-ttfb');
+      updateBar('bar-response', metrics.response, 'txt-response');
+      updateBar('bar-dom', metrics.domProcessing, 'txt-dom');
+
+      telemetryLog.innerHTML = `<pre style="color: var(--accent-cyan);">${JSON.stringify(metrics, null, 2)}</pre>`;
+    }
+
+    function readLiveTiming() {
+      const navEntries = performance.getEntriesByType("navigation");
+      if (!navEntries || navEntries.length === 0) {
+        telemetryLog.textContent = "No Navigation Timing entry found.";
+        return;
+      }
+      const n = navEntries[0];
+      const metrics = {
+        navigationType: n.type,
+        totalDuration: n.duration,
+        redirect: n.redirectEnd - n.redirectStart,
+        dns: n.domainLookupEnd - n.domainLookupStart,
+        connect: n.connectEnd - n.connectStart,
+        secureConnect: n.secureConnectionStart > 0 ? (n.connectEnd - n.secureConnectionStart) : 0,
+        ttfb: n.responseStart - n.requestStart,
+        response: n.responseEnd - n.responseStart,
+        domProcessing: n.domContentLoadedEventEnd - n.responseEnd,
+        dclHandlerDuration: n.domContentLoadedEventEnd - n.domContentLoadedEventStart,
+        loadHandlerDuration: n.loadEventEnd - n.loadEventStart,
+        domInteractive: n.domInteractive,
+        domComplete: n.domComplete
+      };
+      renderMetrics(metrics);
+    }
+
+    function simulateSlowBackend() {
+      const metrics = {
+        navigationType: "simulate_backend_bottleneck",
+        totalDuration: 3450,
+        redirect: 0,
+        dns: 25,
+        connect: 35,
+        secureConnect: 20,
+        ttfb: 3100, // Dominant delay!
+        response: 40,
+        domProcessing: 250,
+        domInteractive: 3220,
+        domComplete: 3450
+      };
+      renderMetrics(metrics);
+    }
+
+    function simulateSlowDCL() {
+      const metrics = {
+        navigationType: "simulate_frontend_dcl_bottleneck",
+        totalDuration: 2800,
+        redirect: 0,
+        dns: 15,
+        connect: 20,
+        secureConnect: 12,
+        ttfb: 120,
+        response: 35,
+        domProcessing: 2610, // Dominant delay in client JS!
+        domInteractive: 450,
+        domComplete: 2800
+      };
+      renderMetrics(metrics);
+    }
+
+    // Initialize on load
+    window.addEventListener('load', () => {
+      setTimeout(readLiveTiming, 100);
+    });
+  </script>
+</body>
+</html>
