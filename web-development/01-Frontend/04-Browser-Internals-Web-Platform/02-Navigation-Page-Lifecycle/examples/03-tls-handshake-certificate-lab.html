@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 03: TLS Handshake, Certificate Chain & Multi-Hop Termination Visualizer</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 320px;
+      overflow-y: auto;
+    }
+
+    .chain-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .chain-node {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--accent-cyan);
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+
+    .chain-node.root { border-left-color: var(--accent-purple); }
+    .chain-node.intermediate { border-left-color: var(--accent-blue); }
+    .chain-node.leaf { border-left-color: var(--accent-green); }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 03: TLS Handshake & Certificate Chain Visualizer</h1>
+      <p class="subtitle">Simulate TLS 1.3 1-RTT handshake, Public Key Infrastructure (PKI) certificate trust validation, and Multi-Hop CDN TLS termination boundaries.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Controls & Simulation -->
+      <div class="card">
+        <h2>⚡ Handshake Simulation</h2>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="simulateTLS13()">🔒 TLS 1.3 (1-RTT Handshake)</button>
+          <button class="btn-secondary" onclick="simulateTLS12()">⏳ TLS 1.2 (2-RTT Handshake)</button>
+          <button class="btn-secondary" onclick="simulate0RTT()">⚡ TLS 1.3 0-RTT (Early Data)</button>
+          <button class="btn-secondary" onclick="simulateCertError()">❌ Certificate Mismatch Error</button>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;">
+          <p>Handshake Mode: <strong id="mode-text" style="color: var(--accent-cyan);">TLS 1.3 Standard</strong></p>
+          <p>Estimated RTT: <strong id="rtt-text" style="color: var(--accent-green);">1 RTT (Handshake + Symmetric Key)</strong></p>
+        </div>
+
+        <div class="chain-box">
+          <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.85rem;">🛡️ PKI Certificate Trust Chain</div>
+          <div class="chain-node root">
+            <div><strong>[Root CA]</strong> ISRG Root X1 (Trust Store)</div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem;">Self-signed • Embedded in OS/Browser</div>
+          </div>
+          <div class="chain-node intermediate">
+            <div><strong>[Intermediate CA]</strong> R3 Intermediate</div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem;">Signed by ISRG Root X1</div>
+          </div>
+          <div class="chain-node leaf" id="leaf-cert">
+            <div><strong>[Leaf Server]</strong> *.github.com (SAN: github.com)</div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem;">Signed by R3 • Key: ECDSA P-256</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Handshake Packet Log -->
+      <div class="card">
+        <h2>📜 Handshake Packet Timeline</h2>
+        <div class="log-box" id="packet-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const packetLog = document.getElementById('packet-log');
+    const modeText = document.getElementById('mode-text');
+    const rttText = document.getElementById('rtt-text');
+    const leafCert = document.getElementById('leaf-cert');
+
+    function logPacket(direction, msg, tagClass, delayMs) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const row = document.createElement('div');
+          row.style.padding = '0.3rem 0';
+          row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+          row.innerHTML = `<span class="tag ${tagClass}">${direction}</span> <span style="font-size: 0.8rem;">${msg}</span>`;
+          packetLog.appendChild(row);
+          packetLog.scrollTop = packetLog.scrollHeight;
+          resolve();
+        }, delayMs);
+      });
+    }
+
+    async function simulateTLS13() {
+      packetLog.innerHTML = '';
+      modeText.textContent = 'TLS 1.3 (1-RTT)';
+      rttText.textContent = '1 RTT Handshake (Ephemeral ECDHE + AEAD Encryption)';
+      leafCert.style.borderLeftColor = 'var(--accent-green)';
+      leafCert.innerHTML = '<div><strong>[Leaf Server]</strong> *.example.com (Valid)</div><div style="color: var(--text-secondary); font-size: 0.75rem;">Signed by R3 • Status: Trusted</div>';
+
+      await logPacket('CLIENT → SERVER', 'ClientHello (Supported Versions: TLS 1.3, KeyShare: X25519, SNI: app.example.com)', 'tag-cyan', 100);
+      await logPacket('SERVER → CLIENT', 'ServerHello (Selected: TLS 1.3, KeyShare: X25519) + EncryptedExtensions', 'tag-purple', 250);
+      await logPacket('SERVER → CLIENT', '{Encrypted} Certificate + CertificateVerify + Finished', 'tag-green', 200);
+      await logPacket('CLIENT → SERVER', '{Encrypted} Finished', 'tag-cyan', 150);
+      await logPacket('ESTABLISHED', '✨ Secure AES-256-GCM Channel Ready! Sending HTTP/2 GET /dashboard', 'tag-green', 100);
+    }
+
+    async function simulateTLS12() {
+      packetLog.innerHTML = '';
+      modeText.textContent = 'TLS 1.2 (2-RTT Legacy)';
+      rttText.textContent = '2 RTT Handshake (Separate Parameter & Key Exchange)';
+      leafCert.style.borderLeftColor = 'var(--accent-green)';
+
+      await logPacket('CLIENT → SERVER', 'ClientHello (Supported: TLS 1.2, Ciphers)', 'tag-cyan', 100);
+      await logPacket('SERVER → CLIENT', 'ServerHello + Certificate + ServerKeyExchange + ServerHelloDone', 'tag-purple', 300);
+      await logPacket('CLIENT → SERVER', 'ClientKeyExchange + [ChangeCipherSpec] + Finished', 'tag-yellow', 250);
+      await logPacket('SERVER → CLIENT', '[ChangeCipherSpec] + Finished', 'tag-purple', 200);
+      await logPacket('ESTABLISHED', '✨ Secure Channel Ready (Total 2-RTT round trips paid)', 'tag-green', 100);
+    }
+
+    async function simulate0RTT() {
+      packetLog.innerHTML = '';
+      modeText.textContent = 'TLS 1.3 0-RTT (Early Data)';
+      rttText.textContent = '0 RTT for Resumed Requests (⚠️ Replay Risk on POST!)';
+
+      await logPacket('CLIENT → SERVER', 'ClientHello + PSK + EarlyData: {Encrypted GET /products}', 'tag-yellow', 100);
+      await logPacket('SERVER → CLIENT', 'ServerHello + EncryptedExtensions + HTTP 200 OK Response', 'tag-green', 250);
+      await logPacket('ESTABLISHED', '⚡ 0-RTT Data Delivered! Zero handshake latency paid on warm reconnect.', 'tag-green', 100);
+    }
+
+    async function simulateCertError() {
+      packetLog.innerHTML = '';
+      modeText.textContent = 'Certificate Hostname Mismatch';
+      rttText.textContent = 'Security Boundary Abort (HTTP Never Reached)';
+      leafCert.style.borderLeftColor = 'var(--accent-red)';
+      leafCert.innerHTML = '<div><strong>[Leaf Server]</strong> evil-tracker.net (MISMATCH)</div><div style="color: var(--accent-red); font-size: 0.75rem;">Requested: app.example.com • Certificate: evil-tracker.net</div>';
+
+      await logPacket('CLIENT → SERVER', 'ClientHello (SNI: app.example.com)', 'tag-cyan', 100);
+      await logPacket('SERVER → CLIENT', 'ServerHello + Certificate (Presented: evil-tracker.net)', 'tag-purple', 250);
+      await logPacket('CLIENT ABORT', '🛑 ERR_CERT_COMMON_NAME_INVALID: Hostname mismatch. Aborting TLS handshake before sending HTTP headers!', 'tag-red', 150);
+    }
+
+    // Default to TLS 1.3 on load
+    simulateTLS13();
+  </script>
+</body>
+</html>

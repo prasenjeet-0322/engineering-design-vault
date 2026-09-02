@@ -1,10 +1,11 @@
-# 💾 23 - Specialized Storage & GIS (C110-C113)
+# 💾 23 - Specialized Storage & GIS (C110-C115)
 
 ## 🧭 Proximity, Search & Vector Storage Study Path
 *   [C110 - Geohashing and Proximity Search](./01-Geohashing-and-Proximity-Search.md)
 *   [C111 - Full-Text Search Lucene Internals](./02-Full-Text-Search-Lucene-Internals.md)
 *   [C112 - Vector Databases and ANN](./03-Vector-Databases-and-ANN.md)
 *   [C113 - Time-Series Databases](./04-Time-Series-Databases.md)
+*   [C115 - Elasticsearch Architecture & System Design Deep Dive](./05-Elasticsearch-Architecture-and-System-Design-Deep-Dive.md)
 
 ---
 

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 05: IPC Structured Clone vs Transfer Benchmark</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-container {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 260px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-event {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .log-time {
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 05: IPC Structured Cloning vs Transfer Benchmark</h1>
+      <p class="subtitle">Live browser experiment measuring memory copying latency vs zero-copy Transferable ArrayBuffers across Worker threads.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Benchmark Controls -->
+      <div class="card">
+        <h2>⚡ Payload Transmission Benchmark</h2>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Compare structured cloning (memory deep copy) against zero-copy transfer on a <strong>32MB ArrayBuffer</strong>.
+        </p>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="runStructuredCloneTest()">📦 Run Structured Clone (Copy)</button>
+          <button class="btn-secondary" onclick="runTransferTest()">🚀 Run Zero-Copy Transfer</button>
+          <button class="btn-secondary" onclick="clearLogs()">🧹 Clear Logs</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Live Telemetry Logs -->
+      <div class="card">
+        <h2>📜 IPC Telemetry Log</h2>
+        <div class="log-container" id="log-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logBox = document.getElementById('log-box');
+
+    function logEvent(name, detail = '', duration = '') {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-event">${name}</span> <span style="color: var(--text-primary);">${detail}</span> <span class="log-time">${duration}</span>`;
+      logBox.appendChild(entry);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function clearLogs() {
+      logBox.innerHTML = '';
+      logEvent('SYSTEM', 'Logs cleared');
+    }
+
+    // Inline Web Worker setup
+    const workerBlob = new Blob([`
+      self.onmessage = function(e) {
+        const receivedTime = performance.now();
+        const buffer = e.data.buffer;
+        self.postMessage({
+          type: 'ACK',
+          byteLength: buffer.byteLength,
+          echoTime: receivedTime
+        });
+      };
+    `], { type: 'application/javascript' });
+
+    const worker = new Worker(URL.createObjectURL(workerBlob));
+
+    worker.onmessage = function(e) {
+      logEvent('WORKER_ACK', `Worker received ${ (e.data.byteLength / (1024*1024)).toFixed(1) } MB`);
+    };
+
+    function runStructuredCloneTest() {
+      const sizeMB = 32;
+      const buffer = new ArrayBuffer(sizeMB * 1024 * 1024);
+      const start = performance.now();
+
+      // Send via Structured Clone (normal copy)
+      worker.postMessage({ buffer });
+      const duration = (performance.now() - start).toFixed(2) + ' ms';
+
+      logEvent('STRUCTURED_CLONE', `Cloned ${sizeMB} MB buffer (Main thread retained: ${buffer.byteLength > 0 ? 'YES' : 'NO'})`, duration);
+    }
+
+    function runTransferTest() {
+      const sizeMB = 32;
+      const buffer = new ArrayBuffer(sizeMB * 1024 * 1024);
+      const start = performance.now();
+
+      // Send via Zero-Copy Transfer (ownership moved)
+      worker.postMessage({ buffer }, [buffer]);
+      const duration = (performance.now() - start).toFixed(2) + ' ms';
+
+      logEvent('TRANSFERABLE', `Transferred ${sizeMB} MB buffer (Main thread neutered: ${buffer.byteLength === 0 ? 'TRUE (0 bytes)' : 'FALSE'})`, duration);
+    }
+  </script>
+</body>
+</html>

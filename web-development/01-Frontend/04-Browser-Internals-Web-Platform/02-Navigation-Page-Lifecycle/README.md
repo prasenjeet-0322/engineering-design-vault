@@ -1,49 +1,56 @@
 # KPI 02 — Navigation & Page Lifecycle Architecture
 
-[⬅️ Level 04 Overview](../README.md) | [📚 Frontend Master Hub](../../README.md) | [KPI 03: HTML Parsing & DOM Construction ➡️](../03-HTML-Parsing-DOM-Construction/README.md)
+[⬅️ Back to Level 04 Master Hub](../README.md) | [KPI 03: HTML Parsing ➡️](../03-HTML-Parsing-DOM-Construction/README.md)
 
-> **Tier:** 🔴 MUST KNOW  
-> **Repository Owner & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
-
----
-
-## Overview
-
-Modern web applications do not simply load once and sit static in memory. Users navigate between routes, switch browser tabs, background mobile windows, traverse historical states via the Back/Forward buttons, and restore suspended tabs from memory.
-
-This master module provides an exhaustive, production-grade guide to browser navigation mechanics, the Document and Page Lifecycle specifications, the Visibility API, Back/Forward Cache (BFCache) eligibility, eviction heuristics, and resilient state revalidation architecture.
+> **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)  
+> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
 
 ---
 
-## 🗺️ Module Architecture & Navigation
+## 🎯 Purpose & Core Competencies
 
-| Part | Title | Document | Key Architectural Focus | Status |
-|---|---|---|---|---|
-| **Part 1** | Navigation Types & Browser Traversal | [01-navigation-types-traversal.md](./01-navigation-types-traversal.md) | Hard vs Soft navigations, History API, URL fragment vs PushState, Location interface | 🟡 Planned |
-| **Part 2** | Document Loading Stages & Parser State | [02-document-loading-parser-states.md](./02-document-loading-parser-states.md) | `document.readyState`, `DOMContentLoaded`, `load`, Parser blocking scripts, `defer` vs `async` | 🟡 Planned |
-| **Part 3** | Resource Timing & Navigation Timing APIs | [03-navigation-timing-resource-timing.md](./03-navigation-timing-resource-timing.md) | `PerformanceNavigationTiming`, DNS lookup, TCP/TLS handshake, TTFB, DOM Interactive | 🟡 Planned |
-| **Part 4** | The Page Lifecycle API Specification | [04-page-lifecycle-api-spec.md](./04-page-lifecycle-api-spec.md) | Active, Passive, Hidden, Frozen, Terminated, Discarded lifecycle states | 🟡 Planned |
-| **Part 5** | The Visibility API & Background Throttling | [05-visibility-api-background-throttling.md](./05-visibility-api-background-throttling.md) | `document.visibilityState`, `visibilitychange`, CPU throttling, Audio/Video pausing | 🟡 Planned |
-| **Part 6** | `beforeunload` & `unload` Deprecation Realities | [06-beforeunload-unload-deprecation.md](./06-beforeunload-unload-deprecation.md) | Unsaved changes dialogs, `event.preventDefault()`, Why `unload` is forbidden | 🟡 Planned |
-| **Part 7** | `pagehide` & `pageshow` Event Mechanics | [07-pagehide-pageshow-mechanics.md](./07-pagehide-pageshow-mechanics.md) | `PageTransitionEvent`, `event.persisted`, Clean document teardowns | 🟡 Planned |
-| **Part 8** | Tab Discarding & Memory Freeze Recovery | [08-tab-discarding-freeze-recovery.md](./08-tab-discarding-freeze-recovery.md) | `document.wasDiscarded`, Browser memory shedding, Tab suspension recovery | 🟡 Planned |
-| **Part 9** | Single-Page Application (SPA) vs MPA Lifecycle | [09-spa-vs-mpa-lifecycle.md](./09-spa-vs-mpa-lifecycle.md) | Client-side routing, Virtual history, Memory accumulation, Scroll restoration | 🟡 Planned |
-| **Part 10** | Pre-rendering, Prerender2 & Speculation Rules | [10-prerendering-speculation-rules.md](./10-prerendering-speculation-rules.md) | `<script type="speculationrules">`, Prerender activation, `document.prerendering` | 🟡 Planned |
-| **Part 11** | Mobile Browser Page Lifecycles & App Switching | [11-mobile-browser-lifecycles.md](./11-mobile-browser-lifecycles.md) | iOS WebKit freeze limits, Android task switching, Battery saving throttles | 🟡 Planned |
-| **Part 12** | BFCache: Advanced Eligibility, Eviction & Restoration | [12-bfcache-advanced-eligibility-eviction-restoration.md](./12-bfcache-advanced-eligibility-eviction-restoration.md) | Live document preservation, `pageshow.persisted`, `unload` blocker, Stale data reconciliation | 🟢 Complete |
-| **Part 13** | End-to-End Navigation Debugging & Mastery/Crucible | [13-end-to-end-navigation-debugging-mastery.md](./13-end-to-end-navigation-debugging-mastery.md) | DevTools Back/forward cache testing, `notRestoredReasons`, Full Navigation Audit | 🟡 Upcoming |
+Master the complete navigation lifecycle from URL entry to a rendered, active document:
 
----
-
-## 📁 Runnable Code Examples (`examples/`)
-
-- [`examples/12-bfcache-advanced-eligibility-eviction-restoration.js`](./examples/12-bfcache-advanced-eligibility-eviction-restoration.js): Demonstrates React mount bypassing on BFCache restore, `unload` blocker disqualification vs `pagehide` compliance, in-memory heap preservation, and a standalone BFCache lifecycle engine with selective balance revalidation.
+`	ext
+URL Input / Click
+        ↓
+Network Resolution (DNS → TCP/QUIC → TLS 1.3)
+        ↓
+HTTP Response & MIME Sniffing
+        ↓
+Process Allocation & Document Creation
+        ↓
+Parser & Resource Discovery Boundaries
+        ↓
+Page Lifecycle Events (DOMContentLoaded → load → pageshow)
+        ↓
+History Traversal & BFCache Restoration
+`
 
 ---
 
-## 🧭 Industry Badges & Evaluation Guide
+## 🗺️ KPI 02 Complete Part Map (11 Parts)
 
-- 🟢 **[Daily Driver]**: Core mental models used constantly in day-to-day frontend development.
-- 🟡 **[Moderate]**: Intermediate patterns used for specialized SDK configuration, architecture, and code reviews.
-- 🔵 **[Foundational / Engine Internals]**: Browser engine internals, memory context lifting, and Staff-level concepts.
-- 🔴 **[Production-Critical]**: High-risk failure modes, memory leaks, and fatal runtime crashes.
+| Part | Title | Status | Core Focus |
+|---|---|---|---|
+| **Part 01** | [Complete Navigation Mental Model](./01-complete-navigation-mental-model.md) | ✅ Completed | Navigation initiation, URL resolution, navigation types, document navigation vs SPA navigation, high-level lifecycle. |
+| **Part 02** | [DNS & Connection Establishment](./02-dns-connection-establishment.md) | ✅ Completed | DNS resolution, browser DNS caching, connection reuse, TCP/QUIC, connection setup and how these affect navigation. |
+| **Part 03** | [TLS & Secure Connection Establishment](./03-tls-secure-connection-establishment.md) | ✅ Completed | TLS 1.3, certificate validation, handshake mechanics, session resumption, security/performance implications. |
+| **Part 04** | [HTTP Navigation & Response Processing](./04-http-navigation-response-processing.md) | ✅ Completed | HTTP request/response, redirects, status codes relevant to navigation, headers, caching interaction, response handling. |
+| **Part 05** | [Resource Loading & Critical Rendering Path](./05-document-navigation-lifecycle.md) | ✅ Completed | Resource scheduler, parser-blocking JS, render-blocking CSS, preloads, heuristics, Critical Rendering Path. |
+| **Part 06** | [JavaScript Execution & Event Loop](./06-page-lifecycle-events.md) | ✅ Completed | Event loop, tasks, microtasks, Long Tasks (50ms), layout thrashing, React scheduling, Web Workers. |
+| **Part 07** | [Events, Input & User Interaction](./07-history-session-navigation.md) | ✅ Completed | Event propagation, capture/bubble, delegation, passive listeners, pointer/touch, default actions. |
+| **Part 08** | [Forms, Submission & Default Behavior](./08-bfcache-deep-mechanics.md) | ✅ Completed | Form submission algorithm, constraint validation, FormData, requestSubmit vs submit, CSRF. |
+| **Part 09** | [History API & SPA Navigation](./09-spa-react-nextjs-navigation.md) | ✅ Completed | Session history, pushState/replaceState, popstate, same-document navigation, scroll restoration. |
+| **Part 10** | [Navigation Timing & Measurement](./10-navigation-performance-diagnostics.md) | ✅ Completed | PerformanceNavigationTiming, waterfalls, transition latency, TTFB decomposition, DCL/Load attribution. |
+| **Part 11** | [Navigation Cancellation & Competing Navigations](./11-production-failure-traces-crucible.md) | ✅ Completed | Competing navigations, supersession, AbortController boundaries, race conditions, latest-intent guards. |
+
+---
+
+## 🧠 Diagnostic Labs & Runbooks
+
+* examples/ — Interactive diagnostic labs covering Navigation Timing API visualizer, live BFCache freeze/restore simulator, and DNS pre-resolution profiling.
+
+---
+
+[⬅️ Back to Level 04 Master Hub](../README.md) | [KPI 03: HTML Parsing ➡️](../03-HTML-Parsing-DOM-Construction/README.md)

@@ -1,4 +1,4 @@
-# ⚡ 04 - Caching Mastery (C015-C030)
+# ⚡ 04 - Caching Mastery (C015-C031)
 
 > **"There are only two hard things in Computer Science: cache invalidation and naming things." — Phil Karlton**
 
@@ -32,6 +32,9 @@ Use this structured path aligned with your **Google Sheet Tracker** to deep dive
 
 ### 🔬 6. Probabilistic Data Structures
 *   [C030 - Bloom Filters](./16-Bloom-Filters.md)
+
+### 🚀 7. In-Memory Store & Redis Architecture Deep Dive
+*   [C031 - Redis Architecture & System Design Deep Dive](./17-Redis-Architecture-and-System-Design-Deep-Dive.md)
 
 ---
 

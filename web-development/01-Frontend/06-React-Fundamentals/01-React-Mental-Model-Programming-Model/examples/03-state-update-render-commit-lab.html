@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 03: State Update Queue, Render Snapshots & Commit Simulator</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .snapshot-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 380px;
+      overflow-y: auto;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 06 — React Fundamentals</div>
+      <h1>🧪 Lab 03: State Snapshot & Update Queue Simulator</h1>
+      <p class="subtitle">Inspect why state acts as a render snapshot, compare direct vs functional updates, and test Object.is reference bailout.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Snapshot Inspector -->
+      <div class="card">
+        <h2>⚡ Active Render Snapshot</h2>
+        
+        <div class="snapshot-box">
+          <div><strong style="color: var(--accent-yellow);">Active Render Frame:</strong> <span id="render-frame-id">Render #1</span></div>
+          <div><strong style="color: var(--accent-cyan);">Captured Closure `count`:</strong> <span id="closure-count-val">0</span></div>
+          <div><strong style="color: var(--accent-green);">DOM Host Button Text:</strong> <span id="dom-text-val">"Count: 0"</span></div>
+          <div style="margin-top: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+            <strong style="color: var(--accent-purple);">Enqueued Updates Queue:</strong>
+            <div id="queue-display" style="color: var(--text-secondary);">[ empty ]</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="testDirectUpdates()">1. Test 2x Direct setCount(count + 1)</button>
+          <button class="btn-secondary" onclick="testFunctionalUpdates()">2. Test 2x Functional setCount(c => c + 1)</button>
+          <button class="btn-secondary" onclick="testMutationBailout()">3. Test Mutating State In-Place</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Telemetry Log -->
+      <div class="card">
+        <h2>📜 Execution & Closure Telemetry</h2>
+        <div class="log-box" id="pipeline-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pipelineLog = document.getElementById('pipeline-log');
+    const renderFrameId = document.getElementById('render-frame-id');
+    const closureCountVal = document.getElementById('closure-count-val');
+    const domTextVal = document.getElementById('dom-text-val');
+    const queueDisplay = document.getElementById('queue-display');
+
+    let currentRender = 1;
+    let committedState = 0;
+
+    function logMsg(tag, tagClass, msg) {
+      const now = performance.now().toFixed(1);
+      const row = document.createElement('div');
+      row.style.padding = '0.3rem 0';
+      row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+      row.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.75rem;">${now}ms</span> <span class="tag ${tagClass}">${tag}</span> <span style="font-size: 0.8rem;">${msg}</span>`;
+      pipelineLog.appendChild(row);
+      pipelineLog.scrollTop = pipelineLog.scrollHeight;
+    }
+
+    async function testDirectUpdates() {
+      const snapshot = committedState;
+      logMsg('EVENT START', 'tag-yellow', `Handler running in Render #${currentRender} (closed over count = ${snapshot})`);
+      
+      queueDisplay.textContent = `[ replace(${snapshot} + 1), replace(${snapshot} + 1) ]`;
+      logMsg('ENQUEUE', 'tag-cyan', `setCount(${snapshot} + 1) -> Enqueued request: replace with ${snapshot + 1}`);
+      logMsg('ENQUEUE', 'tag-cyan', `setCount(${snapshot} + 1) -> Enqueued request: replace with ${snapshot + 1}`);
+      logMsg('SNAPSHOT READ', 'tag-purple', `console.log(count) inside handler still reads: ${snapshot}! (Snapshot unmutated)`);
+
+      await new Promise(r => setTimeout(r, 200));
+
+      // Resolve Update
+      committedState = snapshot + 1;
+      currentRender++;
+      renderFrameId.textContent = `Render #${currentRender}`;
+      closureCountVal.textContent = committedState;
+      domTextVal.textContent = `"Count: ${committedState}"`;
+      queueDisplay.textContent = '[ empty ]';
+
+      logMsg('RENDER COMMIT', 'tag-green', `Render #${currentRender} processed update queue! Next snapshot count = ${committedState} (Result: +1, not +2)`);
+    }
+
+    async function testFunctionalUpdates() {
+      const snapshot = committedState;
+      logMsg('EVENT START', 'tag-yellow', `Handler running in Render #${currentRender} with functional updaters`);
+      
+      queueDisplay.textContent = `[ c => c + 1, c => c + 1 ]`;
+      logMsg('ENQUEUE', 'tag-cyan', `setCount(c => c + 1) -> Enqueued functional updater`);
+      logMsg('ENQUEUE', 'tag-cyan', `setCount(c => c + 1) -> Enqueued functional updater`);
+
+      await new Promise(r => setTimeout(r, 200));
+
+      // Resolve Sequential Queue
+      const first = snapshot + 1;
+      const second = first + 1;
+      committedState = second;
+      currentRender++;
+
+      renderFrameId.textContent = `Render #${currentRender}`;
+      closureCountVal.textContent = committedState;
+      domTextVal.textContent = `"Count: ${committedState}"`;
+      queueDisplay.textContent = '[ empty ]';
+
+      logMsg('QUEUE RESOLVED', 'tag-purple', `Chained updaters sequentially: ${snapshot} -> ${first} -> ${second}`);
+      logMsg('RENDER COMMIT', 'tag-green', `Render #${currentRender} completed! Next snapshot count = ${committedState} (Result: +2)`);
+    }
+
+    function testMutationBailout() {
+      logMsg('MUTATION ATTEMPT', 'tag-red', `user.name = "Srikar" (Mutated existing object in-place)`);
+      logMsg('SETSTATE CALL', 'tag-yellow', `setUser(user) called with identical object reference.`);
+      logMsg('OBJECT.IS BAILOUT', 'tag-red', `⚠️ Object.is(prevUser, nextUser) === true! React bails out of render! UI stays stale.`);
+    }
+
+    logMsg('INITIALIZED', 'tag-cyan', 'Lab 03 ready. Initial snapshot count = 0.');
+  </script>
+</body>
+</html>

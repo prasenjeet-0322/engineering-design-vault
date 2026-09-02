@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 05: Critical Rendering Path (CRP) & Resource Scheduler Visualizer</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 320px;
+      overflow-y: auto;
+    }
+
+    .crp-graph {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .crp-node {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--accent-cyan);
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 04 — Browser Internals & Web Platform</div>
+      <h1>🧪 Lab 05: Critical Rendering Path & Resource Scheduler Visualizer</h1>
+      <p class="subtitle">Simulate parser-blocking scripts, render-blocking stylesheets, speculative preload scanning, and defer/async script execution timelines.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Card 1: Simulation Controls -->
+      <div class="card">
+        <h2>⚡ Resource Loading Scenarios</h2>
+        <div class="btn-group">
+          <button class="btn-primary" onclick="simulateOptimizedCRP()">🚀 Modern Optimized CRP (Defer + Preload)</button>
+          <button class="btn-secondary" onclick="simulateParserBlocking()">🛑 Parser-Blocking Synchronous JS</button>
+          <button class="btn-secondary" onclick="simulateRenderBlockingCSS()">🎨 Render-Blocking CSS Waterfall</button>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;">
+          <p>Scenario: <strong id="scenario-title" style="color: var(--accent-cyan);">Optimized CRP</strong></p>
+          <p>Estimated First Paint (FCP): <strong id="fcp-time" style="color: var(--accent-green);">~250 ms</strong></p>
+        </div>
+
+        <div class="crp-graph">
+          <div style="font-weight: 700; color: var(--accent-cyan); font-size: 0.85rem;">🌳 Critical Dependency Graph</div>
+          <div class="crp-node" style="border-left-color: var(--accent-cyan);">
+            <div><strong>[HTML]</strong> document.html (Streaming)</div>
+          </div>
+          <div class="crp-node" style="border-left-color: var(--accent-purple);">
+            <div><strong>[CSS]</strong> critical.css (Render-Blocking • Highest Priority)</div>
+          </div>
+          <div class="crp-node" style="border-left-color: var(--accent-yellow);">
+            <div><strong>[Font]</strong> inter.woff2 (Preloaded • As: font)</div>
+          </div>
+          <div class="crp-node" style="border-left-color: var(--accent-green);">
+            <div><strong>[JS]</strong> app.js (Deferred • Executes after DOM ready)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Timeline Log -->
+      <div class="card">
+        <h2>📜 Parser & Scheduler Execution Timeline</h2>
+        <div class="log-box" id="crp-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const crpLog = document.getElementById('crp-log');
+    const scenarioTitle = document.getElementById('scenario-title');
+    const fcpTime = document.getElementById('fcp-time');
+
+    function logStep(timeMs, tag, tagClass, text) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const row = document.createElement('div');
+          row.style.padding = '0.3rem 0';
+          row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+          row.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.75rem;">+${timeMs}ms</span> <span class="tag ${tagClass}">${tag}</span> <span style="font-size: 0.8rem;">${text}</span>`;
+          crpLog.appendChild(row);
+          crpLog.scrollTop = crpLog.scrollHeight;
+          resolve();
+        }, 180);
+      });
+    }
+
+    async function simulateOptimizedCRP() {
+      crpLog.innerHTML = '';
+      scenarioTitle.textContent = 'Modern Optimized CRP (Defer + Preload)';
+      fcpTime.textContent = '~250 ms (Fast Visual Paint)';
+      fcpTime.style.color = 'var(--accent-green)';
+
+      await logStep(0, 'PRELOAD SCANNER', 'tag-yellow', 'Speculative scanner discovers critical.css, inter.woff2, and app.js');
+      await logStep(50, 'FETCH PARALLEL', 'tag-cyan', 'Network dispatches critical.css (High), font (High), app.js (Low)');
+      await logStep(120, 'HTML PARSER', 'tag-cyan', 'Parsing HTML without pauses (scripts have defer attribute)');
+      await logStep(200, 'CSSOM READY', 'tag-purple', 'critical.css downloaded & parsed $\\to$ CSSOM constructed');
+      await logStep(240, 'STYLE + LAYOUT', 'tag-green', 'Computed style calculation $\\to$ Layout tree formed');
+      await logStep(250, 'PAINT (FCP)', 'tag-green', '🎨 FIRST CONTENTFUL PAINT! Visual UI visible to user.');
+      await logStep(320, 'DOM READY', 'tag-cyan', 'HTML parsing finished $\\to$ DOMContentLoaded event');
+      await logStep(350, 'DEFER JS EXEC', 'tag-yellow', 'app.js executes & hydrates React components');
+    }
+
+    async function simulateParserBlocking() {
+      crpLog.innerHTML = '';
+      scenarioTitle.textContent = 'Parser-Blocking Synchronous JS (<script src="large.js">)';
+      fcpTime.textContent = '~850 ms (Delayed by Main Thread Block)';
+      fcpTime.style.color = 'var(--accent-red)';
+
+      await logStep(0, 'HTML PARSER', 'tag-cyan', 'Parsing &lt;head&gt;...');
+      await logStep(40, 'PARSER BLOCKED', 'tag-red', '🛑 Found synchronous &lt;script src="/bundle.js"&gt; • HTML parser halted!');
+      await logStep(350, 'JS DOWNLOAD', 'tag-yellow', 'Waiting 310ms for bundle.js download over network...');
+      await logStep(600, 'JS EXECUTION', 'tag-red', 'V8 compiling and executing bundle.js on Main Thread (250ms long task)...');
+      await logStep(650, 'PARSER RESUMED', 'tag-cyan', 'HTML parser finally resumes parsing remaining body tags');
+      await logStep(850, 'PAINT (FCP)', 'tag-yellow', '🎨 FIRST CONTENTFUL PAINT! Delayed by parser-blocking script.');
+    }
+
+    async function simulateRenderBlockingCSS() {
+      crpLog.innerHTML = '';
+      scenarioTitle.textContent = 'Render-Blocking CSS Waterfall';
+      fcpTime.textContent = '~600 ms (Blocked by slow stylesheet)';
+      fcpTime.style.color = 'var(--accent-yellow)';
+
+      await logStep(0, 'HTML PARSER', 'tag-cyan', 'DOM built incrementally to &lt;/body&gt;');
+      await logStep(80, 'RENDER BLOCKED', 'tag-purple', '🛑 DOM is ready, but Frame cannot be rendered: CSSOM is incomplete!');
+      await logStep(480, 'CSS DOWNLOAD', 'tag-purple', 'Slow 400ms download for uncompressed themes.css...');
+      await logStep(540, 'CSSOM BUILT', 'tag-green', 'CSSOM resolved $\\to$ Styles combined with DOM');
+      await logStep(600, 'PAINT (FCP)', 'tag-yellow', '🎨 FIRST CONTENTFUL PAINT rendered.');
+    }
+
+    // Default to optimized on load
+    simulateOptimizedCRP();
+  </script>
+</body>
+</html>

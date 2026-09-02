@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧪 Lab 01: Declarative UI vs Imperative DOM & Render Pipeline</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-surface: #131b2e;
+      --bg-card: #1b253b;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-green: #00f5a0;
+      --accent-yellow: #f6d365;
+      --accent-red: #ff5858;
+      --accent-purple: #c084fc;
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Fira Code", Monaco, Consolas, "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(0, 242, 254, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+
+    .metrics-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .metric-pill {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+
+    .metric-val {
+      font-size: 1.5rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--accent-green);
+    }
+
+    .metric-lbl {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    .timeline-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .timeline-step.active {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 242, 254, 0.08);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #000;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .log-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      height: 320px;
+      overflow-y: auto;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .tag-green { background: rgba(0, 245, 160, 0.2); color: var(--accent-green); }
+    .tag-cyan { background: rgba(0, 242, 254, 0.2); color: var(--accent-cyan); }
+    .tag-yellow { background: rgba(246, 211, 101, 0.2); color: var(--accent-yellow); }
+    .tag-purple { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); }
+    .tag-red { background: rgba(255, 88, 88, 0.2); color: var(--accent-red); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="badge">Level 06 — React Fundamentals</div>
+      <h1>🧪 Lab 01: Declarative UI vs Render/Commit Pipeline</h1>
+      <p class="subtitle">Observe how React evaluates UI = f(state, props), runs reconciliation, commits host DOM mutations, and triggers browser layout/paint.</p>
+    </header>
+
+    <div class="metrics-bar">
+      <div class="metric-pill">
+        <div class="metric-val" id="val-render-count">0</div>
+        <div class="metric-lbl">React Renders</div>
+      </div>
+      <div class="metric-pill">
+        <div class="metric-val" id="val-reconcile-count" style="color: var(--accent-yellow);">0</div>
+        <div class="metric-lbl">Diff Comparisons</div>
+      </div>
+      <div class="metric-pill">
+        <div class="metric-val" id="val-commit-count" style="color: var(--accent-cyan);">0</div>
+        <div class="metric-lbl">DOM Commits</div>
+      </div>
+      <div class="metric-pill">
+        <div class="metric-val" id="val-paint-count" style="color: var(--accent-purple);">0</div>
+        <div class="metric-lbl">Browser Paints</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Card 1: Pipeline Timeline -->
+      <div class="card">
+        <h2>⚡ Execution Pipeline Simulator</h2>
+        <div class="timeline" id="pipeline-timeline">
+          <div class="timeline-step" id="step-trigger"><span>1. State Update Trigger</span><span class="tag tag-yellow">EVENT</span></div>
+          <div class="timeline-step" id="step-render"><span>2. Render Phase (UI = f(s, p))</span><span class="tag tag-green">JS CPU</span></div>
+          <div class="timeline-step" id="step-reconcile"><span>3. Reconciliation (Virtual Diff)</span><span class="tag tag-cyan">FIBER</span></div>
+          <div class="timeline-step" id="step-commit"><span>4. Commit Phase (DOM Mutation)</span><span class="tag tag-purple">DOM</span></div>
+          <div class="timeline-step" id="step-paint"><span>5. Browser Layout & Paint</span><span class="tag tag-red">PIXELS</span></div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn-primary" onclick="simulateStateChange(true)">▶️ Trigger Changing State (Count + 1)</button>
+          <button class="btn-secondary" onclick="simulateStateChange(false)">🔄 Trigger Identical State (No-Op Diff)</button>
+          <button class="btn-secondary" onclick="resetMetrics()">🧹 Reset</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Telemetry Stream -->
+      <div class="card">
+        <h2>📜 Telemetry & Fiber Pipeline Log</h2>
+        <div class="log-box" id="telemetry-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let renderCount = 0;
+    let reconcileCount = 0;
+    let commitCount = 0;
+    let paintCount = 0;
+    let countState = 0;
+
+    const valRender = document.getElementById('val-render-count');
+    const valReconcile = document.getElementById('val-reconcile-count');
+    const valCommit = document.getElementById('val-commit-count');
+    const valPaint = document.getElementById('val-paint-count');
+    const telemetryLog = document.getElementById('telemetry-log');
+
+    function logMsg(tag, tagClass, msg) {
+      const now = performance.now().toFixed(1);
+      const row = document.createElement('div');
+      row.style.padding = '0.3rem 0';
+      row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+      row.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.75rem;">${now}ms</span> <span class="tag ${tagClass}">${tag}</span> <span style="font-size: 0.8rem;">${msg}</span>`;
+      telemetryLog.appendChild(row);
+      telemetryLog.scrollTop = telemetryLog.scrollHeight;
+    }
+
+    function setActiveStep(stepId) {
+      document.querySelectorAll('.timeline-step').forEach(s => s.classList.remove('active'));
+      if (stepId) {
+        const el = document.getElementById(stepId);
+        if (el) el.classList.add('active');
+      }
+    }
+
+    async function simulateStateChange(hasChanged) {
+      logMsg('TRIGGER', 'tag-yellow', `State update triggered. ${hasChanged ? 'New value' : 'Identical value'}`);
+      setActiveStep('step-trigger');
+      await new Promise(r => setTimeout(r, 120));
+
+      // 1. Render Phase
+      renderCount++;
+      valRender.textContent = renderCount;
+      setActiveStep('step-render');
+      logMsg('RENDER PHASE', 'tag-green', `Executing Component(state=${hasChanged ? countState + 1 : countState}) $\\to$ Element Object returned`);
+      await new Promise(r => setTimeout(r, 150));
+
+      // 2. Reconciliation Phase
+      reconcileCount++;
+      valReconcile.textContent = reconcileCount;
+      setActiveStep('step-reconcile');
+      
+      if (hasChanged) {
+        countState++;
+        logMsg('RECONCILIATION', 'tag-cyan', `Fiber diff: textContent changed ('${countState - 1}' $\\to$ '${countState}'). Flags: Update`);
+        await new Promise(r => setTimeout(r, 150));
+
+        // 3. Commit Phase
+        commitCount++;
+        valCommit.textContent = commitCount;
+        setActiveStep('step-commit');
+        logMsg('COMMIT PHASE', 'tag-purple', `DOM Mutation: button.textContent = '${countState}'`);
+        await new Promise(r => setTimeout(r, 150));
+
+        // 4. Browser Paint
+        paintCount++;
+        valPaint.textContent = paintCount;
+        setActiveStep('step-paint');
+        logMsg('BROWSER PAINT', 'tag-red', 'Browser recalculates style, layout, paint and compositing');
+      } else {
+        logMsg('RECONCILIATION', 'tag-cyan', `Fiber diff: Element tree structurally identical. Flags: No-op. Bailout!`);
+        logMsg('BAILOUT', 'tag-yellow', `⚠️ Render occurred, but COMMIT and BROWSER PAINT were skipped! (Render $\\neq$ Paint)`);
+      }
+
+      await new Promise(r => setTimeout(r, 200));
+      setActiveStep(null);
+    }
+
+    function resetMetrics() {
+      renderCount = 0;
+      reconcileCount = 0;
+      commitCount = 0;
+      paintCount = 0;
+      countState = 0;
+      valRender.textContent = 0;
+      valReconcile.textContent = 0;
+      valCommit.textContent = 0;
+      valPaint.textContent = 0;
+      telemetryLog.innerHTML = '';
+      logMsg('INITIALIZED', 'tag-cyan', 'Pipeline telemetry reset.');
+    }
+
+    logMsg('INITIALIZED', 'tag-cyan', 'Pipeline telemetry initialized. Ready for simulation.');
+  </script>
+</body>
+</html>

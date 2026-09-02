@@ -45,10 +45,10 @@ Before learning how HTML parses or how CSS renders, you must understand the **ho
 | **Part 03** | [Renderer Process & Main Thread](./03-renderer-process-main-thread.md) | ✅ Completed | Renderer responsibilities, Main thread execution, DOM/CSSOM coordination, JS $\leftrightarrow$ rendering bridge. |
 | **Part 04** | [Browser Event Loop & Scheduling](./04-browser-event-loop-tasks-rendering.md) | ✅ Completed | Tasks vs Microtasks, microtask starvation, frame budgets, cooperative yielding, React Scheduler boundaries. |
 | **Part 05** | [Navigation, Document & Page Lifecycle](./05-navigation-document-page-lifecycle.md) | ✅ Completed | Navigation resolution, document creation, `DOMContentLoaded`, `load`, `pageshow`, `visibilitychange`, BFCache, SPA routing. |
-| **Part 06** | [Site Isolation & Security Boundaries](./06-site-isolation-security-boundaries.md) | ⏳ Next | Origin vs Site, Spectre/Meltdown mitigations, Out-of-Process iframes (OOPIFs), OS sandboxing. |
-| **Part 07** | [IPC & Cross-Process Communication](./07-ipc-cross-process-communication.md) | ⏳ Pending | Why processes cannot share memory, Mojo IPC, shared memory buffers, serialization costs, security validation. |
-| **Part 08** | [Browser ↔ Operating System](./08-browser-operating-system.md) | ⏳ Pending | OS processes, threads, file descriptors, network sockets, GPU drivers, permissions, hardware mediation. |
-| **Part 09** | [Observing Architecture & Production Debugging](./09-observing-architecture-production-debugging.md) | ⏳ Pending | Task Manager, `chrome://gpu`, `chrome://process-internals`, Perfetto traces, production jank diagnostics. |
+| **Part 06** | [Site Isolation & Security Boundaries](./06-site-isolation-security-boundaries.md) | ✅ Completed | Origin vs Site, Spectre/Meltdown mitigations, Out-of-Process iframes (OOPIFs), OS sandboxing, COOP/COEP/CORP. |
+| **Part 07** | [IPC & Cross-Process Communication](./07-ipc-cross-process-communication.md) | ✅ Completed | Why processes cannot share memory, Mojo IPC, shared memory buffers, serialization costs, security validation. |
+| **Part 08** | [Browser ↔ Operating System](./08-browser-operating-system.md) | ✅ Completed | OS processes, threads, virtual memory, file descriptors, network sockets, GPU drivers, permissions, hardware mediation. |
+| **Part 09** | [Observing Architecture & Production Debugging](./09-observing-architecture-production-debugging.md) | ✅ Completed | Task Manager, `chrome://gpu`, `chrome://process-internals`, Perfetto traces, production jank diagnostics. |
 
 ---
 

@@ -1,6 +1,7 @@
 # 📨 LLD Problem: In-Memory Message Queue (Pub-Sub with Consumer Groups)
 
-> **Patterns:** Observer · Command · Singleton · Iterator
+> **Patterns:** Observer · Command · Singleton · Iterator  
+> 🌐 **Companion HLD Reference:** [C102 - Kafka System Design Interview Deep Dive](../../../../hld/06-Message-Queues/11-Kafka-System-Design-Interview-Deep-Dive.md)
 
 ---
 
