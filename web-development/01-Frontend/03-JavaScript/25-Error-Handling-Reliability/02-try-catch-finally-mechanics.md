@@ -1,587 +1,1669 @@
-# KPI 25 — Part 02: `try`, `catch`, `finally` & Synchronous Error Handling
+# KPI 25 — Error Handling, Debugging & Reliability
 
-[⬅️ Part 01: Errors, Exceptions & Failure Model](./01-errors-exceptions-failure-model.md) | [📚 KPI 25 Index](./README.md) | [Part 03: Error Propagation & Custom Errors ➡️](./03-error-propagation-custom-errors.md)
+## Part 2 — `try`, `catch`, `finally` & Synchronous Error Handling
 
----
 
-## ⚡ 30-Second Executive Cheat Sheet
+> **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)
+> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
 
-| Mechanism | Execution Rule | Key Failure Mode & Risk | Senior Engineering Standard |
-|---|---|---|---|
-| **`try` Block** | Executes synchronous statements, halting immediately upon encountering a `throw`. | Remaining statements inside the `try` block are permanently abandoned. | 🟢 Scope `try` blocks narrowly around specific operations that can actually throw. |
-| **`catch (err)` Block** | Intercepts any thrown value from the `try` block, binding it to the `err` variable. | Silently swallowing exceptions (`catch {}`) masks bugs and corrupts app state. | 🔴 **CRITICAL:** Always Handle, Log, Transform, or Re-throw. Never swallow errors silently. |
-| **`finally` Block** | Guaranteed to execute after `try` (and `catch`), even when `return` or `throw` occurs. | Writing `return` inside `finally` silently suppresses thrown exceptions. | 🔴 **NEVER return or throw inside `finally`:** Use strictly for resource/state cleanup. |
-| **Re-throwing (`throw err`)** | Passes unhandled exception types up the call stack to higher architectural boundaries. | Catching every error locally prevents global error telemetry from logging crashes. | 🟢 Catch selectively via `instanceof`; re-throw unexpected programmer/system errors. |
-| **`Error.cause` Chaining** | Wraps low-level errors inside domain errors while preserving root cause (`{ cause: err }`). | Overwriting errors without `cause` destroys the original V8 stack trace. | 🟢 Use `new DomainError("High-level message", { cause: originalError })`. |
-| **Synchronous Boundary** | `try/catch` cannot catch exceptions thrown in detached callbacks (`setTimeout`, events). | Unhandled exceptions in timer callbacks bypass surrounding synchronous `try/catch`. | 🔴 Wrap internal callback bodies in their own `try/catch` or use `async/await`. |
 
----
+Part 1 established the failure model. Now we need to understand **how JavaScript actually intercepts and handles exceptions**.
 
-> [!CAUTION]
-> ### 🎯 Senior Interview Gotchas: `finally` Return Masking & Asynchronous Catch Traps
-> 
-> #### Gotcha A: `return` Inside `finally` Overriding and Silently Suppressing Thrown Exceptions
-> *"Why did our critical authentication failure never throw an error and return 'OK' instead?"*  
-> ```js
-> // ❌ DISASTROUS RETURN INSIDE FINALLY:
-> function authenticateUser(credentials) {
->   try {
->     if (!credentials.token) {
->       // 1. Throws critical authentication exception:
->       throw new Error("UNAUTHORIZED: Invalid security token!");
->     }
->     return "AUTH_SUCCESS";
->   } catch (err) {
->     console.error("Auth failed:", err.message);
->     // 2. Re-throws error to halt user login:
->     throw err;
->   } finally {
->     // 3. 💥 FATAL FLAW: return inside finally OVERRIDES any pending exception or return!
->     // The thrown exception is SILENTLY DISCARDED, and the function returns "CLEANUP_DONE"!
->     return "CLEANUP_DONE";
->   }
-> }
-> 
-> const result = authenticateUser({}); // Returns "CLEANUP_DONE" with NO error thrown!
-> ```
-> **Deep Architectural Explanation:**  
-> In the ECMAScript specification, the completion record of a `finally` block takes absolute precedence over any pending abrupt completion (such as a `throw` or preceding `return`) in the `try` or `catch` blocks. If `finally` executes a `return`, `break`, `continue`, or `throw`, the engine immediately discards the original exception, permanently silencing the failure and returning the `finally` value.  
-> **The Senior Standard:** Restrict `finally` blocks exclusively to pure cleanup actions (e.g. `setLoading(false)`, `socket.close()`, `timer.clear()`). Never include control flow statements (`return`, `throw`, `break`) inside `finally`:
-> ```js
-> // ✅ CLEAN FINALLY BLOCK (Exception propagates cleanly):
-> function authenticateUserSafe(credentials) {
->   try {
->     if (!credentials.token) throw new Error("UNAUTHORIZED: Invalid token!");
->     return "AUTH_SUCCESS";
->   } finally {
->     resetAuthSpinner(); // 🟢 Pure cleanup! Pending return or throw is preserved!
->   }
-> }
-> ```
-> 
-> ---
-> 
-> #### Gotcha B: The "Asynchronous try/catch Trap" with Timers & Event Callbacks
-> *"Why did our global try/catch block fail to catch a crash inside `setTimeout`?"*  
-> ```js
-> // ❌ ATTEMPTING TO CATCH DETACHED ASYNCHRONOUS ERRORS:
-> function startBackgroundWorker() {
->   try {
->     // 💥 FATAL MISCONCEPTION: try/catch is purely SYNCHRONOUS!
->     setTimeout(() => {
->       // This callback executes 1000ms LATER in a brand new call stack!
->       throw new Error("Worker background calculation crashed!");
->     }, 1000);
->   } catch (err) {
->     // 💥 THIS CATCH BLOCK NEVER RUNS!
->     console.error("Caught worker crash:", err.message);
->   }
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> A `try/catch` statement only protects the code that executes **synchronously on the call stack** while control is physically inside the `try` block. When `setTimeout` is called, it merely registers a timer in the browser Web APIs and immediately returns. The `try/catch` finishes and leaves the call stack. One second later, the timer callback executes in a completely separate macrotask with its own fresh call stack; there is no active `catch` block on the stack, resulting in an unhandled exception crash.  
-> **The Senior Standard:** Place the `try/catch` directly inside the asynchronous callback, or convert the API to Promises / `async/await`:
-> ```js
-> // ✅ METHOD 1: LOCAL CATCH INSIDE CALLBACK
-> setTimeout(() => {
->   try {
->     doHeavyWorkerTask();
->   } catch (err) {
->     logError(err); // 🟢 Correctly intercepted in active execution frame!
->   }
-> }, 1000);
-> 
-> // ✅ METHOD 2: PROMISE + ASYNC/AWAIT (Senior Standard)
-> async function runWorkerAsync() {
->   try {
->     await delay(1000);
->     doHeavyWorkerTask();
->   } catch (err) {
->     logError(err); // 🟢 Intercepted via async/await promise rejection!
->   }
-> }
-> ```
-
----
-
-## 🧭 Industry Frequency & Framework Relevance
-
-| Badge | Industry Frequency | Relevance in React / Next.js / Vite Stacks | What to Focus On |
-|---|---|---|---|
-| 🟢 **Daily Driver** | Used in 100% of code | `try/catch/finally` in `async/await`, resetting loading states in `finally`, selective catch blocks | Universal requirement for asynchronous data fetching, form submission, and local resource cleanup. |
-| 🟡 **Moderate** | Used in ~45% of code | Error wrapping via `{ cause }`, Custom error type guards, `try...finally` without catch | Essential for building API clients, SDK middleware, transaction engines, and background tasks. |
-| 🔵 **Foundational / Engine** | Runtime internals | ECMAScript completion records, Call stack unwinding mechanics, V8 de-optimization heuristics | Required for Staff/Principal architecture reviews, APM instrumentation, and platform resilience. |
-
----
-
-## Core Concepts (20 Subtopics)
-
-### Part 1 — What Is the `try` Block? Enclosing Protected Execution `🟢 [Daily Driver]`
-
-Defines an execution scope watched by the runtime for thrown exceptions.
-
----
-
-### Part 2 — Immediate Control Flow Abandonment on `throw` `🟢 [Daily Driver]`
-
-The microsecond `throw` executes, all subsequent statements in the `try` block are skipped; control transfers to `catch`.
-
----
-
-### Part 3 — Anatomy of `catch`: The Interception Boundary `🟢 [Daily Driver]`
-
-Binds the thrown value to an identifier (`catch (err)`) or uses ES2019 optional catch binding (`catch {}`) when the error value is irrelevant.
-
----
-
-### Part 4 — `catch` Receives Arbitrary Thrown Values `🟢 [Daily Driver]`
-
-Always normalize unknown caught values using `err instanceof Error ? err.message : String(err)`.
-
----
-
-### Part 5 — Why `catch` Is Not a Magic "Fix" `🟢 [Daily Driver]`
-
-`catch` intercepts the failure; it does not repair invalid application state. You must explicitly recover or abort dependent workflows.
-
----
-
-### Part 6 — The Anti-Pattern: Silently Swallowing Exceptions `🔴 [Production-Critical]`
-
-Empty catch blocks (`catch (e) {}`) conceal bugs, corrupt data stores, and make production debugging impossible.
-
----
-
-### Part 7 — Synchronous Call Stack Traversal `🟢 [Daily Driver]`
-
-Exceptions unwind multiple nested function frames ($C \to B \to A$) until intercepted by the first enclosing `catch` block.
-
----
-
-### Part 8 — Error Ownership Architecture `🟢 [Daily Driver]`
-
-Place `try/catch` at the layer that owns the recovery strategy (e.g. data service normalizes errors; UI component renders fallback).
-
----
-
-### Part 9 — The `finally` Guarantee `🟢 [Daily Driver]`
-
-`finally` executes in all scenarios: normal completion, handled error, and unhandled propagated error.
-
----
-
-### Part 10 — Common `finally` Use Cases: Cleanup & Teardowns `🟢 [Daily Driver]`
+The core mechanism is:
 
 ```js
 try {
-  setLoading(true);
-  await fetchData();
-} catch (err) {
-  setError(err);
+  // Code that may throw
+} catch (error) {
+  // Handle the thrown error
 } finally {
-  setLoading(false); // 🟢 Always runs!
+  // Always runs after try/catch completes
 }
 ```
 
----
-
-### Part 11 — `finally` Execution Timing with `return` Statements `🔵 [Foundational / Engine]`
-
-When a `return` is reached in `try`, the return value is evaluated, `finally` executes, and then the function returns.
+The important thing is not memorizing this syntax. You need to understand the **control-flow mechanics**.
 
 ---
 
-### Part 12 — The Catastrophic `return` / `throw` Inside `finally` Override Bug `🔴 [Production-Critical]`
+# 1. What Is `try`?
 
-Never write `return` or `throw` in `finally`; it discards active exceptions from `try`/`catch`.
+## Definition
 
----
+A `try` block defines a section of code where JavaScript should watch for exceptions that can be handled by an associated `catch`.
 
-### Part 13 — `try...finally` Without `catch` `🟢 [Daily Driver]`
-
-Used when a function must guarantee resource cleanup without intercepting or suppressing the error.
-
----
-
-### Part 14 — Anti-Pattern: Using Exceptions as Normal Control Flow `🟢 [Daily Driver]`
-
-Do not throw exceptions for routine expected outcomes (e.g. array lookup miss). Use `null` or `Result` objects.
-
----
-
-### Part 15 — Selective Error Handling via `instanceof` `🟢 [Daily Driver]`
+Example:
 
 ```js
 try {
-  processOrder();
-} catch (err) {
-  if (err instanceof PaymentDeclinedError) showPaymentPrompt();
-  else throw err; // 🟢 Re-throw unexpected programmer/system errors!
+  const user = null;
+
+  console.log(user.name);
 }
 ```
 
----
-
-### Part 16 — The 3 Actions in `catch`: Handle, Transform, Re-throw `🟢 [Daily Driver]`
-
-1. **Handle:** Fully resolve failure with fallback UI.  
-2. **Transform:** Wrap technical error into a domain error.  
-3. **Re-throw:** Log telemetry and bubble up to global error boundary.
-
----
-
-### Part 17 — Preserving Root Cause Context with `new Error(msg, { cause })` `🟢 [Daily Driver]`
-
-```js
-try {
-  parseConfig();
-} catch (err) {
-  throw new Error("Failed to initialize application configuration", { cause: err });
-}
-```
-
----
-
-### Part 18 — Coarse-Grained vs Fine-Grained `try/catch` Boundaries `🟢 [Daily Driver]`
-
-Wrap cohesive transactional operations together; avoid wrapping every single line in individual `try/catch` blocks.
-
----
-
-### Part 19 — The Synchronous Boundary Limit `🔴 [Production-Critical]`
-
-`try/catch` cannot catch errors thrown inside detached asynchronous callbacks (`setTimeout`, DOM events).
-
----
-
-### Part 20 — The 10-Point Senior `try/catch/finally` Audit Checklist `🟢 [Daily Driver]`
+Execution:
 
 ```text
-1. Are empty catch blocks eliminated? ──► 2. Are return/throw avoided inside finally?
-3. Is loading state reset inside finally? ──► 4. Are unexpected errors re-thrown?
-5. Is { cause: err } used during re-throws? ──► 6. Are detached async callbacks protected?
-7. Is instanceof used for selective catching? ──► 8. Are unknown caught errors normalized?
-9. Is try/catch placed at recovery layer? ──► 10. Is dependent flow aborted on failure?
+try block starts
+       ↓
+user = null
+       ↓
+user.name
+       ↓
+TypeError occurs ❌
 ```
 
----
-
-## ⚖️ 4-Pillar Senior Engineering Decision Matrix
-
-| Error Handling Structure | 1. When to Use | 2. When NOT to Use | 3. Bottlenecks & Tradeoffs | 4. Modern Alternatives |
-|---|---|---|---|---|
-| **Fine-Grained `try/catch`** | Isolating optional/secondary operations (e.g. analytics, cache updates). | Large monolithic transactional workflows where all steps must succeed. | Can lead to verbose, fragmented code if overused. | Coarse boundary with rollback. |
-| **`try...finally` (No `catch`)** | Guaranteeing cleanup (releasing locks, timers) while letting errors bubble. | When local error recovery or user notification is required. | Does not intercept or handle the failure; caller must catch. | `try/catch/finally`. |
-| **Re-throwing with `{ cause }`** | Translating low-level technical errors into high-level business domain errors. | Simple single-layer utility functions. | Allocates an extra `Error` wrapper object. | Direct re-throw (`throw err`). |
-| **Result Objects / Tuples** | High-throughput functional pipelines, Go-style explicit error checking. | Standard idiomatic TypeScript/JavaScript applications with exceptions. | Requires callers to check `if (result.error)` manually on every call. | Standard `try/catch`. |
+Once the exception occurs, normal execution inside that `try` block stops.
 
 ---
 
-## ⚛️ Senior React Ecosystem Architecture & Component Patterns
+# 2. What Happens When an Error Is Thrown?
 
-### Enterprise Multi-Layer Transaction Pipeline in TypeScript
-```tsx
-import React, { useState, useCallback } from 'react';
+Consider:
 
-// ==========================================
-// 1. DOMAIN ERROR TAXONOMY
-// ==========================================
-export class DatabaseLockError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'DatabaseLockError';
-  }
+```js
+try {
+  console.log("Step 1");
+
+  throw new Error("Failure");
+
+  console.log("Step 2");
+} catch (error) {
+  console.log("Error handled");
 }
+```
 
-export class TransactionPipelineError extends Error {
-  constructor(message: string, public readonly step: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'TransactionPipelineError';
-  }
-}
+Execution:
 
-export interface TransactionRecord {
-  txId: string;
-  amount: number;
-  status: 'PENDING' | 'COMMITTED' | 'ROLLED_BACK';
-}
+```text
+Step 1
+  ↓
+throw Error
+  ↓
+❌ Normal execution interrupted
+  ↓
+Jump to catch
+  ↓
+"Error handled"
+```
 
-// ==========================================
-// 2. TRANSACTION PIPELINE DASHBOARD
-// ==========================================
-export function EnterpriseTransactionDashboard() {
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [activeTx, setActiveTx] = useState<TransactionRecord | null>(null);
+This line never executes:
 
-  const appendLog = (msg: string) => setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+```js
+console.log("Step 2");
+```
 
-  // 🟢 Resilient multi-step pipeline with guaranteed finally cleanup and cause chaining
-  const executeTransaction = useCallback(async (amount: number) => {
-    setIsProcessing(true);
-    appendLog(`▶️ Initiating transaction for $${amount}...`);
+This is critical:
 
-    let lockAcquired = false;
+> **Throwing an exception immediately abandons the remaining synchronous execution of the current protected block and begins exception propagation.**
 
-    try {
-      // Step 1: Acquire Lock
-      appendLog('Acquiring resource lock...');
-      lockAcquired = true;
+---
 
-      // Step 2: Validate & Process
-      if (amount > 5000) {
-        throw new DatabaseLockError('Transaction limit exceeded: Maximum $5,000 per block');
-      }
+# 3. Basic `try` / `catch`
 
-      // Step 3: Commit Transaction
-      setActiveTx({
-        txId: `tx_${Date.now()}`,
-        amount,
-        status: 'COMMITTED'
-      });
-      appendLog('✅ Transaction committed successfully.');
-    } catch (err: unknown) {
-      // 🟢 Selective Error Handling & Re-throwing with { cause }
-      if (err instanceof DatabaseLockError) {
-        appendLog(`⚠️ Operational Warning: ${err.message}`);
-        setActiveTx({ txId: 'N/A', amount, status: 'ROLLED_BACK' });
-      } else {
-        // Transform low-level crash into contextual Domain Error
-        const pipelineErr = new TransactionPipelineError(
-          'Critical failure during transaction processing',
-          'PAYMENT_STEP',
-          { cause: err as Error }
-        );
-        appendLog(`🔴 ${pipelineErr.message} (Step: ${pipelineErr.step})`);
-        setActiveTx({ txId: 'N/A', amount, status: 'ROLLED_BACK' });
-      }
-    } finally {
-      // 🟢 GUARANTEED CLEANUP: Releases resource lock regardless of success or failure!
-      if (lockAcquired) {
-        appendLog('🧹 [Finally Cleanup]: Releasing resource lock and resetting spinner.');
-      }
-      setIsProcessing(false); // 🟢 Guaranteed state reset
-    }
-  }, []);
+Example:
 
-  return (
-    <div className="transaction-dashboard-card">
-      <header className="card-header">
-        <h3>Enterprise Transaction Pipeline &amp; <code>finally</code> Engine</h3>
-        <span className="badge">🛡️ Guaranteed Cleanup</span>
-      </header>
-
-      <p className="architecture-description">
-        Demonstrates synchronous/asynchronous <code>try/catch/finally</code> execution flow, <code>Error.cause</code> context preservation, and guaranteed lock release in <code>finally</code>.
-      </p>
-
-      <div className="controls-row">
-        <button
-          type="button"
-          onClick={() => executeTransaction(2500)}
-          disabled={isProcessing}
-          className="btn-success"
-        >
-          {isProcessing ? 'Processing...' : '💳 Execute Valid Tx ($2,500)'}
-        </button>
-        <button
-          type="button"
-          onClick={() => executeTransaction(9999)}
-          disabled={isProcessing}
-          className="btn-danger"
-        >
-          {isProcessing ? 'Processing...' : '💥 Trigger Failing Tx ($9,999)'}
-        </button>
-      </div>
-
-      {activeTx && (
-        <div className={`tx-status-banner ${activeTx.status.toLowerCase()}`}>
-          <span>Tx ID: <strong>{activeTx.txId}</strong></span>
-          <span>Status: <strong>{activeTx.status}</strong></span>
-        </div>
-      )}
-
-      <div className="log-console">
-        <h4>Execution Audit Log:</h4>
-        {logs.map((log, i) => (
-          <div key={i} className="log-line">{log}</div>
-        ))}
-      </div>
-    </div>
+```js
+try {
+  const data =
+    JSON.parse("invalid json");
+} catch (error) {
+  console.error(
+    "Parsing failed:",
+    error.message
   );
 }
 ```
 
+Conceptually:
+
+```text
+try
+ │
+ ├── Success ────────→ Continue
+ │
+ └── Error
+       ↓
+     catch
+       ↓
+    Handle error
+       ↓
+    Continue
+```
+
+Without the `try/catch`:
+
+```text
+Invalid JSON
+      ↓
+SyntaxError
+      ↓
+Unhandled exception
+```
+
+With `try/catch`:
+
+```text
+Invalid JSON
+      ↓
+SyntaxError
+      ↓
+catch handles it
+      ↓
+Application can continue
+```
+
 ---
 
-## 🧠 Part 02 — Integrated Challenges & Active Recall Solutions
+# 4. `catch` Receives the Thrown Value
 
-### Prediction Challenge 1: `finally` with `throw` and `catch` Flow
+Example:
+
 ```js
 try {
-  console.log("1");
-  throw new Error("Err");
-  console.log("2");
-} catch (e) {
-  console.log("3");
+  throw new Error(
+    "Failed to load user"
+  );
+} catch (error) {
+  console.log(error.message);
+}
+```
+
+Output:
+
+```text
+Failed to load user
+```
+
+The `error` variable is simply the value that was thrown.
+
+For example:
+
+```js
+try {
+  throw 404;
+} catch (error) {
+  console.log(error);
+}
+```
+
+Output:
+
+```text
+404
+```
+
+Or:
+
+```js
+try {
+  throw "Something failed";
+} catch (error) {
+  console.log(error);
+}
+```
+
+This is one reason arbitrary thrown values are problematic.
+
+A handler cannot safely assume:
+
+```js
+error.message
+```
+
+exists.
+
+---
+
+# 5. Why `Error` Objects Are Better
+
+Consider:
+
+```js
+try {
+  throw new Error("Failed");
+} catch (error) {
+  console.log(error.message);
+}
+```
+
+This gives structured error information.
+
+Conceptually:
+
+```text
+Error Object
+│
+├── name
+├── message
+└── stack
+```
+
+This is more consistent than:
+
+```js
+throw "Failed";
+```
+
+or:
+
+```js
+throw 500;
+```
+
+A reliable application benefits from predictable error shapes.
+
+---
+
+# 6. `catch` Is Not a Magic "Fix"
+
+Consider:
+
+```js
+try {
+  const user = null;
+
+  console.log(user.name);
+} catch (error) {
+  console.log("Something failed");
+}
+```
+
+The application did not fix:
+
+```text
+user = null
+```
+
+It only changed what happens **after the failure**.
+
+Conceptually:
+
+```text
+Bug exists
+    ↓
+Operation fails
+    ↓
+catch intercepts failure
+    ↓
+Application decides what to do
+```
+
+This distinction is important.
+
+Bad engineering can look like:
+
+```js
+try {
+  everything();
+} catch {
+  // ignore
+}
+```
+
+This hides the failure.
+
+---
+
+# 7. Never Silently Swallow Errors
+
+Example:
+
+```js
+try {
+  processPayment();
+} catch (error) {
+}
+```
+
+This is usually dangerous.
+
+Conceptually:
+
+```text
+Failure occurs
+      ↓
+catch
+      ↓
+Nothing happens
+      ↓
+Failure disappears ❌
+```
+
+Now:
+
+```text
+Developer cannot debug it
+User may not know what happened
+Application state may be inconsistent
+```
+
+At minimum, determine whether the error should be:
+
+```text
+Handled
+Reported
+Transformed
+Rethrown
+Recovered from
+```
+
+---
+
+# 8. `try/catch` and Function Calls
+
+A `try/catch` can handle an error thrown inside a synchronously executed function.
+
+```js
+function processUser() {
+  throw new Error("Invalid user");
+}
+
+try {
+  processUser();
+} catch (error) {
+  console.log(error.message);
+}
+```
+
+Execution:
+
+```text
+try
+ │
+ ▼
+processUser()
+ │
+ ▼
+throw Error ❌
+ │
+ ▼
+catch
+```
+
+The important condition is:
+
+> The error occurs during the synchronous execution path protected by the `try`.
+
+---
+
+# 9. Nested Function Error Propagation
+
+Consider:
+
+```js
+function levelOne() {
+  levelTwo();
+}
+
+function levelTwo() {
+  levelThree();
+}
+
+function levelThree() {
+  throw new Error("Failure");
+}
+
+try {
+  levelOne();
+} catch (error) {
+  console.log(
+    "Handled:",
+    error.message
+  );
+}
+```
+
+Execution:
+
+```text
+try
+ │
+ ▼
+levelOne()
+ │
+ ▼
+levelTwo()
+ │
+ ▼
+levelThree()
+ │
+ ▼
+throw Error ❌
+ │
+ └───────────────┐
+                 │
+                 ▼
+              catch
+```
+
+JavaScript propagates the exception upward through the call stack.
+
+The `catch` does **not** need to be inside the exact function where the error originated.
+
+---
+
+# 10. Where Should You Catch an Error?
+
+This is where senior-level reasoning begins.
+
+You should not automatically write:
+
+```js
+try {
+  everySingleOperation();
+} catch {
+}
+```
+
+Instead ask:
+
+> **Which layer can actually make a meaningful recovery decision?**
+
+Example:
+
+```text
+parseResponse()
+      ↓
+API client
+      ↓
+Data hook
+      ↓
+Component
+```
+
+Suppose JSON parsing fails.
+
+Possible architecture:
+
+```text
+parseResponse()
+      ↓
+throws error
+      ↓
+API client
+      ↓
+normalizes failure
+      ↓
+Data hook
+      ↓
+returns failure state
+      ↓
+Component
+      ↓
+shows UI
+```
+
+The component may not need to understand:
+
+```text
+JSON parsing
+HTTP transport
+response decoding
+```
+
+It only needs to know:
+
+```text
+Can I show the data?
+
+If not, what failure state exists?
+```
+
+---
+
+# 11. `finally`
+
+## Definition
+
+The `finally` block runs after the `try` block completes and after a matching `catch` handles an exception, including during many control-flow exits.
+
+Example:
+
+```js
+try {
+  console.log("Start");
+} catch (error) {
+  console.log("Error");
 } finally {
-  console.log("4");
-}
-console.log("5");
-```
-**Question:** In what exact sequence do numbers output to the console?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
-
-**Answer:** `1`, `3`, `4`, `5`.  
-**Why:**  
-1. `try` outputs `"1"`.  
-2. `throw` halts `try` (`"2"` is skipped) and jumps to `catch`, logging `"3"`.  
-3. `finally` executes, logging `"4"`.  
-4. Execution continues normally after the protected block, logging `"5"`.
-</details>
-
----
-
-### Prediction Challenge 2: Dangerous `return` Inside `finally`
-```js
-function testFinallyReturn() {
-  try {
-    throw new Error("Crash");
-  } catch (err) {
-    throw new Error("Secondary Crash");
-  } finally {
-    return "Suppressed!";
-  }
-}
-console.log(testFinallyReturn());
-```
-**Question:** What happens when `testFinallyReturn()` is called?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
-
-**Answer:**  
-The function outputs `"Suppressed!"` and **NO ERROR IS THROWN**.  
-**Why:** The `return "Suppressed!"` statement inside `finally` completely overrides and discards the active `Secondary Crash` exception from `catch`.
-</details>
-
----
-
-### Prediction Challenge 3: `try...finally` Uncaught Propagation
-```js
-function processWork() {
-  try {
-    throw new TypeError("Invalid argument");
-  } finally {
-    console.log("Cleanup Executed");
-  }
-}
-try {
-  processWork();
-} catch (err) {
-  console.log("Outer Catch:", err.name);
+  console.log("Cleanup");
 }
 ```
-**Question:** What is the console output order?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-1. `"Cleanup Executed"` (The inner `finally` executes as the error begins unwinding the stack).  
-2. `"Outer Catch: TypeError"` (The outer `catch` catches the unwound exception).
-</details>
+Output:
 
----
+```text
+Start
+Cleanup
+```
 
-### Prediction Challenge 4: Error Chaining with `{ cause }`
+With an error:
+
 ```js
 try {
-  JSON.parse("invalid");
-} catch (err) {
-  const customErr = new Error("Config parsing failed", { cause: err });
-  console.log(customErr.cause instanceof SyntaxError);
+  throw new Error("Failure");
+} catch (error) {
+  console.log("Error");
+} finally {
+  console.log("Cleanup");
 }
 ```
-**Question:** What does the `console.log` statement output?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:** **`true`**.  
-**Why:** Passing `{ cause: err }` attaches the original `SyntaxError` from `JSON.parse` directly to `customErr.cause`, preserving the root causal chain.
-</details>
+Output:
 
----
+```text
+Error
+Cleanup
+```
 
-## 🎯 Tiered Interview Question Bank (Intern ➔ Staff / Principal)
+Conceptually:
 
-### 🟢 Tier 1: Intern / Junior Level
-**Q1:** What is the purpose of the `finally` block in JavaScript?  
-<details>
-<summary><strong>Answer</strong></summary>
-The `finally` block contains cleanup code that is guaranteed to execute after the `try` block (and `catch` block, if an exception occurred), regardless of whether the operation succeeded, threw a handled error, or encountered an unhandled error. It is commonly used to reset loading spinners, clear intervals, close file handles, and release resource locks.
-</details>
-
-**Q2:** Why should you avoid putting a `return` statement inside a `finally` block?  
-<details>
-<summary><strong>Answer</strong></summary>
-A `return` statement inside a `finally` block takes precedence over any pending `throw` or preceding `return` in `try`/`catch`. If an error was thrown, putting `return` in `finally` will silently swallow and discard the exception, masking critical bugs from developers.
-</details>
-
----
-
-### 🟡 Tier 2: Mid-Level Engineer
-**Q3:** Why does wrapping `try/catch` around `setTimeout(() => { throw new Error() }, 1000)` fail to catch the error?  
-<details>
-<summary><strong>Answer</strong></summary>
-`try/catch` is strictly synchronous; it only protects code executing in the current call stack while execution is physically inside the `try` block. `setTimeout` schedules the callback to run 1000ms later in a completely separate macrotask. When the callback throws, the synchronous `try/catch` has already completed and exited the call stack, resulting in an unhandled asynchronous exception.
-</details>
-
-**Q4:** What is the purpose of the `cause` property in modern JavaScript `Error` objects?  
-<details>
-<summary><strong>Answer</strong></summary>
-The `cause` property (introduced in ES2022 via `new Error(message, { cause: originalError })`) allows developers to wrap low-level technical errors (e.g. `SyntaxError`, `NetworkError`) inside high-level business domain errors while maintaining a direct link to the original error and its V8 stack trace for observability tools.
-</details>
-
----
-
-### 🟠 Tier 3: Senior Frontend Engineer
-**Q5:** How do you structure error handling across application layers to avoid duplicating `try/catch` blocks in every React component?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. **API / Transport Layer:** Wraps low-level `fetch` calls, catches network failures, and normalizes HTTP status codes into typed `HttpError` subclasses.  
-2. **Domain / Service Layer:** Implements business logic and wraps API errors with contextual `DomainError` instances using `{ cause: httpError }`.  
-3. **Data Hooks (`useQuery`):** Exposes state (`isLoading`, `error`, `data`) and handles retry policies.  
-4. **UI Layer:** React components simply read the hook state to display contextual error UI, while unhandled component render crashes bubble up to React **Error Boundaries**.
-</details>
-
----
-
-### 🔴 Tier 4: Staff / Principal Architect
-**Q6:** How does V8 handle Exception Unwinding and De-Optimization (`DeoptToBaseline` / `DeoptToInterpreter`) when a `throw` statement executes in optimized JIT (TurboFan) code?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. **TurboFan Speculative Optimization:** TurboFan optimizes functions assuming the "Happy Path" where no exceptions are thrown.  
-2. **Abrupt De-Optimization:** When a `throw` statement executes, TurboFan cannot safely execute non-linear stack jumps; it triggers a **Bailout / De-optimization**, reverting the JIT-compiled machine code back to the Ignition Bytecode interpreter.  
-3. **Staff Architecture:** Do not use `try/catch` or `throw` for high-frequency normal control flow (e.g. validating $100,000$ loop records). Reserve `throw` for exceptional failures to keep TurboFan JIT optimizations active in hot paths.
-</details>
-
----
-
-## 🛠️ Senior Architecture Challenge: Standalone Pipeline Runner with `finally` Tracking
-
-```js
-// See runnable implementation in examples/02-try-catch-finally-mechanics.js
+```text
+try
+ │
+ ├── Success ────┐
+ │               │
+ └── Error       │
+       ↓         │
+     catch ──────┤
+                 ↓
+              finally
 ```
 
 ---
 
-## Key Takeaways
-1. **Never Return or Throw in `finally`:** Protect active exceptions from being silently suppressed.
-2. **`try/catch` Is Synchronous:** Wrap callback internals or use `async/await` for asynchronous code.
-3. **Always Clean Up in `finally`:** Ensure loading spinners and resource locks reset unconditionally.
-4. **Preserve Root Causes:** Use `new Error(msg, { cause: err })` when transforming exceptions.
-5. **Catch Selectively:** Handle known domain errors; re-throw unexpected programmer bugs to telemetry.
+# 12. The Purpose of `finally`
+
+`finally` is generally for work that should happen regardless of whether the operation succeeds or fails.
+
+Example:
+
+```js
+try {
+  startOperation();
+
+  performOperation();
+} catch (error) {
+  handleError(error);
+} finally {
+  stopLoading();
+}
+```
+
+Conceptually:
+
+```text
+Operation starts
+      ↓
+Loading = true
+      ↓
+   Success?
+   /      \
+ Yes       No
+  │         │
+  ▼         ▼
+Result    Handle error
+  \         /
+   \       /
+    ▼     ▼
+    finally
+       ↓
+Loading = false
+```
+
+This makes cleanup logic explicit.
 
 ---
 
-[⬅️ Part 01: Errors, Exceptions & Failure Model](./01-errors-exceptions-failure-model.md) | [📚 KPI 25 Index](./README.md) | [Part 03: Error Propagation & Custom Errors ➡️](./03-error-propagation-custom-errors.md)
+# 13. Common `finally` Use Cases
+
+Typical uses include:
+
+```text
+Reset loading state
+Release temporary resources
+Close connections
+Cleanup temporary state
+Stop progress indicators
+Restore UI state
+```
+
+Example:
+
+```js
+async function loadUser() {
+  setLoading(true);
+
+  try {
+    const user =
+      await fetchUser();
+
+    setUser(user);
+  } catch (error) {
+    setError(error);
+  } finally {
+    setLoading(false);
+  }
+}
+```
+
+This pattern ensures:
+
+```text
+Success → loading false
+
+Failure → loading false
+```
+
+---
+
+# 14. `finally` and `return`
+
+This behavior is important.
+
+Consider:
+
+```js
+function getValue() {
+  try {
+    return "A";
+  } finally {
+    console.log("Cleanup");
+  }
+}
+```
+
+Execution:
+
+```text
+return "A"
+    ↓
+finally runs first
+    ↓
+function returns "A"
+```
+
+Output:
+
+```text
+Cleanup
+```
+
+Result:
+
+```js
+getValue(); // "A"
+```
+
+Conceptually:
+
+```text
+try
+ ↓
+return requested
+ ↓
+finally executes
+ ↓
+return completes
+```
+
+---
+
+# 15. Dangerous `return` Inside `finally`
+
+Consider:
+
+```js
+function getValue() {
+  try {
+    return "A";
+  } finally {
+    return "B";
+  }
+}
+```
+
+Result:
+
+```js
+getValue(); // "B"
+```
+
+The `return` inside `finally` overrides the earlier return.
+
+This is dangerous because it can suppress expected control flow.
+
+Similarly:
+
+```js
+function run() {
+  try {
+    throw new Error("Failure");
+  } finally {
+    return "Recovered";
+  }
+}
+```
+
+The thrown error is effectively suppressed by the `return` in `finally`.
+
+Therefore:
+
+> **Avoid `return`, `throw`, or other control-flow overrides inside `finally` unless you explicitly intend to override the previous completion.**
+
+For cleanup logic, `finally` should usually remain simple.
+
+---
+
+# 16. `try` Without `catch`
+
+JavaScript allows:
+
+```js
+try {
+  performOperation();
+} finally {
+  cleanup();
+}
+```
+
+If `performOperation()` throws:
+
+```text
+try
+ ↓
+Error ❌
+ ↓
+finally runs
+ ↓
+Error continues propagating
+```
+
+Example:
+
+```js
+function run() {
+  try {
+    throw new Error("Failure");
+  } finally {
+    console.log("Cleanup");
+  }
+}
+```
+
+The error is not handled.
+
+The `finally` block runs, and then the exception continues upward.
+
+This is useful when your responsibility is:
+
+```text
+Cleanup
+```
+
+but not:
+
+```text
+Error recovery
+```
+
+---
+
+# 17. `try/catch` Control Flow vs Normal Flow
+
+Consider:
+
+```js
+function getUser(id) {
+  try {
+    if (!id) {
+      throw new Error(
+        "ID required"
+      );
+    }
+
+    return {
+      id,
+      name: "Sunny"
+    };
+  } catch (error) {
+    return null;
+  }
+}
+```
+
+This works, but ask whether an exception is necessary.
+
+Could this simply be:
+
+```js
+function getUser(id) {
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    name: "Sunny"
+  };
+}
+```
+
+The second version may be clearer if missing `id` is an expected state.
+
+Avoid using exceptions as ordinary control flow when a normal result model is more appropriate.
+
+---
+
+# 18. Selective Error Handling
+
+Suppose:
+
+```js
+try {
+  await loadData();
+} catch (error) {
+  handleError(error);
+}
+```
+
+Not every error should necessarily receive the same treatment.
+
+You may need classification.
+
+Example:
+
+```js
+try {
+  await loadData();
+} catch (error) {
+  if (error instanceof ValidationError) {
+    showValidationError(
+      error.message
+    );
+  } else {
+    reportUnexpectedError(error);
+  }
+}
+```
+
+Conceptually:
+
+```text
+Error
+ │
+ ├── ValidationError
+ │       ↓
+ │    User correction
+ │
+ └── Unexpected Error
+         ↓
+      Report / fallback
+```
+
+This becomes more powerful with custom error types, which we will cover in Part 3.
+
+---
+
+# 19. Catch, Handle, or Rethrow?
+
+A `catch` does not mean:
+
+```text
+The error must end here.
+```
+
+You can:
+
+### Handle
+
+```js
+try {
+  operation();
+} catch (error) {
+  showFallback();
+}
+```
+
+### Transform
+
+```js
+try {
+  operation();
+} catch (error) {
+  throw new Error(
+    "Failed to initialize dashboard"
+  );
+}
+```
+
+### Rethrow
+
+```js
+try {
+  operation();
+} catch (error) {
+  logError(error);
+
+  throw error;
+}
+```
+
+Conceptually:
+
+```text
+Error occurs
+      ↓
+catch
+      │
+      ├── Handle
+      │
+      ├── Transform
+      │
+      └── Rethrow
+```
+
+The choice depends on which layer owns recovery.
+
+---
+
+# 20. Error Context When Rethrowing
+
+Suppose:
+
+```js
+try {
+  await fetchUser();
+} catch (error) {
+  throw new Error(
+    "Failed to initialize dashboard"
+  );
+}
+```
+
+This adds context, but it can obscure the original failure if handled carelessly.
+
+Modern JavaScript supports preserving causal context with an error cause:
+
+```js
+try {
+  await fetchUser();
+} catch (error) {
+  throw new Error(
+    "Failed to initialize dashboard",
+    {
+      cause: error
+    }
+  );
+}
+```
+
+Conceptually:
+
+```text
+Dashboard Error
+      │
+      └── cause
+            │
+            ▼
+       Original Error
+```
+
+This allows higher layers to understand both:
+
+```text
+What failed at this layer?
+```
+
+and:
+
+```text
+What caused it?
+```
+
+---
+
+# 21. The Error Boundary Principle
+
+A useful architecture:
+
+```text
+Low-level layer
+      ↓
+Throws detailed technical error
+      ↓
+Higher-level layer
+      ↓
+Adds context / transforms meaning
+      ↓
+UI boundary
+      ↓
+Decides user experience
+```
+
+Example:
+
+```text
+fetch()
+  ↓
+Network failure
+
+API client
+  ↓
+ApiError
+
+Dashboard loader
+  ↓
+DashboardLoadError
+
+UI
+  ↓
+"Unable to load dashboard"
++ Retry
+```
+
+The user should usually not see:
+
+```text
+TypeError:
+Cannot read properties of undefined
+```
+
+That is technical diagnostic information, not useful recovery guidance.
+
+---
+
+# 22. One Large `try` Block vs Focused `try` Blocks
+
+Consider:
+
+```js
+try {
+  validateUser();
+  updateCache();
+  saveUser();
+  sendAnalytics();
+  renderSuccess();
+} catch (error) {
+  handleError(error);
+}
+```
+
+What failed?
+
+```text
+Validation?
+Cache?
+Save?
+Analytics?
+Rendering?
+```
+
+The error boundary is broad.
+
+Sometimes that is correct.
+
+Often, more deliberate boundaries are better:
+
+```js
+validateUser();
+
+try {
+  await saveUser();
+} catch (error) {
+  showSaveError();
+  return;
+}
+
+try {
+  sendAnalytics();
+} catch (error) {
+  reportAnalyticsError(error);
+}
+
+renderSuccess();
+```
+
+Now failure handling matches ownership.
+
+But do not split every line into separate `try/catch` blocks either.
+
+The principle is:
+
+> **Define error boundaries around meaningful operations and recovery strategies.**
+
+---
+
+# 23. `try/catch` Is Synchronous by Default
+
+This is a critical distinction.
+
+Consider:
+
+```js
+try {
+  setTimeout(() => {
+    throw new Error("Failure");
+  }, 1000);
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+The outer `catch` does **not** catch that later callback error.
+
+Why?
+
+Execution:
+
+```text
+try starts
+   ↓
+Schedule timer
+   ↓
+try finishes
+   ↓
+catch scope is gone
+
+Later...
+   ↓
+Timer callback executes
+   ↓
+Error occurs ❌
+```
+
+The error occurs in a later execution context.
+
+The correct model is:
+
+```text
+try/catch
+protects the execution occurring
+while control is inside the try path.
+```
+
+We will go much deeper into async errors in Part 4.
+
+---
+
+# 24. Correct Handling Inside an Async Callback
+
+Example:
+
+```js
+setTimeout(() => {
+  try {
+    throw new Error("Failure");
+  } catch (error) {
+    console.error(error);
+  }
+}, 1000);
+```
+
+Now:
+
+```text
+Timer callback starts
+        ↓
+try begins
+        ↓
+Error occurs
+        ↓
+catch handles it
+```
+
+Again, the handler exists around the execution context where the exception occurs.
+
+---
+
+# 25. `try/catch` with `async/await`
+
+An `await` changes how we work with asynchronous failures.
+
+Example:
+
+```js
+async function loadUser() {
+  try {
+    const user =
+      await fetchUser();
+
+    return user;
+  } catch (error) {
+    console.error(error);
+  }
+}
+```
+
+Conceptually:
+
+```text
+try
+ ↓
+Start async operation
+ ↓
+await Promise
+
+Success
+  ↓
+Continue inside try
+
+OR
+
+Promise rejects
+  ↓
+catch
+```
+
+This is one reason `async/await` makes asynchronous failure handling resemble synchronous code.
+
+But the underlying mechanism still involves Promise rejection.
+
+We will analyze this precisely in Part 4.
+
+---
+
+# 26. Common Anti-Pattern — Catch Everything and Continue
+
+Example:
+
+```js
+try {
+  const user =
+    await loadUser();
+
+  processUser(user);
+} catch (error) {
+  console.error(error);
+}
+
+continueApplication();
+```
+
+What happens if:
+
+```text
+loadUser()
+```
+
+fails?
+
+You may continue with:
+
+```text
+Invalid application state
+```
+
+A better approach may be:
+
+```js
+try {
+  const user =
+    await loadUser();
+
+  processUser(user);
+} catch (error) {
+  showErrorState();
+  return;
+}
+
+continueApplication();
+```
+
+Now:
+
+```text
+Failure
+   ↓
+Handle failure
+   ↓
+Stop dependent flow
+```
+
+The important question is:
+
+> **After handling this failure, is it actually safe to continue?**
+
+---
+
+# 27. Recovery Must Match the Failure
+
+Consider:
+
+```text
+Network timeout
+```
+
+Possible response:
+
+```text
+Retry
+```
+
+Now:
+
+```text
+Invalid user input
+```
+
+Better response:
+
+```text
+Ask user to correct input
+```
+
+Now:
+
+```text
+Programming bug
+```
+
+Better response:
+
+```text
+Report
+Fix
+Possibly isolate with fallback UI
+```
+
+Therefore:
+
+```text
+Error
+  ↓
+Classification
+  ↓
+Recovery strategy
+```
+
+Do not apply:
+
+```text
+catch → "Something went wrong"
+```
+
+to every failure in a large application.
+
+---
+
+# 28. Production Example — Loading Data
+
+```js
+async function loadProducts() {
+  setLoading(true);
+  setError(null);
+
+  try {
+    const products =
+      await productService.getAll();
+
+    setProducts(products);
+  } catch (error) {
+    reportError(error);
+
+    setError({
+      type: "LOAD_PRODUCTS_FAILED",
+      message:
+        "Unable to load products."
+    });
+  } finally {
+    setLoading(false);
+  }
+}
+```
+
+State flow:
+
+```text
+Start
+ ↓
+loading = true
+error = null
+ ↓
+Request
+ │
+ ├── Success
+ │      ↓
+ │   setProducts()
+ │
+ └── Failure
+        ↓
+     reportError()
+        ↓
+     setError()
+             │
+             ▼
+          finally
+             ↓
+      loading = false
+```
+
+This is much closer to production-quality thinking than simply:
+
+```js
+fetch(...).catch(console.error);
+```
+
+---
+
+# 29. Prediction Challenge #1
+
+What happens?
+
+```js
+try {
+  console.log("A");
+
+  throw new Error("Failure");
+
+  console.log("B");
+} catch (error) {
+  console.log("C");
+} finally {
+  console.log("D");
+}
+```
+
+Answer:
+
+```text
+A
+C
+D
+```
+
+Because:
+
+```text
+A executes
+ ↓
+Error thrown
+ ↓
+B skipped
+ ↓
+catch → C
+ ↓
+finally → D
+```
+
+---
+
+# 30. Prediction Challenge #2
+
+What happens?
+
+```js
+function test() {
+  try {
+    return "A";
+  } finally {
+    console.log("Cleanup");
+  }
+}
+```
+
+Answer:
+
+```text
+"Cleanup"
+```
+
+is logged first.
+
+Then:
+
+```text
+"A"
+```
+
+is returned.
+
+Conceptually:
+
+```text
+return requested
+      ↓
+finally executes
+      ↓
+return completes
+```
+
+---
+
+# 31. Prediction Challenge #3
+
+What happens?
+
+```js
+function test() {
+  try {
+    throw new Error("Failure");
+  } finally {
+    return "Recovered";
+  }
+}
+```
+
+The result becomes:
+
+```text
+"Recovered"
+```
+
+The `return` inside `finally` overrides the thrown exception.
+
+This is why control-flow statements inside `finally` are dangerous.
+
+---
+
+# 32. Senior-Level Design Questions
+
+Before writing a `try/catch`, ask:
+
+```text
+1. What operation can actually fail?
+
+2. What failures do I expect?
+
+3. Where should the error boundary exist?
+
+4. Can this layer recover?
+
+5. Should the error be transformed?
+
+6. Should the original cause be preserved?
+
+7. Is it safe to continue?
+
+8. What cleanup must happen regardless?
+
+9. Should finally handle lifecycle cleanup?
+
+10. Should the failure propagate upward?
+```
+
+---
+
+# 33. 30-Second Executive Cheat Sheet
+
+```text
+TRY / CATCH / FINALLY
+════════════════════════════
+
+try
+=
+Execute protected code
+
+
+throw
+=
+Interrupt normal execution
+
+
+catch
+=
+Receive and handle thrown value
+
+
+finally
+=
+Run cleanup regardless of normal
+success or handled/unhandled failure
+
+
+Error propagation:
+
+Function C throws
+      ↑
+Function B
+      ↑
+Function A
+      ↑
+Nearest suitable handler
+
+
+catch can:
+
+Handle
+Transform
+Rethrow
+
+
+finally:
+
+Runs before pending return completes
+
+Avoid return/throw inside finally
+unless intentionally overriding control flow
+
+
+Senior principle:
+
+Don't ask:
+
+"Where can I catch this?"
+
+Ask:
+
+"Which layer owns recovery?"
+```
+
+---
+
+# KPI 25 Progress
+
+```text
+KPI 25 — Error Handling, Debugging & Reliability
+══════════════════════════════════════════════════
+
+Part 1  ✅ Errors, Exceptions & Failure Model
+Part 2  ✅ try / catch / finally
+Part 3  ⏳ Error Propagation & Custom Errors
+Part 4  ⏳ Async Errors & Promise Rejections
+Part 5  ⏳ API Failure Handling & Retry Strategies
+Part 6  ⏳ React Error Boundaries & Recovery
+Part 7  ⏳ Logging, Observability & Production Debugging
+Part 8  ⏳ Systematic Debugging Methodology
+```
+
+**Next: Part 3 — Error propagation across application layers, custom error classes, error taxonomy, error transformation, and preserving the original cause.**

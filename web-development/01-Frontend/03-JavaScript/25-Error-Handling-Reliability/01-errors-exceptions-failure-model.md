@@ -1,582 +1,1587 @@
-# KPI 25 — Part 01: Errors, Exceptions & the JavaScript Failure Model
+# KPI 25 — Error Handling, Debugging & Reliability
 
-[⬅️ KPI 24 — Performance Profiling](../24-Performance-Profiling/README.md) | [📚 KPI 25 Index](./README.md) | [Part 02: try / catch / finally Mechanics ➡️](./02-try-catch-finally-mechanics.md)
+## Part 1 — Errors, Exceptions & the JavaScript Failure Model
 
----
 
-## ⚡ 30-Second Executive Cheat Sheet
+> **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)
+> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
 
-| Failure Concept | Precise Definition | Key Properties & Mechanics | Senior Engineering Standard |
-|---|---|---|---|
-| **Bug vs Error vs Exception** | **Bug:** Defect in code logic. **Error:** Runtime failure state. **Exception:** Interruption caught by a handler. | Exceptions halt execution and unwind the call stack until a `catch` block is reached. | 🟢 Distinguish between code bugs (fix immediately) and operational failures (handle gracefully). |
-| **`Error` Object** | Standard JavaScript class containing `name`, `message`, and `stack`. | `Error.prototype.stack` captures the exact call frame sequence in the V8 engine. | 🔴 **CRITICAL:** Always throw instances of `Error` (or derived subclasses), never strings or plain objects. |
-| **Built-in Error Types** | Core V8 taxonomy: `TypeError`, `ReferenceError`, `SyntaxError`, `RangeError`, `URIError`. | Extends `Error.prototype`; represents distinct categories of language/runtime failure. | 🟢 Inspect `error.name` or `error instanceof TypeError` to perform targeted recovery. |
-| **`throw` vs `return`** | `return` represents normal expected control flow; `throw` represents exceptional breakdown. | `throw` unwinds the call stack and must be intercepted by an error boundary or `try/catch`. | 🟢 Return `null` / `Result` tuples for expected missing items; `throw` when contracts are broken. |
-| **Programmer vs Operational Errors** | **Programmer:** Code defects (e.g. `undefined.map()`). **Operational:** External failures (e.g. 500 API / offline). | Operational errors must offer user retry/fallback; programmer errors require logging and hotfixing. | 🔴 Never mask programmer syntax/type bugs behind generic user "Retry" notifications. |
-| **Failure as UI State** | UI state is never binary (`Loading` $\to$ `Success`); it includes explicit recoverable failure states. | `Idle` $\to$ `Loading` $\to$ `Success` \| `RecoverableError` (with Retry) \| `FatalError` (with Fallback). | 🟢 Model domain failures explicitly in state machines (e.g. `Result<T, E>`). |
 
----
-
-> [!CAUTION]
-> ### 🎯 Senior Interview Gotchas: Throwing Primitive Strings & Masking Programmer Bugs
-> 
-> #### Gotcha A: Throwing Primitive Strings (`throw 'User not found'` vs `throw new Error(...)`)
-> *"Why did our production error tracking in Sentry group 10,000 completely different errors into a single useless event?"*  
-> ```js
-> // ❌ DISASTROUS PRIMITIVE THROWING:
-> function fetchUserProfile(userId) {
->   if (!userId) {
->     // 💥 FATAL MISTAKE: Throwing a primitive string!
->     // 1. NO STACK TRACE: V8 does NOT capture the execution call stack!
->     // 2. BREAKS INSTANCEOF: (error instanceof Error) returns FALSE!
->     // 3. BREAKS SENTRY/DATADOG: Aggregators cannot group or symbolicate source lines!
->     throw "Invalid User ID";
->   }
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> In JavaScript, the `throw` statement allows throwing any value (strings, numbers, booleans, objects). However, only instances of `Error` (or classes derived from `Error`) trigger the V8 engine's `Error.captureStackTrace()` mechanism to record the active call frames, file names, and line numbers. Throwing raw strings discards all debugging telemetry, makes type-safe catch blocks (`if (err instanceof ValidationError)`) fail, and prevents error observability tools from grouping issues.  
-> **The Senior Standard:** Always throw instances of `Error` or domain-specific custom subclasses:
-> ```js
-> // ✅ THROWING STRUCTURED ERROR INSTANCE:
-> class ValidationError extends Error {
->   constructor(message, public details: Record<string, unknown> = {}) {
->     super(message);
->     this.name = "ValidationError";
->   }
-> }
-> 
-> function fetchUserProfileSafe(userId) {
->   if (!userId) {
->     // 🟢 Full stack trace captured, instanceof compatible, structured metadata attached!
->     throw new ValidationError("User ID is required", { field: "userId", received: userId });
->   }
-> }
-> ```
-> 
-> ---
-> 
-> #### Gotcha B: Masking Programmer Errors Behind Generic Operational Fallbacks
-> *"Why did our checkout page silently fail to submit without any console errors?"*  
-> ```js
-> // ❌ DANGEROUS CATCH-ALL SILENCING:
-> async function handleCheckout(cart) {
->   try {
->     // Developer typo: calculateDiscount is undefined!
->     const total = cart.calculateDiscount(); // 💥 Throws TypeError: cart.calculateDiscount is not a function
->     await submitPayment(total);
->   } catch (err) {
->     // 💥 FATAL SILENCING: Blindly assumes every error is an operational network glitch!
->     showToast("Payment failed. Please click Try Again."); // User repeatedly clicks but it NEVER works!
->   }
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> A `TypeError` caused by a developer typo or missing method is a **Programmer Error** (a bug in the code). It is fundamentally different from an **Operational Error** (e.g. credit card declined or network timeout). Catching all errors indiscriminately and displaying a generic "Please Try Again" message traps the user in an unrecoverable loop while concealing the code defect from engineering logs.  
-> **The Senior Standard:** Classify errors in the catch block: handle known operational errors gracefully with user retry buttons, and re-throw / report unexpected programmer errors directly to observability systems:
-> ```js
-> // ✅ TARGETED FAILURE CLASSIFICATION:
-> async function handleCheckoutSafe(cart) {
->   try {
->     const total = cart.calculateTotal();
->     await submitPayment(total);
->   } catch (err) {
->     if (err instanceof PaymentDeclinedError) {
->       // Operational domain failure: User actionable!
->       showToast(err.message);
->     } else {
->       // Unexpected Programmer Error / System Crash: Log & escalate!
->       telemetry.captureException(err);
->       showFatalFallbackUI("An unexpected error occurred. Our engineering team has been notified.");
->     }
->   }
-> }
-> ```
-
----
-
-## 🧭 Industry Frequency & Framework Relevance
-
-| Badge | Industry Frequency | Relevance in React / Next.js / Vite Stacks | What to Focus On |
-|---|---|---|---|
-| 🟢 **Daily Driver** | Used in 100% of code | Custom Error classes, `Error` object properties (`name`, `message`, `stack`), `throw` vs `return` | Universal foundation for reliable business logic, form validation, and domain service APIs. |
-| 🟡 **Moderate** | Used in ~45% of code | Differentiating Programmer vs Operational errors, Safe `Result<T, E>` tuples | Mandatory for enterprise API clients, payment flows, and micro-frontend communication. |
-| 🔵 **Foundational / Engine** | Runtime internals | V8 stack trace compilation, Error prototype inheritance, Error propagation mechanics | Required for Staff/Principal architecture reviews, Sentry SDK integrations, and platform reliability. |
-
----
-
-## Core Concepts (20 Subtopics)
-
-### Part 1 — What Is an Error? Execution Interruption & Invalid States `🟢 [Daily Driver]`
-
-An error represents an abnormal condition where the runtime cannot continue normal execution along the expected program path.
-
----
-
-### Part 2 — The Precise Taxonomy: Bug vs Error vs Exception `🟢 [Daily Driver]`
-
-- **Bug:** Flaw in the program logic (e.g. subtraction instead of multiplication).
-- **Error:** The runtime manifestation of failure (e.g. `new Error()`).
-- **Exception:** An error that interrupts control flow and can be intercepted by a `catch` handler.
-
----
-
-### Part 3 — Anatomy of the JavaScript `Error` Object `🟢 [Daily Driver]`
-
-Every standard error object provides three core properties:
-- `name`: The error classification string (defaults to `"Error"`).
-- `message`: Human-readable technical description of the failure.
-- `stack`: V8 execution stack trace string showing file names and line numbers.
-
----
-
-### Part 4 — Crafting Meaningful Error Messages `🟢 [Daily Driver]`
-
-Include exact context (parameters, received values, expected types). Avoid cryptic strings like `"Failed"` in favor of `"Failed to fetch user [ID: 402]: Server returned HTTP 503"`.
-
----
-
-### Part 5 — Demystifying the V8 Stack Trace `🔵 [Foundational / Engine]`
-
-The stack trace reveals the ordered chain of active execution call frames at the exact microsecond the error was instantiated.
-
----
-
-### Part 6 — The Built-in Error Hierarchy `🟢 [Daily Driver]`
-
-$$\text{Object} \implies \text{Error} \implies \{\text{TypeError}, \text{ReferenceError}, \text{SyntaxError}, \text{RangeError}, \text{URIError}\}$$
-
----
-
-### Part 7 — `TypeError`: Type Mismatches & Incompatible Operations `🟢 [Daily Driver]`
-
-Fires when accessing properties on `null`/`undefined`, calling non-functions (`val()`), or reassigning `const` variables.
-
----
-
-### Part 8 — `ReferenceError`: Unscoped Identifiers & TDZ `🟢 [Daily Driver]`
-
-Fires when referencing undeclared variables or accessing `let`/`const` variables inside their Temporal Dead Zone (TDZ).
-
----
-
-### Part 9 — `SyntaxError`: Parsing Grammar Violations `🟢 [Daily Driver]`
-
-Fires when source code grammar is invalid or when `JSON.parse("invalid json")` fails at runtime.
-
----
-
-### Part 10 — `RangeError`: Numeric Limits & Call Stack Overflow `🟢 [Daily Driver]`
-
-Fires when creating arrays with invalid lengths (`new Array(-1)`) or exceeding maximum call stack recursion depth.
-
----
-
-### Part 11 — `URIError`: Malformed URI Encoded Strings `🟢 [Daily Driver]`
-
-Fires when URI decoding functions receive invalid percent-encoded sequences (`decodeURIComponent("%")`).
-
----
-
-### Part 12 — Errors as First-Class Structured Objects `🟢 [Daily Driver]`
-
-Errors are dynamic JavaScript objects; custom properties (e.g. `err.statusCode = 404`, `err.retryable = true`) can be attached for structured logging.
-
----
-
-### Part 13 — The `throw` Statement: Halting Normal Flow `🟢 [Daily Driver]`
-
-Immediately terminates the current function execution and begins unwinding the call stack to find the nearest enclosing `catch` block.
-
----
-
-### Part 14 — Error Propagation Mechanics `🔵 [Foundational / Engine]`
-
-Uncaught errors propagate upward through every caller frame in the execution call stack until intercepted by a handler or reaching the global environment.
-
----
-
-### Part 15 — `throw` vs `return`: Exceptional vs Normal Fallback `🟢 [Daily Driver]`
-
-- `return null`: For expected, benign non-presence (e.g. search query yielded 0 results).
-- `throw new Error()`: When a mandatory contract is violated (e.g. database connection dropped).
-
----
-
-### Part 16 — The Anti-Pattern: Throwing Arbitrary Primitives `🔴 [Production-Critical]`
-
-Never execute `throw "error"` or `throw 404`; always instantiate `new Error()` or custom subclasses to preserve stack traces.
-
----
-
-### Part 17 — Failure Classification: Programmer Errors vs Operational Errors `🔴 [Production-Critical]`
-
-- **Programmer Errors:** Bugs in code logic (`TypeError`, syntax defects) $\implies$ Fix code.
-- **Operational Errors:** Runtime environment failures (Network drop, 500 API) $\implies$ Handle with retry/fallback.
-
----
-
-### Part 18 — Expected Domain Failures vs Unexpected System Crashes `🟢 [Daily Driver]`
-
-Model expected domain issues (validation failed, insufficient funds) as normal state objects; reserve exceptions for unexpected system crashes.
-
----
-
-### Part 19 — Beyond the Happy Path: Multi-State Failure Modeling `🟢 [Daily Driver]`
-
-Always design UI states for: `Idle` $\to$ `Loading` $\to$ `Success` $\to$ `OperationalError` $\to$ `FatalFallback`.
-
----
-
-### Part 20 — The 10-Point Senior Frontend Failure Audit Checklist `🟢 [Daily Driver]`
+Up to KPI 24, much of the focus was on:
 
 ```text
-1. Are only Error subclasses thrown (no strings)? ──► 2. Are error messages actionable and contextual?
-3. Are Programmer Errors separated from Operational? ──► 4. Is JSON.parse wrapped in try/catch?
-5. Are UI states designed for network failure? ──► 6. Are retry buttons provided for operational errors?
-7. Is custom error metadata attached? ──► 8. Are unhandled rejections tracked globally?
-9. Is Sentry/Datadog grouping verified? ──► 10. Does component unmount cleanly on error?
+Correct behavior
+Performance
+Browser execution
+Asynchronous operations
+Memory
+```
+
+Now the focus changes to:
+
+```text
+What happens when things go wrong?
+```
+
+A senior frontend engineer does not design only for:
+
+```text
+User clicks button
+      ↓
+API succeeds
+      ↓
+Correct data arrives
+      ↓
+UI updates
+```
+
+They also design for:
+
+```text
+API fails
+Network disconnects
+Invalid data arrives
+Promise rejects
+Code throws
+User retries
+Request times out
+Server returns unexpected data
+Third-party service fails
+```
+
+This KPI builds the **failure model** required to create reliable frontend applications.
+
+---
+
+# 1. What Is an Error?
+
+## Definition
+
+An **error** is a condition in which the program cannot continue executing normally according to its expected behavior.
+
+Example:
+
+```js
+const user = null;
+
+console.log(user.name);
+```
+
+JavaScript cannot access:
+
+```text
+name
+```
+
+on:
+
+```text
+null
+```
+
+So execution produces an error.
+
+Conceptually:
+
+```text
+Expected operation
+       ↓
+Invalid state
+       ↓
+JavaScript cannot continue normally
+       ↓
+Error
 ```
 
 ---
 
-## ⚖️ 4-Pillar Senior Engineering Decision Matrix
+# 2. Error vs Bug vs Exception
 
-| Failure Handling Approach | 1. When to Use | 2. When NOT to Use | 3. Bottlenecks & Tradeoffs | 4. Modern Alternatives |
-|---|---|---|---|---|
-| **Throwing Exceptions (`throw new Error`)** | Unrecoverable failures, broken invariants, mandatory contractual violations. | Expected routine domain states (e.g. user not found in search). | Unwinds the call stack; creates non-local control flow jumps. | Result tuples / Sentinel returns. |
-| **Result Tuples (`[err, data]`)** | Asynchronous operations, Go-style explicit error handling pipelines. | Deeply nested OOP inheritance hierarchies. | Requires callers to explicitly check `if (err)` on every step. | `try/catch` / Option types. |
-| **Sentinel Returns (`null` / `undefined`)** | Optional lookups, cache misses, finding an item in an array (`find()`). | Operations where `null` is a valid return value or failure reason matters. | Loses technical context on *why* the operation failed. | Discriminated union Result types. |
-| **Discriminated Union Results** | Complex domain operations (e.g. `{ ok: true, data } \| { ok: false, error }`). | Trivial one-line helper functions. | Minor object allocation overhead per execution. | Throwing custom errors. |
+These terms are related but not identical.
+
+## Bug
+
+A **bug** is a defect in program logic or implementation.
+
+Example:
+
+```js
+function calculateTotal(price, quantity) {
+  return price - quantity;
+}
+```
+
+If the intended behavior is multiplication:
+
+```js
+price * quantity
+```
+
+then the code contains a bug.
 
 ---
 
-## ⚛️ Senior React Ecosystem Architecture & Component Patterns
+## Error
 
-### Enterprise Multi-State Resilient Action Handler in TypeScript
-```tsx
-import React, { useState, useCallback } from 'react';
+An **error** is a failure condition represented during program execution.
 
-// ==========================================
-// 1. DOMAIN FAILURE TAXONOMY & TYPES
-// ==========================================
-export type Result<T, E = Error> =
-  | { success: true; data: T }
-  | { success: false; error: E; isOperational: boolean };
+Example:
 
-export class OperationalNetworkError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
-    super(message);
-    this.name = 'OperationalNetworkError';
+```js
+throw new Error("Invalid product");
+```
+
+---
+
+## Exception
+
+An **exception** is an error condition that interrupts the normal flow of execution and can potentially be caught and handled.
+
+Example:
+
+```js
+try {
+  throw new Error("Something failed");
+} catch (error) {
+  console.log("Handled error");
+}
+```
+
+Conceptually:
+
+```text
+Normal execution
+      ↓
+Exception occurs
+      ↓
+Normal flow interrupted
+      ↓
+Search for handler
+      ↓
+catch
+```
+
+---
+
+# 3. The JavaScript Error Object
+
+JavaScript represents many runtime failures using objects derived from:
+
+```js
+Error
+```
+
+Example:
+
+```js
+const error =
+  new Error("Something went wrong");
+```
+
+An error commonly contains information such as:
+
+```text
+name
+message
+stack
+```
+
+Example:
+
+```js
+const error =
+  new Error("Failed to load products");
+
+console.log(error.name);
+console.log(error.message);
+console.log(error.stack);
+```
+
+Conceptually:
+
+```text
+Error
+│
+├── name
+│
+├── message
+│
+└── stack
+```
+
+---
+
+# 4. `error.message`
+
+The message describes the failure.
+
+Example:
+
+```js
+throw new Error(
+  "User authentication failed"
+);
+```
+
+Then:
+
+```text
+error.message
+
+"User authentication failed"
+```
+
+A useful error message should provide meaningful context.
+
+Bad:
+
+```js
+throw new Error("Error");
+```
+
+Better:
+
+```js
+throw new Error(
+  "Failed to load user profile"
+);
+```
+
+Even better depends on the context and audience.
+
+For example, internal logging can contain more technical details than the message shown to the user.
+
+---
+
+# 5. The Stack Trace
+
+## Definition
+
+A **stack trace** shows the sequence of function calls that led to an error.
+
+Example:
+
+```js
+function a() {
+  b();
+}
+
+function b() {
+  c();
+}
+
+function c() {
+  throw new Error("Failure");
+}
+
+a();
+```
+
+Conceptually:
+
+```text
+a()
+ ↓
+b()
+ ↓
+c()
+ ↓
+Error ❌
+```
+
+The stack provides debugging context.
+
+It helps answer:
+
+```text
+Where did the error happen?
+
+Which functions led to it?
+
+What execution path produced the failure?
+```
+
+---
+
+# 6. Major Built-In JavaScript Error Types
+
+JavaScript provides several important error classes.
+
+Conceptually:
+
+```text
+Error
+│
+├── TypeError
+├── ReferenceError
+├── SyntaxError
+├── RangeError
+├── URIError
+└── others depending on environment
+```
+
+You must understand these not just as definitions, but as **categories of failure**.
+
+---
+
+# 7. `TypeError`
+
+## Definition
+
+A `TypeError` occurs when a value is used in a way that is incompatible with its expected type or operation.
+
+Example:
+
+```js
+const user = null;
+
+user.name;
+```
+
+Conceptually:
+
+```text
+Expected:
+Object
+
+Received:
+null
+
+Operation:
+Access property
+
+Result:
+TypeError ❌
+```
+
+Another example:
+
+```js
+const value = 42;
+
+value.map();
+```
+
+Numbers do not provide:
+
+```text
+map()
+```
+
+Therefore:
+
+```text
+TypeError
+```
+
+Frontend examples:
+
+```js
+user.profile.name
+```
+
+when:
+
+```text
+user = null
+```
+
+or:
+
+```js
+products.map(...)
+```
+
+when:
+
+```text
+products
+```
+
+is not actually an array.
+
+---
+
+# 8. `ReferenceError`
+
+## Definition
+
+A `ReferenceError` occurs when JavaScript attempts to access an identifier that does not exist in the current scope.
+
+Example:
+
+```js
+console.log(userName);
+```
+
+If:
+
+```text
+userName
+```
+
+was never declared:
+
+```text
+ReferenceError ❌
+```
+
+Conceptually:
+
+```text
+JavaScript looks for:
+
+userName
+   ↓
+Not found
+   ↓
+ReferenceError
+```
+
+Example:
+
+```js
+function getUser() {
+  return currentUser;
+}
+```
+
+If:
+
+```text
+currentUser
+```
+
+does not exist in the accessible scope, execution fails.
+
+---
+
+# 9. `SyntaxError`
+
+## Definition
+
+A `SyntaxError` occurs when JavaScript code violates the language grammar.
+
+Example:
+
+```js
+const user = {
+  name: "Sunny"
+```
+
+Missing:
+
+```text
+}
+```
+
+JavaScript cannot correctly parse the program.
+
+Conceptually:
+
+```text
+Source code
+    ↓
+Parser
+    ↓
+Invalid grammar
+    ↓
+SyntaxError ❌
+```
+
+This differs from many runtime errors.
+
+A syntax problem may prevent the affected code from executing correctly at all.
+
+---
+
+# 10. `RangeError`
+
+## Definition
+
+A `RangeError` occurs when a value is outside an acceptable range.
+
+Example:
+
+```js
+const array =
+  new Array(-1);
+```
+
+Negative array length is invalid.
+
+Result:
+
+```text
+RangeError
+```
+
+Another possible class of range-related failure involves operations exceeding acceptable engine limits.
+
+---
+
+# 11. `URIError`
+
+A `URIError` can occur when URI-related functions receive invalid input.
+
+For example, certain malformed URI operations may fail when using functions such as:
+
+```js
+decodeURIComponent()
+```
+
+Conceptually:
+
+```text
+Encoded URI
+      ↓
+Malformed input
+      ↓
+Cannot decode
+      ↓
+URIError
+```
+
+This is less common in everyday frontend code but should be recognized.
+
+---
+
+# 12. Errors Are Objects
+
+This is important.
+
+You can create:
+
+```js
+const error =
+  new Error("Failed");
+```
+
+And inspect it:
+
+```js
+console.log(error);
+```
+
+You can also attach additional information:
+
+```js
+const error =
+  new Error("Failed to load product");
+
+error.productId = 123;
+```
+
+Although application-level error modeling is usually better handled with deliberate custom error classes or structured error metadata, the key concept is:
+
+> **Errors are values with structured information, not just console messages.**
+
+---
+
+# 13. Throwing Errors
+
+JavaScript allows you to explicitly interrupt normal execution using:
+
+```js
+throw
+```
+
+Example:
+
+```js
+function divide(a, b) {
+  if (b === 0) {
+    throw new Error(
+      "Cannot divide by zero"
+    );
   }
+
+  return a / b;
+}
+```
+
+Conceptually:
+
+```text
+divide(10, 0)
+      ↓
+b === 0
+      ↓
+throw Error
+      ↓
+Normal execution stops
+```
+
+Without a handler, the error propagates upward.
+
+---
+
+# 14. Error Propagation
+
+Consider:
+
+```js
+function loadDashboard() {
+  loadUser();
 }
 
-export class BusinessValidationError extends Error {
-  constructor(message: string, public readonly invalidField: string) {
-    super(message);
-    this.name = 'BusinessValidationError';
-  }
+function loadUser() {
+  fetchUserData();
 }
 
-export interface UserAccount {
-  id: string;
-  email: string;
-  role: 'ADMIN' | 'ENGINEER';
-}
-
-// ==========================================
-// 2. RESILIENT AUTHENTICATION DASHBOARD
-// ==========================================
-export function EnterpriseResilientAuthDashboard() {
-  const [emailInput, setEmailInput] = useState<string>('');
-  const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
-  const [activeUser, setActiveUser] = useState<UserAccount | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isRetryable, setIsRetryable] = useState<boolean>(false);
-
-  // 🟢 Resilient execution pipeline with failure classification
-  const handleAuthenticate = useCallback(async (email: string) => {
-    setStatus('LOADING');
-    setErrorMessage(null);
-    setIsRetryable(false);
-
-    try {
-      // 1. Validation check (Expected domain rule)
-      if (!email || !email.includes('@')) {
-        throw new BusinessValidationError('Please enter a valid corporate email address', 'email');
-      }
-
-      // 2. Simulated Network Request
-      const response = await simulateAuthApi(email);
-
-      if (!response.ok) {
-        throw new OperationalNetworkError('Authentication server temporarily unavailable', response.status);
-      }
-
-      const userData: UserAccount = await response.json();
-      setActiveUser(userData);
-      setStatus('SUCCESS');
-    } catch (err: unknown) {
-      setStatus('ERROR');
-
-      // 🟢 Classification: Operational vs Programmer Error
-      if (err instanceof BusinessValidationError) {
-        setErrorMessage(`Validation Error: ${err.message} (${err.invalidField})`);
-        setIsRetryable(false);
-      } else if (err instanceof OperationalNetworkError) {
-        setErrorMessage(`Network Error (${err.statusCode}): ${err.message}`);
-        setIsRetryable(true); // Allow user retry for operational network drops
-      } else if (err instanceof Error) {
-        // Unexpected programmer/system crash
-        setErrorMessage(`Unexpected Failure: ${err.message}`);
-        setIsRetryable(false);
-      } else {
-        // Fallback for non-Error thrown values
-        setErrorMessage('An unknown system error occurred');
-        setIsRetryable(false);
-      }
-    }
-  }, []);
-
-  return (
-    <div className="resilient-auth-card">
-      <header className="card-header">
-        <h3>Enterprise Failure-Resilient Authentication Engine</h3>
-        <span className="badge">🛡️ Multi-State Failure Model</span>
-      </header>
-
-      <p className="architecture-description">
-        Demonstrates failure classification (Operational vs Programmer Errors), typed Error subclasses, and contextual UI recovery states.
-      </p>
-
-      <div className="form-group">
-        <input
-          type="email"
-          value={emailInput}
-          onChange={(e) => setEmailInput(e.target.value)}
-          placeholder="engineer@enterprise.io"
-          className="email-input"
-          disabled={status === 'LOADING'}
-        />
-        <button
-          type="button"
-          onClick={() => handleAuthenticate(emailInput)}
-          disabled={status === 'LOADING'}
-          className="auth-btn"
-        >
-          {status === 'LOADING' ? 'Authenticating...' : 'Sign In Securely'}
-        </button>
-      </div>
-
-      {status === 'SUCCESS' && activeUser && (
-        <div className="success-banner">
-          <span>✅ Authenticated as <strong>{activeUser.email}</strong> ({activeUser.role})</span>
-        </div>
-      )}
-
-      {status === 'ERROR' && errorMessage && (
-        <div className="error-banner">
-          <div className="error-content">
-            <span className="error-icon">⚠️</span>
-            <span>{errorMessage}</span>
-          </div>
-          {isRetryable && (
-            <button
-              type="button"
-              onClick={() => handleAuthenticate(emailInput)}
-              className="retry-btn"
-            >
-              🔄 Retry Connection
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+function fetchUserData() {
+  throw new Error(
+    "User API unavailable"
   );
 }
 
-// Mock API simulation helper
-async function simulateAuthApi(email: string): Promise<{ ok: boolean; status: number; json: () => Promise<UserAccount> }> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (email.includes('offline')) {
-        resolve({ ok: false, status: 503, json: async () => ({} as UserAccount) });
-      } else {
-        resolve({
-          ok: true,
-          status: 200,
-          json: async () => ({ id: 'usr_882', email, role: 'ENGINEER' })
-        });
-      }
-    }, 400);
-  });
-}
+loadDashboard();
+```
+
+Conceptually:
+
+```text
+fetchUserData()
+       ❌
+       │
+       ↑
+loadUser()
+       │
+       ↑
+loadDashboard()
+       │
+       ↑
+Global error boundary
+```
+
+The error propagates through the call stack until:
+
+```text
+A handler catches it
+```
+
+or:
+
+```text
+It becomes unhandled
+```
+
+This is fundamental to understanding:
+
+```text
+try/catch
+async errors
+Promise rejections
+React error boundaries
 ```
 
 ---
 
-## 🧠 Part 01 — Integrated Challenges & Active Recall Solutions
+# 15. The Difference Between `throw` and `return`
 
-### Prediction Challenge 1: Call Stack Propagation Unwinding
+Consider:
+
 ```js
-function levelA() { levelB(); }
-function levelB() { levelC(); }
-function levelC() { throw new TypeError("Invalid parameter type"); }
-try {
-  levelA();
-} catch (err) {
-  console.log(err.name);
-  console.log(err instanceof Error);
+function getUser(id) {
+  if (!id) {
+    return null;
+  }
+
+  return fetchUser(id);
 }
 ```
-**Question:** What will the two `console.log` statements output?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-1. `TypeError` (The specific error class name).  
-2. `true` (`TypeError` inherits from `Error.prototype` via the prototype chain).
-</details>
+Here:
+
+```text
+null
+```
+
+represents a normal returned value.
+
+Now:
+
+```js
+function getUser(id) {
+  if (!id) {
+    throw new Error(
+      "User ID is required"
+    );
+  }
+
+  return fetchUser(id);
+}
+```
+
+Now:
+
+```text
+Missing ID
+```
+
+is treated as an exceptional failure.
+
+Conceptually:
+
+```text
+return
+=
+Normal control flow
+
+
+throw
+=
+Exceptional control flow
+```
+
+Choosing between them depends on your API and domain design.
+
+Do not automatically throw for every invalid condition.
 
 ---
 
-### Prediction Challenge 2: Throwing Strings vs Error Instances
+# 16. When Should You Throw?
+
+A useful mental model:
+
+```text
+Can the caller reasonably continue
+using a normal return value?
+```
+
+If yes:
+
+```text
+Return a meaningful result.
+```
+
+If the operation cannot fulfill its contract:
+
+```text
+Throw or reject with meaningful failure information.
+```
+
+Example:
+
 ```js
-function testThrowString() {
-  try {
-    throw "Fatal connection lost";
-  } catch (err) {
-    console.log(err.stack);
-    console.log(err instanceof Error);
+function parseUser(data) {
+  if (!data) {
+    throw new Error(
+      "User data is required"
+    );
+  }
+
+  return {
+    id: data.id,
+    name: data.name
+  };
+}
+```
+
+The function contract requires valid user data.
+
+Without it:
+
+```text
+Normal result cannot be produced.
+```
+
+---
+
+# 17. Avoid Throwing Arbitrary Values
+
+JavaScript technically allows:
+
+```js
+throw "Something failed";
+```
+
+Or:
+
+```js
+throw 404;
+```
+
+Or:
+
+```js
+throw {
+  message: "Failed"
+};
+```
+
+These work syntactically.
+
+But they create inconsistent error handling.
+
+Prefer:
+
+```js
+throw new Error(
+  "Something failed"
+);
+```
+
+Or a custom error type:
+
+```js
+class ValidationError extends Error {
+  constructor(message) {
+    super(message);
+
+    this.name =
+      "ValidationError";
   }
 }
-testThrowString();
 ```
-**Question:** What will be output to the console?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-1. `undefined` (Primitive strings do NOT possess a `.stack` property in V8).  
-2. `false` (Primitive strings are not instances of `Error`).
-</details>
+Then:
 
----
-
-### Prediction Challenge 3: Built-in Error Type Classification
 ```js
-// Scenario A: decodeURIComponent("%")
-// Scenario B: const x = (undefined).value
-// Scenario C: new Array(-5)
+throw new ValidationError(
+  "Email is invalid"
+);
 ```
-**Question:** Which built-in Error type is thrown by Scenario A, Scenario B, and Scenario C?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-- **Scenario A:** `URIError` (Malformed URI sequence).  
-- **Scenario B:** `TypeError` (Cannot read properties of undefined).  
-- **Scenario C:** `RangeError` (Invalid array length).
-</details>
+This gives your failure model structure.
 
 ---
 
-### Prediction Challenge 4: Programmer Error vs Operational Error
+# 18. Error Boundaries in the Execution Model
+
+At a high level:
+
 ```text
-Case 1: User enters an invalid password on login.
-Case 2: Engineer writes `items.filterr(...)` (typo).
-Case 3: AWS S3 bucket returns 500 Internal Server Error.
+Operation
+   ↓
+Possible failure
+   ↓
+Who owns handling?
 ```
-**Question:** Classify each case as an **Expected Domain Failure**, a **Programmer Error**, or an **Operational Error**.
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-- **Case 1:** **Expected Domain Failure** (Model as normal UI validation state).  
-- **Case 2:** **Programmer Error** (Code defect; requires code fix).  
-- **Case 3:** **Operational Error** (External system failure; requires retry/fallback handling).
-</details>
+Example:
 
----
+```text
+Low-level function
+      ↓
+Repository/API layer
+      ↓
+Application logic
+      ↓
+UI
+```
 
-## 🎯 Tiered Interview Question Bank (Intern ➔ Staff / Principal)
+Not every layer should necessarily:
 
-### 🟢 Tier 1: Intern / Junior Level
-**Q1:** What is the difference between an Error, a Bug, and an Exception?  
-<details>
-<summary><strong>Answer</strong></summary>
-- **Bug:** A defect or mistake in the code logic written by a programmer.  
-- **Error:** An abnormal condition or object representing a runtime failure.  
-- **Exception:** An error condition that actively breaks normal execution flow and can be intercepted by a `try/catch` block.
-</details>
+```text
+catch
+log
+transform
+display
+```
 
-**Q2:** Why should you always throw `new Error("...")` instead of `throw "..."`?  
-<details>
-<summary><strong>Answer</strong></summary>
-Throwing an `Error` instance automatically captures the **V8 execution stack trace** (`err.stack`), preserves prototype inheritance for `instanceof` checks, and allows monitoring tools (Sentry, Datadog) to group and symbolicate error events accurately. Throwing raw strings discards all stack telemetry and breaks error handling contracts.
-</details>
+the same error.
 
----
+A mature system assigns responsibility.
 
-### 🟡 Tier 2: Mid-Level Engineer
-**Q3:** What is the difference between a Programmer Error and an Operational Error?  
-<details>
-<summary><strong>Answer</strong></summary>
-- **Programmer Errors:** Bugs within the codebase itself (e.g. `TypeError`, accessing properties of `undefined`, syntax errors). They indicate broken code assumptions and must be resolved by fixing the code.  
-- **Operational Errors:** Runtime failures that occur in correct code due to external environmental factors (e.g. 503 API outages, network drops, malformed external payloads). They must be anticipated and handled gracefully with user retry buttons or fallbacks.
-</details>
+For example:
 
-**Q4:** What are the 5 major built-in JavaScript error classes and what causes them?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. `TypeError`: Incompatible operations (e.g. `null.prop`, `42()`).  
-2. `ReferenceError`: Accessing an undeclared variable or accessing variables in TDZ.  
-3. `SyntaxError`: Invalid language grammar or malformed `JSON.parse()`.  
-4. `RangeError`: Numbers outside legal bounds (e.g. `new Array(-1)`).  
-5. `URIError`: Malformed percent-encoded sequences in `decodeURIComponent()`.
-</details>
+```text
+API layer
+    ↓
+Normalize transport error
+
+Domain layer
+    ↓
+Interpret application failure
+
+UI
+    ↓
+Display appropriate state
+```
+
+We will explore this architecture later in the KPI.
 
 ---
 
-### 🟠 Tier 3: Senior Frontend Engineer
-**Q5:** How do you design an enterprise-grade error taxonomy using custom TypeScript Error classes?  
-<details>
-<summary><strong>Answer</strong></summary>
-Create an abstract `BaseApplicationError` inheriting from `Error` that sets `this.name = this.constructor.name` and captures the stack trace. Then derive domain-specific subclasses:  
-- `ValidationError`: For client-side form and DTO validation with structured `fields` metadata.  
-- `HttpError`: For API transport failures containing `statusCode`, `endpoint`, and `isRetryable` flags.  
-- `AuthError`: For session expiration with automatic refresh triggers.  
-This enables consumers to perform clean, type-safe error recovery via `instanceof` switching without parsing fragile string messages.
-</details>
+# 19. Programmer Errors vs Operational Errors
 
----
+This distinction is extremely useful.
 
-### 🔴 Tier 4: Staff / Principal Architect
-**Q6:** How does V8 compile and manage Stack Trace Frame Arrays via `Error.prepareStackTrace` under the hood, and how do you prevent performance degradation during high-frequency error instantiations?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. **Stack Trace Capture Cost:** In V8, instantiating `new Error()` synchronously captures the current C++ execution stack frame pointers. When `.stack` is first accessed, V8 formats these pointers into a formatted string, incurring substantial CPU overhead in hot paths.  
-2. **`Error.prepareStackTrace` API:** V8 exposes `Error.prepareStackTrace(err, structuredStackTrace)` allowing custom formatting of CallSite objects (inspecting `getFileName()`, `getLineNumber()`, `getFunctionName()`) for custom APM tracers.  
-3. **Staff Optimization:** Never use exceptions for normal control flow in high-frequency loops ($>10,000\text{ ops/sec}$). Use Result objects (`{ ok: true, val } \| { ok: false, err }`) to avoid expensive stack trace captures on expected domain branches.
-</details>
+## Programmer Errors
 
----
+These result from defects in your code.
 
-## 🛠️ Senior Architecture Challenge: Standalone Failure Classifier Engine
+Examples:
+
+```text
+Calling undefined function
+Accessing invalid object
+Incorrect assumptions
+Broken logic
+```
+
+Example:
 
 ```js
-// See runnable implementation in examples/01-errors-exceptions-failure-model.js
+const user = undefined;
+
+user.name;
+```
+
+This usually indicates a bug.
+
+---
+
+## Operational Errors
+
+These are failures that can happen even when the application code is correct.
+
+Examples:
+
+```text
+Network unavailable
+Server timeout
+API returns 500
+User loses connection
+External service fails
+```
+
+Conceptually:
+
+```text
+Programmer error
+
+Code assumption
+      ↓
+Broken ❌
+
+
+Operational error
+
+Correct code
+      ↓
+External dependency fails ❌
+```
+
+These often require different strategies.
+
+---
+
+# 20. Why This Distinction Matters
+
+Consider:
+
+```text
+Server returns HTTP 500
+```
+
+The frontend should often handle this.
+
+For example:
+
+```text
+Show error state
+Allow retry
+Log context
+```
+
+Now consider:
+
+```text
+Developer accidentally calls:
+
+undefined.map()
+```
+
+Showing the user:
+
+```text
+"Please try again"
+```
+
+does not actually fix the underlying programming defect.
+
+A senior engineer asks:
+
+```text
+What category of failure is this?
+
+Can the user recover?
+
+Should we retry?
+
+Should we report it?
+
+Is this a bug that needs fixing?
 ```
 
 ---
 
-## Key Takeaways
-1. **Always Throw `Error` Subclasses:** Preserve the V8 stack trace and `instanceof` contracts.
-2. **Classify Programmer vs Operational Errors:** Fix code bugs; provide retries for operational drops.
-3. **Failure Is Application State:** Model `Idle` $\to$ `Loading` $\to$ `Success` $\to$ `Error` explicitly in UI.
-4. **Never Use Exceptions for Control Flow:** Return `null` or `Result` objects for expected non-presence.
-5. **Contextual Error Messages:** Provide actionable technical details for logs and clear guidance for users.
+# 21. Expected vs Unexpected Failures
+
+Another useful distinction:
+
+## Expected Failure
+
+The application anticipates it.
+
+Examples:
+
+```text
+Invalid password
+Form validation fails
+User has no permission
+Product not found
+```
+
+These may be represented as normal application states.
+
+Example:
+
+```js
+{
+  success: false,
+  reason: "INVALID_PASSWORD"
+}
+```
 
 ---
 
-[⬅️ KPI 24 — Performance Profiling](../24-Performance-Profiling/README.md) | [📚 KPI 25 Index](./README.md) | [Part 02: try / catch / finally Mechanics ➡️](./02-try-catch-finally-mechanics.md)
+## Unexpected Failure
+
+Something happened that the application did not expect.
+
+Examples:
+
+```text
+Server crashes
+Malformed response
+Third-party service outage
+Unexpected null value
+```
+
+These may require:
+
+```text
+Error reporting
+Fallback UI
+Retry
+Investigation
+```
+
+A senior frontend application should distinguish between:
+
+```text
+Expected failure state
+```
+
+and:
+
+```text
+Unexpected application failure
+```
+
+---
+
+# 22. The Happy Path Is Not Enough
+
+Beginner implementation:
+
+```text
+Click Login
+      ↓
+Request succeeds
+      ↓
+Redirect
+```
+
+Reliable implementation:
+
+```text
+Click Login
+      ↓
+Validate input
+      ↓
+Request starts
+      ↓
+Loading state
+      │
+      ├── Success
+      │      ↓
+      │    Redirect
+      │
+      ├── Invalid credentials
+      │      ↓
+      │    Show validation message
+      │
+      ├── Network failure
+      │      ↓
+      │    Show retry option
+      │
+      ├── Server failure
+      │      ↓
+      │    Show fallback state
+      │
+      └── Unexpected failure
+             ↓
+          Log + recover
+```
+
+This is the beginning of **reliability engineering on the frontend**.
+
+---
+
+# 23. Failure Is Part of Application State
+
+A common mistake is thinking:
+
+```text
+Success
+```
+
+is the only meaningful result.
+
+Real UI state often looks like:
+
+```text
+Idle
+ ↓
+Loading
+ ├── Success
+ └── Failure
+```
+
+More detailed:
+
+```text
+Request State
+
+Idle
+ │
+ ▼
+Loading
+ │
+ ├───────────────┐
+ ▼               ▼
+Success        Failure
+                  │
+         ┌────────┴─────────┐
+         ▼                  ▼
+      Recoverable       Fatal
+         │
+         ▼
+        Retry
+```
+
+This model becomes critical in React applications.
+
+---
+
+# 24. Basic Error Handling Architecture
+
+A reliable application should think about failures at multiple levels.
+
+```text
+Infrastructure
+      │
+      ▼
+Network/API Layer
+      │
+      ▼
+Application Logic
+      │
+      ▼
+Component
+      │
+      ▼
+User Interface
+```
+
+Each layer has a different responsibility.
+
+For example:
+
+### API Layer
+
+```text
+Did the request fail?
+What status code occurred?
+Did parsing fail?
+```
+
+### Application Layer
+
+```text
+What does this failure mean
+for the business logic?
+```
+
+### UI Layer
+
+```text
+What should the user see?
+Can they retry?
+Can they continue?
+```
+
+This separation prevents every component from becoming:
+
+```text
+fetch
+try/catch
+status handling
+logging
+parsing
+retry logic
+UI
+```
+
+all mixed together.
+
+---
+
+# 25. Example — Poor Error Architecture
+
+```jsx
+function ProductPage() {
+  const [error, setError] =
+    useState(null);
+
+  async function loadProduct() {
+    try {
+      const response =
+        await fetch("/api/product");
+
+      if (!response.ok) {
+        throw new Error(
+          "Request failed"
+        );
+      }
+
+      const data =
+        await response.json();
+
+      setProduct(data);
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        "Something went wrong"
+      );
+    }
+  }
+
+  // ...
+}
+```
+
+This is not always wrong.
+
+But as the application grows, repeating this in every component can create:
+
+```text
+Duplicated logic
+Inconsistent errors
+Inconsistent logging
+Different retry behavior
+Hard-to-maintain components
+```
+
+A scalable architecture separates responsibilities.
+
+We will build that model in later parts.
+
+---
+
+# 26. Example — Thinking in Error Boundaries
+
+Instead of asking only:
+
+```text
+How do I catch this error?
+```
+
+Ask:
+
+```text
+Where should this error be handled?
+```
+
+Example:
+
+```text
+JSON parsing fails
+      ↓
+Should UI handle raw parsing error?
+
+Probably not.
+      ↓
+API/data layer may normalize it
+      ↓
+UI receives meaningful failure state
+```
+
+This is a major shift from junior to senior error handling.
+
+---
+
+# 27. Error Handling Is About Recovery
+
+The purpose of handling an error is not always:
+
+```text
+console.error(error);
+```
+
+The real questions are:
+
+```text
+Can we recover?
+
+Can the user retry?
+
+Can we use cached data?
+
+Can we show a fallback?
+
+Can the feature fail without crashing
+the entire application?
+
+Should we report this?
+```
+
+Conceptually:
+
+```text
+Failure
+   ↓
+Detection
+   ↓
+Classification
+   ↓
+Recovery strategy
+```
+
+---
+
+# 28. Prediction Challenge #1
+
+What happens here?
+
+```js
+function first() {
+  second();
+}
+
+function second() {
+  third();
+}
+
+function third() {
+  throw new Error("Failure");
+}
+
+first();
+```
+
+Conceptually:
+
+```text
+third() ❌
+   ↑
+second()
+   ↑
+first()
+```
+
+The error propagates upward until something catches it.
+
+If nothing catches it:
+
+```text
+Unhandled error
+```
+
+---
+
+# 29. Prediction Challenge #2
+
+What is wrong with this?
+
+```js
+throw "User not found";
+```
+
+It is valid JavaScript.
+
+But it produces inconsistent error modeling.
+
+Better:
+
+```js
+throw new Error(
+  "User not found"
+);
+```
+
+Or, when classification matters:
+
+```js
+throw new NotFoundError(
+  "User not found"
+);
+```
+
+---
+
+# 30. Prediction Challenge #3
+
+Which is more appropriate?
+
+```js
+return null;
+```
+
+or:
+
+```js
+throw new Error();
+```
+
+There is no universal answer.
+
+Ask:
+
+```text
+Is this an expected result?
+
+Can the caller reasonably handle it
+as part of normal control flow?
+
+Or has the function failed to fulfill
+its contract?
+```
+
+---
+
+# 31. Senior-Level Failure Questions
+
+Whenever implementing a feature, ask:
+
+```text
+1. What can fail?
+
+2. Is the failure expected or unexpected?
+
+3. Can the user recover?
+
+4. Should we retry?
+
+5. Should this failure propagate?
+
+6. Which layer owns handling it?
+
+7. What should the UI show?
+
+8. Should this be logged?
+
+9. Could this crash unrelated UI?
+
+10. How will we debug it in production?
+```
+
+These questions form the foundation of reliable frontend engineering.
+
+---
+
+# 32. 30-Second Executive Cheat Sheet
+
+```text
+ERRORS & FAILURE MODEL
+════════════════════════════════
+
+Bug
+=
+Defect in code
+
+
+Error
+=
+Failure condition
+
+
+Exception
+=
+Failure that interrupts normal flow
+and can be handled
+
+
+Core Error Properties:
+
+name
+message
+stack
+
+
+Major Error Types:
+
+Error
+TypeError
+ReferenceError
+SyntaxError
+RangeError
+URIError
+
+
+throw
+=
+Exceptional control flow
+
+
+return
+=
+Normal control flow
+
+
+Failure Categories:
+
+Expected
+Unexpected
+
+Programmer error
+Operational error
+
+
+Senior mindset:
+
+Don't ask only:
+
+"How do I catch this?"
+
+Ask:
+
+"Where should this failure
+be handled, and how can
+the application recover?"
+```
+
+---
+
+# KPI 25 Progress
+
+```text
+KPI 25 — Error Handling, Debugging & Reliability
+══════════════════════════════════════════════════
+
+Part 1  ✅ Errors, Exceptions & Failure Model
+Part 2  ⏳ try / catch / finally
+Part 3  ⏳ Error Propagation & Custom Errors
+Part 4  ⏳ Async Errors & Promise Rejections
+Part 5  ⏳ API Failure Handling & Retry Strategies
+Part 6  ⏳ React Error Boundaries & Recovery
+Part 7  ⏳ Logging, Observability & Production Debugging
+Part 8  ⏳ Systematic Debugging Methodology
+```
+
+**Next: KPI 25 — Part 2: `try`, `catch`, `finally`, error propagation, and the precise mechanics of handling synchronous failures.**

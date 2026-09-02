@@ -1,554 +1,1714 @@
-# KPI 25 — Part 04: Async Errors, Promise Rejections & `async/await`
+# KPI 25 — Error Handling, Debugging & Reliability
 
-[⬅️ Part 03: Error Propagation & Custom Errors](./03-error-propagation-custom-errors.md) | [📚 KPI 25 Index](./README.md) | [Part 05: API Failure Handling & Retry Strategies ➡️](./05-api-failure-handling-retry-strategies.md)
+## Part 4 — Async Errors, Promise Rejections & `async/await`
 
----
 
-## ⚡ 30-Second Executive Cheat Sheet
+> **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)
+> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
 
-| Async Error Concept | Underlying Mechanism | Failure Mode & Risk | Senior Engineering Standard |
-|---|---|---|---|
-| **Promise Rejection vs Sync Throw** | Rejections occur in the **Microtask Queue**, not in the synchronous call stack. | Wrapping a synchronous `try/catch` around an un-awaited Promise fails to catch the rejection. | 🟢 Always `await` Promises inside `try/catch`, or chain `.catch()`. |
-| **`return await p` in `try/catch`** | `return await p` suspends execution inside the `try` block to catch rejections locally. | `return p` exits the `try` block immediately, allowing rejections to bypass the local `catch`. | 🔴 **CRITICAL:** Always write `return await promise;` when inside a `try/catch` block. |
-| **The Missing `await` False Success** | Calling `saveUser()` without `await` immediately executes subsequent success logic. | UI displays "Saved!" while the un-awaited background request crashes with an error. | 🔴 **CRITICAL:** Never trigger side effects after an un-awaited asynchronous function. |
-| **`Promise.all` Fail-Fast** | Rejects the microsecond the *first* Promise rejects. | Does NOT cancel running sibling Promises (they continue consuming network/CPU). | 🟢 Pair with `AbortController` to cancel sibling network requests when one fails. |
-| **`Promise.allSettled`** | Resolves only after *all* Promises settle (`fulfilled` or `rejected`). | Fails to reject automatically if all operations are required. | 🟢 Use for dashboards with independent widgets where partial success is acceptable. |
-| **Unhandled Rejections** | Rejections with no active `.catch()` or `await` error handler. | Crashes Node.js runtimes and triggers silent failure telemetry spikes in browsers. | 🟢 Implement global `window.onunhandledrejection` monitoring in production. |
 
----
+Part 3 covered how errors propagate through **synchronous call stacks and application layers**.
 
-> [!CAUTION]
-> ### 🎯 Senior Interview Gotchas: `return await` Bypasses & Missing `await` Traps
-> 
-> #### Gotcha A: `return promise` vs `return await promise` Inside `try/catch`
-> *"Why did our local try/catch block completely ignore a 500 error and let the app crash?"*  
-> ```js
-> // ❌ DISASTROUS RETURN WITHOUT AWAIT IN TRY/CATCH:
-> async function loadUserProfile(userId) {
->   try {
->     // 💥 FATAL MISTAKE: Returning the raw Promise directly!
->     // 1. fetchUser(userId) returns a pending Promise.
->     // 2. loadUserProfile() immediately RETURNS the Promise and EXITS the try block.
->     // 3. 200ms later, the Promise REJECTS with an HTTP 500 error.
->     // 4. The local catch block is ALREADY GONE! The error bubbles to the caller!
->     return fetchUser(userId);
->   } catch (err) {
->     console.error("Local fallback executed:", err.message);
->     return { id: userId, name: "Guest User" }; // NEVER REACHED!
->   }
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> When you write `return fetchUser(userId);` without `await`, the function immediately resolves its own outer Promise with the inner pending Promise and unwinds its execution context. Control exits the `try` block synchronously. When the inner Promise rejects in a future microtask turn, there is no active `try/catch` frame protecting it; the rejection bypasses the local `catch` block entirely.  
-> **The Senior Standard:** Always use `return await` when returning a Promise from inside a `try/catch` block so the engine pauses execution *inside* the `try` scope:
-> ```js
-> // ✅ CORRECT: AWAIT SUSPENDS INSIDE TRY BLOCK:
-> async function loadUserProfileSafe(userId) {
->   try {
->     // 🟢 Pauses execution INSIDE the try block. If it rejects, catch intercepts it locally!
->     return await fetchUser(userId);
->   } catch (err) {
->     console.warn("Local fallback activated:", err.message);
->     return { id: userId, name: "Guest User" }; // 🟢 Successfully handled!
->   }
-> }
-> ```
-> 
-> ---
-> 
-> #### Gotcha B: The "Floating Promise" Missing `await` False Success Trap
-> *"Why did our payment checkout show 'Order Confirmed' even though the credit card transaction failed?"*  
-> ```js
-> // ❌ THE FLOATING PROMISE FALSE SUCCESS BUG:
-> async function handleCheckout(cart) {
->   try {
->     // 💥 FATAL BUG: Forgot the `await` keyword!
->     processPaymentApi(cart); // Returns a Promise, but JavaScript continues synchronously!
->     
->     // 💥 Executes IMMEDIATELY on the current tick:
->     showSuccessModal("Order Confirmed! Your items are on the way.");
->   } catch (err) {
->     showErrorMessage("Payment Failed."); // NEVER TRIGGERED ON REJECTION!
->   }
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> In JavaScript, invoking an `async` function without `await` launches a "floating Promise". The synchronous caller continues execution without pausing. In the snippet above, `showSuccessModal()` executes immediately while `processPaymentApi` is still communicating with Stripe. When Stripe rejects 800ms later with `INSUFFICIENT_FUNDS`, the user is already looking at a false "Order Confirmed" screen, and an `UnhandledPromiseRejection` is logged to the console.  
-> **The Senior Standard:** Enable the ESLint rule `@typescript-eslint/no-floating-promises` and strictly `await` all asynchronous side effects:
-> ```js
-> // ✅ PROPERLY AWAITED PIPELINE:
-> async function handleCheckoutSafe(cart) {
->   try {
->     const receipt = await processPaymentApi(cart); // 🟢 Pauses until payment settles!
->     showSuccessModal(`Order #${receipt.id} Confirmed!`);
->   } catch (err) {
->     showErrorMessage(`Payment Failed: ${err.message}`); // 🟢 Properly catches card decline!
->   }
-> }
-> ```
+Now we need to understand one of the most important distinctions in modern JavaScript:
 
----
+> **A synchronous exception and an asynchronous Promise rejection are related failure mechanisms, but they do not behave identically.**
 
-## 🧭 Industry Frequency & Framework Relevance
+This matters constantly in frontend development because modern applications are heavily asynchronous:
 
-| Badge | Industry Frequency | Relevance in React / Next.js / Vite Stacks | What to Focus On |
-|---|---|---|---|
-| 🟢 **Daily Driver** | Used in 100% of code | `async/await` with `try/catch/finally`, `return await` in data hooks, `Promise.all` vs `Promise.allSettled` | Universal foundation for data fetching, API mutations, form submissions, and authentication. |
-| 🟡 **Moderate** | Used in ~45% of code | `window.onunhandledrejection` monitoring, Promise timeout race vs `AbortController` cancellation | Critical for production telemetry, Sentry APM tracking, and building robust offline-first SPAs. |
-| 🔵 **Foundational / Engine** | Runtime internals | Microtask queue rejection mechanics, Promise reaction jobs, V8 unhandled rejection tracking | Mandatory for Staff/Principal architecture reviews, framework internals, and asynchronous pipelines. |
-
----
-
-## Core Concepts (20 Subtopics)
-
-### Part 1 — Call Stack Exceptions vs Promise Rejections `🟢 [Daily Driver]`
-
-Synchronous exceptions unwind the active call stack immediately; Promise rejections resolve asynchronously in the **Microtask Queue**.
-
----
-
-### Part 2 — Anatomy of Promise Rejection: The 3 States `🟢 [Daily Driver]`
-
-A Promise transitions from `Pending` $\to$ `Fulfilled` (with value) OR `Pending` $\to$ `Rejected` (with reason). State transitions are immutable.
-
----
-
-### Part 3 — Why Synchronous `try/catch` Cannot Catch Detached Promises `🟢 [Daily Driver]`
-
-A synchronous `try/catch` finishes executing before the microtask containing the Promise rejection runs.
-
----
-
-### Part 4 — Handling Rejections via `.catch()` Chains `🟢 [Daily Driver]`
-
-```js
-fetchUser()
-  .then(user => render(user))
-  .catch(err => handleError(err));
+```text
+API requests
+Authentication
+File uploads
+Timers
+Database calls through APIs
+Dynamic imports
+Web Workers
+Background operations
+User-triggered async actions
 ```
 
 ---
 
-### Part 5 — How `await` Translates Rejections into Catchable Control Flow `🟢 [Daily Driver]`
+# 1. The Fundamental Problem
 
-The `await` keyword halts execution of the `async` generator function until the Promise settles; if rejected, it throws the rejection value into the enclosing `try/catch`.
-
----
-
-### Part 6 — Rule: `async` Functions Always Return Promises `🟢 [Daily Driver]`
-
-Writing `return "data"` in an `async` function wraps the value in `Promise.resolve("data")`.
-
----
-
-### Part 7 — Throwing Inside an `async` Function `🔵 [Foundational / Engine]`
-
-Executing `throw new Error()` inside an `async` function converts the exception into a rejected Promise (`Promise.reject(err)`).
-
----
-
-### Part 8 — `return promise` vs `return await promise` in `try/catch` `🔴 [Production-Critical]`
-
-`return await p` ensures any rejection from `p` is caught by the surrounding `catch` block; `return p` causes the rejection to escape.
-
----
-
-### Part 9 — Multi-Step Promise Chains & Linear Error Bubbling `🟢 [Daily Driver]`
-
-A single `.catch()` at the end of a chain catches rejections from any preceding `.then()` step.
-
----
-
-### Part 10 — Errors Thrown Inside `.then()` Callbacks `🟢 [Daily Driver]`
-
-Exceptions thrown inside `.then(data => { throw new Error(); })` automatically reject the downstream Promise.
-
----
-
-### Part 11 — The Catastrophic "Missing `await`" False Success Bug `🔴 [Production-Critical]`
-
-Forgetting `await` causes code following the async call to execute immediately before the operation completes.
-
----
-
-### Part 12 — Sequential Async Workflows with Single Error Boundaries `🟢 [Daily Driver]`
+Consider synchronous code:
 
 ```js
+function getUser() {
+  throw new Error("User failed");
+}
+
 try {
-  const user = await fetchUser();
-  const perms = await fetchPerms(user.id);
-  const dashboard = await fetchDashboard(perms);
-} catch (err) {
-  handleInitError(err);
+  getUser();
+} catch (error) {
+  console.log("Caught:", error.message);
 }
 ```
 
----
+This works because the failure occurs while execution is inside the `try` block.
 
-### Part 13 — Parallel Execution: `Promise.all` Fail-Fast Semantics `🟢 [Daily Driver]`
-
-`Promise.all([p1, p2, p3])` rejects immediately when the *first* Promise rejects, discarding subsequent successful results.
-
----
-
-### Part 14 — The Fail-Fast Leak: Running Siblings Are NOT Cancelled `🔴 [Production-Critical]`
-
-When `Promise.all` rejects, other pending Promises continue running in the background unless explicitly aborted via `AbortController`.
-
----
-
-### Part 15 — Partial Failure Resilience: `Promise.allSettled` `🟢 [Daily Driver]`
-
-Returns an array of `{ status: "fulfilled", value }` and `{ status: "rejected", reason }`, allowing independent UI sections to render.
-
----
-
-### Part 16 — `Promise.all` vs `Promise.allSettled` Decision Framework `🟢 [Daily Driver]`
-
-- Use `Promise.all` when all operations are strictly interdependent (e.g. checkout transaction).
-- Use `Promise.allSettled` when operations are independent (e.g. dashboard analytics widgets).
-
----
-
-### Part 17 — `Promise.race` Timeouts vs `AbortController` Active Cancellation `🟢 [Daily Driver]`
-
-`Promise.race` determines which Promise finishes first, but does **not** cancel the losing request. Use `AbortController.abort()` to terminate pending network buffers.
-
----
-
-### Part 18 — Global Unhandled Rejection Tracking `🟢 [Daily Driver]`
+Now compare:
 
 ```js
-window.addEventListener("unhandledrejection", (event) => {
-  console.error("Unhandled Rejection:", event.reason);
-  telemetry.captureException(event.reason);
+try {
+  fetchUser();
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+If `fetchUser()` returns a Promise that later rejects, this `catch` may not handle the rejection unless you use the Promise correctly.
+
+The mental model must change.
+
+---
+
+# 2. What Is a Promise Rejection?
+
+## Definition
+
+A **Promise rejection represents an asynchronous operation that completed unsuccessfully.**
+
+A Promise can conceptually exist in one of three states:
+
+```text
+           ┌────────────┐
+           │  Pending   │
+           └─────┬──────┘
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+  Fulfilled            Rejected
+   Success              Failure
+```
+
+Example:
+
+```js
+const promise = Promise.reject(
+  new Error("Request failed")
+);
+```
+
+Conceptually:
+
+```text
+Promise
+   ↓
+Rejected
+   ↓
+Error value available
+```
+
+The rejection is not automatically handled by a normal synchronous `try/catch`.
+
+---
+
+# 3. Synchronous Throw vs Promise Rejection
+
+Consider:
+
+### Synchronous exception
+
+```js
+function syncOperation() {
+  throw new Error("Sync failure");
+}
+
+try {
+  syncOperation();
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+Execution:
+
+```text
+try begins
+    ↓
+syncOperation()
+    ↓
+throw ❌
+    ↓
+catch immediately handles
+```
+
+Now:
+
+### Asynchronous rejection
+
+```js
+function asyncOperation() {
+  return Promise.reject(
+    new Error("Async failure")
+  );
+}
+
+try {
+  asyncOperation();
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+Execution:
+
+```text
+try begins
+    ↓
+asyncOperation()
+    ↓
+Returns Promise
+    ↓
+try completes
+    ↓
+Promise later rejected ❌
+```
+
+The `try` block only protects the synchronous execution that occurred inside it.
+
+---
+
+# 4. Handling Promise Rejections with `.catch()`
+
+The Promise pattern:
+
+```js
+asyncOperation()
+  .then((result) => {
+    console.log(result);
+  })
+  .catch((error) => {
+    console.error(error);
+  });
+```
+
+Conceptually:
+
+```text
+Async Operation
+      ↓
+Promise
+      │
+      ├── Fulfilled
+      │       ↓
+      │     then()
+      │
+      └── Rejected
+              ↓
+            catch()
+```
+
+The `.catch()` is part of the Promise chain.
+
+---
+
+# 5. `await` Converts Promise Rejection Into Catchable Control Flow
+
+Consider:
+
+```js
+async function loadUser() {
+  try {
+    const user = await fetchUser();
+
+    return user;
+  } catch (error) {
+    console.error(error);
+  }
+}
+```
+
+This works because:
+
+```text
+await Promise
+      │
+      ├── Fulfilled
+      │       ↓
+      │   Continue execution
+      │
+      └── Rejected
+              ↓
+      Behaves like a thrown failure
+              ↓
+            catch
+```
+
+A useful mental model is:
+
+```text
+Promise rejection
+       ↓
+await
+       ↓
+Exception-like control flow
+       ↓
+try/catch
+```
+
+This is why `async/await` is generally easier to reason about for multi-step asynchronous operations.
+
+---
+
+# 6. Important: `async` Functions Always Return Promises
+
+Consider:
+
+```js
+async function getUser() {
+  return {
+    name: "Sunny"
+  };
+}
+```
+
+Even though you wrote:
+
+```js
+return {
+  name: "Sunny"
+};
+```
+
+the function returns a Promise.
+
+Conceptually:
+
+```js
+async function getUser()
+```
+
+behaves approximately like:
+
+```js
+function getUser() {
+  return Promise.resolve({
+    name: "Sunny"
+  });
+}
+```
+
+Therefore:
+
+```js
+const result = getUser();
+
+console.log(result);
+```
+
+Conceptually:
+
+```text
+Promise
+```
+
+To access the resolved value:
+
+```js
+const user = await getUser();
+```
+
+or:
+
+```js
+getUser().then((user) => {
+  console.log(user);
 });
 ```
 
 ---
 
-### Part 19 — The Promise `.catch()` Swallowing Trap `🔴 [Production-Critical]`
+# 7. What Happens When You `throw` Inside an `async` Function?
 
-If `.catch()` returns a normal value without re-throwing, subsequent `.then()` blocks in the chain will execute as if nothing failed.
+Consider:
+
+```js
+async function getUser() {
+  throw new Error("User failed");
+}
+```
+
+Calling it does not synchronously throw into the caller in the usual way.
+
+Instead:
+
+```text
+async function
+      ↓
+throw
+      ↓
+Returned Promise becomes rejected
+```
+
+Conceptually:
+
+```js
+getUser();
+```
+
+produces something like:
+
+```js
+Promise.reject(
+  new Error("User failed")
+);
+```
+
+Therefore:
+
+```js
+getUser()
+  .catch((error) => {
+    console.log(error.message);
+  });
+```
+
+works.
+
+Or:
+
+```js
+try {
+  await getUser();
+} catch (error) {
+  console.log(error.message);
+}
+```
+
+also works.
 
 ---
 
-### Part 20 — The 10-Point Senior Asynchronous Reliability Checklist `🟢 [Daily Driver]`
+# 8. Prediction Challenge #1
+
+What happens here?
+
+```js
+async function fail() {
+  throw new Error("Failure");
+}
+
+try {
+  fail();
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+The outer `catch` does not handle the rejection.
+
+Why?
 
 ```text
-1. Are floating promises eliminated? ──► 2. Is return await used inside try/catch?
-3. Is Promise.allSettled used for independent widgets? ──► 4. Are sibling requests aborted on failure?
-5. Is window.onunhandledrejection monitored? ──► 6. Are catch blocks re-throwing unhandled errors?
-7. Are async loading flags reset in finally? ──► 8. Are timeout races paired with AbortController?
-9. Is ESLint no-floating-promises enabled? ──► 10. Does UI reflect partial success accurately?
+try
+ ↓
+fail()
+ ↓
+Returns rejected Promise
+ ↓
+try finishes
+
+Later Promise rejection exists
+ ↓
+No rejection handler
+```
+
+Correct handling:
+
+```js
+fail().catch((error) => {
+  console.log("Caught");
+});
+```
+
+Or:
+
+```js
+try {
+  await fail();
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+inside an async context.
+
+---
+
+# 9. `return` vs `await`
+
+Consider:
+
+```js
+async function getUser() {
+  return fetchUser();
+}
+```
+
+Versus:
+
+```js
+async function getUser() {
+  return await fetchUser();
+}
+```
+
+Both often result in the caller receiving the same fulfilled or rejected result.
+
+However, inside a `try/catch`, the difference matters.
+
+Example:
+
+```js
+async function getUser() {
+  try {
+    return fetchUser();
+  } catch (error) {
+    console.log("Caught");
+  }
+}
+```
+
+If `fetchUser()` returns a Promise that later rejects:
+
+```text
+fetchUser()
+   ↓
+Returns Promise immediately
+   ↓
+try completes
+   ↓
+Promise rejects later
+   ↓
+Local catch does not handle it
+```
+
+Now:
+
+```js
+async function getUser() {
+  try {
+    return await fetchUser();
+  } catch (error) {
+    console.log("Caught");
+  }
+}
+```
+
+Execution:
+
+```text
+try
+ ↓
+await Promise
+ ↓
+Promise rejects
+ ↓
+catch handles rejection
+```
+
+This is a critical practical distinction.
+
+> If you need the current `try/catch` to handle a Promise rejection, you generally need to `await` that Promise inside the `try`.
+
+---
+
+# 10. Promise Chains and Error Propagation
+
+Consider:
+
+```js
+fetchUser()
+  .then((user) => {
+    return processUser(user);
+  })
+  .then((result) => {
+    return saveUser(result);
+  })
+  .catch((error) => {
+    handleError(error);
+  });
+```
+
+The failure can occur in multiple places:
+
+```text
+fetchUser()
+     │
+     ├── Reject ❌
+     │
+     └── Resolve
+           ↓
+       processUser()
+           │
+           ├── Throw ❌
+           │
+           └── Return
+                 ↓
+              saveUser()
+                 │
+                 └── Reject ❌
+```
+
+All these failures can propagate through the Promise chain to:
+
+```js
+.catch(handleError)
 ```
 
 ---
 
-## ⚖️ 4-Pillar Senior Engineering Decision Matrix
+# 11. Errors Thrown Inside `.then()`
 
-| Async Handling Paradigm | 1. When to Use | 2. When NOT to Use | 3. Bottlenecks & Tradeoffs | 4. Modern Alternatives |
-|---|---|---|---|---|
-| **`async/await` with `try/catch`** | Linear multi-step async workflows, data fetching in components, mutation pipelines. | Simple single-expression callbacks where `.then()` is more concise. | Requires wrapping in an `async` function context. | Promise chaining. |
-| **`Promise.all` (Fail-Fast)** | Batching strictly interdependent operations (e.g. database schema migrations). | Loading independent dashboard widgets where partial rendering is desired. | Abandons all results if a single minor operation fails. | `Promise.allSettled`. |
-| **`Promise.allSettled` (Resilient)** | Multi-widget dashboards, bulk email dispatchers, telemetry batching. | Atomic all-or-nothing transactions (e.g. financial transfers). | Requires manual filtering of `fulfilled` vs `rejected` entries. | `Promise.all`. |
-| **`Promise.race` + `AbortController`** | Enforcing strict SLA request timeouts with active network cancellation. | Operations that cannot be cancelled or where all results are needed. | `Promise.race` alone leaks running background promises without `AbortSignal`. | Native `fetch` with `{ signal }`. |
+Consider:
+
+```js
+Promise.resolve("data")
+  .then((data) => {
+    throw new Error("Processing failed");
+  })
+  .catch((error) => {
+    console.log(error.message);
+  });
+```
+
+The error thrown inside `.then()` becomes a rejection in the next Promise chain.
+
+Conceptually:
+
+```text
+Promise fulfilled
+      ↓
+then()
+      ↓
+throw ❌
+      ↓
+Next Promise rejected
+      ↓
+catch()
+```
+
+This is why Promise chains can propagate both:
+
+```text
+Promise rejection
+```
+
+and:
+
+```text
+Synchronous exceptions thrown
+inside chain callbacks
+```
+
+through `.catch()`.
 
 ---
 
-## ⚛️ Senior React Ecosystem Architecture & Component Patterns
+# 12. Promise Error Propagation
 
-### Enterprise Resilient Multi-Resource Async Loader in TypeScript
-```tsx
-import React, { useState, useCallback } from 'react';
+Consider:
 
-// ==========================================
-// 1. ASYNC RESOURCE CONTRACTS
-// ==========================================
-export interface ResourceResult<T> {
-  name: string;
-  status: 'SUCCESS' | 'ERROR';
-  data?: T;
-  errorMessage?: string;
+```js
+function first() {
+  return second();
 }
 
-export interface UserProfile { id: string; name: string }
-export interface UserSettings { theme: 'DARK' | 'LIGHT'; notifications: boolean }
-export interface UserAnalytics { views: number; clicks: number }
+function second() {
+  return third();
+}
 
-// ==========================================
-// 2. RESILIENT ASYNC DASHBOARD
-// ==========================================
-export function EnterpriseAsyncReliabilityDashboard() {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [resources, setResources] = useState<ResourceResult<unknown>[]>([]);
-
-  // 🟢 Resilient parallel data loading using Promise.allSettled with return await in try/catch
-  const loadDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    setResources([]);
-
-    try {
-      // 🟢 1. Execute independent requests in parallel using Promise.allSettled
-      const [profileSettled, settingsSettled, analyticsSettled] = await Promise.allSettled([
-        fetchProfile(),
-        fetchSettings(),
-        fetchAnalytics() // Simulated failure!
-      ]);
-
-      // 🟢 2. Decompose settled results into structured UI states
-      const parsedResults: ResourceResult<unknown>[] = [
-        profileSettled.status === 'fulfilled'
-          ? { name: 'User Profile', status: 'SUCCESS', data: profileSettled.value }
-          : { name: 'User Profile', status: 'ERROR', errorMessage: profileSettled.reason?.message },
-
-        settingsSettled.status === 'fulfilled'
-          ? { name: 'User Settings', status: 'SUCCESS', data: settingsSettled.value }
-          : { name: 'User Settings', status: 'ERROR', errorMessage: settingsSettled.reason?.message },
-
-        analyticsSettled.status === 'fulfilled'
-          ? { name: 'Analytics Telemetry', status: 'SUCCESS', data: analyticsSettled.value }
-          : { name: 'Analytics Telemetry', status: 'ERROR', errorMessage: analyticsSettled.reason?.message }
-      ];
-
-      setResources(parsedResults);
-    } catch (err: unknown) {
-      // Top-level unexpected crash boundary
-      console.error('Catastrophic failure in dashboard loader:', err);
-    } finally {
-      // 🟢 3. Guaranteed state reset
-      setIsLoading(false);
-    }
-  }, []);
-
-  return (
-    <div className="async-dashboard-card">
-      <header className="card-header">
-        <h3>Enterprise Async Reliability &amp; <code>allSettled</code> Engine</h3>
-        <span className="badge">🛡️ Partial Failure Resilient</span>
-      </header>
-
-      <p className="architecture-description">
-        Demonstrates resilient parallel data fetching with <code>Promise.allSettled</code>, eliminating single-point-of-failure crashes while rendering available data widgets.
-      </p>
-
-      <div className="controls-row">
-        <button
-          type="button"
-          onClick={loadDashboardData}
-          disabled={isLoading}
-          className="btn-load"
-        >
-          {isLoading ? 'Fetching Resources...' : '⚡ Load Multi-Resource Dashboard'}
-        </button>
-      </div>
-
-      <div className="resources-grid">
-        {resources.map((res, idx) => (
-          <div key={idx} className={`resource-card ${res.status.toLowerCase()}`}>
-            <div className="resource-header">
-              <span className="resource-name">{res.name}</span>
-              <span className={`status-pill ${res.status.toLowerCase()}`}>
-                {res.status === 'SUCCESS' ? '🟢 Ready' : '🔴 Failed'}
-              </span>
-            </div>
-            <div className="resource-body">
-              {res.status === 'SUCCESS' ? (
-                <pre>{JSON.stringify(res.data, null, 2)}</pre>
-              ) : (
-                <div className="error-alert">
-                  <span>⚠️ {res.errorMessage}</span>
-                  <button type="button" className="retry-btn">Retry Widget</button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+function third() {
+  return Promise.reject(
+    new Error("Failure")
   );
 }
 
-// Simulated API helpers
-async function fetchProfile(): Promise<UserProfile> {
-  return new Promise((resolve) => setTimeout(() => resolve({ id: 'usr_101', name: 'Sarah Connor' }), 300));
-}
-
-async function fetchSettings(): Promise<UserSettings> {
-  return new Promise((resolve) => setTimeout(() => resolve({ theme: 'DARK', notifications: true }), 400));
-}
-
-async function fetchAnalytics(): Promise<UserAnalytics> {
-  return new Promise((_, reject) => setTimeout(() => reject(new Error('Analytics microservice 503 unavailable')), 350));
-}
+first().catch((error) => {
+  console.log(error.message);
+});
 ```
+
+Conceptually:
+
+```text
+third()
+   ↓
+Rejected Promise
+   ↑
+second()
+   ↑
+first()
+   ↓
+catch()
+```
+
+This resembles synchronous propagation, but the transport mechanism is the Promise chain rather than only the synchronous call stack.
 
 ---
 
-## 🧠 Part 04 — Integrated Challenges & Active Recall Solutions
+# 13. The Danger of Forgetting `await`
 
-### Prediction Challenge 1: `try/catch` on Un-Awaited Async Function
+Consider:
+
 ```js
-async function doTask() { throw new Error("Task Failed"); }
-try {
-  doTask();
-  console.log("Success A");
-} catch (err) {
-  console.log("Caught B");
-}
-```
-**Question:** What will output to the console?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
-
-**Answer:**  
-1. `"Success A"` outputs immediately.  
-2. An `UnhandledPromiseRejection` is logged to the runtime console.  
-**Why:** `doTask()` is not awaited; it returns a pending/rejected Promise. The synchronous `try` block finishes before the Promise rejection is processed in the microtask queue.
-</details>
-
----
-
-### Prediction Challenge 2: `return promise` vs `return await promise`
-```js
-async function stepOne() {
+async function save() {
   try {
-    return Promise.reject(new Error("Step 1 Rejection"));
-  } catch (e) {
-    return "Handled Locally";
-  }
-}
-async function stepTwo() {
-  try {
-    return await Promise.reject(new Error("Step 2 Rejection"));
-  } catch (e) {
-    return "Handled Locally";
+    saveUser();
+
+    showSuccess();
+  } catch (error) {
+    showError();
   }
 }
 ```
-**Question:** What will `await stepOne()` and `await stepTwo()` return?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-- `stepOne()`: **Rejects** with `"Step 1 Rejection"` (bypasses the local `catch` block!).  
-- `stepTwo()`: **Resolves** with `"Handled Locally"` (paused inside `try`, caught by `catch`).
-</details>
+Suppose:
 
----
-
-### Prediction Challenge 3: `Promise.all` Fail-Fast Execution
 ```js
-const p1 = new Promise(res => setTimeout(() => res("P1 Success"), 500));
-const p2 = Promise.reject(new Error("P2 Immediate Failure"));
-try {
-  await Promise.all([p1, p2]);
-} catch (err) {
-  console.log("Caught:", err.message);
+saveUser()
+```
+
+returns a Promise.
+
+Execution may become:
+
+```text
+saveUser starts
+    ↓
+Promise returned
+    ↓
+showSuccess() executes immediately ❌
+    ↓
+saveUser later fails
+```
+
+The function has effectively declared success before the operation completed.
+
+Correct:
+
+```js
+async function save() {
+  try {
+    await saveUser();
+
+    showSuccess();
+  } catch (error) {
+    showError();
+  }
 }
 ```
-**Question:** How many milliseconds before the catch block executes, and does `p1` stop executing?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-- **$0\text{ms}$** (immediately on the next microtask tick because `p2` is already rejected).  
-- **No, `p1` does not stop.** `p1`'s timer continues in the background until it completes at 500ms.
-</details>
+Now:
+
+```text
+saveUser()
+    ↓
+await
+    │
+    ├── Success
+    │      ↓
+    │  showSuccess()
+    │
+    └── Failure
+           ↓
+        showError()
+```
+
+This is one of the most common async bugs in JavaScript.
 
 ---
 
-### Prediction Challenge 4: Promise `.catch()` Swallowing and Trailing `.then()`
+# 14. Sequential Async Operations
+
+Consider:
+
 ```js
-Promise.reject(new Error("API Timeout"))
-  .catch((err) => {
-    console.log("Caught Error");
-    return "Default Fallback";
+async function initializeDashboard() {
+  try {
+    const user =
+      await loadUser();
+
+    const permissions =
+      await loadPermissions(
+        user.id
+      );
+
+    const dashboard =
+      await loadDashboard(
+        permissions
+      );
+
+    return dashboard;
+  } catch (error) {
+    handleInitializationError(error);
+  }
+}
+```
+
+Flow:
+
+```text
+loadUser()
+    ↓
+loadPermissions()
+    ↓
+loadDashboard()
+```
+
+If any awaited operation rejects:
+
+```text
+Failure
+   ↓
+Remaining statements skipped
+   ↓
+catch
+```
+
+This creates one error boundary around a complete initialization workflow.
+
+That is appropriate if all failures share the same recovery strategy.
+
+---
+
+# 15. Parallel Operations and `Promise.all`
+
+Consider:
+
+```js
+const [user, products] =
+  await Promise.all([
+    loadUser(),
+    loadProducts()
+  ]);
+```
+
+Conceptually:
+
+```text
+loadUser() ───────┐
+                  │
+                  ▼
+             Promise.all
+                  │
+loadProducts() ───┘
+```
+
+If both succeed:
+
+```text
+Promise.all
+     ↓
+Fulfilled
+```
+
+If one rejects:
+
+```text
+One Promise rejects ❌
+        ↓
+Promise.all rejects
+        ↓
+await throws into catch
+```
+
+Example:
+
+```js
+try {
+  const [user, products] =
+    await Promise.all([
+      loadUser(),
+      loadProducts()
+    ]);
+} catch (error) {
+  handleError(error);
+}
+```
+
+---
+
+# 16. Important: `Promise.all` Is Fail-Fast
+
+Suppose:
+
+```text
+loadUser()      → 500ms → Success
+loadProducts()  → 100ms → Failure
+```
+
+`Promise.all()` rejects when the rejection occurs.
+
+However, you should not mentally interpret that as:
+
+```text
+Other operations magically stop.
+```
+
+Promises already started may continue running unless the underlying operation supports explicit cancellation.
+
+This distinction matters for:
+
+```text
+Network requests
+Mutations
+Analytics
+Background work
+```
+
+Failure aggregation and operation cancellation are separate concerns.
+
+---
+
+# 17. `Promise.allSettled`
+
+Sometimes you want to know the result of every operation.
+
+Example:
+
+```js
+const results =
+  await Promise.allSettled([
+    loadUser(),
+    loadProducts(),
+    loadNotifications()
+  ]);
+```
+
+The result might conceptually look like:
+
+```js
+[
+  {
+    status: "fulfilled",
+    value: user
+  },
+  {
+    status: "rejected",
+    reason: error
+  },
+  {
+    status: "fulfilled",
+    value: notifications
+  }
+]
+```
+
+This is useful when partial failure is acceptable.
+
+Example:
+
+```text
+Dashboard
+│
+├── User profile ✅
+├── Products ❌
+└── Notifications ✅
+```
+
+Instead of failing the entire dashboard, you can decide:
+
+```text
+Render available sections
++
+Show an error only where failure occurred
+```
+
+---
+
+# 18. `Promise.all` vs `Promise.allSettled`
+
+| Behavior        | `Promise.all`                      | `Promise.allSettled`       |
+| --------------- | ---------------------------------- | -------------------------- |
+| All success     | Resolves                           | Resolves                   |
+| One fails       | Rejects                            | Resolves with results      |
+| Partial results | Not directly returned on rejection | Available                  |
+| Best for        | All operations required            | Partial failure acceptable |
+
+Senior-level decision:
+
+```text
+Are these operations dependent on all succeeding?
+```
+
+If yes:
+
+```text
+Promise.all()
+```
+
+If independent:
+
+```text
+Promise.allSettled()
+```
+
+may better represent your UI and failure requirements.
+
+---
+
+# 19. `Promise.race`
+
+Consider:
+
+```js
+const result =
+  await Promise.race([
+    fetchData(),
+    timeoutPromise()
+  ]);
+```
+
+The first Promise to settle determines the result.
+
+Conceptually:
+
+```text
+fetchData() ──────┐
+                  ├── First to settle wins
+timeoutPromise() ─┘
+```
+
+A common pattern is timeout logic.
+
+Example concept:
+
+```js
+function timeout(ms) {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(
+        new Error("Request timed out")
+      );
+    }, ms);
+  });
+}
+```
+
+Then:
+
+```js
+await Promise.race([
+  fetchData(),
+  timeout(5000)
+]);
+```
+
+But there is an important production issue:
+
+> **Winning the race does not automatically cancel the losing operation.**
+
+If the timeout rejects first, the original request may still continue unless you explicitly cancel it.
+
+Modern frontend code often uses:
+
+```text
+AbortController
+```
+
+for cancellation, which we will connect to API reliability in Part 5.
+
+---
+
+# 20. Unhandled Promise Rejections
+
+Consider:
+
+```js
+async function loadData() {
+  throw new Error("Failure");
+}
+
+loadData();
+```
+
+You created a rejected Promise without handling it.
+
+Conceptually:
+
+```text
+Async operation
+      ↓
+Rejected Promise ❌
+      ↓
+No .catch()
+No await/catch
+      ↓
+Unhandled rejection
+```
+
+Unhandled rejections are serious because they represent failures with no defined recovery path.
+
+The exact runtime behavior and reporting can vary by environment, but your engineering rule should be simple:
+
+> **Every Promise that can reject should have a deliberate error-handling strategy at an appropriate boundary.**
+
+That does **not** mean every function needs its own `.catch()`.
+
+Propagation is valid.
+
+For example:
+
+```js
+async function loadUser() {
+  return fetchUser();
+}
+
+async function initialize() {
+  try {
+    await loadUser();
+  } catch (error) {
+    handleError(error);
+  }
+}
+```
+
+The Promise is handled at the higher boundary.
+
+---
+
+# 21. `try/catch` Around an Async Workflow
+
+A common production pattern:
+
+```js
+async function submitForm(data) {
+  setSubmitting(true);
+  setError(null);
+
+  try {
+    const result =
+      await submitUser(data);
+
+    showSuccess(result);
+  } catch (error) {
+    reportError(error);
+
+    setError(
+      "Unable to submit the form."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+}
+```
+
+State machine:
+
+```text
+Idle
+ ↓
+Submitting
+ │
+ ├── Success
+ │      ↓
+ │   Success state
+ │
+ └── Failure
+        ↓
+     Error state
+        ↓
+      finally
+        ↓
+Submitting = false
+```
+
+This is a clean example of:
+
+```text
+await
++
+try/catch
++
+finally
+```
+
+working together.
+
+---
+
+# 22. Multiple Error Boundaries in Async Code
+
+Consider:
+
+```js
+async function checkout() {
+  try {
+    await validateOrder();
+  } catch (error) {
+    showValidationError(error);
+    return;
+  }
+
+  try {
+    await processPayment();
+  } catch (error) {
+    showPaymentError(error);
+    return;
+  }
+
+  try {
+    await sendConfirmation();
+  } catch (error) {
+    reportConfirmationError(error);
+  }
+
+  showSuccess();
+}
+```
+
+Different failures have different consequences.
+
+```text
+Validation fails
+      ↓
+Cannot continue
+
+
+Payment fails
+      ↓
+Cannot continue
+
+
+Confirmation fails
+      ↓
+Order may still be successful
+```
+
+This is much better than:
+
+```js
+try {
+  await validateOrder();
+  await processPayment();
+  await sendConfirmation();
+} catch (error) {
+  showError();
+}
+```
+
+if those failures require different recovery behavior.
+
+---
+
+# 23. Async Errors Can Be Lost
+
+Consider:
+
+```js
+async function saveUser() {
+  try {
+    await updateDatabase();
+  } catch (error) {
+    console.error(error);
+  }
+}
+```
+
+The error is logged.
+
+But then:
+
+```js
+await saveUser();
+
+showSuccess();
+```
+
+The caller sees successful completion because the inner function swallowed the error.
+
+Flow:
+
+```text
+updateDatabase() fails
+       ↓
+catch logs error
+       ↓
+saveUser resolves normally ❌
+       ↓
+Caller assumes success
+```
+
+If the caller needs to know about failure:
+
+```js
+async function saveUser() {
+  try {
+    await updateDatabase();
+  } catch (error) {
+    console.error(error);
+
+    throw error;
+  }
+}
+```
+
+Or simply:
+
+```js
+async function saveUser() {
+  await updateDatabase();
+}
+```
+
+Then the caller can handle it.
+
+This is a major architectural lesson:
+
+> **Logging an error is not the same as handling the application's failure state.**
+
+---
+
+# 24. `catch` in Promise Chains Can Also Swallow Errors
+
+Example:
+
+```js
+fetchUser()
+  .then(processUser)
+  .catch((error) => {
+    console.error(error);
   })
-  .then((data) => {
-    console.log("Next Then:", data);
+  .then(() => {
+    showSuccess();
   });
 ```
-**Question:** What is the console output order?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-1. `"Caught Error"`  
-2. `"Next Then: Default Fallback"`  
-**Why:** The `.catch()` block returned a normal value (`"Default Fallback"`), resolving the Promise and allowing downstream `.then()` callbacks to execute.
-</details>
+Potential problem:
 
----
+```text
+fetchUser fails
+      ↓
+catch logs it
+      ↓
+catch resolves normally
+      ↓
+Next then executes
+      ↓
+showSuccess() ❌
+```
 
-## 🎯 Tiered Interview Question Bank (Intern ➔ Staff / Principal)
+The chain continues because the `.catch()` returned successfully.
 
-### 🟢 Tier 1: Intern / Junior Level
-**Q1:** What is the difference between a synchronous throw and a Promise rejection?  
-<details>
-<summary><strong>Answer</strong></summary>
-A synchronous `throw` immediately halts execution in the current call stack frame and unwinds to the nearest `try/catch`. A Promise rejection represents an asynchronous failure stored in a Promise object and evaluated in the **Microtask Queue**; it can only be intercepted via `.catch()` or `await` inside a `try/catch` block.
-</details>
-
-**Q2:** Why should you avoid un-awaited "Floating Promises" in JavaScript?  
-<details>
-<summary><strong>Answer</strong></summary>
-When an `async` function is invoked without `await`, subsequent code executes immediately without waiting for the asynchronous operation to finish. If the operation fails, the error will bypass local error handlers, trigger `unhandledrejection` events, and cause false success UI state anomalies.
-</details>
-
----
-
-### 🟡 Tier 2: Mid-Level Engineer
-**Q3:** When should you choose `Promise.allSettled` over `Promise.all`?  
-<details>
-<summary><strong>Answer</strong></summary>
-- **`Promise.all`:** Ideal for atomic, interdependent operations where if one fails, all must fail (e.g. creating an order, updating inventory, processing payment).  
-- **`Promise.allSettled`:** Ideal for composite dashboards or batch operations where operations are independent and partial success is desired (e.g. loading profile, notifications, and analytics widgets independently).
-</details>
-
-**Q4:** Why is `return await promise;` necessary inside a `try/catch` block?  
-<details>
-<summary><strong>Answer</strong></summary>
-Inside a `try/catch` block, writing `return promise;` returns the pending Promise immediately and exits the `try` block before the Promise settles, causing any future rejection to bypass the local `catch`. Writing `return await promise;` pauses execution inside the `try` block until the Promise resolves or rejects, ensuring rejections are caught locally.
-</details>
-
----
-
-### 🟠 Tier 3: Senior Frontend Engineer
-**Q5:** How do you prevent resource leaks when using `Promise.race` for network request timeouts?  
-<details>
-<summary><strong>Answer</strong></summary>
-`Promise.race([fetch(url), timeout(5000)])` rejects when the timeout finishes first, but the underlying HTTP network socket for `fetch` remains open in the background. To prevent resource leaks, pass an `AbortController.signal` to `fetch()` and call `controller.abort()` when the timeout timer fires, terminating the physical network socket and freeing browser buffer memory.
-</details>
-
----
-
-### 🔴 Tier 4: Staff / Principal Architect
-**Q6:** How does V8's Promise Reaction Job queue handle Unhandled Rejections under the hood, and how do you architect a global Zero-Unhandled-Rejection enforcement pipeline in an enterprise SPA?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. **V8 Promise Reaction Lifecycle:** When a Promise rejects with no attached handler, V8 marks the Promise as `kUnhandledRejection` and schedules an unhandled rejection check in the next event loop turn. If no `.catch()` is added before that turn, V8 emits `window.onunhandledrejection` / `process.emit('unhandledRejection')`.  
-2. **Global Telemetry Listener:** Attach a top-level `window.addEventListener('unhandledrejection', handler)` that extracts `event.reason`, sanitizes PII, attaches navigation breadcrumbs, and beacons the error to Datadog/Sentry.  
-3. **CI/CD Build Enforcement:** Enable ESLint `@typescript-eslint/no-floating-promises` and run automated Cypress/Playwright integration suites that fail CI builds if any `unhandledrejection` console event is triggered during automated end-to-end user journeys.
-</details>
-
----
-
-## 🛠️ Senior Architecture Challenge: Standalone Async Concurrency & Timeout Engine
+If failure should stop the success path:
 
 ```js
-// See runnable implementation in examples/04-async-errors-promise-rejections.js
+fetchUser()
+  .then(processUser)
+  .then(showSuccess)
+  .catch(handleError);
+```
+
+Or rethrow after partial handling:
+
+```js
+.catch((error) => {
+  reportError(error);
+
+  throw error;
+});
+```
+
+Understanding Promise chains as **value and failure propagation pipelines** is essential.
+
+---
+
+# 25. Async Error Boundary Architecture
+
+A strong frontend architecture often looks like:
+
+```text
+UI Event
+   ↓
+Mutation / Action
+   ↓
+Service
+   ↓
+API Client
+   ↓
+Network
+```
+
+Failure travels upward:
+
+```text
+Network Error
+   ↑
+API Client normalizes
+   ↑
+Service adds domain context
+   ↑
+Action decides recovery
+   ↑
+UI displays appropriate state
+```
+
+Example:
+
+```text
+fetch failed
+     ↓
+NetworkError
+     ↓
+UserUpdateError
+     ↓
+Form state = error
+     ↓
+"Unable to save changes"
+```
+
+This connects directly to the error taxonomy from Part 3.
+
+---
+
+# 26. Async Function Failure Model
+
+A useful mental model:
+
+```text
+async function
+│
+├── return value
+│      ↓
+│   Promise fulfilled
+│
+├── return Promise
+│      ↓
+│   Adopts that Promise's outcome
+│
+└── throw error
+       ↓
+   Promise rejected
+```
+
+Example:
+
+```js
+async function example(type) {
+  if (type === "success") {
+    return "Success";
+  }
+
+  if (type === "promise") {
+    return Promise.resolve("Success");
+  }
+
+  throw new Error("Failure");
+}
+```
+
+Conceptually:
+
+```text
+success
+   ↓
+Fulfilled Promise
+
+
+promise
+   ↓
+Fulfilled Promise
+
+
+throw
+   ↓
+Rejected Promise
 ```
 
 ---
 
-## Key Takeaways
-1. **Always Await Inside `try/catch`:** Use `return await p;` to intercept rejections locally.
-2. **Never Forget `await`:** Eliminate floating promises to prevent false success states.
-3. **Choose the Right Concurrency Tool:** Use `Promise.all` for all-or-nothing; `Promise.allSettled` for partial success.
-4. **`Promise.race` Does Not Abort:** Pair timeouts with `AbortController` to cancel losing network buffers.
-5. **Monitor Unhandled Rejections:** Implement global `window.onunhandledrejection` telemetry in production.
+# 27. Prediction Challenge #1
+
+What happens?
+
+```js
+async function getData() {
+  throw new Error("Failure");
+}
+
+async function run() {
+  try {
+    getData();
+
+    console.log("Success");
+  } catch (error) {
+    console.log("Caught");
+  }
+}
+```
+
+Result:
+
+```text
+"Success"
+```
+
+Why?
+
+Because:
+
+```js
+getData();
+```
+
+returns a rejected Promise.
+
+It was not awaited.
+
+Therefore:
+
+```text
+try
+ ↓
+getData()
+ ↓
+Promise returned
+ ↓
+console.log("Success")
+ ↓
+try completes
+```
+
+The rejection is separate from that synchronous path.
+
+Correct:
+
+```js
+try {
+  await getData();
+
+  console.log("Success");
+} catch (error) {
+  console.log("Caught");
+}
+```
+
+Now:
+
+```text
+Caught
+```
 
 ---
 
-[⬅️ Part 03: Error Propagation & Custom Errors](./03-error-propagation-custom-errors.md) | [📚 KPI 25 Index](./README.md) | [Part 05: API Failure Handling & Retry Strategies ➡️](./05-api-failure-handling-retry-strategies.md)
+# 28. Prediction Challenge #2
+
+What happens?
+
+```js
+async function save() {
+  try {
+    await Promise.reject(
+      new Error("Failure")
+    );
+  } catch (error) {
+    console.log("Handled");
+  }
+
+  console.log("Continue");
+}
+```
+
+Output:
+
+```text
+Handled
+Continue
+```
+
+Because the error was handled locally.
+
+The function continues normally afterward.
+
+If continuing is unsafe:
+
+```js
+catch (error) {
+  console.log("Handled");
+
+  return;
+}
+```
+
+or:
+
+```js
+catch (error) {
+  throw error;
+}
+```
+
+may be more appropriate.
+
+---
+
+# 29. Prediction Challenge #3
+
+What happens?
+
+```js
+async function save() {
+  try {
+    await saveUser();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+await save();
+
+showSuccess();
+```
+
+If `saveUser()` fails:
+
+```text
+Error logged
+      ↓
+save() completes successfully
+      ↓
+showSuccess() executes ❌
+```
+
+Because the error was swallowed.
+
+A correct design depends on whether `save()` owns recovery.
+
+---
+
+# 30. Senior-Level Async Failure Questions
+
+When writing async code, ask:
+
+```text
+1. Does this function return a Promise?
+
+2. Can that Promise reject?
+
+3. Where will rejection be handled?
+
+4. Did I forget await?
+
+5. If I catch this error,
+   should the function continue?
+
+6. If I log it,
+   should I rethrow it?
+
+7. Are multiple operations dependent?
+
+8. Should they run sequentially or in parallel?
+
+9. If one fails, should all results fail?
+
+10. Is partial success acceptable?
+
+11. Does a timeout actually cancel the operation?
+
+12. Can this operation still update state
+    after the user leaves the page?
+```
+
+That final question becomes especially important in React applications.
+
+---
+
+# 31. 30-Second Executive Cheat Sheet
+
+```text
+ASYNC ERRORS & PROMISE REJECTIONS
+════════════════════════════════════
+
+Synchronous:
+
+throw
+  ↓
+try/catch
+
+
+Promise:
+
+reject
+  ↓
+.catch()
+
+
+async / await:
+
+Promise rejection
+      ↓
+await
+      ↓
+try/catch
+
+
+async function:
+
+return
+  ↓
+Fulfilled Promise
+
+
+throw
+  ↓
+Rejected Promise
+
+
+Critical mistake:
+
+try {
+  asyncOperation();
+} catch {}
+
+❌ Does not handle later rejection
+
+
+Correct:
+
+try {
+  await asyncOperation();
+} catch {}
+
+
+Parallel operations:
+
+Promise.all()
+=
+All required
+
+
+Promise.allSettled()
+=
+Partial failure allowed
+
+
+Senior principle:
+
+Logging a failure does not mean
+the calling workflow knows it failed.
+
+Do not swallow errors accidentally.
+```
+
+---
+
+# KPI 25 Progress
+
+```text
+KPI 25 — Error Handling, Debugging & Reliability
+══════════════════════════════════════════════════
+
+Part 1  ✅ Errors, Exceptions & Failure Model
+Part 2  ✅ try / catch / finally
+Part 3  ✅ Error Propagation & Custom Errors
+Part 4  ✅ Async Errors & Promise Rejections
+Part 5  ⏳ API Failure Handling & Retry Strategies
+Part 6  ⏳ React Error Boundaries & Recovery
+Part 7  ⏳ Logging, Observability & Production Debugging
+Part 8  ⏳ Systematic Debugging Methodology
+```
+
+**Next: Part 5 — API failure handling, HTTP error normalization, retries, exponential backoff, timeouts, cancellation with `AbortController`, idempotency, and production-safe retry strategies.**

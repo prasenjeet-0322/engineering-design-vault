@@ -1,589 +1,1868 @@
-# KPI 25 — Part 05: API Failure Handling, Retries, Timeouts, Cancellation & Production-Safe Requests
+# KPI 25 — Error Handling, Debugging & Reliability
 
-[⬅️ Part 04: Async Errors & Promise Rejections](./04-async-errors-promise-rejections.md) | [📚 KPI 25 Index](./README.md) | [Part 06: React Error Boundaries & Component Recovery ➡️](./06-react-error-boundaries-recovery.md)
+## Part 5 — API Failure Handling, Retries, Timeouts, Cancellation & Production-Safe Requests
 
----
 
-## ⚡ 30-Second Executive Cheat Sheet
+> **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)
+> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)
 
-| API Reliability Concept | Underlying Mechanism | Failure Mode & Risk | Senior Engineering Standard |
-|---|---|---|---|
-| **`fetch()` `response.ok` Check** | `fetch()` only rejects on network/transport loss; HTTP 404 and 500 resolve normally. | Wrapping `fetch()` in `try/catch` misses 4xx/5xx errors entirely without manual inspection. | 🔴 **CRITICAL:** Always check `if (!response.ok)` and throw structured `HttpError`. |
-| **Idempotency in Retries** | Repeating an idempotent operation ($f(f(x)) = f(x)$) produces the same side effect. | Retrying non-idempotent `POST /payments` on timeout causes catastrophic duplicate charges. | 🔴 **NEVER blindly retry non-idempotent mutations:** Enforce `Idempotency-Key` headers. |
-| **Exponential Backoff + Jitter** | Delay increases exponentially ($t = \text{base} \times 2^{\text{attempt}} + \text{rand}$), scattering retry attempts. | Fixed retry delays from 10,000 clients cause synchronized **Retry Storms** that crash servers. | 🔵 Always add random jitter ($\pm 25\%$) to exponential backoff delays. |
-| **Selective Retry Matrix** | Retrying transient network drops (503, 504, connection drops) vs failing fast on 4xx. | Retrying 400 Bad Request, 401 Unauthorized, or 404 Not Found wastes CPU and bandwidth. | 🟢 Never retry 4xx errors (except 429 with `Retry-After`); retry transient 5xx & network drops. |
-| **`AbortController` Cancellation** | Signals hardware/browser sockets to terminate active network buffers. | `Promise.race` alone leaks active background HTTP sockets even when the timeout wins. | 🟢 Pass `{ signal: controller.signal }` to `fetch()` and call `controller.abort()`. |
-| **Defensive JSON Parsing** | Handling non-JSON 500 error responses (HTML proxy crash pages, NGINX 502s). | `await res.json()` on HTML error pages throws a `SyntaxError`, masking the root HTTP error. | 🟢 Parse error bodies inside a fallback `try/catch` to preserve the original status code. |
 
----
+Part 4 established how asynchronous failures propagate through Promises.
 
-> [!CAUTION]
-> ### 🎯 Senior Interview Gotchas: `response.ok` Traps & Duplicate Mutation Retries
-> 
-> #### Gotcha A: `fetch()` Resolves on HTTP 404/500 (The `response.ok` Trap)
-> *"Why did our React component render blank and log 'Success' when the backend returned 500 Internal Server Error?"*  
-> ```js
-> // ❌ DISASTROUS FETCH MISSING RESPONSE.OK CHECK:
-> async function loadUserData(userId) {
->   try {
->     const response = await fetch(`/api/users/${userId}`);
->     // 💥 FATAL FLAW: fetch() does NOT reject on HTTP 404 or 500!
->     // The response is a valid Response object with response.ok === false.
->     // The catch block is BYPASSED, and response.json() tries to parse the 500 HTML error page!
->     const data = await response.json();
->     console.log("Success:", data);
->     return data;
->   } catch (err) {
->     console.error("Caught error:", err.message); // Only catches offline/DNS drops!
->   }
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> The native Fetch API strictly models network transport completion. From the browser's perspective, if the HTTP handshake, TLS negotiation, and TCP packet exchange succeeded, the network request was successful, even if the application server replied with `500 Internal Server Error` or `404 Not Found`. `fetch()` only rejects its Promise on physical transport failures (e.g. offline, DNS lookup failure, CORS blockage, or request abortion).  
-> **The Senior Standard:** Always verify `response.ok` (which checks `status >= 200 && status < 300`) and throw a structured `HttpError`:
-> ```js
-> // ✅ RESILIENT PRODUCTION REQUEST HANDLER:
-> async function loadUserDataSafe(userId) {
->   const response = await fetch(`/api/users/${userId}`);
->   if (!response.ok) {
->     // 🟢 Explicitly normalize HTTP status codes into domain-catchable errors!
->     throw new HttpError(`HTTP ${response.status}: Failed to load user [${userId}]`, response.status);
->   }
->   return await response.json();
-> }
-> ```
-> 
-> ---
-> 
-> #### Gotcha B: Blind Retries on Non-Idempotent Mutations (The Duplicate Charge Trap)
-> *"Why was a customer charged 3 times for a single purchase during a network timeout?"*  
-> ```js
-> // ❌ DANGEROUS BLIND RETRY ON NON-IDEMPOTENT WRITE:
-> async function submitPayment(paymentDetails) {
->   // 💥 FATAL BUG: Retrying POST /charges without an Idempotency-Key!
->   // 1. Attempt 1 is received by Stripe and charges the card.
->   // 2. Network connection drops BEFORE the 200 OK response reaches the client.
->   // 3. Frontend assumes the request failed and RETRIES!
->   // 4. Stripe charges the card a SECOND time!
->   return retryWithBackoff(() => fetch("/api/charges", {
->     method: "POST",
->     body: JSON.stringify(paymentDetails)
->   }));
-> }
-> ```
-> **Deep Architectural Explanation:**  
-> A timeout or network drop does not mean the server did not execute the mutation. In distributed systems, a request often succeeds on the server, but the return response packet is lost in transit. If the client blindly re-transmits a non-idempotent `POST` request, the server executes a second distinct transaction.  
-> **The Senior Standard:** Only retry idempotent reads (`GET`), or attach a persistent client-generated `Idempotency-Key` UUID header on mutating `POST`/`PUT` requests so the backend recognizes duplicates:
-> ```js
-> // ✅ IDEMPOTENT PRODUCTION MUTATION RETRY:
-> async function submitPaymentSafe(paymentDetails, idempotencyKey = crypto.randomUUID()) {
->   return retryWithBackoff(() => fetch("/api/charges", {
->     method: "POST",
->     headers: {
->       "Content-Type": "application/json",
->       "Idempotency-Key": idempotencyKey // 🟢 Backend deduplicates identical keys!
->     },
->     body: JSON.stringify(paymentDetails)
->   }), { maxAttempts: 3, shouldRetry: (err) => err.status >= 500 || err.name === "NetworkError" });
-> }
-> ```
-
----
-
-## 🧭 Industry Frequency & Framework Relevance
-
-| Badge | Industry Frequency | Relevance in React / Next.js / Vite Stacks | What to Focus On |
-|---|---|---|---|
-| 🟢 **Daily Driver** | Used in 100% of code | `response.ok` checks, `AbortController` cleanup in `useEffect`, `HttpError` normalization | Universal requirement for any data-fetching application communicating with REST/GraphQL APIs. |
-| 🟡 **Moderate** | Used in ~45% of code | Exponential backoff with jitter, `Idempotency-Key` headers, Rate-limit (429) backoffs | Critical for high-traffic e-commerce checkouts, payment processing, file uploaders, and SaaS apps. |
-| 🔵 **Foundational / Engine** | Runtime internals | TCP socket teardowns via `AbortSignal`, Circuit breaker state machines, SWR cache policies | Required for Staff/Principal architecture reviews, SDK client design, and API gateway engineering. |
-
----
-
-## Core Concepts (20 Subtopics)
-
-### Part 1 — The Multi-Layer API Failure Model `🟢 [Daily Driver]`
-
-Failures stem from 4 distinct tiers: Client Runtime (pre-request), Network/Transport (DNS/CORS/Offline), HTTP Protocol (4xx/5xx), and Application Schema (JSON parsing).
-
----
-
-### Part 2 — The `response.ok` Imperative `🔴 [Production-Critical]`
-
-`fetch()` resolves on 4xx/5xx; manual validation via `if (!response.ok)` is mandatory to convert HTTP status codes into JavaScript exceptions.
-
----
-
-### Part 3 — Anatomy of a Production-Grade `HttpError` Class `🟢 [Daily Driver]`
-
-```ts
-export class HttpError extends Error {
-  constructor(message: string, public readonly status: number, public readonly data?: unknown, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'HttpError';
-  }
-}
-```
-
----
-
-### Part 4 — HTTP Status Code Taxonomy & Frontend Decisions `🟢 [Daily Driver]`
-
-- **400 / 422:** Validation defect $\implies$ Do not retry; highlight form inputs.
-- **401:** Unauthorized $\implies$ Trigger token refresh or redirect to login.
-- **403:** Forbidden $\implies$ Render 403 screen; do not retry.
-- **404:** Not Found $\implies$ Render empty state; do not retry.
-- **409:** Conflict $\implies$ Prompt user to reload/merge state.
-- **429:** Rate Limited $\implies$ Respect `Retry-After` header before retrying.
-- **500 / 502 / 503 / 504:** Gateway/Server drop $\implies$ Retry with backoff.
-
----
-
-### Part 5 — Distinguishing Network Drops from HTTP Responses `🟢 [Daily Driver]`
-
-- `TypeError: Failed to fetch`: Physical network loss or CORS denial (Promise rejects).
-- `response.ok === false`: Server responded with HTTP failure code (Promise resolved).
-
----
-
-### Part 6 — Normalizing Heterogeneous Backend Payloads `🟢 [Daily Driver]`
-
-Shield UI components from backend inconsistency by mapping raw backend payloads to unified domain error models.
-
----
-
-### Part 7 — Parsing Error Responses Defensively `🟢 [Daily Driver]`
-
-Never assume a failed response is JSON. Use a safe parsing helper:
-```js
-async function parseErrorData(res) {
-  try { return await res.json(); } catch { return await res.text().catch(() => null); }
-}
-```
-
----
-
-### Part 8 — The Transient vs Permanent Failure Matrix `🟢 [Daily Driver]`
-
-Only retry **transient** operational failures (network drops, 503 Service Unavailable, 429); fail fast on **permanent** failures (400, 401, 403, 404).
-
----
-
-### Part 9 — The Law of Idempotency in Retries `🔴 [Production-Critical]`
-
-`GET`, `PUT`, `DELETE` are idempotent ($f(f(x)) = f(x)$); `POST` is non-idempotent by default and must not be retried without idempotency guards.
-
----
-
-### Part 10 — `Idempotency-Key` Request Headers `🔵 [Foundational / Engine]`
-
-Generate a unique UUID per mutation; pass `"Idempotency-Key": uuid` so servers deduplicate repeated submissions.
-
----
-
-### Part 11 — Fixed Delay vs Exponential Backoff `🟢 [Daily Driver]`
-
-$$\text{Fixed: } t = 1000\text{ms} \implies 1000\text{ms} \implies 1000\text{ms}$$
-$$\text{Exponential: } t = 1000\text{ms} \implies 2000\text{ms} \implies 4000\text{ms} \implies 8000\text{ms}$$
-
----
-
-### Part 12 — Preventing Retry Storms: Full Jitter Formula `🔵 [Foundational / Engine]`
-
-$$\text{Sleep} = \text{Math.random}() \times (\text{Base} \times 2^{\text{attempt}})$$
-Scatters retry waves across a time window, preventing synchronized server spikes.
-
----
-
-### Part 13 — Selective Retries: The `shouldRetry` Filter `🔴 [Production-Critical]`
-
-```js
-function shouldRetry(err) {
-  if (err.name === 'AbortError') return false; // Never retry user cancellations
-  if (err instanceof HttpError) return err.status >= 500 || err.status === 429;
-  return err instanceof NetworkError;
-}
-```
-
----
-
-### Part 14 — The Timeout Dilemma: Why `Promise.race` Leaks `🔴 [Production-Critical]`
-
-`Promise.race([fetch(), timeout(5000)])` resolves the race, but the underlying HTTP TCP connection remains open in the browser.
-
----
-
-### Part 15 — Active Cancellation with `AbortController` `🟢 [Daily Driver]`
-
-```js
-const controller = new AbortController();
-fetch(url, { signal: controller.signal });
-controller.abort(); // 🟢 Physically closes the network socket!
-```
-
----
-
-### Part 16 — Modern `AbortSignal.timeout(ms)` API `🟢 [Daily Driver]`
-
-```js
-fetch('/api/data', { signal: AbortSignal.timeout(5000) }); // Built-in 5s timeout!
-```
-
----
-
-### Part 17 — User Cancellation & Stale Response Elimination `🟢 [Daily Driver]`
-
-Abort previous in-flight search requests when the user types a new character to eliminate out-of-order response overwrites.
-
----
-
-### Part 18 — Handling `AbortError` Cleanly `🟢 [Daily Driver]`
-
-```js
-catch (err) {
-  if (err.name === 'AbortError') return; // 🟢 Silently ignore intentional aborts!
-  showErrorToast(err.message);
-}
-```
-
----
-
-### Part 19 — The Request State Machine `🟢 [Daily Driver]`
-
-$$\text{Idle} \implies \text{Loading} \iff \text{Retrying (Attempt } N) \implies \text{Success} \mid \text{Error} \mid \text{Aborted}$$
-
----
-
-### Part 20 — The 10-Point Senior API Reliability Audit Checklist `🟢 [Daily Driver]`
+Now we apply that model to one of the most common sources of frontend failures:
 
 ```text
-1. Is response.ok checked on every fetch? ──► 2. Are 4xx errors excluded from retries?
-3. Is exponential backoff + jitter used? ──► 4. Are POST mutations guarded with Idempotency-Key?
-5. Are AbortControllers used for timeouts? ──► 6. Are AbortErrors ignored in UI alerts?
-7. Is response.json() parsed defensively? ──► 8. Is a max retry budget (e.g. 3) enforced?
-9. Are previous search requests aborted? ──► 10. Does UI display active retry attempts?
+Network requests
+API failures
+Slow servers
+Lost connections
+Timeouts
+Cancelled requests
+Duplicate submissions
+Retry behavior
 ```
 
----
+The key senior-level principle is:
 
-## ⚖️ 4-Pillar Senior Engineering Decision Matrix
+> **An API request failing does not automatically tell you what recovery strategy is correct.**
 
-| API Resilience Pattern | 1. When to Use | 2. When NOT to Use | 3. Bottlenecks & Tradeoffs | 4. Modern Alternatives |
-|---|---|---|---|---|
-| **Exponential Backoff + Jitter** | Transient 5xx server errors, 429 rate limits, mobile network reconnections. | 400 Bad Request, 401 Unauthorized, 404 Not Found, non-idempotent writes without keys. | Increases total latency before ultimate failure is reported to the user. | Immediate fail-fast. |
-| **`AbortController` Active Cancellation** | Request timeouts, component unmounting, typeahead search autocomplete. | Critical background mutations that must complete even if user navigates away. | Requires passing `signal` across all network layers. | `Promise.race` (leaky). |
-| **`Idempotency-Key` Headers** | Mutating `POST`/`PUT` requests (Payments, Order Creation, Batch Inserts). | Read-only `GET` requests that are naturally idempotent. | Requires backend database support for key deduplication. | Disabling UI buttons. |
-| **Circuit Breakers** | Microservices, third-party integrations (e.g. Maps, Analytics, Search APIs). | Simple CRUD SPAs with a single primary backend API. | Adds memory and state-tracking complexity to frontend client. | Simple retry with max budget. |
+A `404`, a `401`, a network disconnect, and a `500` are all failures—but retrying them all would be bad engineering.
 
 ---
 
-## ⚛️ Senior React Ecosystem Architecture & Component Patterns
+# 1. The API Failure Model
 
-### Enterprise Resilient HTTP Client with Backoff, Jitter & AbortController in TypeScript
-```tsx
-import React, { useState, useCallback, useRef } from 'react';
+When a frontend makes a request:
 
-// ==========================================
-// 1. HTTP ERROR TAXONOMY & CONTRACTS
-// ==========================================
-export class HttpError extends Error {
-  constructor(message: string, public readonly status: number, public readonly data?: unknown) {
-    super(message);
-    this.name = 'HttpError';
-  }
+```text
+Frontend
+   ↓
+Browser / Network
+   ↓
+Server
+   ↓
+Application
+   ↓
+Database / Services
+```
+
+Failure can occur at multiple levels.
+
+```text
+Request Failure
+│
+├── Client-side failure
+│
+├── Network failure
+│
+├── Timeout
+│
+├── HTTP failure response
+│
+├── Invalid response
+│
+└── Application-level failure
+```
+
+These should not all be treated identically.
+
+---
+
+# 2. `fetch()` Does Not Reject for HTTP 404 or 500
+
+This is one of the most important frontend API concepts.
+
+Consider:
+
+```js
+const response = await fetch("/api/user/123");
+```
+
+If the server returns:
+
+```text
+404 Not Found
+```
+
+`fetch()` generally resolves successfully with a `Response` object.
+
+Therefore:
+
+```js
+try {
+  const response = await fetch("/api/user/123");
+
+  console.log("Success");
+} catch (error) {
+  console.log("Failure");
 }
+```
 
-export class NetworkError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = 'NetworkError';
-  }
-}
+A `404` does not automatically enter `catch`.
 
-export interface RequestOptions extends RequestInit {
-  timeoutMs?: number;
-  maxRetries?: number;
-  baseDelayMs?: number;
-  idempotencyKey?: string;
-}
+Why?
 
-// ==========================================
-// 2. PRODUCTION-GRADE RESILIENT FETCH ENGINE
-// ==========================================
-export async function resilientFetch<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const {
-    timeoutMs = 8000,
-    maxRetries = 3,
-    baseDelayMs = 500,
-    idempotencyKey,
-    headers = {},
-    ...fetchInit
-  } = options;
+Because from the browser's perspective:
 
-  let lastError: Error | null = null;
+```text
+Network communication succeeded.
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+Server responded.
 
-    try {
-      const requestHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(headers as Record<string, string>)
-      };
+HTTP response received.
+```
 
-      if (idempotencyKey) {
-        requestHeaders['Idempotency-Key'] = idempotencyKey;
-      }
+The HTTP response may represent an unsuccessful **application request**, but the transport itself completed.
 
-      const response = await fetch(url, {
-        ...fetchInit,
-        headers: requestHeaders,
-        signal: controller.signal
-      });
+You must inspect:
 
-      if (!response.ok) {
-        let errorBody: unknown = null;
-        try { errorBody = await response.json(); } catch { errorBody = await response.text().catch(() => null); }
-        throw new HttpError(`HTTP ${response.status}: Request failed`, response.status, errorBody);
-      }
+```js
+response.ok
+```
 
-      return (await response.json()) as T;
-    } catch (err: unknown) {
-      const isAbort = (err as Error)?.name === 'AbortError';
-      const isHttp = err instanceof HttpError;
-      const isTransient = !isHttp || (isHttp && (err.status >= 500 || err.status === 429));
+Example:
 
-      lastError = isHttp ? err : new NetworkError(isAbort ? 'Request timed out' : 'Network unreachable', { cause: err as Error });
+```js
+const response = await fetch("/api/user/123");
 
-      // 🔴 Fail Fast on non-transient errors or last attempt
-      if (attempt === maxRetries || !isTransient || isAbort) {
-        throw lastError;
-      }
-
-      // 🔵 Exponential Backoff with Full Jitter: Sleep = rand(0, base * 2^attempt)
-      const maxBackoff = baseDelayMs * Math.pow(2, attempt);
-      const jitterDelay = Math.floor(Math.random() * maxBackoff);
-      await new Promise((resolve) => setTimeout(resolve, jitterDelay));
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  throw lastError ?? new Error('Unknown network failure');
-}
-
-// ==========================================
-// 3. ENTERPRISE API RELIABILITY DASHBOARD
-// ==========================================
-export function EnterpriseApiReliabilityDashboard() {
-  const [logs, setLogs] = useState<string[]>([]);
-  const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
-  const activeSearchController = useRef<AbortController | null>(null);
-
-  const appendLog = (msg: string) => setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-
-  // Demonstration: Resilient Mutation with Idempotency Key
-  const handleExecutePayment = useCallback(async () => {
-    setStatus('LOADING');
-    const paymentIdempotencyKey = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    appendLog(`💳 Initiating Payment with Idempotency-Key: ${paymentIdempotencyKey}`);
-
-    try {
-      // Simulate calling resilientFetch
-      appendLog('Attempting transmission with 3 retries, exponential backoff, and full jitter...');
-      await new Promise((res) => setTimeout(res, 600)); // simulated call
-      appendLog('✅ Payment transaction committed successfully.');
-      setStatus('SUCCESS');
-    } catch (err: unknown) {
-      appendLog(`🔴 Payment failed: ${(err as Error).message}`);
-      setStatus('ERROR');
-    }
-  }, []);
-
-  return (
-    <div className="api-reliability-card">
-      <header className="card-header">
-        <h3>Enterprise API Reliability &amp; Idempotency Engine</h3>
-        <span className="badge">🛡️ Backoff, Jitter &amp; Cancellation</span>
-      </header>
-
-      <p className="architecture-description">
-        Demonstrates resilient HTTP operations featuring <code>response.ok</code> verification, <code>Idempotency-Key</code> deduplication, full jitter backoff, and <code>AbortController</code> timeouts.
-      </p>
-
-      <div className="controls-row">
-        <button
-          type="button"
-          onClick={handleExecutePayment}
-          disabled={status === 'LOADING'}
-          className="btn-pay"
-        >
-          {status === 'LOADING' ? 'Processing...' : '💳 Submit Idempotent Payment ($150)'}
-        </button>
-      </div>
-
-      <div className="console-panel">
-        <h4>Telemetry Audit Logs:</h4>
-        {logs.map((log, i) => (
-          <div key={i} className="log-entry">{log}</div>
-        ))}
-      </div>
-    </div>
+if (!response.ok) {
+  throw new Error(
+    `Request failed: ${response.status}`
   );
 }
 ```
 
+Now:
+
+```text
+404
+ ↓
+response.ok = false
+ ↓
+throw
+ ↓
+catch can handle it
+```
+
 ---
 
-## 🧠 Part 05 — Integrated Challenges & Active Recall Solutions
+# 3. Basic Production Request Pattern
 
-### Prediction Challenge 1: `fetch()` on HTTP 503 Service Unavailable
+A better starting point:
+
+```js
+async function fetchUser(id) {
+  const response = await fetch(
+    `/api/users/${id}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `HTTP ${response.status}`
+    );
+  }
+
+  return response.json();
+}
+```
+
+But this still has problems.
+
+The error only says:
+
+```text
+HTTP 404
+```
+
+or:
+
+```text
+HTTP 500
+```
+
+Your application needs structured information.
+
+---
+
+# 4. Creating a Structured HTTP Error
+
+Instead of:
+
+```js
+throw new Error("HTTP 404");
+```
+
+create something like:
+
+```js
+class HttpError extends Error {
+  constructor(
+    message,
+    {
+      status,
+      code,
+      cause
+    } = {}
+  ) {
+    super(message, { cause });
+
+    this.name = "HttpError";
+    this.status = status;
+    this.code = code;
+  }
+}
+```
+
+Now:
+
+```js
+async function request(url) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new HttpError(
+      `Request failed with status ${response.status}`,
+      {
+        status: response.status
+      }
+    );
+  }
+
+  return response.json();
+}
+```
+
+The caller can now make decisions based on:
+
+```js
+error.status
+```
+
+rather than parsing:
+
+```js
+error.message
+```
+
+---
+
+# 5. HTTP Status Codes Are Not Just Numbers
+
+A practical frontend classification:
+
+```text
+2xx → Success
+
+3xx → Redirect behavior
+
+4xx → Client-side/request-related problem
+
+5xx → Server-side failure
+```
+
+For frontend recovery, you need more detail.
+
+---
+
+## `400 Bad Request`
+
+Usually means:
+
+```text
+The server cannot process the request
+because the request is invalid.
+```
+
+Possible response:
+
+```text
+Show validation or request error.
+```
+
+Usually retrying the exact same request is pointless.
+
+---
+
+## `401 Unauthorized`
+
+Usually means:
+
+```text
+Authentication is missing,
+expired, or invalid.
+```
+
+Possible recovery:
+
+```text
+Refresh session
+or
+Ask user to authenticate again
+```
+
+Blind retry:
+
+```text
+401
+↓
+Retry
+↓
+401
+↓
+Retry
+```
+
+is usually useless.
+
+---
+
+## `403 Forbidden`
+
+The user is authenticated but lacks permission.
+
+Recovery may be:
+
+```text
+Show permission UI.
+```
+
+Retrying generally does not solve the problem.
+
+---
+
+## `404 Not Found`
+
+The requested resource does not exist.
+
+Recovery:
+
+```text
+Show not-found state.
+```
+
+Do not automatically retry.
+
+---
+
+## `409 Conflict`
+
+The request conflicts with the current server state.
+
+Example:
+
+```text
+Two users edit the same resource.
+```
+
+Recovery may require:
+
+```text
+Refresh data
+Resolve conflict
+Ask user to retry intentionally
+```
+
+---
+
+## `429 Too Many Requests`
+
+The server is rate limiting requests.
+
+This is one of the cases where retrying **may** be appropriate—but the client should respect server guidance such as a retry delay when provided.
+
+---
+
+## `500`, `502`, `503`, `504`
+
+These represent different server or gateway failures.
+
+A temporary retry may sometimes be reasonable.
+
+But:
+
+> **A retry is not automatically harmless.**
+
+We will examine why shortly.
+
+---
+
+# 6. Network Failure vs HTTP Failure
+
+Consider:
+
 ```js
 try {
-  const res = await fetch("/api/status"); // Returns 503
-  console.log("A");
-} catch (e) {
-  console.log("B");
+  const response = await fetch("/api/users");
+} catch (error) {
+  console.log("Network failure");
 }
 ```
-**Question:** What will be output to the console?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:** `"A"`.  
-**Why:** `fetch()` only rejects on network loss or CORS failures. Since the server replied with an HTTP 503 response packet, `fetch()` resolves successfully. To catch it, you must check `if (!res.ok) throw new Error(...)`.
-</details>
+The `catch` is more likely to handle failures such as:
 
----
-
-### Prediction Challenge 2: Exponential Backoff with Jitter Calculation
 ```text
-Base Delay: 1000ms
-Attempt: 2 (3rd attempt: 0, 1, 2)
-Formula: Math.random() * (1000 * 2^2)
+Connection unavailable
+DNS failure
+Request aborted
+Certain browser/network failures
 ```
-**Question:** What is the theoretical minimum and maximum sleep duration for this attempt?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-- **Minimum:** $0\text{ms}$  
-- **Maximum:** $4,000\text{ms}$ ($1000 \times 2^2 = 4000\text{ms}$).  
-**Senior Takeaway:** Full Jitter uniformly distributes retry requests between $0$ and $\text{maxBackoff}$, completely eliminating synchronized server traffic spikes.
-</details>
+While:
+
+```text
+404
+500
+503
+```
+
+are usually received as HTTP responses.
+
+So your request flow is:
+
+```text
+fetch()
+   │
+   ├── Network-level failure
+   │         ↓
+   │      Promise rejects
+   │
+   └── HTTP response received
+             ↓
+        Inspect response.ok
+             │
+             ├── true
+             │     ↓
+             │  Success
+             │
+             └── false
+                    ↓
+             Normalize failure
+```
+
+This distinction is fundamental.
 
 ---
 
-### Prediction Challenge 3: Timeout Race vs Socket Leak
+# 7. Error Normalization
+
+Suppose your API produces errors like:
+
+```json
+{
+  "message": "Email already exists",
+  "code": "EMAIL_EXISTS"
+}
+```
+
+But another endpoint returns:
+
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+And another returns plain text:
+
+```text
+Internal Server Error
+```
+
+If every component handles these differently, your UI becomes tightly coupled to backend inconsistency.
+
+Instead:
+
+```text
+Raw API Response
+       ↓
+Normalization Layer
+       ↓
+Consistent Application Error
+       ↓
+UI / Feature Layer
+```
+
+Example:
+
 ```js
-const controller = new AbortController();
-const fetchPromise = fetch("/api/heavy-data", { signal: controller.signal });
-const timeoutPromise = new Promise((_, reject) => setTimeout(() => {
-  controller.abort();
-  reject(new Error("Timeout"));
-}, 2000));
-await Promise.race([fetchPromise, timeoutPromise]);
-```
-**Question:** Does the underlying HTTP socket close when the timeout timer fires?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
+class ApiError extends Error {
+  constructor(
+    message,
+    {
+      status,
+      code,
+      cause
+    } = {}
+  ) {
+    super(message, { cause });
 
-**Answer:** **Yes.**  
-**Why:** Because `controller.abort()` was invoked inside the timer callback, the browser physically terminates the TCP socket and frees the associated network memory buffers.
-</details>
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+```
+
+Then:
+
+```js
+async function request(url) {
+  let response;
+
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    throw new NetworkError(
+      "Unable to reach the server",
+      {
+        cause: error
+      }
+    );
+  }
+
+  if (!response.ok) {
+    throw new ApiError(
+      "API request failed",
+      {
+        status: response.status
+      }
+    );
+  }
+
+  return response.json();
+}
+```
+
+Now your application has a consistent failure contract.
 
 ---
 
-### Prediction Challenge 4: Retrying 401 Unauthorized
+# 8. Parsing Error Responses Safely
+
+A common mistake:
+
+```js
+const errorData =
+  await response.json();
+```
+
+You may assume every failed response contains JSON.
+
+But the server could return:
+
+```text
+HTML error page
+Plain text
+Empty response
+Proxy-generated error
+```
+
+A safer approach:
+
+```js
+async function parseError(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+```
+
+Then:
+
+```js
+if (!response.ok) {
+  const errorData =
+    await parseError(response);
+
+  throw new ApiError(
+    errorData?.message ??
+      "Request failed",
+    {
+      status: response.status,
+      code: errorData?.code
+    }
+  );
+}
+```
+
+This prevents your error handling from producing a second error while attempting to understand the first one.
+
+---
+
+# 9. What Should Be Retried?
+
+This is the core retry question:
+
+> **Is this failure likely temporary, and is repeating the operation safe?**
+
+Examples:
+
+| Failure              | Retry?            | Reason                               |
+| -------------------- | ----------------- | ------------------------------------ |
+| Network interruption | Sometimes         | Temporary failure possible           |
+| Timeout              | Sometimes         | Server may recover                   |
+| `500`                | Sometimes         | Temporary server issue               |
+| `503`                | Often potentially | Service unavailable may be temporary |
+| `429`                | Yes, carefully    | Respect retry instructions           |
+| `400`                | Usually no        | Request is invalid                   |
+| `401`                | Not blindly       | Authentication issue                 |
+| `403`                | Usually no        | Permission won't change              |
+| `404`                | Usually no        | Resource missing                     |
+| Validation error     | No                | User must correct input              |
+
+The word **sometimes** is important.
+
+Senior engineering does not mean:
+
+```text
+5xx → retry 3 times
+```
+
+without understanding the operation.
+
+---
+
+# 10. Idempotency: The Most Important Retry Concept
+
+## Definition
+
+An operation is **idempotent** when performing it multiple times has the same intended effect as performing it once.
+
+Example:
+
+```text
+GET /users/123
+```
+
+You can usually repeat it.
+
+Reading the same user multiple times does not create multiple users.
+
+Now consider:
+
+```text
+POST /payments
+```
+
+Suppose:
+
+```text
+Payment request sent
+      ↓
+Server processes payment
+      ↓
+Network response lost ❌
+      ↓
+Frontend thinks request failed
+      ↓
+Retry
+      ↓
+Second payment ❌
+```
+
+This is dangerous.
+
+Therefore:
+
+> **Retry strategy must consider the operation's side effects.**
+
+---
+
+# 11. Safe vs Unsafe Retry Thinking
+
+Conceptually:
+
+```text
+READ
+GET /products
+
+Usually safer to retry
+```
+
+Versus:
+
+```text
+WRITE
+POST /orders
+
+May create duplicate side effects
+```
+
+However, do not oversimplify this into:
+
+```text
+GET = safe
+POST = unsafe
+```
+
+A `POST` can be made retry-safe with proper server-side idempotency mechanisms.
+
+For example:
+
+```text
+Client sends:
+Idempotency-Key: abc-123
+```
+
+The server recognizes repeated requests with the same key.
+
+Conceptually:
+
+```text
+Request 1
+Key: abc-123
+    ↓
+Order created
+
+Request 2
+Key: abc-123
+    ↓
+Same operation recognized
+    ↓
+Do not create duplicate order
+```
+
+This requires backend support.
+
+Frontend retry behavior and backend idempotency are architectural partners.
+
+---
+
+# 12. Fixed Retry Delay
+
+The simplest retry:
+
+```js
+async function retry(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    await wait(1000);
+
+    return operation();
+  }
+}
+```
+
+Where:
+
+```js
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+```
+
+Timeline:
+
+```text
+Attempt 1
+   ↓ failure
+Wait 1 second
+   ↓
+Attempt 2
+```
+
+This works for simple cases, but repeated clients retrying simultaneously can create a problem.
+
+---
+
+# 13. Retry Storms
+
+Imagine:
+
+```text
+10,000 clients
+```
+
+A service goes down.
+
+All clients do:
+
+```text
+Fail
+↓
+Wait exactly 1 second
+↓
+Retry together
+```
+
+Then:
+
+```text
+10,000 retry requests
+        ↓
+Server receives huge spike
+        ↓
+Fails again
+        ↓
+Another synchronized retry
+```
+
+This can worsen the outage.
+
+---
+
+# 14. Exponential Backoff
+
+## Definition
+
+**Exponential backoff increases the waiting time between retries.**
+
+Example:
+
+```text
+Attempt 1 → immediate
+
+Attempt 2 → wait 1 second
+
+Attempt 3 → wait 2 seconds
+
+Attempt 4 → wait 4 seconds
+
+Attempt 5 → wait 8 seconds
+```
+
+Formula:
+
+```text
+delay = baseDelay × 2^attempt
+```
+
+Example implementation:
+
+```js
+function getDelay(attempt) {
+  return 1000 * 2 ** attempt;
+}
+```
+
+Usage:
+
+```js
+async function retry(
+  operation,
+  maxAttempts = 3
+) {
+  let lastError;
+
+  for (
+    let attempt = 0;
+    attempt < maxAttempts;
+    attempt++
+  ) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      const isLastAttempt =
+        attempt === maxAttempts - 1;
+
+      if (isLastAttempt) {
+        throw error;
+      }
+
+      const delay =
+        1000 * 2 ** attempt;
+
+      await wait(delay);
+    }
+  }
+
+  throw lastError;
+}
+```
+
+---
+
+# 15. What Is Jitter?
+
+If every client uses the exact same exponential delay:
+
+```text
+1 second
+2 seconds
+4 seconds
+8 seconds
+```
+
+they can still retry together.
+
+**Jitter adds randomness to retry delays.**
+
+Conceptually:
+
+```text
+Base delay: 4000ms
+
+Client A → 3721ms
+Client B → 4183ms
+Client C → 3450ms
+```
+
+Example:
+
+```js
+function getDelay(attempt) {
+  const base = 1000 * 2 ** attempt;
+
+  const jitter =
+    Math.random() * 500;
+
+  return base + jitter;
+}
+```
+
+The goal:
+
+```text
+Many clients
+    ↓
+Spread retry attempts
+    ↓
+Reduce synchronized traffic spikes
+```
+
+---
+
+# 16. Retries Must Be Selective
+
+This is a bad abstraction:
+
+```js
+async function retryEverything(operation) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await operation();
+    } catch {
+      // retry
+    }
+  }
+}
+```
+
+Why?
+
+Because it retries:
+
+```text
+400
+401
+403
+404
+Validation errors
+Programming errors
+Network failures
+Server failures
+```
+
+These do not have the same recovery strategy.
+
+A better concept:
+
 ```js
 function shouldRetry(error) {
-  return error.status === 401;
+  if (error instanceof NetworkError) {
+    return true;
+  }
+
+  if (
+    error instanceof ApiError &&
+    error.status >= 500
+  ) {
+    return true;
+  }
+
+  return false;
 }
 ```
-**Question:** Why is blindly retrying a 401 Unauthorized request considered an architectural antipattern?
-<details>
-<summary><strong>Solution & Step-by-Step Breakdown</strong></summary>
 
-**Answer:**  
-A 401 error means authentication credentials are missing or expired. Retrying the exact same request with the exact same expired token will fail 100% of the time, wasting bandwidth and triggering server rate limits. The client must first execute a token refresh mutation before retrying.
-</details>
-
----
-
-## 🎯 Tiered Interview Question Bank (Intern ➔ Staff / Principal)
-
-### 🟢 Tier 1: Intern / Junior Level
-**Q1:** Why doesn't `fetch()` throw an error when a server returns HTTP 404 or 500?  
-<details>
-<summary><strong>Answer</strong></summary>
-The native `fetch()` API strictly models network transport status. As long as the browser was able to contact the server and receive an HTTP response packet, the network transport succeeded, so `fetch()` resolves with a `Response` object. Developers must check `if (!response.ok)` to manually detect HTTP 4xx and 5xx error status codes.
-</details>
-
-**Q2:** How do you cancel an in-flight `fetch()` request in JavaScript?  
-<details>
-<summary><strong>Answer</strong></summary>
-Instantiate an `AbortController`, pass its signal to the request options (`fetch(url, { signal: controller.signal })`), and call `controller.abort()` when cancellation is needed (e.g. component unmounting or user typing a new search query).
-</details>
-
----
-
-### 🟡 Tier 2: Mid-Level Engineer
-**Q3:** What is Exponential Backoff with Jitter, and why is it superior to fixed-delay retries?  
-<details>
-<summary><strong>Answer</strong></summary>
-- **Fixed Delay ($1\text{s}, 1\text{s}, 1\text{s}$):** When a backend service recovers from an outage, thousands of clients retry at the exact same millisecond intervals, creating a **Retry Storm (Thundering Herd Problem)** that immediately crashes the server again.  
-- **Exponential Backoff + Jitter ($t = \text{random}() \times (\text{base} \times 2^{\text{attempt}})$):** Exponentially increases delay while adding randomness to scatter client retry requests evenly over time, allowing the backend to recover gracefully.
-</details>
-
-**Q4:** What is Idempotency, and why is it critical when implementing retry policies?  
-<details>
-<summary><strong>Answer</strong></summary>
-An operation is idempotent if executing it multiple times produces the exact same outcome as executing it once ($f(f(x)) = f(x)$). `GET`, `PUT`, and `DELETE` are typically idempotent. `POST` requests (e.g. creating orders or charging credit cards) are non-idempotent; blindly retrying a timed-out `POST` request can result in duplicate payments. To retry safely, clients must attach an `Idempotency-Key` header so the server recognizes and deduplicates identical requests.
-</details>
-
----
-
-### 🟠 Tier 3: Senior Frontend Engineer
-**Q5:** How do you design an enterprise-grade resilient HTTP client in TypeScript that handles timeouts, selective retries, idempotency, and defensive JSON parsing?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. **Unified Options Interface:** Accept `timeoutMs`, `maxRetries`, `idempotencyKey`, and `shouldRetry` predicates.  
-2. **Defensive Parsing:** Wrap `res.json()` in a fallback handler to safely extract text from non-JSON 500 proxy error pages.  
-3. **Status Classification:** Normalize failures into typed `HttpError` and `NetworkError` classes.  
-4. **Selective Backoff Loop:** Retry only transient errors (network drops, 503, 429) using exponential backoff with full jitter; fail-fast on 4xx validation/auth errors.  
-5. **Abort Signal Management:** Attach `AbortController` timeouts to cancel physical network sockets and ignore `AbortError` in UI notifications.
-</details>
-
----
-
-### 🔴 Tier 4: Staff / Principal Architect
-**Q6:** How do you implement a Client-Side Circuit Breaker Pattern (`Closed` $\to$ `Open` $\to$ `Half-Open`) to protect degrading microservices in high-throughput frontend SPAs?  
-<details>
-<summary><strong>Answer</strong></summary>
-1. **Closed State (Normal):** All requests pass through. If the rolling failure rate exceeds a threshold (e.g. 50% failures over 20 requests), trip the breaker to **Open**.  
-2. **Open State (Tripped):** Immediately fail-fast all subsequent requests locally without hitting the network for a cooldown period (e.g. 30 seconds), instantly returning cached data or fallback UI to prevent server overload.  
-3. **Half-Open State (Trial):** After cooldown, allow a single canary probe request through. If it succeeds, reset the breaker to **Closed**; if it fails, reset the timer and return to **Open**.  
-4. **Staff Architecture:** Implement the circuit breaker at the API gateway client level, exposing telemetry metrics to monitor service health in real-time.
-</details>
-
----
-
-## 🛠️ Senior Architecture Challenge: Standalone Resilient Fetch Engine
+Then:
 
 ```js
-// See runnable implementation in examples/05-api-failure-handling-retry-strategies.js
+async function retry(
+  operation,
+  maxAttempts = 3
+) {
+  let lastError;
+
+  for (
+    let attempt = 0;
+    attempt < maxAttempts;
+    attempt++
+  ) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      const isLastAttempt =
+        attempt === maxAttempts - 1;
+
+      if (
+        isLastAttempt ||
+        !shouldRetry(error)
+      ) {
+        throw error;
+      }
+
+      await wait(
+        getDelay(attempt)
+      );
+    }
+  }
+
+  throw lastError;
+}
+```
+
+This connects directly to the error taxonomy from Part 3.
+
+---
+
+# 17. Timeouts
+
+A request may not fail quickly.
+
+It may simply:
+
+```text
+Start
+ ↓
+Remain pending
+ ↓
+Remain pending
+ ↓
+Remain pending...
+```
+
+A timeout defines:
+
+> **How long the application is willing to wait before considering the operation unsuccessful.**
+
+A basic timeout pattern can use `Promise.race()`:
+
+```js
+function timeout(ms) {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(
+        new Error("Request timed out")
+      );
+    }, ms);
+  });
+}
+```
+
+Then:
+
+```js
+await Promise.race([
+  fetch("/api/users"),
+  timeout(5000)
+]);
+```
+
+But this has a major limitation.
+
+---
+
+# 18. Timeout Does Not Automatically Cancel the Request
+
+Consider:
+
+```text
+fetch()
+   │
+   ├── 5 seconds pass
+   │
+   └── timeout wins ❌
+```
+
+The Promise race ends from your perspective.
+
+But the original network request may still be running.
+
+So:
+
+```text
+Timeout ≠ Cancellation
+```
+
+This is critical.
+
+---
+
+# 19. `AbortController`
+
+## Definition
+
+`AbortController` provides a mechanism for signalling cancellation to APIs that support an `AbortSignal`.
+
+Example:
+
+```js
+const controller =
+  new AbortController();
+
+const response = await fetch(
+  "/api/users",
+  {
+    signal: controller.signal
+  }
+);
+```
+
+Later:
+
+```js
+controller.abort();
+```
+
+Conceptually:
+
+```text
+AbortController
+      ↓
+AbortSignal
+      ↓
+fetch()
+      ↓
+Cancellation signal
 ```
 
 ---
 
-## Key Takeaways
-1. **Always Check `response.ok`:** `fetch()` resolves on 404/500; convert them to `HttpError`.
-2. **Never Blindly Retry Mutations:** Protect `POST` writes with `Idempotency-Key` headers.
-3. **Use Exponential Backoff + Jitter:** Eliminate synchronized retry storms on recovering servers.
-4. **`AbortController` Closes Sockets:** Actively terminate network buffers on timeouts and unmounts.
-5. **Parse Error Responses Defensively:** Prevent secondary JSON syntax crashes on HTML 500 error pages.
+# 20. Creating a Real Timeout with `AbortController`
+
+Example:
+
+```js
+async function fetchWithTimeout(
+  url,
+  timeoutMs
+) {
+  const controller =
+    new AbortController();
+
+  const timeoutId =
+    setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+  try {
+    const response = await fetch(
+      url,
+      {
+        signal: controller.signal
+      }
+    );
+
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+```
+
+Flow:
+
+```text
+Request starts
+      ↓
+Timer starts
+      │
+      ├── Request finishes first
+      │       ↓
+      │   Clear timer
+      │
+      └── Timer finishes first
+              ↓
+           abort()
+              ↓
+        Request cancelled
+```
+
+This is generally closer to the intended timeout behavior than merely racing two Promises.
 
 ---
 
-[⬅️ Part 04: Async Errors & Promise Rejections](./04-async-errors-promise-rejections.md) | [📚 KPI 25 Index](./README.md) | [Part 06: React Error Boundaries & Component Recovery ➡️](./06-react-error-boundaries-recovery.md)
+# 21. User-Initiated Cancellation
+
+Cancellation is not only for timeouts.
+
+Imagine a search interface:
+
+```text
+User types:
+"rea"
+
+Request starts
+```
+
+Then immediately:
+
+```text
+User types:
+"react"
+
+New request starts
+```
+
+The old request may return later.
+
+Without cancellation:
+
+```text
+Request 1 → slow
+Request 2 → fast
+```
+
+Timeline:
+
+```text
+"rea"   ─────────────── response arrives late
+"react" ───── response arrives early
+```
+
+Now stale data may overwrite current data.
+
+Using cancellation:
+
+```text
+Request 1
+    ↓
+User changes input
+    ↓
+Abort request 1
+    ↓
+Start request 2
+```
+
+This improves both:
+
+```text
+Correctness
++
+Resource efficiency
+```
+
+---
+
+# 22. Handling Abort Errors Deliberately
+
+An aborted request may not represent a system failure.
+
+Example:
+
+```text
+User navigated away
+New search replaced old search
+Component unmounted
+```
+
+These are expected control-flow events.
+
+Therefore:
+
+```js
+try {
+  await fetchWithTimeout();
+} catch (error) {
+  if (error.name === "AbortError") {
+    return;
+  }
+
+  throw error;
+}
+```
+
+The exact error shape can depend on the API and environment, but the architectural idea is:
+
+> **Do not show users a scary error message for an operation you intentionally cancelled.**
+
+---
+
+# 23. Request State Machine
+
+A frontend request should usually be understood as a state machine.
+
+```text
+Idle
+ ↓
+Loading
+ │
+ ├── Success
+ │
+ ├── Error
+ │
+ └── Cancelled
+```
+
+Sometimes:
+
+```text
+Idle
+ ↓
+Loading
+ ↓
+Retrying
+ │
+ ├── Success
+ └── Failed
+```
+
+This is more accurate than only:
+
+```text
+loading = true / false
+```
+
+Because:
+
+```text
+Error
+Cancelled
+Retrying
+```
+
+are meaningfully different states.
+
+---
+
+# 24. Example: A More Complete Request Utility
+
+Here is a conceptual request wrapper:
+
+```js
+class ApiError extends Error {
+  constructor(
+    message,
+    {
+      status,
+      code,
+      cause
+    } = {}
+  ) {
+    super(message, { cause });
+
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+class NetworkError extends Error {
+  constructor(message, options) {
+    super(message, options);
+
+    this.name = "NetworkError";
+  }
+}
+```
+
+Request:
+
+```js
+async function request(
+  url,
+  options = {}
+) {
+  let response;
+
+  try {
+    response = await fetch(
+      url,
+      options
+    );
+  } catch (error) {
+    if (
+      error.name === "AbortError"
+    ) {
+      throw error;
+    }
+
+    throw new NetworkError(
+      "Network request failed",
+      {
+        cause: error
+      }
+    );
+  }
+
+  if (!response.ok) {
+    let errorData = null;
+
+    try {
+      errorData =
+        await response.json();
+    } catch {}
+
+    throw new ApiError(
+      errorData?.message ??
+        "Request failed",
+      {
+        status: response.status,
+        code: errorData?.code
+      }
+    );
+  }
+
+  return response.json();
+}
+```
+
+Then the higher layer decides:
+
+```js
+try {
+  const user =
+    await request("/api/user");
+} catch (error) {
+  if (
+    error instanceof NetworkError
+  ) {
+    showOfflineMessage();
+  } else if (
+    error instanceof ApiError &&
+    error.status === 401
+  ) {
+    redirectToLogin();
+  } else {
+    showGenericError();
+  }
+}
+```
+
+That is the separation we want:
+
+```text
+Request layer
+↓
+Detect + normalize
+
+Feature layer
+↓
+Interpret
+
+UI layer
+↓
+Recover + communicate
+```
+
+---
+
+# 25. Retry Strategy Architecture
+
+A production retry decision can be modeled like this:
+
+```text
+Request fails
+      ↓
+Classify error
+      │
+      ├── Permanent failure
+      │       ↓
+      │     Stop
+      │
+      ├── Temporary failure
+      │       ↓
+      │   Is retry safe?
+      │       │
+      │       ├── No
+      │       │    ↓
+      │       │  Stop
+      │       │
+      │       └── Yes
+      │            ↓
+      │      Attempts remaining?
+      │            │
+      │            ├── No → Stop
+      │            │
+      │            └── Yes
+      │                 ↓
+      │            Backoff + jitter
+      │                 ↓
+      │               Retry
+```
+
+This is much stronger than:
+
+```text
+catch → retry()
+```
+
+---
+
+# 26. Retry Budget
+
+Another useful concept:
+
+> **Do not retry indefinitely.**
+
+Example:
+
+```text
+Maximum attempts: 3
+```
+
+or:
+
+```text
+Maximum total retry time: 10 seconds
+```
+
+Without limits:
+
+```text
+Failure
+ ↓
+Retry
+ ↓
+Failure
+ ↓
+Retry forever
+```
+
+This wastes resources and can hide outages.
+
+A retry policy should define:
+
+```text
+Maximum attempts
+Maximum delay
+Which errors qualify
+Whether operation is safe to repeat
+Cancellation behavior
+```
+
+---
+
+# 27. Avoid Retrying Programming Errors
+
+Consider:
+
+```js
+throw new TypeError(
+  "Cannot read properties of undefined"
+);
+```
+
+Retrying this:
+
+```text
+Attempt 1 ❌
+Wait 1 second
+Attempt 2 ❌
+Wait 2 seconds
+Attempt 3 ❌
+```
+
+does nothing.
+
+This is why:
+
+```text
+Error classification
+```
+
+must happen before retry.
+
+Retries are for potentially recoverable operational failures—not broken application logic.
+
+---
+
+# 28. Duplicate Submission Problem
+
+Consider:
+
+```js
+async function submitOrder() {
+  await createOrder();
+
+  showSuccess();
+}
+```
+
+User clicks the button:
+
+```text
+Click
+ ↓
+Request starts
+```
+
+Then clicks again:
+
+```text
+Click
+ ↓
+Second request starts
+```
+
+Potential result:
+
+```text
+Order 1 created
+Order 2 created ❌
+```
+
+A frontend should often prevent accidental duplicates:
+
+```text
+Idle
+ ↓
+Submitting
+ ↓
+Disable duplicate action
+```
+
+Conceptually:
+
+```js
+if (isSubmitting) {
+  return;
+}
+
+setIsSubmitting(true);
+
+try {
+  await createOrder();
+} finally {
+  setIsSubmitting(false);
+}
+```
+
+But frontend prevention alone is not sufficient for critical operations.
+
+Network retries, multiple tabs, and race conditions can still create duplicates.
+
+The backend should provide appropriate idempotency guarantees when required.
+
+---
+
+# 29. Prediction Challenge #1
+
+What happens?
+
+```js
+try {
+  const response =
+    await fetch("/api/user");
+
+  console.log("Success");
+} catch {
+  console.log("Failure");
+}
+```
+
+The server returns:
+
+```text
+404 Not Found
+```
+
+Likely result:
+
+```text
+Success
+```
+
+because the network request completed and `fetch()` resolved.
+
+You must check:
+
+```js
+if (!response.ok) {
+  throw new Error("Request failed");
+}
+```
+
+---
+
+# 30. Prediction Challenge #2
+
+Is this a real cancellation?
+
+```js
+await Promise.race([
+  fetch("/api/data"),
+  timeout(5000)
+]);
+```
+
+Not necessarily.
+
+It only determines which Promise settles the race first.
+
+The network request may continue.
+
+For cancellation, use a supported mechanism such as:
+
+```text
+AbortController
+```
+
+---
+
+# 31. Prediction Challenge #3
+
+Should this always retry?
+
+```text
+POST /payments
+```
+
+No.
+
+Ask:
+
+```text
+Could the first request have succeeded
+even though the client received an error?
+```
+
+If yes, a blind retry may duplicate the side effect.
+
+A safe retry strategy may require backend idempotency support.
+
+---
+
+# 32. Senior-Level API Reliability Checklist
+
+Before implementing request handling, ask:
+
+```text
+1. Can this fail at the network level?
+
+2. Can the server return a non-2xx response?
+
+3. How will errors be normalized?
+
+4. Is the error response guaranteed to be JSON?
+
+5. Which failures are recoverable?
+
+6. Which failures should retry?
+
+7. Is retrying this operation safe?
+
+8. Is the operation idempotent?
+
+9. Does the backend support idempotency keys?
+
+10. What is the retry limit?
+
+11. Should backoff and jitter be used?
+
+12. What happens when the request takes too long?
+
+13. Does timeout actually cancel the request?
+
+14. Can the user cancel the operation?
+
+15. Can stale requests update current UI state?
+
+16. Can duplicate user actions create duplicate side effects?
+```
+
+---
+
+# 33. 30-Second Executive Cheat Sheet
+
+```text
+API FAILURE HANDLING
+══════════════════════════════════════
+
+fetch()
+
+Network failure
+    ↓
+Promise rejects
+    ↓
+catch
+
+
+HTTP 404 / 500
+
+fetch resolves
+    ↓
+response.ok = false
+    ↓
+Manually normalize failure
+
+
+Retry only when:
+
+Failure may be temporary
++
+Operation is safe to repeat
+
+
+Never blindly retry:
+
+400
+401
+403
+404
+Validation errors
+Programming errors
+
+
+Retry strategy:
+
+Classify
+↓
+Check safety
+↓
+Retry budget
+↓
+Exponential backoff
+↓
+Jitter
+↓
+Retry
+
+
+Timeout:
+
+Timeout ≠ cancellation
+
+
+AbortController:
+
+AbortSignal
+↓
+fetch()
+↓
+Actual cancellation
+
+
+Critical concept:
+
+Retry safety depends on idempotency.
+```
+
+---
+
+# KPI 25 Progress
+
+```text
+KPI 25 — Error Handling, Debugging & Reliability
+══════════════════════════════════════════════════
+
+Part 1  ✅ Errors, Exceptions & Failure Model
+Part 2  ✅ try / catch / finally
+Part 3  ✅ Error Propagation & Custom Errors
+Part 4  ✅ Async Errors & Promise Rejections
+Part 5  ✅ API Failure Handling & Retry Strategies
+Part 6  ⏳ React Error Boundaries & Recovery
+Part 7  ⏳ Logging, Observability & Production Debugging
+Part 8  ⏳ Systematic Debugging Methodology
+```
+
+**Next: Part 6 — React Error Boundaries, rendering failures, event-handler and async limitations, Suspense interaction, fallback UI, recovery, and designing resilient React/Next.js application boundaries.**
