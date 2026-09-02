@@ -203,6 +203,14 @@ $$\text{Partition Index} = \text{MurmurHash2}(\text{key}) \pmod{\text{Total Part
 * **Key Present:** All messages with the exact same key land on the **same partition**, preserving strict per-key ordering.
 * **Key Null:** Kafka uses a Round-Robin / Sticky Partitioner strategy to distribute records evenly across partitions.
 
+#### 🔥 Mitigating Hot Partitions (Skewed Traffic):
+1. **Random Key Salting:** Append a pseudo-random suffix (`key = adId + "_" + random(1..10)`) to distribute high-velocity events across multiple partitions.
+2. **Compound Keys:** Combine business ID with an orthogonal property (`key = adId + "_" + regionId + "_" + userSegment`).
+3. **Sticky / No-Key Strategy:** Omit keys if strict message ordering is not required; modern producers batch to a partition and rotate evenly.
+4. **Producer Backpressure:** Throttle producer publishing rate when target partition consumer lag exceeds safety thresholds.
+
+*(For full interview problem breakdowns and code snippets, see [Kafka System Design Interview Deep Dive](./11-Kafka-System-Design-Interview-Deep-Dive.md).)*
+
 ---
 
 ### 4.2 Consumer Group Scaling Architecture

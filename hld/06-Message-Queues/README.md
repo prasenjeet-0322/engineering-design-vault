@@ -1,4 +1,4 @@
-# 📬 06 - Message Queues & Event Streaming (C092-C101)
+# 📬 06 - Message Queues & Event Streaming (C092-C102)
 
 ## 🧭 Messaging & Queues Study Path
 Use this structured path aligned with your **Google Sheet Tracker** to master async communication patterns:
@@ -16,6 +16,7 @@ Use this structured path aligned with your **Google Sheet Tracker** to master as
 ### 🔴 3. Kafka Deep Dive
 *   [C098 - Kafka Architecture](./07-Kafka-Architecture.md)
 *   [C099 - Kafka vs RabbitMQ](./08-Kafka-vs-RabbitMQ.md)
+*   [C102 - Kafka System Design Interview Deep Dive](./11-Kafka-System-Design-Interview-Deep-Dive.md)
 
 ### 🟣 4. Event-Driven Systems
 *   [C100 - Event-Driven Architecture (EDA)](./09-Event-Driven-Architecture.md)

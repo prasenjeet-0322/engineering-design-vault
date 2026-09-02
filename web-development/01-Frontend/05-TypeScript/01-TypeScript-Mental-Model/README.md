@@ -17,7 +17,7 @@ Establish the correct mental model of TypeScript before learning its type syntax
 | **Part 02** | [TypeScript's Type System](./02-typescripts-type-system.md) | ✅ Completed | Structural typing, assignability, compatibility, soundness |
 | **Part 03** | [From TS Source to JS Runtime](./03-from-ts-source-to-js-runtime.md) | ✅ Completed | 5-stage pipeline, `tsc --noEmit`, SWC/esbuild, monorepos |
 | **Part 04** | [Static Types vs Runtime Data](./04-static-types-vs-runtime-data.md) | ✅ Completed | Trust boundaries, Zod validation, discriminated unions, `never` |
-| **Part 05** | [TypeScript Engineering Philosophy](./05-typescript-engineering-philosophy.md) | ⏳ Next | Inference-first, escape hatches, senior trade-off decision making |
+| **Part 05** | [TypeScript Engineering Philosophy](./05-typescript-engineering-philosophy.md) | ✅ Completed | Inference-first, escape hatches, senior trade-off decision making |
 
 ---
 

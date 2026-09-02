@@ -1,34 +1,31 @@
 # L007: Elasticsearch
 
+> 🌐 **Comprehensive Master Deep Dive:** [C115 - Elasticsearch Architecture & System Design Deep Dive](../../../23-Specialized-Storage-and-GIS/05-Elasticsearch-Architecture-and-System-Design-Deep-Dive.md)
+
 ## 📖 Overview
 ### What is this component?
-*(A brief 2-3 sentence explanation of what this technology is, its primary purpose, and its role in modern system design.)*
+Elasticsearch is a distributed, JSON-based document store and search engine built on Apache Lucene. It is engineered for horizontal scalability, sub-second full-text inverted index searches, faceted aggregations, and real-time operational log analytics.
 
 ### Core Capabilities
-*(List 3-4 bullet points detailing exactly what this component does best.)*
+* **Full-Text Inverted Index Search:** Tokenizes, stems, and ranks text queries using the Okapi BM25 scoring algorithm.
+* **Faceted Multi-Dimensional Filtering:** Bypasses score calculation via memory-cached bitsets for fast exact filtering.
+* **Near Real-Time (NRT) Ingestion:** Fast memory-to-OS page cache refreshes ($1\text{s}$ interval) backed by sequential Translog disk safety.
+* **Horizontal Auto-Sharding:** Transparent distribution of primary and replica shards across data nodes with automatic failover.
 
 ## 📋 Tracker Metadata
 | Column | Value / Status |
 | :--- | :--- |
-| **Category** | Search |
-| **Type** |  |
-| **Primary Use Case** |  |
-| **Strengths** |  |
-| **Weaknesses** |  |
-| **Best For** | Full-text search, analytics |
-| **Never Use When** | Primary database |
-| **Max Scale** |  |
-| **Consistency Model** |  |
-| **CAP Choice** | AP |
-| **Understanding** | [🔴 None / 🟡 Conceptual / 🟢 Applied] |
-| **Internals Known** | [ ] Yes / [ ] No |
-| **Interview Ready** | [ ] Yes / [ ] No |
-| **Used In Projects** | [ ] Yes / [ ] No |
-| **Key Config Known** | [ ] Yes / [ ] No |
-| **Comparison Known** | [ ] Yes / [ ] No |
-| **Last Revised** | YYYY-MM-DD |
-| **Next Review** | YYYY-MM-DD |
-| **Mastery** | [🔴 Familiar / 🟡 Competent / 🟢 Expert] |
+| **Category** | Search & Analytics Engine |
+| **Type** | Distributed Inverted Index Document Store |
+| **Primary Use Case** | Full-Text Search, E-Commerce Product Catalogs, Log Analytics (ELK) |
+| **Strengths** | Rich Query DSL, BM25 Scoring, Filter Bitset Caching, Horizontal Scale |
+| **Weaknesses** | High JVM Heap Footprint, Update Write Amplification, Eventual Consistency |
+| **Best For** | Full-text search, faceted search, real-time log analysis |
+| **Never Use When** | Primary ACID transactional database, low-latency key-value store |
+| **Max Scale** | Petabyte-scale across hundreds of cluster nodes (20–50GB per shard) |
+| **Consistency Model** | Eventual Consistency (NRT refresh) |
+| **CAP Choice** | AP (Tunable with quorum writes) |
+| **Mastery** | 🟢 Expert |
 
 ---
 
