@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 07 / Part 13 Lab — Ref Coordination & Third-Party Integrations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+    }
+
+    /* Grid */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Buttons */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      border-color: #6366f1;
+      color: #fff;
+      box-shadow: 0 2px 10px var(--accent-primary-glow);
+    }
+
+    button.emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    button.cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.35);
+      color: #22d3ee;
+    }
+
+    button.amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    button.rose {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: #fb7185;
+    }
+
+    /* Inputs & Textareas */
+    input[type="text"], select, textarea {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    textarea:focus, input[type="text"]:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-glow);
+    }
+
+    /* Canvas / Chart Container */
+    canvas {
+      background: #070a14;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      width: 100%;
+      height: 160px;
+      margin-bottom: 12px;
+    }
+
+    /* Metrics Grid */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-box {
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-top: 4px;
+    }
+
+    /* Terminal Console */
+    .terminal-window {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-top: 14px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: #64748b;
+      min-width: 65px;
+    }
+    .log-cmd {
+      color: #818cf8;
+      font-weight: 600;
+    }
+    .log-info {
+      color: #22d3ee;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .log-err {
+      color: #f43f5e;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-titles">
+        <h1>
+          <span>🔌 Ref Coordination & Third-Party Integrations</span>
+        </h1>
+        <div class="subtitle">KPI 07 · Part 13 Companion Lab — Decoupled Lifecycles, Echo Mutex Guards & Leaf DOM Islands</div>
+      </div>
+      <div>
+        <span class="badge badge-primary">Level 06 Core Competency</span>
+      </div>
+    </header>
+
+    <!-- Top Grid: Chart Lifecycle Separation vs Controlled Editor Echo Guard -->
+    <div class="grid-2col">
+      <!-- Panel 1: Chart Engine Creation vs Data Sync -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. Chart Engine: Creation vs Sync</span>
+          <span class="status-pill" id="chartStatusBadge" style="background: rgba(16,185,129,0.15); color:#34d399;">1 Instance (Stable)</span>
+        </div>
+        <p class="card-desc">
+          Separating creation (<code>mount []</code>) from synchronization (<code>[data]</code>) allows updating visual bars in-place without destroying canvas contexts or triggering screen flicker.
+        </p>
+
+        <canvas id="chartCanvas" width="550" height="160"></canvas>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Instantiations (create)</span>
+            <span class="metric-value" id="chartInstantiationsVal" style="color:#10b981;">1</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">In-Place Updates</span>
+            <span class="metric-value" id="chartUpdatesVal" style="color:#38bdf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Active Points</span>
+            <span class="metric-value" id="chartPointsVal" style="color:#a855f7;">5</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnAddDataPoint">📊 Push Data (In-Place Update)</button>
+          <button class="rose" id="btnNaiveRecreate">⚠️ Naive Recreate (Destroy & Re-init)</button>
+          <button class="cyan" id="btnToggleTheme">🎨 Toggle Palette</button>
+        </div>
+
+        <div class="terminal-window" id="chartTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[ChartEngine] Created Canvas instance on containerRef.</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Controlled Editor & Echo Loop Mutex -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Controlled Editor & Echo Loop Mutex</span>
+          <span class="status-pill" id="mutexStatusBadge" style="background: rgba(16,185,129,0.15); color:#34d399;">Echo Guard Active</span>
+        </div>
+        <p class="card-desc">
+          When parent state calls <code>editor.setValue()</code>, the editor fires an <code>onChange</code> event. The mutex flag <code>isInternalChangeRef</code> prevents infinite recursive render loops.
+        </p>
+
+        <div style="margin-bottom: 12px;">
+          <textarea id="mockEditor" rows="4" style="width:100%; resize:none;">function calculateTelemetry() {
+  return performance.now();
+}</textarea>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Parent State Updates</span>
+            <span class="metric-value" id="parentStateUpdatesVal" style="color:#38bdf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Blocked Echo Passes</span>
+            <span class="metric-value" id="blockedEchoVal" style="color:#10b981;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Loop Hazard</span>
+            <span class="metric-value" id="loopHazardVal" style="color:#10b981; font-size:0.85rem;">0 (Protected)</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnFormatCode">⚡ External Format: setValue(formatted)</button>
+          <button class="rose" id="btnSimulateEchoLoop">💥 Disable Guard (Trigger Echo Loop)</button>
+        </div>
+
+        <div class="terminal-window" id="editorTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Editor] Initialized with mutex protection.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid: Leaf Container DOM Isolation vs Constrained Handle Deck -->
+    <div class="grid-2col">
+      <!-- Panel 3: Leaf Container DOM Isolation Island -->
+      <div class="card">
+        <div class="card-title">
+          <span>3. Leaf Container DOM Island</span>
+          <span class="badge badge-primary">Zero JSX Children</span>
+        </div>
+        <p class="card-desc">
+          The container <code>&lt;div ref={containerRef} /&gt;</code> is treated as an isolated island. The third-party engine mutates inner DOM nodes without React reconciliation conflicts.
+        </p>
+
+        <div id="thirdPartyIsland" style="background:#070a14; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; min-height:100px; margin-bottom:12px;">
+          <!-- Third party engine injects arbitrary nodes here -->
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">React Parent Rerenders</span>
+            <span class="metric-value" id="parentRendersVal" style="color:#38bdf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Island Injected Nodes</span>
+            <span class="metric-value" id="injectedNodesVal" style="color:#a855f7;">3</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Reconciliation Clashes</span>
+            <span class="metric-value" id="clashCountVal" style="color:#10b981;">0</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="cyan" id="btnReRenderParent">🔄 Trigger Parent Re-render</button>
+          <button class="emerald" id="btnInjectThirdPartyNode">🧩 Engine: Inject Node to Island</button>
+        </div>
+
+        <div class="terminal-window" id="islandTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Island] Leaf container isolated from React Virtual DOM tree.</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 4: Constrained Imperative Capability Handle -->
+      <div class="card">
+        <div class="card-title">
+          <span>4. Video Engine Capability Handle</span>
+          <span class="status-pill" id="playerStatusBadge" style="background: rgba(100,116,139,0.2); color:#94a3b8;">Paused (0.0s)</span>
+        </div>
+        <p class="card-desc">
+          <code>useImperativeHandle</code> exposes high-level actions (<code>play()</code>, <code>seek()</code>) while keeping private engine internals (decoders, memory buffers) strictly encapsulated.
+        </p>
+
+        <div style="background:#0b1120; padding:14px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); margin-bottom:14px;">
+          <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:4px;">EXPOSED HANDLE METHODS</div>
+          <code style="color:#38bdf8; font-size:0.85rem;">{ play(), pause(), seek(sec), getCurrentTime() }</code>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Playback Position</span>
+            <span class="metric-value" id="playheadVal" style="color:#f59e0b;">0.0s</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Private Internals</span>
+            <span class="metric-value" id="internalsVal" style="color:#10b981; font-size:0.85rem;">Encapsulated 🔒</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Player Status</span>
+            <span class="metric-value" id="playerStateVal" style="color:#38bdf8; font-size:0.9rem;">Paused</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnPlayerPlay">▶️ ref.current.play()</button>
+          <button class="amber" id="btnPlayerPause">⏸️ ref.current.pause()</button>
+          <button class="cyan" id="btnPlayerSeek">⏩ ref.current.seek(15.0)</button>
+        </div>
+
+        <div class="terminal-window" id="playerTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[CapabilityHandle] Handle bound. Private fields _decoder and _buffer hidden.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getTime() {
+      const d = new Date();
+      return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0').slice(0,2);
+    }
+
+    function log(terminalId, cmd, info, type = 'info') {
+      const term = document.getElementById(terminalId);
+      if (!term) return;
+      const row = document.createElement('div');
+      row.className = 'log-line';
+      row.innerHTML = `<span class="log-time">${getTime()}</span><span class="log-cmd">${cmd}</span><span class="log-${type}">${info}</span>`;
+      term.appendChild(row);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // --- PANEL 1: CHART ENGINE CREATION VS SYNC ---
+    const canvas = document.getElementById('chartCanvas');
+    const ctx = canvas.getContext('2d');
+    let chartData = [35, 75, 50, 90, 60];
+    let chartTheme = '#6366f1';
+    let chartInstantiations = 1;
+    let chartUpdates = 0;
+
+    const chartInstantiationsVal = document.getElementById('chartInstantiationsVal');
+    const chartUpdatesVal = document.getElementById('chartUpdatesVal');
+    const chartPointsVal = document.getElementById('chartPointsVal');
+    const chartStatusBadge = document.getElementById('chartStatusBadge');
+
+    function drawChart() {
+      ctx.fillStyle = '#070a14';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = 35;
+      const gap = 15;
+      const startX = 20;
+
+      chartData.forEach((val, i) => {
+        const h = (val / 100) * 120;
+        const x = startX + i * (barWidth + gap);
+        const y = canvas.height - h - 15;
+
+        ctx.fillStyle = chartTheme;
+        ctx.shadowColor = chartTheme;
+        ctx.shadowBlur = 8;
+        ctx.fillRect(x, y, barWidth, h);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px monospace';
+        ctx.fillText(`${val}%`, x + 6, y - 6);
+      });
+    }
+
+    drawChart();
+
+    document.getElementById('btnAddDataPoint').addEventListener('click', () => {
+      chartData.push(Math.floor(Math.random() * 70 + 25));
+      if (chartData.length > 9) chartData.shift();
+      chartUpdates++;
+      chartUpdatesVal.textContent = chartUpdates;
+      chartPointsVal.textContent = chartData.length;
+      drawChart();
+      log('chartTerminal', 'instance.setData(data)', `✅ In-place data update #${chartUpdates} (Zero canvas recreation!).`, 'emerald');
+    });
+
+    document.getElementById('btnNaiveRecreate').addEventListener('click', () => {
+      chartInstantiations++;
+      chartInstantiationsVal.textContent = chartInstantiations;
+      chartStatusBadge.textContent = `Recreated (${chartInstantiations}x)`;
+      chartStatusBadge.style.background = 'rgba(244,63,94,0.15)';
+      chartStatusBadge.style.color = '#fb7185';
+      drawChart();
+      log('chartTerminal', 'new ChartEngine()', `⚠️ DESTROYED & RECREATED instance #${chartInstantiations}! Flash & state loss hazard.`, 'err');
+    });
+
+    document.getElementById('btnToggleTheme').addEventListener('click', () => {
+      chartTheme = chartTheme === '#6366f1' ? '#06b6d4' : (chartTheme === '#06b6d4' ? '#10b981' : '#6366f1');
+      drawChart();
+      log('chartTerminal', 'instance.setTheme()', `Updated palette to ${chartTheme}.`, 'info');
+    });
+
+    // --- PANEL 2: CONTROLLED EDITOR & ECHO MUTEX ---
+    const mockEditor = document.getElementById('mockEditor');
+    const parentStateUpdatesVal = document.getElementById('parentStateUpdatesVal');
+    const blockedEchoVal = document.getElementById('blockedEchoVal');
+    const mutexStatusBadge = document.getElementById('mutexStatusBadge');
+
+    let isInternalChange = false;
+    let parentStateUpdates = 0;
+    let blockedEchoCount = 0;
+
+    mockEditor.addEventListener('input', () => {
+      if (isInternalChange) {
+        blockedEchoCount++;
+        blockedEchoVal.textContent = blockedEchoCount;
+        log('editorTerminal', 'Echo Blocked', '🛡️ Mutex prevented programmatic change from firing parent setState.', 'info');
+        return;
+      }
+      parentStateUpdates++;
+      parentStateUpdatesVal.textContent = parentStateUpdates;
+      log('editorTerminal', 'User Typing', `User input synced to React parent state #${parentStateUpdates}`, 'info');
+    });
+
+    document.getElementById('btnFormatCode').addEventListener('click', () => {
+      isInternalChange = true;
+      mockEditor.value = `// Formatted at ${getTime()}\n` + mockEditor.value.trim();
+      log('editorTerminal', 'editor.setValue(formatted)', '✅ Programmatic format executed with mutex flag active.', 'emerald');
+      setTimeout(() => { isInternalChange = false; }, 50);
+    });
+
+    document.getElementById('btnSimulateEchoLoop').addEventListener('click', () => {
+      mutexStatusBadge.textContent = '💥 Echo Loop Active!';
+      mutexStatusBadge.style.background = 'rgba(244,63,94,0.2)';
+      mutexStatusBadge.style.color = '#f43f5e';
+      log('editorTerminal', 'Echo Loop Hazard', '💥 Disabled mutex! Programmatic set triggered recursive onChange cycle.', 'err');
+    });
+
+    // --- PANEL 3: LEAF CONTAINER ISLAND ---
+    const thirdPartyIsland = document.getElementById('thirdPartyIsland');
+    const parentRendersVal = document.getElementById('parentRendersVal');
+    const injectedNodesVal = document.getElementById('injectedNodesVal');
+    let parentRenders = 0;
+    let injectedNodeCount = 3;
+
+    function renderIslandNodes() {
+      thirdPartyIsland.innerHTML = '';
+      for (let i = 1; i <= injectedNodeCount; i++) {
+        const badge = document.createElement('span');
+        badge.style.cssText = 'background:#1e293b; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:6px 12px; margin-right:8px; font-size:0.8rem; color:#38bdf8; display:inline-block; margin-bottom:6px;';
+        badge.textContent = `⚡ Engine Node #${i}`;
+        thirdPartyIsland.appendChild(badge);
+      }
+    }
+    renderIslandNodes();
+
+    document.getElementById('btnReRenderParent').addEventListener('click', () => {
+      parentRenders++;
+      parentRendersVal.textContent = parentRenders;
+      log('islandTerminal', 'Parent Re-render', `React reconciled parent tree #${parentRenders}. Island container DOM untouched!`, 'info');
+    });
+
+    document.getElementById('btnInjectThirdPartyNode').addEventListener('click', () => {
+      injectedNodeCount++;
+      injectedNodesVal.textContent = injectedNodeCount;
+      renderIslandNodes();
+      log('islandTerminal', 'Engine DOM Mutation', `Third-party library directly appended Node #${injectedNodeCount}.`, 'emerald');
+    });
+
+    // --- PANEL 4: VIDEO CAPABILITY HANDLE ---
+    let playhead = 0.0;
+    let playerPlaying = false;
+    let playerTimer = null;
+
+    const playheadVal = document.getElementById('playheadVal');
+    const playerStateVal = document.getElementById('playerStateVal');
+    const playerStatusBadge = document.getElementById('playerStatusBadge');
+
+    function updatePlayerMetrics() {
+      playheadVal.textContent = `${playhead.toFixed(1)}s`;
+      playerStateVal.textContent = playerPlaying ? 'Playing' : 'Paused';
+      if (playerPlaying) {
+        playerStatusBadge.textContent = `Playing (${playhead.toFixed(1)}s)`;
+        playerStatusBadge.style.background = 'rgba(16,185,129,0.15)';
+        playerStatusBadge.style.color = '#34d399';
+      } else {
+        playerStatusBadge.textContent = `Paused (${playhead.toFixed(1)}s)`;
+        playerStatusBadge.style.background = 'rgba(100,116,139,0.2)';
+        playerStatusBadge.style.color = '#94a3b8';
+      }
+    }
+
+    document.getElementById('btnPlayerPlay').addEventListener('click', () => {
+      if (playerPlaying) return;
+      playerPlaying = true;
+      playerTimer = setInterval(() => {
+        playhead += 0.1;
+        updatePlayerMetrics();
+      }, 100);
+      updatePlayerMetrics();
+      log('playerTerminal', 'handle.play()', 'Command executed. Playhead started.', 'info');
+    });
+
+    document.getElementById('btnPlayerPause').addEventListener('click', () => {
+      playerPlaying = false;
+      if (playerTimer) clearInterval(playerTimer);
+      updatePlayerMetrics();
+      log('playerTerminal', 'handle.pause()', 'Command executed. Playhead paused.', 'warn');
+    });
+
+    document.getElementById('btnPlayerSeek').addEventListener('click', () => {
+      playhead = 15.0;
+      updatePlayerMetrics();
+      log('playerTerminal', 'handle.seek(15.0)', 'Seeked playhead to 15.0s.', 'cmd');
+    });
+  </script>
+</body>
+</html>

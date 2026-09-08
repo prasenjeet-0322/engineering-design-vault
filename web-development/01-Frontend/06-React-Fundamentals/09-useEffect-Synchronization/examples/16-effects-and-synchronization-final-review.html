@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 16 — KPI 06 Final Review & Mastery Hub</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(168, 85, 247, 0.18), rgba(34, 197, 94, 0.15));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.5rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .terminal {
+      background: #050811;
+      border: 1px solid #1a2333;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 140px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+    }
+    .log-time { color: #64748b; }
+    .log-event { font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+    .log-warn { color: var(--accent-amber); }
+    .log-error { color: var(--accent-red); }
+    .log-success { color: var(--accent-green); }
+    .log-purple { color: var(--accent-purple); }
+
+    .lane-box {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .quiz-question {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useSyncExternalStore } = React;
+
+    // --- LOG TERMINAL COMPONENT ---
+    function LogTerminal({ logs, onClear }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [logs]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Execution Telemetry</span>
+            <button style={{ padding: "2px 8px", fontSize: "0.72rem" }} onClick={onClear}>Clear</button>
+          </div>
+          <div className="terminal">
+            {logs.length === 0 ? (
+              <div style={{ color: "#475569", fontStyle: "italic" }}>No runtime events recorded yet.</div>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className="log-line">
+                  <span className="log-time">[{log.time}]</span>
+                  <span className={`log-${log.type} log-event`}>{log.event}</span>
+                  <span>{log.message}</span>
+                </div>
+              ))
+            )}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 1: THE 3-LANE ARCHITECTURE IN ACTION
+    // =========================================================================
+    function ThreeLaneDemo() {
+      const [first, setFirst] = useState("Srikar");
+      const [last, setLast] = useState("Kudurmalla");
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      // LANE 1: RENDER LANE (Pure calculation, 0 effects)
+      const fullName = `${first} ${last}`;
+
+      // LANE 2: EVENT HANDLER LANE (User Command)
+      const handleReset = () => {
+        addLog("EVENT COMMAND", "Resetting name via user click", "cyan");
+        setFirst("John");
+        setLast("Doe");
+      };
+
+      // LANE 3: EFFECT LANE (External System Synchronization)
+      useEffect(() => {
+        addLog("EFFECT SYNC", `Synchronizing document.title to "${fullName}"`, "purple");
+        document.title = `Profile: ${fullName}`;
+
+        return () => {
+          addLog("EFFECT CLEANUP", "Cleaning up title synchronization", "warn");
+        };
+      }, [fullName]);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. The 3-Lane Architecture</span>
+            <span className="badge badge-primary">Render vs Event vs Effect</span>
+          </div>
+          <p className="card-desc">
+            Experience the strict separation between <strong>Render Calculation</strong> (pure derivation), <strong>Event Handler</strong> (user commands), and <strong>Effect Boundary</strong> (external synchronization).
+          </p>
+
+          <div className="btn-group">
+            <button onClick={() => { setFirst("Srikar"); setLast("Kudurmalla"); }}>Set "Srikar Kudurmalla"</button>
+            <button onClick={() => { setFirst("Prasenjeet"); setLast("Engineer"); }}>Set "Prasenjeet Engineer"</button>
+            <button onClick={handleReset} style={{ borderColor: "var(--accent-cyan)" }}>⚡ Event Reset Command</button>
+          </div>
+
+          <div className="lane-box">
+            <div>Lane 1 (Render Calculation): <strong style={{ color: "var(--accent-green)" }}>{fullName}</strong> (1 Render Pass)</div>
+            <div>Lane 2 (Event Command): <strong style={{ color: "var(--accent-cyan)" }}>handleReset()</strong></div>
+            <div>Lane 3 (Effect System): <strong style={{ color: "var(--accent-purple)" }}>document.title = "{fullName}"</strong></div>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 2: THE 5-QUESTION ARCHITECTURAL AUDIT INSPECTOR
+    // =========================================================================
+    function AuditInspectorDemo() {
+      const [selectedScenario, setSelectedScenario] = useState("socket");
+
+      const scenarios = {
+        socket: {
+          title: "WebSocket Chat Session",
+          q1: "External System: Browser WebSocket API",
+          q2: "Reactive Inputs: [roomId, authToken]",
+          q3: "Resource Established: WebSocket Instance #4892",
+          q4: "Owner: ChatRoom Component",
+          q5: "Invalidation: roomId prop changes or component unmounts"
+        },
+        timer: {
+          title: "Telemetry Heartbeat Timer",
+          q1: "External System: Browser setInterval Engine",
+          q2: "Reactive Inputs: [intervalMs, isTracking]",
+          q3: "Resource Established: Timer ID #91823",
+          q4: "Owner: TelemetryProvider Context",
+          q5: "Invalidation: isTracking disabled or intervalMs updated"
+        },
+        store: {
+          title: "External Auth Store (uSES)",
+          q1: "External System: Global Auth Session Store",
+          q2: "Reactive Inputs: None (useSyncExternalStore handles subscribe)",
+          q3: "Resource Established: Active Listener Subscription",
+          q4: "Owner: Application Core Root",
+          q5: "Invalidation: Session token changes or user logs out"
+        }
+      };
+
+      const current = scenarios[selectedScenario];
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. The 5-Question Architectural Audit</span>
+            <span className="badge badge-purple">Senior Audit Standard</span>
+          </div>
+          <p className="card-desc">
+            Select a real-world production synchronization relationship and inspect its mechanical 5-Question Resource Ledger answers.
+          </p>
+
+          <div className="btn-group">
+            <button className={selectedScenario === "socket" ? "active" : ""} onClick={() => setSelectedScenario("socket")}>
+              💬 WebSocket Chat
+            </button>
+            <button className={selectedScenario === "timer" ? "active" : ""} onClick={() => setSelectedScenario("timer")}>
+              ⏱️ Interval Timer
+            </button>
+            <button className={selectedScenario === "store" ? "active" : ""} onClick={() => setSelectedScenario("store")}>
+              📦 External Auth Store
+            </button>
+          </div>
+
+          <div className="lane-box" style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem" }}>
+            <div style={{ color: "var(--accent-cyan)", fontWeight: 700, fontSize: "1rem" }}>📋 {current.title}</div>
+            <div style={{ color: "#fff" }}>1. {current.q1}</div>
+            <div style={{ color: "var(--accent-amber)" }}>2. {current.q2}</div>
+            <div style={{ color: "var(--accent-green)" }}>3. {current.q3}</div>
+            <div style={{ color: "var(--accent-purple)" }}>4. {current.q4}</div>
+            <div style={{ color: "var(--accent-red)" }}>5. {current.q5}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 3: FULL-STACK PRODUCTION SYNCHRONIZATION BENCHMARK
+    // =========================================================================
+    const globalMasterStore = {
+      state: { count: 0, status: "healthy" },
+      listeners: new Set(),
+      getState() { return this.state; },
+      mutate(fn) {
+        this.state = fn(this.state);
+        this.listeners.forEach(l => l());
+      },
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      }
+    };
+
+    function FullStackSyncDemo() {
+      const storeState = useSyncExternalStore(
+        globalMasterStore.subscribe.bind(globalMasterStore),
+        () => globalMasterStore.getState()
+      );
+
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      const handleTrigger = () => {
+        globalMasterStore.mutate(s => ({ ...s, count: s.count + 1 }));
+        addLog("uSES DISPATCH", `External store mutated count to ${globalMasterStore.getState().count}`, "success");
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>3. Full-Stack Synchronization Sandbox</span>
+            <span className="badge badge-green">Production Grade</span>
+          </div>
+          <p className="card-desc">
+            Live integration demonstrating <code>useSyncExternalStore</code> subscriber evaluation, tearing-free render synchronization, and external state coordination.
+          </p>
+
+          <div className="btn-group">
+            <button onClick={handleTrigger} style={{ borderColor: "var(--accent-green)" }}>
+              ⚡ Mutate External Store State ({storeState.count})
+            </button>
+            <button onClick={() => {
+              globalMasterStore.mutate(s => ({ ...s, status: s.status === "healthy" ? "warning" : "healthy" }));
+              addLog("STATUS TOGGLE", `Store status changed to "${globalMasterStore.getState().status}"`, "purple");
+            }}>
+              🔄 Toggle System Status ({storeState.status})
+            </button>
+          </div>
+
+          <div className="lane-box" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>Store Count: <strong style={{ color: "var(--accent-cyan)", fontSize: "1.3rem" }}>{storeState.count}</strong></div>
+            <div>Health State: <strong style={{ color: storeState.status === "healthy" ? "var(--accent-green)" : "var(--accent-amber)" }}>{storeState.status.toUpperCase()}</strong></div>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // SECTION 4: KPI 06 MASTERY KNOWLEDGE QUIZ & RUBRIC
+    // =========================================================================
+    function MasteryQuizDemo() {
+      const [score, setScore] = useState(0);
+      const [answered, setAnswered] = useState({});
+
+      const questions = [
+        {
+          id: 1,
+          q: "What is the primary purpose of useEffect in React?",
+          options: [
+            "To run code after every render",
+            "To synchronize React with external systems outside React",
+            "To calculate derived state values"
+          ],
+          correct: 1
+        },
+        {
+          id: 2,
+          q: "What does an empty dependency array [] mean?",
+          options: [
+            "Run once and never clean up",
+            "The Effect has zero reactive dependencies from component scope",
+            "Freeze all state updates forever"
+          ],
+          correct: 1
+        },
+        {
+          id: 3,
+          q: "Why is useSyncExternalStore preferred over useEffect + useState for external stores?",
+          options: [
+            "It is 1000x faster",
+            "It guarantees synchronous snapshot reads and eliminates tearing",
+            "It automatically writes tests"
+          ],
+          correct: 1
+        }
+      ];
+
+      const handleAnswer = (qId, optionIdx, correctIdx) => {
+        if (answered[qId] !== undefined) return;
+        const isCorrect = optionIdx === correctIdx;
+        setAnswered(prev => ({ ...prev, [qId]: optionIdx }));
+        if (isCorrect) setScore(s => s + 1);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>4. KPI 06 Mastery Graduation Assessment</span>
+            <span className="badge badge-amber">Score: {score} / {questions.length}</span>
+          </div>
+          <p className="card-desc">
+            Test your senior-level mastery of Effects & Synchronization concepts. Answer all questions to verify graduation.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {questions.map((q) => {
+              const userAns = answered[q.id];
+              return (
+                <div key={q.id} className="quiz-question">
+                  <div style={{ fontWeight: 600, color: "#fff" }}>{q.id}. {q.q}</div>
+                  <div className="btn-group">
+                    {q.options.map((opt, oIdx) => {
+                      let btnStyle = {};
+                      if (userAns !== undefined) {
+                        if (oIdx === q.correct) btnStyle = { background: "rgba(34, 197, 94, 0.3)", borderColor: "var(--accent-green)" };
+                        else if (userAns === oIdx) btnStyle = { background: "rgba(239, 68, 68, 0.3)", borderColor: "var(--accent-red)" };
+                      }
+                      return (
+                        <button 
+                          key={oIdx} 
+                          style={btnStyle}
+                          disabled={userAns !== undefined}
+                          onClick={() => handleAnswer(q.id, oIdx, q.correct)}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APPLICATION
+    // =========================================================================
+    function App() {
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🏆</span>
+                Lab 16 — KPI 06 Final Review & Mastery Hub
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 4 }}>
+                Terminal synthesis suite verifying 3-Lane Architecture, 5-Question resource audits, <code>useSyncExternalStore</code> coordination, and senior graduation standards.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <span className="badge badge-primary">React 18</span>
+              <span className="badge badge-green">KPI 06 GRADUATED</span>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            <ThreeLaneDemo />
+            <AuditInspectorDemo />
+            <FullStackSyncDemo />
+            <MasteryQuizDemo />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

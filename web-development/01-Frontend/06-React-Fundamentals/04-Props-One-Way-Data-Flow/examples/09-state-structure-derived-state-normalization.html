@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 09: State Structure, Derived State & Normalization</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+      --yellow: #d29922;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .badge.ok {
+      background: #0d281e;
+      color: var(--green);
+      border-color: #1a7f37;
+    }
+    .badge.broken {
+      background: #3c1418;
+      color: var(--red);
+      border-color: #8b181b;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+    input[type="text"] {
+      background: #090d13;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .inspector {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      padding: 2px 0;
+      border-bottom: 1px dotted #1b2128;
+    }
+    .row:last-child { border-bottom: none; }
+    .stale { color: var(--red); font-weight: bold; }
+    .fresh { color: var(--green); font-weight: bold; }
+    .tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #21262d;
+      margin-left: 6px;
+    }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 09: State Structure, Derived State & Normalization</h1>
+  <p class="subtitle">Interactive Diagnostic Sandbox for Canonical Facts, Pure Projections, and Relational Normalization</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // SECTION A: Redundant State vs Invariant Breakdown
+    function RedundantStateSection() {
+      const [items, setItems] = useState([{ id: 1, name: "Book" }]);
+      const [storedCount, setStoredCount] = useState(1);
+
+      const addItemSynced = () => {
+        const nextId = Date.now();
+        setItems(prev => [...prev, { id: nextId, name: `Item ${nextId % 100}` }]);
+        setStoredCount(prev => prev + 1);
+      };
+
+      const addItemDesynced = () => {
+        // Bug simulation: update collection but forget to update duplicated state
+        const nextId = Date.now();
+        setItems(prev => [...prev, { id: nextId, name: `Item ${nextId % 100}` }]);
+      };
+
+      const resetAll = () => {
+        setItems([]);
+        setStoredCount(0);
+      };
+
+      const canonicalCount = items.length;
+      const isInvariantPreserved = storedCount === canonicalCount;
+
+      return (
+        <div className="card">
+          <h2>
+            Lab A: Redundant State & Invariant
+            <span className={`badge ${isInvariantPreserved ? "ok" : "broken"}`}>
+              {isInvariantPreserved ? "Invariant Valid" : "INVARIANT VIOLATED"}
+            </span>
+          </h2>
+          <div className="inspector">
+            <div className="row">
+              <span>Canonical <code>items.length</code>:</span>
+              <span className="fresh">{canonicalCount}</span>
+            </div>
+            <div className="row">
+              <span>Stored <code>storedCount</code> (State):</span>
+              <span className={isInvariantPreserved ? "fresh" : "stale"}>{storedCount}</span>
+            </div>
+            <div className="row">
+              <span>Derived <code>const isEmpty</code>:</span>
+              <span>{String(canonicalCount === 0)}</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={addItemSynced}>Add Item (Synced)</button>
+            <button className="danger" onClick={addItemDesynced}>Add Item (Desync Bug)</button>
+            <button onClick={resetAll}>Reset</button>
+          </div>
+        </div>
+      );
+    }
+
+    // SECTION B: Pure Render-Time Derivation
+    function DerivedStateSection() {
+      const [products, setProducts] = useState([
+        { id: 1, name: "Mechanical Keyboard", price: 120 },
+        { id: 2, name: "Ergonomic Mouse", price: 80 },
+        { id: 3, name: "4K Monitor", price: 450 },
+        { id: 4, name: "USB-C Hub", price: 45 },
+      ]);
+      const [query, setQuery] = useState("");
+
+      // Pure calculations during render
+      const filteredProducts = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      const visibleCount = filteredProducts.length;
+      const totalPrice = filteredProducts.reduce((sum, p) => sum + p.price, 0);
+
+      return (
+        <div className="card">
+          <h2>
+            Lab B: Pure Render-Time Derivations
+            <span className="badge">Filtered: {visibleCount}</span>
+          </h2>
+          <input
+            type="text"
+            placeholder="Search products (query state)..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+          <div className="inspector">
+            <div className="row">
+              <span>Filtered Products:</span>
+              <span>{visibleCount} of {products.length}</span>
+            </div>
+            <div className="row">
+              <span>Derived Total Price:</span>
+              <span className="fresh">${totalPrice}</span>
+            </div>
+            <div className="row">
+              <span>Dependency Graph:</span>
+              <span style={{ color: "var(--cyan)" }}>products + query → filtered → totalPrice</span>
+            </div>
+          </div>
+          <ul style={{ margin: "4px 0", paddingLeft: "20px", fontSize: "12px" }}>
+            {filteredProducts.map(p => (
+              <li key={p.id}>{p.name} — ${p.price}</li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    // SECTION C: Selected ID vs Selected Object
+    function SelectedIdVsObjectSection() {
+      const [users, setUsers] = useState([
+        { id: "u1", name: "Alice", role: "Developer" },
+        { id: "u2", name: "Bob", role: "Designer" }
+      ]);
+      const [selectedUserId, setSelectedUserId] = useState("u1"); // Canonical ID
+      const [selectedUserObj, setSelectedUserObj] = useState(users[0]); // Anti-pattern: stored object copy
+
+      const handleSelect = (user) => {
+        setSelectedUserId(user.id);
+        setSelectedUserObj(user);
+      };
+
+      const handleUpdateAliceName = () => {
+        setUsers(prev => prev.map(u => u.id === "u1" ? { ...u, name: u.name === "Alice" ? "Alicia (Updated)" : "Alice" } : u));
+      };
+
+      // Derived resolution
+      const derivedSelectedUser = users.find(u => u.id === selectedUserId) ?? null;
+      const isObjStale = selectedUserObj && derivedSelectedUser && selectedUserObj.name !== derivedSelectedUser.name;
+
+      return (
+        <div className="card">
+          <h2>
+            Lab C: Selected ID vs Stored Object
+            <span className={`badge ${isObjStale ? "broken" : "ok"}`}>
+              {isObjStale ? "Object Copy Stale" : "Up-to-date"}
+            </span>
+          </h2>
+          <div className="btn-group">
+            {users.map(u => (
+              <button
+                key={u.id}
+                className={selectedUserId === u.id ? "primary" : ""}
+                onClick={() => handleSelect(u)}
+              >
+                Select {u.name}
+              </button>
+            ))}
+            <button onClick={handleUpdateAliceName}>Rename Alice in Canonical State</button>
+          </div>
+          <div className="inspector">
+            <div className="row">
+              <span>Canonical Derived User (from ID):</span>
+              <span className="fresh">{derivedSelectedUser ? `${derivedSelectedUser.name} (${derivedSelectedUser.role})` : "None"}</span>
+            </div>
+            <div className="row">
+              <span>Stored <code>selectedUserObj</code> (Duplicate):</span>
+              <span className={isObjStale ? "stale" : "fresh"}>
+                {selectedUserObj ? `${selectedUserObj.name} (${selectedUserObj.role})` : "None"}
+                {isObjStale && " ⚠️ STALE REF"}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // SECTION D: Normalized vs Denormalized Entities
+    function NormalizationSection() {
+      // Normalized representation
+      const [usersById, setUsersById] = useState({
+        u1: { id: "u1", name: "Alice" },
+        u2: { id: "u2", name: "Bob" }
+      });
+      const [projectsById, setProjectsById] = useState({
+        p1: { id: "p1", name: "Frontend Architecture", ownerId: "u1" },
+        p2: { id: "p2", name: "Design System", ownerId: "u1" },
+        p3: { id: "p3", name: "Backend Services", ownerId: "u2" }
+      });
+      const [projectIds, setProjectIds] = useState(["p1", "p2", "p3"]);
+
+      const handleRenameAlice = () => {
+        setUsersById(prev => ({
+          ...prev,
+          u1: { ...prev.u1, name: prev.u1.name === "Alice" ? "Alicia" : "Alice" }
+        }));
+      };
+
+      const handleReorder = () => {
+        setProjectIds(prev => [...prev].reverse());
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            Lab D: Relational Normalization
+            <span className="badge ok">1 Source of Truth</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Alice owns 2 projects (<code>p1</code> and <code>p2</code>). Renaming her in <code>usersById</code> instantly updates both projects without multiple object mutations.
+          </p>
+          <div className="btn-group">
+            <button className="primary" onClick={handleRenameAlice}>Toggle Alice / Alicia in <code>usersById</code></button>
+            <button onClick={handleReorder}>Reverse <code>projectIds</code> Order</button>
+          </div>
+          <div className="inspector">
+            {projectIds.map(pid => {
+              const project = projectsById[pid];
+              const owner = usersById[project.ownerId];
+              return (
+                <div key={pid} className="row">
+                  <span>{project.name} (<code>{pid}</code>):</span>
+                  <span className="fresh">Owner: {owner?.name} <span className="tag">ID: {project.ownerId}</span></span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <RedundantStateSection />
+          <DerivedStateSection />
+          <SelectedIdVsObjectSection />
+          <NormalizationSection />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

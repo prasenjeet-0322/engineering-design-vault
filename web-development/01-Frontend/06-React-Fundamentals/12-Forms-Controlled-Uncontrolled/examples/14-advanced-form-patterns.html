@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 08 Part 14 — Advanced Form Patterns Simulator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.75);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1250px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 950px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(51, 65, 85, 0.8);
+      color: #cbd5e1;
+      border: 1px solid #475569;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .stepper {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+
+    .step-item {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .step-item.active {
+      color: #38bdf8;
+    }
+
+    .step-item.completed {
+      color: #10b981;
+    }
+
+    .dynamic-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #334155;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .code-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useMemo, useEffect } = React;
+
+    const INITIAL_WIZARD_DATA = {
+      companyName: "Acme Robotics Inc",
+      regNumber: "REG-99014",
+      country: "US",
+      contacts: [
+        { id: "c_101", name: "Alice Smith", email: "alice@acme.com" },
+        { id: "c_102", name: "Bob Jones", email: "invalid-bob-email" }
+      ],
+      tier: "enterprise",
+      budgetDisplay: "$15,000",
+      budgetCanonical: 15000,
+      agreeToTerms: false
+    };
+
+    function wizardReducer(state, action) {
+      switch (action.type) {
+        case "FIELD_CHANGED":
+          return {
+            ...state,
+            draft: { ...state.draft, [action.field]: action.value }
+          };
+        case "CONTACT_ADDED":
+          return {
+            ...state,
+            draft: {
+              ...state.draft,
+              contacts: [...state.draft.contacts, action.contact]
+            }
+          };
+        case "CONTACT_REMOVED":
+          return {
+            ...state,
+            draft: {
+              ...state.draft,
+              contacts: state.draft.contacts.filter(c => c.id !== action.id)
+            }
+          };
+        case "CONTACT_UPDATED":
+          return {
+            ...state,
+            draft: {
+              ...state.draft,
+              contacts: state.draft.contacts.map(c =>
+                c.id === action.id ? { ...c, [action.field]: action.value } : c
+              )
+            }
+          };
+        case "NEXT_STEP":
+          return { ...state, activeStep: Math.min(state.activeStep + 1, 2) };
+        case "PREV_STEP":
+          return { ...state, activeStep: Math.max(state.activeStep - 1, 0) };
+        case "HYDRATE_DRAFT":
+          return { ...state, draft: action.payload };
+        default:
+          return state;
+      }
+    }
+
+    function App() {
+      const [state, dispatch] = useReducer(wizardReducer, {
+        activeStep: 0,
+        draft: INITIAL_WIZARD_DATA
+      });
+
+      const [persistenceEnabled, setPersistenceEnabled] = useState(true);
+      const [persistedSnapshot, setPersistedSnapshot] = useState(null);
+
+      // Validation Rules
+      const stepErrors = useMemo(() => {
+        const errs = {};
+        if (state.activeStep === 0) {
+          if (!state.draft.companyName.trim()) errs.companyName = "Company name is required.";
+          if (!state.draft.regNumber.trim()) errs.regNumber = "Registration number is required.";
+        }
+        if (state.activeStep === 1) {
+          if (state.draft.contacts.length === 0) errs.contacts = "At least one contact required.";
+          state.draft.contacts.forEach((c) => {
+            if (!c.name.trim()) errs[`${c.id}_name`] = "Name required";
+            if (!c.email.trim() || !c.email.includes("@")) errs[`${c.id}_email`] = "Valid email required";
+          });
+        }
+        if (state.activeStep === 2) {
+          if (!state.draft.agreeToTerms) errs.agreeToTerms = "Must accept terms.";
+        }
+        return errs;
+      }, [state.activeStep, state.draft]);
+
+      const isCurrentStepValid = Object.keys(stepErrors).length === 0;
+
+      // LocalStorage Draft Persistence Simulation
+      useEffect(() => {
+        if (!persistenceEnabled) return;
+        const sanitized = { ...state.draft };
+        const payload = {
+          version: 2,
+          timestamp: new Date().toLocaleTimeString(),
+          data: sanitized
+        };
+        setPersistedSnapshot(payload);
+      }, [state.draft, persistenceEnabled]);
+
+      const handleBudgetMask = (str) => {
+        const numeric = Number(str.replace(/[^0-9]/g, "")) || 0;
+        dispatch({ type: "FIELD_CHANGED", field: "budgetDisplay", value: "$" + numeric.toLocaleString() });
+        dispatch({ type: "FIELD_CHANGED", field: "budgetCanonical", value: numeric });
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>KPI 08 Part 14 — Advanced Form Patterns</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "4px" }}>
+                Multi-Step Wizard Engines, Dynamic Field Registries, Adapters & Secure Draft Persistence
+              </p>
+            </div>
+            <div className="badge">Level 06 — React Fundamentals</div>
+          </header>
+
+          <div className="grid">
+            {/* Left Column: Interactive Multi-Step Form */}
+            <div className="card">
+              <div className="card-title">
+                <span>Enterprise Multi-Step Wizard Engine</span>
+                <span className="badge">Step {state.activeStep + 1} of 3</span>
+              </div>
+
+              {/* Stepper Progress Header */}
+              <div className="stepper">
+                <div className={`step-item ${state.activeStep === 0 ? "active" : state.activeStep > 0 ? "completed" : ""}`}>
+                  1. Company Profile
+                </div>
+                <div className={`step-item ${state.activeStep === 1 ? "active" : state.activeStep > 1 ? "completed" : ""}`}>
+                  2. Key Contacts ({state.draft.contacts.length})
+                </div>
+                <div className={`step-item ${state.activeStep === 2 ? "active" : ""}`}>
+                  3. Plan & Review
+                </div>
+              </div>
+
+              {/* Step 1: Company Profile */}
+              {state.activeStep === 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div className="form-group">
+                    <label>Company Legal Name *</label>
+                    <input
+                      type="text"
+                      value={state.draft.companyName}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "companyName", value: e.target.value })}
+                    />
+                    {stepErrors.companyName && <span style={{ color: "#f87171", fontSize: "0.8rem" }}>{stepErrors.companyName}</span>}
+                  </div>
+
+                  <div className="form-group">
+                    <label>Business Registration Number *</label>
+                    <input
+                      type="text"
+                      value={state.draft.regNumber}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "regNumber", value: e.target.value })}
+                    />
+                    {stepErrors.regNumber && <span style={{ color: "#f87171", fontSize: "0.8rem" }}>{stepErrors.regNumber}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Dynamic Contact List with Stable Entity IDs */}
+              {state.activeStep === 1 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                    Notice how deleting Row 0 keeps Row 1's error permanently attached to Bob!
+                  </div>
+
+                  {state.draft.contacts.map((c, idx) => (
+                    <div key={c.id} className="dynamic-row">
+                      <span style={{ color: "#38bdf8", fontSize: "0.75rem", fontFamily: "monospace" }}>{c.id}</span>
+                      <input
+                        type="text"
+                        placeholder="Contact Name"
+                        value={c.name}
+                        onChange={(e) => dispatch({ type: "CONTACT_UPDATED", id: c.id, field: "name", value: e.target.value })}
+                        style={{ flex: 1 }}
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={c.email}
+                        onChange={(e) => dispatch({ type: "CONTACT_UPDATED", id: c.id, field: "email", value: e.target.value })}
+                        style={{ flex: 1, borderColor: stepErrors[`${c.id}_email`] ? "#ef4444" : "#334155" }}
+                      />
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: "6px 10px", fontSize: "0.75rem" }}
+                        onClick={() => dispatch({ type: "CONTACT_REMOVED", id: c.id })}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.85rem" }}
+                    onClick={() => dispatch({
+                      type: "CONTACT_ADDED",
+                      contact: { id: "c_" + Math.random().toString(36).substring(2, 6), name: "", email: "" }
+                    })}
+                  >
+                    + Add Dynamic Contact Person
+                  </button>
+                </div>
+              )}
+
+              {/* Step 3: Plan Review & Adapter */}
+              {state.activeStep === 2 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div className="form-group">
+                    <label>Subscription Tier</label>
+                    <select
+                      value={state.draft.tier}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "tier", value: e.target.value })}
+                    >
+                      <option value="startup">Startup Tier</option>
+                      <option value="enterprise">Enterprise Tier</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Budget (Formatted Presentation vs Canonical Value Adapter)</label>
+                    <input
+                      type="text"
+                      value={state.draft.budgetDisplay}
+                      onChange={(e) => handleBudgetMask(e.target.value)}
+                    />
+                    <span style={{ fontSize: "0.75rem", color: "#a5b4fc", fontFamily: "monospace" }}>
+                      Canonical Domain Number: {state.draft.budgetCanonical} (USD)
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+                    <input
+                      type="checkbox"
+                      id="terms-check"
+                      checked={state.draft.agreeToTerms}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "agreeToTerms", value: e.target.checked })}
+                    />
+                    <label htmlFor="terms-check" style={{ color: "#cbd5e1" }}>
+                      I accept enterprise master service agreements.
+                    </label>
+                  </div>
+                  {stepErrors.agreeToTerms && (
+                    <span style={{ color: "#f87171", fontSize: "0.8rem" }}>{stepErrors.agreeToTerms}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Stepper Navigation Actions */}
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px", borderTop: "1px solid #334155", paddingTop: "14px" }}>
+                <button
+                  className="btn btn-secondary"
+                  disabled={state.activeStep === 0}
+                  onClick={() => dispatch({ type: "PREV_STEP" })}
+                >
+                  ← Previous Step
+                </button>
+
+                {state.activeStep < 2 ? (
+                  <button
+                    className="btn btn-primary"
+                    disabled={!isCurrentStepValid}
+                    onClick={() => dispatch({ type: "NEXT_STEP" })}
+                  >
+                    Next Step →
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    disabled={!isCurrentStepValid}
+                    style={{ background: "#10b981" }}
+                    onClick={() => alert(`✓ Completed Registration for "${state.draft.companyName}" with ${state.draft.contacts.length} contacts!`)}
+                  >
+                    Complete Registration ✓
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Pattern Diagnostics & Draft Persistence */}
+            <div className="card">
+              <div className="card-title">
+                <span>Durable State & Storage Inspector</span>
+                <span className="badge">Durable Parent Draft</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Active Step:</span>
+                  <span style={{ fontWeight: 600, color: "#38bdf8" }}>Step #{state.activeStep + 1}</span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Step Validity:</span>
+                  <span style={{ fontWeight: 600, color: isCurrentStepValid ? "#10b981" : "#ef4444" }}>
+                    {isCurrentStepValid ? "VALID TO ADVANCE" : "INVALID"}
+                  </span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Persistence Status:</span>
+                  <span style={{ fontWeight: 600, color: "#a5b4fc" }}>
+                    {persistenceEnabled ? "ACTIVE (LocalStorage)" : "DISABLED"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Durable Parent State (Retained across Step unmounts):</label>
+                <div className="code-box">
+                  {JSON.stringify(state.draft, null, 2)}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Sanitized Persistence Payload (Sensitive fields filtered):</label>
+                <div className="code-box">
+                  {JSON.stringify(persistedSnapshot, null, 2)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

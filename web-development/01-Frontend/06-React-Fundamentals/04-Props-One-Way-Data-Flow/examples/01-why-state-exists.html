@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 01: Why React State Exists & Render Snapshots</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 01: Why React State Exists & Render Snapshots</h1>
+  <p class="subtitle">Interactive sandbox demonstrating ordinary local variable failure vs persistent React-managed component memory snapshots.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('localVariableFailure')">1. Ordinary Variable vs State</button>
+    <button onclick="selectLab('renderSnapshot')">2. Render Snapshot Model</button>
+    <button onclick="selectLab('independentOccurrences')">3. Multiple Component Occurrences</button>
+    <button onclick="selectLab('derivedData')">4. State vs Derived Data</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Code Representation</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Execution Pipeline & Memory Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Diagnosis</h2>
+      <span id="badge" class="status-badge badge-warn">Local Variable: Non-Reactive</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Mental Model Rule</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      localVariableFailure: {
+        code: `// ❌ Ordinary Local Variable:\nfunction Counter() {\n  let count = 0;\n  function handleClick() {\n    count++; // Mutates closure binding only\n  }\n  return <button onClick={handleClick}>{count}</button>;\n}\n\n// ✅ React-Managed State:\nfunction Counter() {\n  const [count, setCount] = useState(0);\n  return <button onClick={() => setCount(count + 1)}>{count}</button>;\n}`,
+        trace: `1. Initial Render: Counter() executes, count = 0, returns <button>0</button>.\n2. User clicks button: handleClick() runs, count becomes 1 in closure.\n3. Problem: React is not notified! No new render is requested. UI stays 0.`,
+        verdict: `Ordinary local variables die with function execution and do not participate in React's render scheduling.`,
+        rule: `Use React state for information that must persist across component renders and whose changes participate in future UI computation.`,
+        badgeClass: 'badge-warn',
+        badgeText: '⚠️ Mutation Ignored by React'
+      },
+      renderSnapshot: {
+        code: `// Render Snapshot Concept:\nfunction SnapshotDemo() {\n  const [count, setCount] = useState(0);\n  // During this specific render execution,\n  // count is a CONSTANT immutable value (e.g. 0).\n  console.log('Render snapshot:', count);\n  return <button onClick={() => setCount(count + 1)}>{count}</button>;\n}`,
+        trace: `Render #1: count = 0 -> Returns JSX with '0' -> Commit to DOM.\nState Update requested (setCount(1)).\nRender #2: Fresh function execution reads persistent state memory: count = 1 -> Commit.`,
+        verdict: `Render execution is temporary; React-managed state memory survives across renders.`,
+        rule: `Each render is a snapshot of inputs (props and state) at a specific moment in time: UI = f(props, state).`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Snapshot Render Model'
+      },
+      independentOccurrences: {
+        code: `// Two Occurrences of the Same Component Type:\n<>\n  <Counter /> {/* Occurrence A: Fiber A memoizedState = 3 */}\n  <Counter /> {/* Occurrence B: Fiber B memoizedState = 0 */}\n</>`,
+        trace: `State is not a global static variable on Counter.\nState is stored on the Fiber node associated with each component occurrence's tree position.`,
+        verdict: `Independent State: Clicking Counter A increments Occurrence A without re-rendering or altering Counter B.`,
+        rule: `State belongs to the component occurrence's identity in the tree, not to the JavaScript function globally.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Isolated Occurrence Memory'
+      },
+      derivedData: {
+        code: `// ❌ Redundant State (Synchronization Anti-Pattern):\nconst [first, setFirst] = useState('Jane');\nconst [last, setLast] = useState('Doe');\nconst [fullName, setFullName] = useState('Jane Doe'); // Unnecessary state!\n\n// ✅ Synchronous Pure Derivation:\nconst fullName = \`\${first} \${last}\`;`,
+        trace: `firstName & lastName are canonical state.\nfullName is derived synchronously during render.\nZero useEffect synchronization cycles required.`,
+        verdict: `Single Source of Truth: Eliminates stale state tearing and impossible UI combinations.`,
+        rule: `Never store as state what can be synchronously derived from existing props or state during render.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Derived Projection'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('localVariableFailure');
+  </script>
+</body>
+</html>

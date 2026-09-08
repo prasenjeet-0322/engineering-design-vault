@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 05: State Structure, Derived State & Normalization</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 05: State Structure, Derived State & Normalization</h1>
+  <p class="subtitle">Interactive sandbox analyzing Canonical Facts vs Derived Projections, Selected Entity IDs, and Relational Normalization.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('factsVsDerivations')">1. Store Facts, Derive Results</button>
+    <button onclick="selectLab('entityIdVsObject')">2. Store Selected ID vs Entity</button>
+    <button onclick="selectLab('normalizationModel')">3. Relational Normalization</button>
+    <button onclick="selectLab('syncEffectTrap')">4. Synchronization Effect Smell</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Architecture & State Code</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Dependency Graph & Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Verification</h2>
+      <span id="badge" class="status-badge badge-ok">Architecture: Minimal Facts</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      factsVsDerivations: {
+        code: `// ❌ Redundant Duplication:\nconst [items, setItems] = useState([]);\nconst [count, setCount] = useState(0);\nconst [hasItems, setHasItems] = useState(false);\n\n// ✅ Minimal Canonical Facts + Render Derivation:\nconst [items, setItems] = useState([]);\nconst count = items.length;\nconst hasItems = count > 0;`,
+        trace: `Canonical State: items (single source of truth).\nDerived during render: count, hasItems.\nZero synchronization code required when adding or removing items.`,
+        verdict: `Zero State Drift: Prevents impossible UI combinations (e.g. items.length = 5 but count = 4).`,
+        rule: `Store independent facts in state. Derive deterministic consequences synchronously during render.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Minimal Facts'
+      },
+      entityIdVsObject: {
+        code: `// ❌ Storing whole duplicate entity object:\nconst [selectedUser, setSelectedUser] = useState(user);\n\n// ✅ Storing entity identifier reference:\nconst [selectedId, setSelectedId] = useState(null);\nconst selectedUser = users.find(u => u.id === selectedId) ?? null;`,
+        trace: `When 'users' array updates from server refresh, selectedUser automatically reflects updated name/details without stale state bugs.`,
+        verdict: `Single Source of Truth: The entity is never cloned into a competing state bucket.`,
+        rule: `Store entity IDs to reference canonical collections instead of storing duplicate entity objects.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ ID Identity Reference'
+      },
+      normalizationModel: {
+        code: `// Normalized Relational State:\nconst state = {\n  usersById: { 1: { id: 1, name: 'Alice' } },\n  postsById: { 101: { id: 101, title: 'React 19' } },\n  userPostIds: { 1: [101] }\n};`,
+        trace: `Updating Post 101 modifies exactly one canonical post object in postsById, immediately reflecting in all feeds and author views.`,
+        verdict: `High Scalability: Eliminates multi-location sync bugs across dense many-to-many domain relationships.`,
+        rule: `Normalize state when identical entities participate in multiple relationships and require targeted updates.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Normalized Entities'
+      },
+      syncEffectTrap: {
+        code: `// ❌ Effect Synchronization Anti-Pattern:\nconst [query, setQuery] = useState('');\nconst [filtered, setFiltered] = useState([]);\nuseEffect(() => {\n  setFiltered(items.filter(i => i.name.includes(query)));\n}, [items, query]); // Triggers unnecessary extra render!\n\n// ✅ Pure Render-Time Derivation:\nconst filtered = items.filter(i => i.name.includes(query));`,
+        trace: `Eliminates an intermediate render pass where UI displays stale search results before effect execution.`,
+        verdict: `Instant Consistency: Render calculation is 100% synchronous and deterministic.`,
+        rule: `Never use useEffect to synchronize data that can be deterministically calculated from existing state/props during render.`,
+        badgeClass: 'badge-warn',
+        badgeText: '⚠️ Synchronous Derivation Required'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('factsVsDerivations');
+  </script>
+</body>
+</html>

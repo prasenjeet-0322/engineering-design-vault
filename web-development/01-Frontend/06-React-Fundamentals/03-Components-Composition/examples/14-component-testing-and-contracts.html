@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 14: Component Testing & Behavioral Contracts</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 14: Component Testing & Behavioral Contracts</h1>
+  <p class="subtitle">Interactive laboratory demonstrating Contract Testing vs Implementation Details, Callback Payloads, Refactor Resistance, and Identity Verification.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('behaviorVsInternal')">1. Contract vs Implementation</button>
+    <button onclick="selectLab('callbackPayload')">2. Callback Payload Verification</button>
+    <button onclick="selectLab('refactorResistance')">3. Refactor-Resistant Assertions</button>
+    <button onclick="selectLab('identityPreservation')">4. Identity & State Reset Testing</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Test Strategy & Code</h2>
+      <pre id="code-panel">// Strategy</pre>
+
+      <h2>Assertion & Execution Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Contract Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Contract: Behavioral & Observable</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      behaviorVsInternal: {
+        code: `// ❌ Brittle Implementation Test:\nexpect(component.state.count).toBe(1);\nexpect(useState).toHaveBeenCalled();\n\n// ✅ Robust Behavioral Contract Test:\nrender(<Counter />);\nfireEvent.click(screen.getByRole('button', { name: /count/i }));\nexpect(screen.getByRole('button')).toHaveTextContent('Count: 1');`,
+        trace: `Targeting accessible button role and user-observable text asserts what the user and consumer care about, ignoring internal hook mechanics.`,
+        verdict: `Refactor-Proof: Switching from useState to useReducer or state machine keeps this test 100% GREEN.`,
+        rule: `Test the component from the outside in: provide inputs, perform user actions, assert observable outcomes.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Behavioral Contract Test'
+      },
+      callbackPayload: {
+        code: `// Callback Protocol Test:\nconst handleRemove = jest.fn();\nrender(<ProductRow product={{ id: 'p-42' }} onRemove={handleRemove} />);\nfireEvent.click(screen.getByRole('button', { name: /remove/i }));\n\n// Assert exact semantic payload:\nexpect(handleRemove).toHaveBeenCalledWith('p-42');`,
+        trace: `Asserting exact arguments ensures the component communicates the correct entity identity upward to the parent state owner.`,
+        verdict: `Zero Data Bugs: Prevents severe production bugs where the callback is triggered with undefined or wrong row index.`,
+        rule: `Always assert the semantic payload of callback contracts, not merely invocation existence.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Payload Contract Verified'
+      },
+      refactorResistance: {
+        code: `// Accessibility-Based Querying:\nconst saveBtn = screen.getByRole('button', { name: /save/i });\nexpect(saveBtn).toBeDisabled();\n\n// ❌ CSS Class Matching (Brittle):\nexpect(element).toHaveClass('btn-disabled-v2');`,
+        trace: `Refactoring CSS classes from BEM to CSS Modules breaks class assertions but keeps accessible role contracts intact.`,
+        verdict: `High Semantic Precision: Tests fail only when actual user interaction capability or accessibility regresses.`,
+        rule: `Styling implementation ≠ interaction contract. Locate elements through user-facing semantics.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Semantic Query Strategy'
+      },
+      identityPreservation: {
+        code: `// Testing Intentional Reset:\nconst { rerender } = render(<Editor key="doc-1" initialText="Draft 1" />);\nfireEvent.change(screen.getByRole('textbox'), { target: { value: 'Edited' } });\n\n// Change Key to trigger intentional occurrence reset:\nrerender(<Editor key="doc-2" initialText="Draft 2" />);\nexpect(screen.getByRole('textbox')).toHaveValue('Draft 2');`,
+        trace: `Validates that changing key identity cleanly unmounts doc-1 state and initializes fresh doc-2 state without draft leakage.`,
+        verdict: `Lifecycle Safety: Verifies the product requirement that switching documents starts clean state.`,
+        rule: `Test React identity and lifecycle through observable user consequences rather than Fiber internals.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Identity Contract Verified'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('behaviorVsInternal');
+  </script>
+</body>
+</html>

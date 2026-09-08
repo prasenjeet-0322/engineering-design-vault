@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 06 — Dependency Correctness, Stable Identity & Stale Closures</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    button.purple { background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 250px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line { display: flex; gap: 8px; align-items: center; }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-stale { color: var(--accent-red); font-weight: 600; }
+    .log-fresh { color: var(--accent-green); font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+
+    .timeline-container {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 0;
+    }
+
+    .timeline-node {
+      background: #0d1527;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
+      min-width: 100px;
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      text-align: center;
+    }
+    .timeline-node.current {
+      border-color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    // Demonstration 1: Stale Closure vs Correct Reactivity in Timers
+    function StaleClosureSandbox({ count, mode, onLog }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      // Stale Mode: [] omits count dependency
+      useEffect(() => {
+        if (mode === "stale") {
+          onLog(`[MOUNT] Stale Timer Effect started! Captured count = ${count}`, "stale");
+          const id = setInterval(() => {
+            onLog(`[INTERVAL TICK] Stale closure logs: count = ${count}`, "stale");
+          }, 1500);
+          return () => {
+            onLog(`[TEARDOWN] Stale Timer cleared!`, "info");
+            clearInterval(id);
+          };
+        }
+      }, mode === "stale" ? [] : [count]);
+
+      // Fresh Mode: [count] re-synchronizes with every count update
+      useEffect(() => {
+        if (mode === "fresh") {
+          onLog(`[SETUP] Fresh Timer Effect synchronized with count = ${count}`, "fresh");
+          const id = setInterval(() => {
+            onLog(`[INTERVAL TICK] Fresh closure logs: count = ${count}`, "fresh");
+          }, 1500);
+          return () => {
+            onLog(`[CLEANUP] Fresh Timer torn down for count = ${count}`, "info");
+            clearInterval(id);
+          };
+        }
+      }, mode === "fresh" ? [count] : []);
+
+      return (
+        <div style={{ padding: "16px", background: "#0c1524", borderRadius: "8px", border: "1px solid #1e293b" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span><strong>Mode:</strong> {mode === "stale" ? "❌ Stale Closure ([])" : "✅ Reactive Sync ([count])"}</span>
+            <span className="badge badge-cyan">Render #{renderCount.current}</span>
+          </div>
+          <div style={{ marginTop: "8px", fontSize: "1.2rem", fontWeight: "700", color: mode === "stale" ? "var(--accent-red)" : "var(--accent-green)" }}>
+            Current React UI Count: {count}
+          </div>
+        </div>
+      );
+    }
+
+    // Main App
+    function App() {
+      const [count, setCount] = useState(0);
+      const [timerMode, setTimerMode] = useState("stale"); // 'stale' or 'fresh'
+      const [timerActive, setTimerActive] = useState(false);
+      const [logs, setLogs] = useState([]);
+      const [renderHistory, setRenderHistory] = useState([1]);
+
+      const logMessage = (text, type) => {
+        const time = new Date().toLocaleTimeString();
+        setLogs(prev => [{ id: Math.random(), time, text, type }, ...prev.slice(0, 39)]);
+      };
+
+      const incrementCount = () => {
+        setCount(c => {
+          const next = c + 1;
+          setRenderHistory(prev => [...prev, prev.length + 1]);
+          return next;
+        });
+      };
+
+      const resetAll = () => {
+        setCount(0);
+        setLogs([]);
+        setRenderHistory([1]);
+      };
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 06: Dependency Correctness & Stale Closures Lab
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Interactive Verification of Closure Capture, Missing Dependencies, and Reference Identity Mechanics
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Panel A: Interactive Stale Closure Simulator */}
+            <div className="card">
+              <h2>
+                <span>1. Stale Closure Incident Simulator</span>
+                <span className="badge badge-tier">Closure Trap</span>
+              </h2>
+
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Start the interval, increment the count, and observe whether the interval callback sees the updated state or is trapped in the mount closure!
+              </p>
+
+              <div className="control-panel">
+                <button
+                  className={timerMode === "stale" ? "danger active" : "danger"}
+                  onClick={() => setTimerMode("stale")}
+                >
+                  ❌ Stale Mode (deps = [])
+                </button>
+                <button
+                  className={timerMode === "fresh" ? "active" : ""}
+                  onClick={() => setTimerMode("fresh")}
+                >
+                  ✅ Fresh Mode (deps = [count])
+                </button>
+              </div>
+
+              <div className="control-panel">
+                <button
+                  className={timerActive ? "danger" : "active"}
+                  onClick={() => setTimerActive(!timerActive)}
+                >
+                  {timerActive ? "Stop Interval" : "Start Interval"}
+                </button>
+                <button className="purple" onClick={incrementCount}>
+                  ⚡ Increment Count ({count} → {count + 1})
+                </button>
+                <button onClick={resetAll}>Reset</button>
+              </div>
+
+              {timerActive ? (
+                <StaleClosureSandbox count={count} mode={timerMode} onLog={logMessage} />
+              ) : (
+                <div style={{ padding: "20px", background: "#0c1524", borderRadius: "8px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic" }}>
+                  Interval is stopped. Click "Start Interval" to begin observation.
+                </div>
+              )}
+
+              <div>
+                <span style={{ fontSize: "0.82rem", fontWeight: "600", color: "var(--text-muted)" }}>Render Snapshot History:</span>
+                <div className="timeline-container">
+                  {renderHistory.map(r => (
+                    <div key={r} className={`timeline-node ${r === renderHistory.length ? "current" : ""}`}>
+                      Render #{r}<br />
+                      <span style={{ color: "var(--accent-cyan)" }}>count={r - 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Panel B: Telemetry Audit Log */}
+            <div className="card">
+              <h2>
+                <span>2. Closure & Synchronization Ledger</span>
+                <span className="badge badge-green">Runtime Audit</span>
+              </h2>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Live Telemetry:</span>
+                <button onClick={() => setLogs([])} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No telemetry yet. Start interval and increment count.</div>
+                ) : (
+                  logs.map(l => (
+                    <div key={l.id} className="log-line">
+                      <span className="log-time">[{l.time}]</span>
+                      <span className={`log-${l.type}`}>{l.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ background: "#0d1527", border: "1px dashed var(--accent-cyan)", borderRadius: "8px", padding: "14px", fontSize: "0.85rem" }}>
+                <strong style={{ color: "var(--accent-cyan)" }}>Mechanics Summary:</strong>
+                <ul style={{ paddingLeft: "18px", marginTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <li><strong>In Stale Mode:</strong> The interval callback closure holds <code>count = 0</code> from Render #1. Even if UI shows <code>count = 5</code>, the interval prints <code>0</code>!</li>
+                  <li><strong>In Fresh Mode:</strong> When <code>count</code> updates, the old interval is cleaned up and a new interval is scheduled closing over the latest <code>count</code>.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

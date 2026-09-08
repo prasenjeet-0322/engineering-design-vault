@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 - Part 08: Callback Contracts & Interaction Architecture Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-accent: #4f46e5;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-violet: #8b5cf6;
+      --code-bg: #030712;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-emerald));
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, var(--accent-indigo), #4338ca); color: white; }
+    .btn-emerald { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-emerald); }
+    .btn-rose { background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); color: var(--accent-rose); }
+    .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+
+    .telemetry-box {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+
+    .pipeline-step {
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.82rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pipeline-step.layer-1 { border-left: 3px solid var(--accent-cyan); }
+    .pipeline-step.layer-2 { border-left: 3px solid var(--accent-amber); }
+    .pipeline-step.layer-3 { border-left: 3px solid var(--accent-emerald); }
+
+    .card-item {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card-item:hover {
+      border-color: var(--accent-indigo);
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    /* Quiz */
+    .quiz-option {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .quiz-option:hover { border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.15); border-color: var(--accent-emerald); color: var(--accent-emerald); }
+    .quiz-option.wrong { background: rgba(244, 63, 94, 0.15); border-color: var(--accent-rose); color: var(--accent-rose); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // Layer 2 Reusable Component: UserCard
+    function UserCard({ user, onOpen, onDelete }) {
+      return (
+        <div 
+          className="card-item"
+          onClick={() => onOpen(user.id)}
+        >
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{user.name}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {user.id} • {user.role}</div>
+          </div>
+          <button 
+            className="btn btn-rose"
+            style={{ fontSize: '0.72rem', padding: '4px 10px' }}
+            onClick={(e) => {
+              e.stopPropagation(); // Explicit boundary: prevents triggering onOpen(user.id)
+              onDelete(user.id);
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      );
+    }
+
+    // Layer 2 Reusable Dropdown Item with Callback Composition
+    function MenuItem({ label, onSelect, onCloseMenu }) {
+      const handleClick = () => {
+        onCloseMenu(); // Internal state orchestration
+        onSelect(label); // External semantic contract
+      };
+
+      return (
+        <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem' }} onClick={handleClick}>
+          ⚡ {label}
+        </button>
+      );
+    }
+
+    function App() {
+      const [users, setUsers] = useState([
+        { id: "usr-101", name: "Asha Sharma", role: "Principal Architect" },
+        { id: "usr-102", name: "Ravi Kumar", role: "Senior Frontend Lead" },
+      ]);
+      const [logs, setLogs] = useState([]);
+      const [isMenuOpen, setIsMenuOpen] = useState(false);
+      const [semanticInputVal, setSemanticInputVal] = useState("");
+
+      // Quiz State
+      const [activeQuiz, setActiveQuiz] = useState(0);
+      const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+      const addLog = (layer, title, payload = {}) => {
+        setLogs(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            time: new Date().toISOString().substring(14, 23),
+            layer,
+            title,
+            payload
+          },
+          ...prev.slice(0, 39)
+        ]);
+      };
+
+      // Layer 3 Domain Handlers
+      const handleOpenUser = (userId) => {
+        addLog("layer-3", `🏛️ DOMAIN: openUserModal('${userId}')`, { contract: "onOpen(userId)" });
+      };
+
+      const handleDeleteUser = (userId) => {
+        addLog("layer-3", `🗑️ DOMAIN: deleteUser('${userId}')`, { contract: "onDelete(userId)" });
+        setUsers(prev => prev.filter(u => u.id !== userId));
+      };
+
+      const handleMenuAction = (actionName) => {
+        addLog("layer-3", `⚙️ DOMAIN: executeCommand('${actionName}')`, { contract: "onSelect(actionName)" });
+      };
+
+      const quizQuestions = [
+        {
+          q: "What is the primary benefit of translating `onClick(event)` into `onDelete(userId)` at the component boundary?",
+          options: [
+            { text: "It prevents React reconciliation from running", isCorrect: false },
+            { text: "It encapsulates internal DOM structure and provides a minimal semantic contract to the parent", isCorrect: true },
+            { text: "It reduces JavaScript heap memory allocations to zero", isCorrect: false },
+            { text: "It converts React events into native browser custom events", isCorrect: false }
+          ],
+          explanation: "Semantic callback contracts (e.g. onDelete(userId)) shield parents from DOM details like event.target, button nesting, or stopPropagation mechanics."
+        },
+        {
+          q: "What is the 'God Handler' anti-pattern?",
+          options: [
+            { text: "A single monolithic function attempting to branch on all event types, networking, validation, and analytics", isCorrect: true },
+            { text: "A handler attached to the document body", isCorrect: false },
+            { text: "Using useCallback without dependencies", isCorrect: false },
+            { text: "A handler returning a Promise", isCorrect: false }
+          ],
+          explanation: "God-handlers collapse physical interaction, state transitions, validation, analytics, and networking into one gigantic untestable function."
+        },
+        {
+          q: "Why should `e.stopPropagation()` be called when clicking a Delete button inside a clickable Card?",
+          options: [
+            { text: "To prevent the outer card's `onOpen` handler from executing simultaneously", isCorrect: true },
+            { text: "To stop the browser from scrolling", isCorrect: false },
+            { text: "Because React forbids nested buttons", isCorrect: false },
+            { text: "To prevent garbage collection", isCorrect: false }
+          ],
+          explanation: "Explicit propagation boundaries prevent low-level DOM bubbling from accidentally triggering conflicting parent interaction handlers."
+        }
+      ];
+
+      return (
+        <div className="container">
+          {/* Header */}
+          <header className="header-card">
+            <div className="header-badge">Level 06 • KPI 05 • Part 08</div>
+            <h1 className="header-title">
+              <span>🏛️</span> Callback Contracts & Interaction Architecture Lab
+            </h1>
+            <p className="header-subtitle">
+              Interactive diagnostic laboratory for inspecting the 3-Layer Event Pipeline, semantic callback boundaries, callback composition, and event ownership.
+            </p>
+          </header>
+
+          {/* Top Grid: 3-Layer Pipeline & Interactive UserCard Sandbox */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 1: Interactive Component & 3-Layer Simulator */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>📦</span> 3-Layer Interaction Sandbox
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Click a card to trigger <code>onOpen(id)</code>, or click Delete to trigger <code>onDelete(id)</code> (with <code>stopPropagation</code> boundary):
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                  {users.map(user => (
+                    <UserCard 
+                      key={user.id}
+                      user={user}
+                      onOpen={handleOpenUser}
+                      onDelete={handleDeleteUser}
+                    />
+                  ))}
+                  {users.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                      All users deleted. <button className="btn btn-secondary" style={{ fontSize: '0.72rem' }} onClick={() => setUsers([
+                        { id: "usr-101", name: "Asha Sharma", role: "Principal Architect" },
+                        { id: "usr-102", name: "Ravi Kumar", role: "Senior Frontend Lead" },
+                      ])}>Reset Cards</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <hr style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+
+              {/* Callback Composition Demo */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                  Callback Composition: Internal State (Close) + External Action
+                </div>
+                <button className="btn btn-primary" onClick={() => setIsMenuOpen(o => !o)}>
+                  {isMenuOpen ? "Close Menu" : "Open Dropdown Menu"}
+                </button>
+
+                {isMenuOpen && (
+                  <div style={{ padding: '10px', background: 'rgba(0,0,0,0.4)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <MenuItem label="Archive Project" onSelect={handleMenuAction} onCloseMenu={() => setIsMenuOpen(false)} />
+                    <MenuItem label="Export Telemetry JSON" onSelect={handleMenuAction} onCloseMenu={() => setIsMenuOpen(false)} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Panel 2: Live 3-Layer Telemetry Log */}
+            <div className="panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="panel-title" style={{ border: 'none', padding: 0 }}>
+                  <span>📡</span> Architectural Pipeline Log
+                </div>
+                <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '3px 8px' }} onClick={() => setLogs([])}>
+                  Clear
+                </button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '90px' }}>
+                    Interact with controls on the left to inspect semantic contract flow...
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className={`pipeline-step ${log.layer}`}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong style={{ color: '#fff' }}>{log.title}</strong>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{log.time}</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                        {JSON.stringify(log.payload)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Grid: Crucible Quiz */}
+          <div className="dashboard-grid">
+            <div className="panel" style={{ gridColumn: 'span 2' }}>
+              <div className="panel-title">
+                <span>🔥</span> Crucible Architecture Challenge ({activeQuiz + 1} / {quizQuestions.length})
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
+                  {quizQuestions[activeQuiz].q}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {quizQuestions[activeQuiz].options.map((opt, i) => {
+                    let className = "quiz-option";
+                    if (selectedAnswer !== null) {
+                      if (opt.isCorrect) className += " correct";
+                      else if (selectedAnswer === i) className += " wrong";
+                    }
+                    return (
+                      <div 
+                        key={i} 
+                        className={className}
+                        onClick={() => {
+                          if (selectedAnswer === null) {
+                            setSelectedAnswer(i);
+                          }
+                        }}
+                      >
+                        <span style={{ fontFamily: 'Fira Code', fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedAnswer !== null && (
+                  <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Architect Note:</strong> {quizQuestions[activeQuiz].explanation}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedAnswer === null}
+                    style={{ opacity: selectedAnswer === null ? 0.5 : 1 }}
+                    onClick={() => {
+                      setSelectedAnswer(null);
+                      setActiveQuiz((prev) => (prev + 1) % quizQuestions.length);
+                    }}
+                  >
+                    Next Question ➡️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

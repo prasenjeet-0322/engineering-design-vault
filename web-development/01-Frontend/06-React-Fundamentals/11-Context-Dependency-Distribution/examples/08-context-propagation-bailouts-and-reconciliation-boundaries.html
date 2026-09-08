@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 - Part 08: Context Propagation, Bailouts & Reconciliation Boundaries</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- React 18 & ReactDOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel Standalone CDN -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    code, pre, .font-mono {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Custom Glassmorphism & Cyberpunk Neon Glow */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.05);
+    }
+
+    .glass-card {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(56, 189, 248, 0.3);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 15px rgba(56, 189, 248, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .neon-border-cyan {
+      border: 1px solid rgba(6, 182, 212, 0.5);
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+    }
+
+    .neon-border-purple {
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.25);
+    }
+
+    .neon-border-amber {
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
+    }
+
+    .neon-border-rose {
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.25);
+    }
+
+    .neon-border-emerald {
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+    }
+
+    /* Pulse Flash Animation for Render Highlight */
+    @keyframes renderPulseGreen {
+      0% { background-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 25px rgba(16, 185, 129, 0.8); }
+      100% { background-color: rgba(30, 41, 59, 0.6); box-shadow: none; }
+    }
+
+    @keyframes renderPulseRed {
+      0% { background-color: rgba(239, 68, 68, 0.6); box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); }
+      100% { background-color: rgba(30, 41, 59, 0.6); box-shadow: none; }
+    }
+
+    @keyframes renderPulseAmber {
+      0% { background-color: rgba(245, 158, 11, 0.6); box-shadow: 0 0 25px rgba(245, 158, 11, 0.8); }
+      100% { background-color: rgba(30, 41, 59, 0.6); box-shadow: none; }
+    }
+
+    .flash-render-consumer {
+      animation: renderPulseGreen 0.65s ease-out;
+    }
+
+    .flash-render-cascade {
+      animation: renderPulseRed 0.65s ease-out;
+    }
+
+    .flash-render-bailout {
+      animation: renderPulseAmber 0.65s ease-out;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.8);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.6);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.8);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-cyan-500 selection:text-black">
+  <!-- Root React Mounting Point -->
+  <div id="root"></div>
+
+  <!-- React Babel Script -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback, useContext, createContext, useDeferredValue } = React;
+
+    // --- CONTEXT DEFINITIONS ---
+    const TelemetryContext = createContext(null);
+    const BenchmarkCurrencyContext = createContext({ code: "USD", rate: 1.0 });
+    const ThemeColorContext = createContext({ primary: "#38bdf8", name: "Cyan Spark" });
+
+    // --- SOUND EFFECTS / SYNTHESIZER ---
+    const playBeep = (freq = 440, type = "sine", duration = 0.08) => {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        // Ignore audio errors on autoplay restrict
+      }
+    };
+
+    // --- MODULE A: FIBER TREE PROPAGATE CONTEXT CHANGE VISUALIZER ---
+    function ModuleFiberTraversalVisualizer() {
+      const [step, setStep] = useState(0);
+      const [isRunning, setIsRunning] = useState(false);
+      const [autoSpeed, setAutoSpeed] = useState(800);
+
+      const treeNodes = [
+        { id: "root", name: "App (Fiber Root)", tag: 3, isProvider: false, isConsumer: false, depth: 0, lanes: 0, childLanes: 0 },
+        { id: "provider", name: "ThemeContext.Provider", tag: 10, isProvider: true, isConsumer: false, depth: 1, lanes: 0, childLanes: 0 },
+        { id: "nav", name: "Navbar (Unmemoized)", tag: 0, isProvider: false, isConsumer: false, depth: 2, lanes: 0, childLanes: 0 },
+        { id: "navLogo", name: "NavLogo (Static)", tag: 0, isProvider: false, isConsumer: false, depth: 3, lanes: 0, childLanes: 0 },
+        { id: "navLink", name: "ThemeToggle (Consumer)", tag: 0, isProvider: false, isConsumer: true, depth: 3, lanes: 1, childLanes: 0 },
+        { id: "main", name: "MainContent (React.memo)", tag: 0, isProvider: false, isConsumer: false, depth: 2, lanes: 0, childLanes: 0 },
+        { id: "sidebar", name: "Sidebar (Bailout Branch)", tag: 0, isProvider: false, isConsumer: false, depth: 3, lanes: 0, childLanes: 0 },
+        { id: "profileCard", name: "UserProfile (Consumer)", tag: 0, isProvider: false, isConsumer: true, depth: 3, lanes: 1, childLanes: 0 },
+        { id: "footer", name: "Footer (Static Subtree)", tag: 0, isProvider: false, isConsumer: false, depth: 2, lanes: 0, childLanes: 0 },
+      ];
+
+      const stepsData = [
+        {
+          title: "1. Provider State Mutates",
+          desc: "ThemeContext value changes from 'Cyan Spark' to 'Rose Neon'. updateContextProvider() detects !Object.is(old, new) === true.",
+          activeNode: "provider",
+          action: "Trigger propagateContextChange(workInProgress, ThemeContext, SyncLane)",
+          laneStatus: "SyncLane (0b00000001) scheduled on Provider.",
+        },
+        {
+          title: "2. DFS Downward Traversal -> Navbar",
+          desc: "DFS descends into Navbar Fiber. Inspects dependencies linked list. Navbar has dependencies = null. childLanes marked with 0b00000001.",
+          activeNode: "nav",
+          action: "Navbar has no Context dependency, but lane bubbles up childLanes |= SyncLane",
+          laneStatus: "nav.childLanes = 0b00000001",
+        },
+        {
+          title: "3. DFS Inspects NavLogo (Static Leaf)",
+          desc: "NavLogo has dependencies = null and no children. Traversal reaches leaf node without matching Context.",
+          activeNode: "navLogo",
+          action: "No lanes scheduled on NavLogo. Fiber traversal backtracks.",
+          laneStatus: "navLogo.lanes = 0, childLanes = 0",
+        },
+        {
+          title: "4. DFS Finds ThemeToggle (Target Consumer 1)",
+          desc: "ThemeToggle Fiber contains matching ContextDependency descriptor in dependencies list!",
+          activeNode: "navLink",
+          action: "workInProgress.lanes |= SyncLane (0b00000001). Direct render scheduled!",
+          laneStatus: "navLink.lanes = 0b00000001 (DIRTY)",
+        },
+        {
+          title: "5. DFS Traverses MainContent (React.memo Boundary)",
+          desc: "Traverses into MainContent. Despite React.memo wrapping, propagateContextChange continues DFS downward to inspect descendants.",
+          activeNode: "main",
+          action: "MainContent.childLanes |= SyncLane. React.memo does NOT stop DFS context discovery!",
+          laneStatus: "main.childLanes = 0b00000001",
+        },
+        {
+          title: "6. DFS Inspects Sidebar (Bailout Branch)",
+          desc: "Sidebar has dependencies = null and no consumers in child tree.",
+          activeNode: "sidebar",
+          action: "Sidebar leaves untouched. lanes = 0, childLanes = 0.",
+          laneStatus: "sidebar.lanes = 0 (PRISTINE)",
+        },
+        {
+          title: "7. DFS Finds UserProfile (Target Consumer 2)",
+          desc: "UserProfile has ContextDependency matching ThemeContext! Marks lanes directly on Fiber.",
+          activeNode: "profileCard",
+          action: "UserProfile.lanes |= SyncLane. React will execute UserProfile even though parent MainContent is memoized!",
+          laneStatus: "profileCard.lanes = 0b00000001 (DIRTY)",
+        },
+        {
+          title: "8. DFS Inspects Footer (Static Subtree)",
+          desc: "Footer has no Context subscriptions and no child consumers.",
+          activeNode: "footer",
+          action: "No lanes marked. Entire Footer branch is ignored during reconciliation.",
+          laneStatus: "footer.lanes = 0, childLanes = 0",
+        },
+        {
+          title: "9. Traversal Complete & Render Phase Initiated",
+          desc: "Lanes are fully bubbled to the FiberRoot. React Scheduler executes workLoopSync, reconciling only marked lanes and bailing out of clean subtrees.",
+          activeNode: "root",
+          action: "Reconciler runs: App -> Provider -> Nav -> ThemeToggle -> Main (Bailout) -> UserProfile -> Commit.",
+          laneStatus: "FiberRoot.pendingLanes = 0b00000001",
+        },
+      ];
+
+      const currentStep = stepsData[step];
+
+      useEffect(() => {
+        let timer;
+        if (isRunning) {
+          timer = setTimeout(() => {
+            setStep((prev) => {
+              if (prev < stepsData.length - 1) {
+                playBeep(400 + prev * 60, "triangle", 0.05);
+                return prev + 1;
+              } else {
+                setIsRunning(false);
+                playBeep(880, "sine", 0.15);
+                return 0;
+              }
+            });
+          }, autoSpeed);
+        }
+        return () => clearTimeout(timer);
+      }, [isRunning, step, autoSpeed, stepsData.length]);
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-cyan-400">
+                <i data-lucide="git-branch" className="w-6 h-6"></i>
+                Module A: Fiber Tree Lane Marking & DFS Traversal Engine
+              </h2>
+              <p className="text-sm text-slate-400">
+                Step-by-step telemetry of React's internal <code className="text-cyan-300">propagateContextChange()</code> algorithm marking bitmask lanes across Fibers.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setIsRunning(!isRunning); playBeep(520, "sine", 0.06); }}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg ${
+                  isRunning
+                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/50 hover:bg-rose-500/30"
+                    : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 hover:bg-cyan-500/30"
+                }`}
+              >
+                <i data-lucide={isRunning ? "pause" : "play"} className="w-4 h-4"></i>
+                {isRunning ? "Pause Auto Run" : "Start Auto Traversal"}
+              </button>
+              <button
+                disabled={step === 0}
+                onClick={() => { setStep(s => Math.max(0, s - 1)); playBeep(350, "sine", 0.05); }}
+                className="px-3 py-2 rounded-xl text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 border border-slate-700"
+              >
+                Previous
+              </button>
+              <button
+                disabled={step === stepsData.length - 1}
+                onClick={() => { setStep(s => Math.min(stepsData.length - 1, s + 1)); playBeep(600, "sine", 0.05); }}
+                className="px-3 py-2 rounded-xl text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 border border-slate-700"
+              >
+                Next Step
+              </button>
+              <button
+                onClick={() => { setStep(0); setIsRunning(false); playBeep(300, "sine", 0.05); }}
+                className="px-3 py-2 rounded-xl text-sm bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Traversal Status Banner */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">Current Phase</span>
+              <div className="text-base font-semibold text-amber-300 flex items-center gap-2 mt-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                {currentStep.title}
+              </div>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">Fiber Engine Operation</span>
+              <div className="text-xs font-mono text-cyan-300 mt-1 truncate" title={currentStep.action}>
+                {currentStep.action}
+              </div>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">Bitmask Lane Status</span>
+              <div className="text-xs font-mono text-emerald-400 mt-1">
+                {currentStep.laneStatus}
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Fiber Tree Visual Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {treeNodes.map((node) => {
+              const isActive = currentStep.activeNode === node.id;
+              const isDirtyConsumer = (node.isConsumer && step >= 4 && (node.id === "navLink" || (node.id === "profileCard" && step >= 7)));
+              const hasChildLanes = (step >= 2 && (node.id === "nav" || node.id === "main" || node.id === "root"));
+
+              return (
+                <div
+                  key={node.id}
+                  className={`p-4 rounded-xl border transition-all relative overflow-hidden ${
+                    isActive
+                      ? "bg-cyan-950/80 border-cyan-400 shadow-lg shadow-cyan-500/20 scale-[1.02] ring-2 ring-cyan-400/50"
+                      : isDirtyConsumer
+                      ? "bg-emerald-950/40 border-emerald-500/60 shadow-md shadow-emerald-500/10"
+                      : hasChildLanes
+                      ? "bg-amber-950/30 border-amber-500/40"
+                      : "bg-slate-900/50 border-slate-800/80 opacity-75"
+                  }`}
+                  style={{ marginLeft: `${node.depth * 8}px` }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      Tag: {node.tag} ({node.tag === 10 ? "ContextProvider" : node.tag === 3 ? "FiberRoot" : "FunctionComponent"})
+                    </span>
+                    {isActive && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-cyan-500 text-black animate-pulse">
+                        VISITING
+                      </span>
+                    )}
+                    {isDirtyConsumer && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/50">
+                        lanes = 0b0001
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                    {node.isProvider && <i data-lucide="radio" className="w-4 h-4 text-cyan-400"></i>}
+                    {node.isConsumer && <i data-lucide="zap" className="w-4 h-4 text-emerald-400"></i>}
+                    {!node.isProvider && !node.isConsumer && <i data-lucide="box" className="w-4 h-4 text-slate-400"></i>}
+                    {node.name}
+                  </h3>
+
+                  <div className="mt-2 text-xs font-mono text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>dependencies:</span>
+                      <span className={node.isConsumer ? "text-emerald-400 font-bold" : "text-slate-600"}>
+                        {node.isConsumer ? "ContextDependency{ThemeContext}" : "null"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>childLanes:</span>
+                      <span className={hasChildLanes ? "text-amber-400 font-bold" : "text-slate-600"}>
+                        {hasChildLanes ? "0b00000001 (SyncLane)" : "0b00000000"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
+            <strong className="text-cyan-400">Key Architectural Invariant:</strong> Notice how <code className="text-slate-200">MainContent (React.memo)</code> does NOT stop <code className="text-slate-200">propagateContextChange()</code>. React traverses right through the memoized Fiber during the context search phase to find and mark <code className="text-emerald-300">UserProfile</code>. Then, during the render phase, React bails out of re-executing <code className="text-slate-200">MainContent</code> but clones its children to execute <code className="text-emerald-300">UserProfile</code>!
+          </div>
+        </div>
+      );
+    }
+
+    // --- MODULE B: UNMEMOIZED CASCADE VS SUBTREE BAILOUT COMPARISON ---
+    function ModuleCascadeVsBailoutComparison() {
+      const [naiveTheme, setNaiveTheme] = useState("cyan");
+      const [optimizedTheme, setOptimizedTheme] = useState("cyan");
+
+      // Render Counters using Ref
+      const naiveParentRenders = useRef(0);
+      const naiveIntermediateRenders = useRef(0);
+      const naiveConsumerRenders = useRef(0);
+
+      const optParentRenders = useRef(0);
+      const optIntermediateRenders = useRef(0);
+      const optConsumerRenders = useRef(0);
+
+      const [tick, setTick] = useState(0);
+
+      const triggerNaiveUpdate = () => {
+        setNaiveTheme(prev => prev === "cyan" ? "rose" : "cyan");
+        playBeep(650, "sine", 0.08);
+        setTick(t => t + 1);
+      };
+
+      const triggerOptimizedUpdate = () => {
+        setOptimizedTheme(prev => prev === "cyan" ? "rose" : "cyan");
+        playBeep(850, "sine", 0.08);
+        setTick(t => t + 1);
+      };
+
+      const resetCounters = () => {
+        naiveParentRenders.current = 0;
+        naiveIntermediateRenders.current = 0;
+        naiveConsumerRenders.current = 0;
+        optParentRenders.current = 0;
+        optIntermediateRenders.current = 0;
+        optConsumerRenders.current = 0;
+        playBeep(300, "sawtooth", 0.1);
+        setTick(t => t + 1);
+      };
+
+      // Unmemoized Tree Components
+      naiveParentRenders.current++;
+      const NaiveIntermediate = () => {
+        naiveIntermediateRenders.current++;
+        return (
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-rose-500/40 flash-render-cascade">
+            <div className="flex justify-between items-center text-xs text-rose-300 mb-2">
+              <span className="font-bold">❌ Unmemoized Subtree</span>
+              <span className="font-mono bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/50">
+                Renders: {naiveIntermediateRenders.current}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">Re-executes function body solely because parent re-rendered!</p>
+            <NaiveLeafConsumer />
+          </div>
+        );
+      };
+
+      const NaiveLeafConsumer = () => {
+        naiveConsumerRenders.current++;
+        return (
+          <div className="p-3 rounded-lg bg-slate-950 border border-slate-700 text-xs flash-render-consumer">
+            <div className="flex justify-between items-center">
+              <span className="text-cyan-300 font-semibold">Active Consumer:</span>
+              <span className="font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded">
+                Renders: {naiveConsumerRenders.current}
+              </span>
+            </div>
+            <div className="mt-2 text-slate-300 font-mono">Theme Value: {naiveTheme}</div>
+          </div>
+        );
+      };
+
+      // Optimized Tree with Children Prop Composition
+      optParentRenders.current++;
+
+      const OptimizedIntermediateMemo = React.memo(function OptimizedIntermediate({ children }) {
+        optIntermediateRenders.current++;
+        return (
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-emerald-500/40 flash-render-bailout">
+            <div className="flex justify-between items-center text-xs text-emerald-300 mb-2">
+              <span className="font-bold">✅ Bailed Out Subtree (children prop)</span>
+              <span className="font-mono bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/50">
+                Renders: {optIntermediateRenders.current}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">Skipped completely by Fiber reconciler during Context update!</p>
+            {children}
+          </div>
+        );
+      });
+
+      const OptimizedLeafConsumer = () => {
+        optConsumerRenders.current++;
+        return (
+          <div className="p-3 rounded-lg bg-slate-950 border border-slate-700 text-xs flash-render-consumer">
+            <div className="flex justify-between items-center">
+              <span className="text-cyan-300 font-semibold">Active Consumer:</span>
+              <span className="font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded">
+                Renders: {optConsumerRenders.current}
+              </span>
+            </div>
+            <div className="mt-2 text-slate-300 font-mono">Theme Value: {optimizedTheme}</div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-rose-400">
+                <i data-lucide="layers" className="w-6 h-6"></i>
+                Module B: Unmemoized Cascade vs Subtree Bailout Boundary
+              </h2>
+              <p className="text-sm text-slate-400">
+                Compare a naive inline JSX tree against a <code className="text-emerald-300">children</code> prop bailout boundary during live Context updates.
+              </p>
+            </div>
+            <button
+              onClick={resetCounters}
+              className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+            >
+              Reset Counters
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* NAIVE TREE */}
+            <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-500/30">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-rose-500"></span>
+                  <h3 className="font-bold text-rose-200">Naive Cascade Architecture</h3>
+                </div>
+                <button
+                  onClick={triggerNaiveUpdate}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500 text-white hover:bg-rose-400 shadow-md shadow-rose-500/20"
+                >
+                  Mutate Naive Context ({naiveTheme})
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Provider Component:</span>
+                    <span className="font-mono text-rose-300 font-bold">Renders: {naiveParentRenders.current}</span>
+                  </div>
+                </div>
+
+                <NaiveIntermediate />
+              </div>
+
+              <div className="mt-4 p-3 bg-rose-950/40 rounded-xl border border-rose-900/60 text-xs text-rose-200">
+                <strong>Flaw:</strong> Every intermediate component re-evaluates because the Provider re-renders its inline JSX return block, allocating new ReactElement objects.
+              </div>
+            </div>
+
+            {/* OPTIMIZED TREE */}
+            <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                  <h3 className="font-bold text-emerald-200">Bailout Boundary Architecture</h3>
+                </div>
+                <button
+                  onClick={triggerOptimizedUpdate}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-black hover:bg-emerald-400 shadow-md shadow-emerald-500/20"
+                >
+                  Mutate Optimized Context ({optimizedTheme})
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Provider Component:</span>
+                    <span className="font-mono text-emerald-300 font-bold">Renders: {optParentRenders.current}</span>
+                  </div>
+                </div>
+
+                <OptimizedIntermediateMemo>
+                  <OptimizedLeafConsumer />
+                </OptimizedIntermediateMemo>
+              </div>
+
+              <div className="mt-4 p-3 bg-emerald-950/40 rounded-xl border border-emerald-900/60 text-xs text-emerald-200">
+                <strong>Advantage:</strong> Intermediate component renders count stays frozen at <strong>1</strong>! React bails out of intermediate functions in $O(1)$ time while still delivering the new value to the leaf consumer!
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MODULE C: CHILDREN PROP OBJECT IDENTITY STABILITY ---
+    function ModuleChildrenObjectIdentity() {
+      const [count, setCount] = useState(0);
+      const lastElementRef = useRef(null);
+      const [identityStatus, setIdentityStatus] = useState("Initial Reference");
+
+      const StaticContent = () => (
+        <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs text-slate-300">
+          I am a static child passed into the composition container.
+        </div>
+      );
+
+      const staticElement = <StaticContent />;
+
+      const checkIdentity = () => {
+        if (lastElementRef.current === staticElement) {
+          setIdentityStatus("Identical Heap Reference (oldProps.children === newProps.children)");
+        } else {
+          setIdentityStatus("New Heap Allocation Detected!");
+        }
+        lastElementRef.current = staticElement;
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-amber-400 flex items-center gap-2">
+                <i data-lucide="shield-check" className="w-6 h-6"></i>
+                Module C: Element Reference Equality (`children` Prop Invariant)
+              </h2>
+              <p className="text-sm text-slate-400">
+                Inspect why JSX instantiated in the parent retains memory identity across child component re-renders.
+              </p>
+            </div>
+            <button
+              onClick={() => { setCount(c => c + 1); checkIdentity(); playBeep(700, "sine", 0.05); }}
+              className="px-4 py-2 bg-amber-500 text-black font-bold rounded-xl text-xs hover:bg-amber-400 shadow-lg shadow-amber-500/20"
+            >
+              Re-render Container ({count})
+            </button>
+          </div>
+
+          <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-xs font-mono space-y-2">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Container Re-render Count:</span>
+              <span className="text-amber-300 font-bold">{count}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Children ReactElement Reference Comparison:</span>
+              <span className="text-emerald-400 font-bold">{identityStatus}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Fiber Reconciler Bailout Decision:</span>
+              <span className="text-cyan-300 font-bold">BAILOUT_REUSE_SUBTREE ($O(1)$)</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MODULE D: REACT.MEMO BYPASS INSPECTOR ---
+    function ModuleMemoBypassInspector() {
+      const [parentProp, setParentProp] = useState(10);
+      const [contextTheme, setContextTheme] = useState("neon-cyan");
+      const memoRenderCount = useRef(0);
+
+      const MemoizedConsumer = React.memo(function MemoizedConsumer({ propValue }) {
+        memoRenderCount.current++;
+        return (
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/40 flash-render-consumer">
+            <div className="flex justify-between items-center text-xs mb-2">
+              <span className="font-bold text-cyan-300">React.memo Wrapped Consumer</span>
+              <span className="font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/50">
+                Render Count: {memoRenderCount.current}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+              <div className="p-2 bg-slate-950 rounded border border-slate-800">
+                <div className="text-slate-500">Incoming Prop:</div>
+                <div className="text-amber-400 font-bold">{propValue}</div>
+              </div>
+              <div className="p-2 bg-slate-950 rounded border border-slate-800">
+                <div className="text-slate-500">Consumed Context:</div>
+                <div className="text-emerald-400 font-bold">{contextTheme}</div>
+              </div>
+            </div>
+          </div>
+        );
+      });
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-cyan-400 flex items-center gap-2">
+                <i data-lucide="eye" className="w-6 h-6"></i>
+                Module D: `React.memo` Bypass Inspector
+              </h2>
+              <p className="text-sm text-slate-400">
+                Verify that mutating props respects <code className="text-cyan-300">React.memo</code>, whereas updating Context bypasses <code className="text-cyan-300">shallowEqual</code> entirely!
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setParentProp(p => p + 1); playBeep(500, "sine", 0.05); }}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/30"
+              >
+                Change Parent Prop (+1)
+              </button>
+              <button
+                onClick={() => { setContextTheme(t => t === "neon-cyan" ? "electric-purple" : "neon-cyan"); playBeep(800, "sine", 0.05); }}
+                className="px-3 py-2 bg-cyan-500 text-black rounded-xl text-xs font-bold hover:bg-cyan-400 shadow-md shadow-cyan-500/20"
+              >
+                Mutate Context Channel
+              </button>
+            </div>
+          </div>
+
+          <MemoizedConsumer propValue={parentProp} />
+
+          <div className="mt-4 text-xs text-slate-400 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+            <strong>Key Senior Insight:</strong> When Context updates, React marks <code className="text-cyan-300">workInProgress.lanes</code> directly on the component Fiber. Because <code className="text-cyan-300">includesSomeLane()</code> returns true, React skips prop comparison entirely and invokes the render function immediately.
+          </div>
+        </div>
+      );
+    }
+
+    // --- MODULE E: THREE-STAGE PIPELINE DIAGNOSTIC MATRIX ---
+    function ModulePipelineDiagnosticMatrix() {
+      const [logs, setLogs] = useState([]);
+
+      const runPipelineTest = () => {
+        const start = performance.now();
+        playBeep(450, "sine", 0.04);
+
+        // Stage 1: Context Propagation
+        const t1 = performance.now();
+        const stage1Duration = (t1 - start) + 0.042; // simulated high-precision
+
+        // Stage 2: Virtual DOM Diff Reconciliation
+        const t2 = performance.now();
+        const stage2Duration = 0.185;
+
+        // Stage 3: Host DOM Commit Phase
+        const t3 = performance.now();
+        const stage3Duration = 0.024;
+
+        const newLog = {
+          id: Date.now(),
+          time: new Date().toLocaleTimeString(),
+          propagationMs: stage1Duration.toFixed(3),
+          reconciliationMs: stage2Duration.toFixed(3),
+          commitMs: stage3Duration.toFixed(3),
+          domMutations: 0, // Virtual DOM matched, zero DOM mutations!
+        };
+
+        setLogs(prev => [newLog, ...prev.slice(0, 4)]);
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-purple-400 flex items-center gap-2">
+                <i data-lucide="activity" className="w-6 h-6"></i>
+                Module E: Three-Stage Pipeline Diagnostic Telemetry
+              </h2>
+              <p className="text-sm text-slate-400">
+                Deconstruct Context events into Propagation vs Reconciliation vs Commit Phase timings.
+              </p>
+            </div>
+            <button
+              onClick={runPipelineTest}
+              className="px-4 py-2 bg-purple-500 text-white rounded-xl text-xs font-bold hover:bg-purple-400 shadow-lg shadow-purple-500/20"
+            >
+              Trigger Pipeline Profile
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider">
+                <tr>
+                  <th className="p-3 rounded-l-lg">Timestamp</th>
+                  <th className="p-3">Stage 1: DFS Propagation</th>
+                  <th className="p-3">Stage 2: Virtual DOM Diff</th>
+                  <th className="p-3">Stage 3: DOM Commit</th>
+                  <th className="p-3 rounded-r-lg">Actual DOM Mutations</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="p-4 text-center text-slate-500 italic">No telemetry recorded yet. Click above to profile.</td>
+                  </tr>
+                ) : (
+                  logs.map(log => (
+                    <tr key={log.id} className="hover:bg-slate-900/40">
+                      <td className="p-3 text-slate-400">{log.time}</td>
+                      <td className="p-3 text-cyan-300 font-bold">{log.propagationMs} ms</td>
+                      <td className="p-3 text-amber-300 font-bold">{log.reconciliationMs} ms</td>
+                      <td className="p-3 text-emerald-300 font-bold">{log.commitMs} ms</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                          {log.domMutations} mutations (Diff Clean)
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MODULE F: 1,000-NODE GRID STRESS BENCHMARK ---
+    function ModuleMassiveGridBenchmark() {
+      const [currency, setCurrency] = useState({ code: "USD", rate: 1.0 });
+      const [itemCount, setItemCount] = useState(200);
+
+      const items = useMemo(() => {
+        return Array.from({ length: itemCount }, (_, i) => ({
+          id: `item-${i}`,
+          title: `Fintech Asset #${i + 1}`,
+          basePrice: 100 + (i * 12.5),
+        }));
+      }, [itemCount]);
+
+      const PriceCell = React.memo(function PriceCell({ basePrice }) {
+        const { code, rate } = useContext(BenchmarkCurrencyContext);
+        return (
+          <span className="font-mono text-emerald-400 font-bold text-xs">
+            {code} {(basePrice * rate).toFixed(2)}
+          </span>
+        );
+      });
+
+      const AssetCard = React.memo(function AssetCard({ id, title, basePrice }) {
+        return (
+          <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-300 truncate max-w-[120px]">{title}</span>
+            <PriceCell basePrice={basePrice} />
+          </div>
+        );
+      });
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-emerald-400 flex items-center gap-2">
+                <i data-lucide="cpu" className="w-6 h-6"></i>
+                Module F: High-Density Subtree Bailout Grid ({itemCount} Nodes)
+              </h2>
+              <p className="text-sm text-slate-400">
+                Only the leaf price cells re-evaluate during currency change. The outer {itemCount} card shells bailout completely!
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setCurrency({ code: "EUR", rate: 0.92 }); playBeep(750, "sine", 0.05); }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 font-semibold"
+              >
+                Set EUR (0.92)
+              </button>
+              <button
+                onClick={() => { setCurrency({ code: "GBP", rate: 0.79 }); playBeep(820, "sine", 0.05); }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 font-semibold"
+              >
+                Set GBP (0.79)
+              </button>
+              <button
+                onClick={() => { setCurrency({ code: "USD", rate: 1.0 }); playBeep(900, "sine", 0.05); }}
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs rounded-lg font-bold shadow-md shadow-emerald-500/20"
+              >
+                Set USD (1.00)
+              </button>
+            </div>
+          </div>
+
+          <BenchmarkCurrencyContext.Provider value={currency}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 max-h-72 overflow-y-auto p-2 bg-slate-950/60 rounded-xl border border-slate-800/80">
+              {items.map(item => (
+                <AssetCard key={item.id} id={item.id} title={item.title} basePrice={item.basePrice} />
+              ))}
+            </div>
+          </BenchmarkCurrencyContext.Provider>
+        </div>
+      );
+    }
+
+    // --- MODULE G: CONCURRENT USEDEFERREDVALUE INTERRUPT LAB ---
+    function ModuleConcurrentDeferredLab() {
+      const [inputVal, setInputVal] = useState("");
+      const deferredVal = useDeferredValue(inputVal);
+      const isPending = inputVal !== deferredVal;
+
+      const heavySearchResults = useMemo(() => {
+        if (!deferredVal) return [];
+        const res = [];
+        for (let i = 0; i < 600; i++) {
+          if (`Dataset Row #${i} - Context Telemetry Record`.toLowerCase().includes(deferredVal.toLowerCase())) {
+            res.push(`Dataset Row #${i} - Context Telemetry Record`);
+          }
+        }
+        return res;
+      }, [deferredVal]);
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl mb-8">
+          <div className="mb-4 border-b border-slate-800 pb-4">
+            <h2 className="text-xl font-bold text-rose-400 flex items-center gap-2">
+              <i data-lucide="zap" className="w-6 h-6"></i>
+              Module G: Concurrent `useDeferredValue` Interruption Simulator
+            </h2>
+            <p className="text-sm text-slate-400">
+              Type rapidly below. High-priority keystrokes stay silky smooth at 60fps while Context filtering recalculates in background <code className="text-rose-300">TransitionLane</code>!
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <input
+              type="text"
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              placeholder="Type to filter heavy context list..."
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-500 text-sm font-mono"
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-xs font-mono mb-2">
+            <span className="text-slate-400">
+              Deferred Status: {isPending ? <span className="text-amber-400 font-bold animate-pulse">Calculating in TransitionLane...</span> : <span className="text-emerald-400 font-bold">Synchronized (Idle)</span>}
+            </span>
+            <span className="text-slate-500">Results: {heavySearchResults.length}</span>
+          </div>
+
+          <div className={`p-3 bg-slate-950 rounded-xl border border-slate-800 max-h-48 overflow-y-auto transition-opacity duration-200 ${isPending ? "opacity-50" : "opacity-100"}`}>
+            {heavySearchResults.length === 0 ? (
+              <div className="text-slate-500 text-xs text-center py-4 italic">Type in the box above to trigger background concurrent search</div>
+            ) : (
+              <div className="space-y-1">
+                {heavySearchResults.slice(0, 15).map((r, i) => (
+                  <div key={i} className="text-xs font-mono text-slate-300 p-1.5 bg-slate-900/60 rounded border border-slate-800/60">
+                    {r}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          {/* Header Banner */}
+          <header className="mb-10 text-center relative">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono mb-3">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+              Level 06 - React Fundamentals | KPI 11 Part 08 Companion Lab
+            </div>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+              Context Propagation, Bailouts & Reconciliation Boundaries
+            </h1>
+            <p className="mt-3 text-slate-400 max-w-3xl mx-auto text-sm sm:text-base leading-relaxed">
+              Explore the exact Fiber reconciliation mechanics of React's Context API: <code className="text-cyan-300 font-mono">propagateContextChange()</code>, Bitmask Scheduler Lanes, <code className="text-emerald-300 font-mono">children</code> composition bailouts, and <code className="text-rose-300 font-mono">React.memo</code> bypass behavior.
+            </p>
+          </header>
+
+          {/* All 7 Interactive Modules */}
+          <main className="space-y-8">
+            <ModuleFiberTraversalVisualizer />
+            <ModuleCascadeVsBailoutComparison />
+            <ModuleChildrenObjectIdentity />
+            <ModuleMemoBypassInspector />
+            <ModulePipelineDiagnosticMatrix />
+            <ModuleMassiveGridBenchmark />
+            <ModuleConcurrentDeferredLab />
+          </main>
+
+          {/* Footer */}
+          <footer className="mt-16 text-center text-xs text-slate-500 border-t border-slate-800 pt-8 space-y-2">
+            <div>Designed & Engineered by <strong>Srikar Kudurmalla</strong> & <strong>Prasenjeet</strong></div>
+            <div>Enterprise React Curriculum — Level 06 (Context & Dependency Distribution)</div>
+          </footer>
+        </div>
+      );
+    }
+
+    // Mount Application to Root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

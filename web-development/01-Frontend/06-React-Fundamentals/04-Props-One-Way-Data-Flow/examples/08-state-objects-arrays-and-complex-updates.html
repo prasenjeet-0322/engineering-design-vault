@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 08: State Objects, Arrays & Complex Updates</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+      --yellow: #d29922;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .badge.warn {
+      background: #341a04;
+      color: var(--orange);
+      border-color: #9e6a03;
+    }
+    .badge.danger {
+      background: #3c1418;
+      color: var(--red);
+      border-color: #8b181b;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+    .ref-graph {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .node-shared {
+      color: var(--green);
+      font-weight: bold;
+    }
+    .node-new {
+      color: var(--purple);
+      font-weight: bold;
+    }
+    .node-mutated {
+      color: var(--red);
+      font-weight: bold;
+      text-decoration: underline;
+    }
+    .log-box {
+      background: #04070b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 160px;
+      overflow-y: auto;
+      color: #8b949e;
+      margin-top: auto;
+    }
+    .log-entry {
+      margin-bottom: 4px;
+      border-bottom: 1px dotted #21262d;
+      padding-bottom: 2px;
+    }
+    .log-entry.warn { color: var(--yellow); }
+    .log-entry.err { color: var(--red); font-weight: bold; }
+    .log-entry.succ { color: var(--green); }
+    .log-entry.info { color: var(--cyan); }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 08: State Objects, Arrays & Complex Transitions</h1>
+  <p class="subtitle">Reference Identity, Structural Sharing, and In-Place Mutation Diagnostic Visualizer</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    function ObjectMutationSection() {
+      const [user, setUser] = useState({ name: "Srikar", age: 25, address: { city: "Hyderabad" } });
+      const [logs, setLogs] = useState([]);
+      const prevRef = useRef(user);
+      const renderCount = useRef(1);
+
+      useEffect(() => {
+        renderCount.current += 1;
+      });
+
+      const addLog = (text, type = 'info') => {
+        setLogs(prev => [...prev.slice(-6), { text, type, id: Math.random() }]);
+      };
+
+      const handleMutateInPlace = () => {
+        const oldRef = user;
+        // In-place mutation
+        user.name = "Rahul (Mutated)";
+        setUser(user); // Same reference!
+        const isSame = Object.is(oldRef, user);
+        addLog(`⚠️ Mutated user.name in place! Same Object reference passed to setUser.`, 'err');
+        addLog(`Object.is(prev, next): ${isSame} (React may bail out or create stale snapshots)`, 'warn');
+      };
+
+      const handleImmutableReplace = () => {
+        const oldRef = user;
+        const nextName = user.name === "Srikar" ? "Rahul" : "Srikar";
+        setUser(prev => {
+          const next = { ...prev, name: nextName };
+          const isNew = oldRef !== next;
+          addLog(`✅ Created new outer object. user !== next: ${isNew}`, 'succ');
+          return next;
+        });
+      };
+
+      const handleNestedChange = () => {
+        const oldRef = user;
+        const nextCity = user.address.city === "Hyderabad" ? "Bengaluru" : "Hyderabad";
+        setUser(prev => ({
+          ...prev,
+          address: {
+            ...prev.address,
+            city: nextCity
+          }
+        }));
+        addLog(`✅ Structural sharing applied: user' new, address' new, user.age shared.`, 'succ');
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            1. Object Reference & Shallow Spread
+            <span className="badge">Renders: {renderCount.current}</span>
+          </h2>
+          <div className="ref-graph">
+            <div>User Root: <span className={prevRef.current === user ? "node-shared" : "node-new"}>{user.name} (age: {user.age})</span></div>
+            <div>Address: <span className="node-shared">{user.address.city}</span></div>
+          </div>
+          <div className="btn-group">
+            <button className="danger" onClick={handleMutateInPlace}>Mutate In-Place (Bug)</button>
+            <button className="primary" onClick={handleImmutableReplace}>Replace User (Spread)</button>
+            <button onClick={handleNestedChange}>Update Nested City</button>
+          </div>
+          <div className="log-box">
+            {logs.length === 0 ? <div style={{ fontStyle: "italic" }}>Click actions to observe reference changes.</div> : null}
+            {logs.map(log => (
+              <div key={log.id} className={`log-entry ${log.type}`}>{log.text}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function ArrayMutationSection() {
+      const [items, setItems] = useState([
+        { id: 1, name: "Task A", done: false },
+        { id: 2, name: "Task B", done: false },
+        { id: 3, name: "Task C", done: false }
+      ]);
+      const [logs, setLogs] = useState([]);
+      const lastArrayRef = useRef(items);
+
+      const addLog = (text, type = 'info') => {
+        setLogs(prev => [...prev.slice(-6), { text, type, id: Math.random() }]);
+      };
+
+      const handleMutatingPush = () => {
+        items.push({ id: Date.now(), name: "Mutated Item", done: false });
+        setItems(items); // Same array reference!
+        addLog(`⚠️ items.push() called directly on state array! State ref unchanged.`, 'err');
+      };
+
+      const handleImmutableAppend = () => {
+        const newItem = { id: Date.now(), name: `Task ${String.fromCharCode(65 + items.length)}`, done: false };
+        setItems(prev => [...prev, newItem]);
+        addLog(`✅ [...prev, newItem] created new Array reference.`, 'succ');
+      };
+
+      const handleToggleItem = (id) => {
+        setItems(prev => prev.map(item => {
+          if (item.id === id) {
+            return { ...item, done: !item.done };
+          }
+          return item; // Preserved unchanged item reference
+        }));
+        addLog(`✅ map() updated target item with new ref; preserved unchanged item refs.`, 'succ');
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            2. Array Immutability & Map Updates
+            <span className="badge">Count: {items.length}</span>
+          </h2>
+          <div className="ref-graph">
+            <div>Array Ref: <span className="node-shared">Array({items.length})</span></div>
+            {items.map(item => (
+              <div key={item.id} style={{ marginLeft: "12px" }}>
+                ├── Item {item.id}: <span className={item.done ? "node-new" : "node-shared"}>{item.name} [{item.done ? "DONE" : "PENDING"}]</span>
+                <button style={{ marginLeft: "8px", padding: "1px 6px", fontSize: "11px" }} onClick={() => handleToggleItem(item.id)}>Toggle</button>
+              </div>
+            ))}
+          </div>
+          <div className="btn-group">
+            <button className="danger" onClick={handleMutatingPush}>Mutating push() (Bug)</button>
+            <button className="primary" onClick={handleImmutableAppend}>Immutable [...prev, item]</button>
+          </div>
+          <div className="log-box">
+            {logs.length === 0 ? <div style={{ fontStyle: "italic" }}>Test array methods.</div> : null}
+            {logs.map(log => (
+              <div key={log.id} className={`log-entry ${log.type}`}>{log.text}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function StructuralSharingInspector() {
+      const [state, setState] = useState({
+        user: { profile: { name: "A" } },
+        settings: { theme: "dark" }
+      });
+      const [history, setHistory] = useState([]);
+
+      const updateProfileNameOnly = () => {
+        const prev = state;
+        const next = {
+          ...prev,
+          user: {
+            ...prev.user,
+            profile: {
+              ...prev.user.profile,
+              name: prev.user.profile.name === "A" ? "B" : "A"
+            }
+          }
+        };
+
+        const comparisons = {
+          rootChanged: prev !== next,
+          userChanged: prev.user !== next.user,
+          profileChanged: prev.user.profile !== next.user.profile,
+          settingsShared: prev.settings === next.settings
+        };
+
+        setState(next);
+        setHistory(old => [comparisons, ...old.slice(0, 3)]);
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            3. Structural Sharing Graph Inspection
+            <span className="badge">Identity Evaluator</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Verify that unchanged branches (<code>settings</code>) maintain exact reference equality (<code>===</code>).
+          </p>
+          <div className="ref-graph">
+            <div>Root State: <span className="node-new">Object {state.user.profile.name}</span></div>
+            <div>├── user: <span className="node-new">Object</span></div>
+            <div>│   └── profile: <span className="node-new">name: "{state.user.profile.name}"</span></div>
+            <div>└── settings: <span className="node-shared">theme: "{state.settings.theme}" (SHARED)</span></div>
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={updateProfileNameOnly}>Update profile.name (Structural Sharing)</button>
+          </div>
+          <div className="log-box">
+            {history.length === 0 ? (
+              <div style={{ fontStyle: "italic" }}>Click button to run reference identity comparisons.</div>
+            ) : (
+              history.map((h, i) => (
+                <div key={i} className="log-entry">
+                  <div>state !== next: <span className="node-new">{String(h.rootChanged)}</span></div>
+                  <div>user !== next.user: <span className="node-new">{String(h.userChanged)}</span></div>
+                  <div>settings === next.settings: <span className="node-shared">{String(h.settingsShared)} (SHARED)</span></div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <ObjectMutationSection />
+          <ArrayMutationSection />
+          <StructuralSharingInspector />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 - Part 09: Context as Dependency Injection Interactive Lab</title>
+  <!-- React 18 & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind for quick utilities and Lucide icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    :root {
+      --bg-main: #0B0F19;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --card-border: rgba(75, 85, 99, 0.4);
+      --accent-cyan: #06B6D4;
+      --accent-indigo: #6366F1;
+      --accent-emerald: #10B981;
+      --accent-rose: #F43F5E;
+      --accent-amber: #F59E0B;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: #F3F4F6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 1rem;
+    }
+
+    .glass-card-sub {
+      background: rgba(31, 41, 55, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(107, 114, 128, 0.3);
+      border-radius: 0.75rem;
+    }
+
+    .glow-cyan {
+      box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.4);
+    }
+    
+    .glow-emerald {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.4);
+    }
+
+    .glow-rose {
+      box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.4);
+    }
+
+    .tab-active {
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-cyan));
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4B5563;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useCallback, useRef, Component } = React;
+
+    // ============================================================================
+    // DOMAIN CONTRACTS (PORTS)
+    // ============================================================================
+    // Payment Port
+    // interface PaymentGatewayPort
+    
+    // ============================================================================
+    // CONCRETE ADAPTERS & FAKES
+    // ============================================================================
+    
+    class LiveProductionPaymentAdapter {
+      constructor(gatewayName = "Stripe Live API v3") {
+        this.name = gatewayName;
+        this.type = "PRODUCTION_ADAPTER";
+      }
+
+      async createIntent(amountCents, currency) {
+        // Simulate real network request
+        await new Promise(r => setTimeout(r, 600));
+        return {
+          intentId: `pi_live_${Math.random().toString(36).substring(4)}`,
+          amountCents,
+          currency,
+          liveMode: true
+        };
+      }
+
+      async confirmPayment(intentId) {
+        await new Promise(r => setTimeout(r, 800));
+        return {
+          success: true,
+          transactionId: `ch_live_${Date.now()}_${Math.random().toString(36).substring(5)}`,
+          networkLatencyMs: 780,
+          provider: this.name
+        };
+      }
+    }
+
+    class InMemoryTestFakePaymentAdapter {
+      constructor(initialLatency = 50) {
+        this.name = "Deterministic In-Memory Fake";
+        this.type = "TEST_FAKE";
+        this.shouldFail = false;
+        this.failureMessage = "Card has insufficient funds (Code: 4002)";
+        this.latencyMs = initialLatency;
+        this.history = [];
+      }
+
+      async createIntent(amountCents, currency) {
+        if (this.latencyMs > 0) await new Promise(r => setTimeout(r, this.latencyMs));
+        const intent = {
+          intentId: `pi_fake_${Math.random().toString(36).substring(4)}`,
+          amountCents,
+          currency,
+          liveMode: false
+        };
+        this.history.push({ action: "CREATE_INTENT", payload: intent, timestamp: Date.now() });
+        return intent;
+      }
+
+      async confirmPayment(intentId) {
+        if (this.latencyMs > 0) await new Promise(r => setTimeout(r, this.latencyMs));
+        if (this.shouldFail) {
+          const err = { success: false, error: this.failureMessage, latencyMs: this.latencyMs };
+          this.history.push({ action: "CONFIRM_FAILED", payload: err, timestamp: Date.now() });
+          return err;
+        }
+        const success = {
+          success: true,
+          transactionId: `txn_fake_${Date.now()}`,
+          networkLatencyMs: this.latencyMs,
+          provider: this.name
+        };
+        this.history.push({ action: "CONFIRM_SUCCESS", payload: success, timestamp: Date.now() });
+        return success;
+      }
+
+      clear() {
+        this.history = [];
+      }
+    }
+
+    class FailingChaosPaymentAdapter {
+      constructor() {
+        this.name = "Chaos Injection 500 Down Adapter";
+        this.type = "FAULT_INJECTION";
+      }
+
+      async createIntent() {
+        await new Promise(r => setTimeout(r, 400));
+        throw new Error("HTTP 502 Bad Gateway: Upstream Payment Service Cluster Unreachable");
+      }
+
+      async confirmPayment() {
+        await new Promise(r => setTimeout(r, 400));
+        throw new Error("HTTP 500 Internal Server Error: Gateway timeout");
+      }
+    }
+
+    // In-Memory Telemetry Logger Port
+    class InMemoryTelemetryLogger {
+      constructor() {
+        this.logs = [];
+        this.listeners = new Set();
+      }
+
+      log(level, event, meta = {}) {
+        const entry = { id: Date.now() + Math.random(), level, event, meta, timestamp: new Date().toLocaleTimeString() };
+        this.logs.unshift(entry);
+        if (this.logs.length > 50) this.logs.pop();
+        this.listeners.forEach(fn => fn(this.logs));
+      }
+
+      subscribe(fn) {
+        this.listeners.add(fn);
+        return () => this.listeners.delete(fn);
+      }
+
+      clear() {
+        this.logs = [];
+        this.listeners.forEach(fn => fn(this.logs));
+      }
+    }
+
+    // In-Memory Database Storage Port (For Multi-Tenant Isolation)
+    class ScopedTenantDatabase {
+      constructor(tenantId) {
+        this.tenantId = tenantId;
+        this.store = new Map();
+      }
+
+      async get(key) {
+        return this.store.get(key) || null;
+      }
+
+      async set(key, val) {
+        this.store.set(key, val);
+      }
+
+      getAll() {
+        const obj = {};
+        for (let [k, v] of this.store.entries()) {
+          obj[k] = v;
+        }
+        return obj;
+      }
+    }
+
+    // ============================================================================
+    // CONTEXT CHANNELS
+    // ============================================================================
+    const PaymentGatewayContext = createContext(null);
+    const TelemetryLoggerContext = createContext(null);
+    const TenantDatabaseContext = createContext(null);
+
+    // ============================================================================
+    // CUSTOM HOOK GATEWAYS (DEFENSIVE INVARIANT ENFORCEMENT)
+    // ============================================================================
+    function usePaymentGateway() {
+      const adapter = useContext(PaymentGatewayContext);
+      if (!adapter) {
+        throw new Error(
+          "🚨 [Invariant Violation]: usePaymentGateway() was called outside of an <PaymentGatewayContext.Provider />. " +
+          "Ensure your component tree is properly wrapped with a Payment Gateway Provider adapter."
+        );
+      }
+      return adapter;
+    }
+
+    function useTelemetryLogger() {
+      const logger = useContext(TelemetryLoggerContext);
+      if (!logger) {
+        throw new Error(
+          "🚨 [Invariant Violation]: useTelemetryLogger() was called outside of an <TelemetryLoggerContext.Provider />."
+        );
+      }
+      return logger;
+    }
+
+    function useTenantDatabase() {
+      const db = useContext(TenantDatabaseContext);
+      if (!db) {
+        throw new Error(
+          "🚨 [Invariant Violation]: useTenantDatabase() was called outside of a <TenantDatabaseContext.Provider />."
+        );
+      }
+      return db;
+    }
+
+    // ============================================================================
+    // ERROR BOUNDARY COMPONENT
+    // ============================================================================
+    class LabErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        console.error("Boundary caught error:", error, errorInfo);
+      }
+
+      reset() {
+        this.setState({ hasError: false, error: null });
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="p-6 glass-card border-rose-500/50 bg-rose-950/30 text-rose-200">
+              <div className="flex items-center space-x-3 mb-3">
+                <span className="text-2xl">🚨</span>
+                <h4 className="font-bold text-lg text-rose-300">Custom Hook Invariant Guard Triggered!</h4>
+              </div>
+              <p className="font-mono text-xs bg-black/60 p-3 rounded border border-rose-800/60 mb-4 whitespace-pre-wrap">
+                {this.state.error?.message || "Unknown error"}
+              </p>
+              <button
+                onClick={() => this.reset()}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg text-xs transition"
+              >
+                Reset Error Boundary
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ============================================================================
+    // FEATURE UI COMPONENTS (PORTS CONSUMERS)
+    // ============================================================================
+    function CheckoutWidget({ orderId, amountCents, currency = "usd" }) {
+      const payment = usePaymentGateway();
+      const logger = useTelemetryLogger();
+      
+      const [loading, setLoading] = useState(false);
+      const [result, setResult] = useState(null);
+      const [errorMessage, setErrorMessage] = useState(null);
+
+      const handleCheckout = async () => {
+        setLoading(true);
+        setErrorMessage(null);
+        setResult(null);
+        logger.log("info", "CHECKOUT_INITIATED", { orderId, amountCents, currency, adapter: payment.name });
+
+        try {
+          const intent = await payment.createIntent(amountCents, currency);
+          logger.log("debug", "INTENT_CREATED", { intentId: intent.intentId });
+
+          const res = await payment.confirmPayment(intent.intentId);
+          if (res.success) {
+            setResult(res);
+            logger.log("info", "PAYMENT_SUCCEEDED", { txn: res.transactionId, latency: res.networkLatencyMs });
+          } else {
+            setErrorMessage(res.error || "Payment was declined");
+            logger.log("warn", "PAYMENT_DECLINED", { error: res.error });
+          }
+        } catch (err) {
+          setErrorMessage(err.message);
+          logger.log("error", "PAYMENT_SYSTEM_CRASH", { message: err.message });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="glass-card-sub p-5">
+          <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-3">
+            <div>
+              <span className="text-xs font-mono uppercase text-gray-400">Order ID</span>
+              <div className="font-bold text-lg text-cyan-300 font-mono">{orderId}</div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-mono uppercase text-gray-400">Total Price</span>
+              <div className="font-extrabold text-2xl text-emerald-400 font-mono">
+                ${(amountCents / 100).toFixed(2)} <span className="text-xs text-gray-300">{currency.toUpperCase()}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <span className="text-xs text-gray-400 block mb-1">Injected Payment Adapter:</span>
+            <div className="flex items-center space-x-2 text-xs font-mono p-2 bg-black/40 rounded border border-gray-700">
+              <span className={`w-2.5 h-2.5 rounded-full ${payment.type === 'PRODUCTION_ADAPTER' ? 'bg-emerald-400' : payment.type === 'TEST_FAKE' ? 'bg-cyan-400' : 'bg-rose-500'}`}></span>
+              <span className="text-gray-200 font-semibold">{payment.name}</span>
+              <span className="text-gray-500 text-[10px]">({payment.type})</span>
+            </div>
+          </div>
+
+          {result && (
+            <div className="p-3 bg-emerald-950/40 border border-emerald-500/50 rounded-lg text-xs font-mono mb-4 text-emerald-200">
+              <div className="font-bold text-emerald-300 flex items-center space-x-1 mb-1">
+                <span>✓ Payment Confirmed</span>
+              </div>
+              <div>Txn: <span className="text-white">{result.transactionId}</span></div>
+              <div>Latency: {result.networkLatencyMs}ms</div>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="p-3 bg-rose-950/40 border border-rose-500/50 rounded-lg text-xs font-mono mb-4 text-rose-200">
+              <div className="font-bold text-rose-300 mb-1">✕ Transaction Failed</div>
+              <div>{errorMessage}</div>
+            </div>
+          )}
+
+          <button
+            onClick={handleCheckout}
+            disabled={loading}
+            className={`w-full py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center space-x-2 ${
+              loading
+                ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white shadow-lg'
+            }`}
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span>Processing Transaction...</span>
+              </>
+            ) : (
+              <span>Confirm & Pay ${(amountCents / 100).toFixed(2)}</span>
+            )}
+          </button>
+        </div>
+      );
+    }
+
+    // ============================================================================
+    // MULTI-TENANT WORKSPACE COMPONENT
+    // ============================================================================
+    function TenantWorkspaceCard({ tenantName }) {
+      const db = useTenantDatabase();
+      const logger = useTelemetryLogger();
+      const [items, setItems] = useState({});
+      const [keyInput, setKeyInput] = useState("");
+      const [valInput, setValInput] = useState("");
+
+      const refresh = useCallback(() => {
+        setItems(db.getAll());
+      }, [db]);
+
+      useEffect(() => {
+        refresh();
+      }, [db, refresh]);
+
+      const handleSave = async () => {
+        if (!keyInput.trim()) return;
+        await db.set(keyInput, valInput);
+        logger.log("info", "TENANT_DATA_SAVED", { tenant: db.tenantId, key: keyInput, val: valInput });
+        setKeyInput("");
+        setValInput("");
+        refresh();
+      };
+
+      return (
+        <div className="glass-card-sub p-4 border-indigo-500/30">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="font-bold text-sm text-indigo-300">{tenantName}</h4>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-900/60 text-indigo-200 border border-indigo-700">
+              Tenant ID: {db.tenantId}
+            </span>
+          </div>
+
+          <div className="space-y-2 mb-3">
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                placeholder="Key (e.g., config_mode)"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                className="w-1/2 px-2 py-1 bg-black/50 border border-gray-700 rounded text-xs text-white"
+              />
+              <input
+                type="text"
+                placeholder="Value (e.g., dark_tier)"
+                value={valInput}
+                onChange={(e) => setValInput(e.target.value)}
+                className="w-1/2 px-2 py-1 bg-black/50 border border-gray-700 rounded text-xs text-white"
+              />
+            </div>
+            <button
+              onClick={handleSave}
+              className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold"
+            >
+              Write to Tenant Database
+            </button>
+          </div>
+
+          <div className="bg-black/60 p-2 rounded border border-gray-800 text-[11px] font-mono min-h-[70px]">
+            <div className="text-gray-500 mb-1">Database Store Dump:</div>
+            {Object.keys(items).length === 0 ? (
+              <span className="text-gray-600 italic">Empty tenant store</span>
+            ) : (
+              <div className="space-y-1">
+                {Object.entries(items).map(([k, v]) => (
+                  <div key={k} className="text-cyan-300">
+                    <span className="text-gray-400">{k}:</span> "{v}"
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ============================================================================
+    // MAIN INTERACTIVE LAB DASHBOARD
+    // ============================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("adapters");
+      
+      // Global Telemetry Logger instance
+      const telemetryLogger = useMemo(() => new InMemoryTelemetryLogger(), []);
+      const [logs, setLogs] = useState([]);
+
+      useEffect(() => {
+        return telemetryLogger.subscribe(setLogs);
+      }, [telemetryLogger]);
+
+      // Adapter state for Adapter Swapper Tab
+      const [selectedAdapterType, setSelectedAdapterType] = useState("fake");
+      const [fakeLatency, setFakeLatency] = useState(50);
+      const [fakeShouldFail, setFakeShouldFail] = useState(false);
+
+      const liveAdapter = useMemo(() => new LiveProductionPaymentAdapter(), []);
+      const testFakeAdapter = useMemo(() => {
+        const fake = new InMemoryTestFakePaymentAdapter(fakeLatency);
+        fake.shouldFail = fakeShouldFail;
+        return fake;
+      }, [fakeLatency, fakeShouldFail]);
+      const chaosAdapter = useMemo(() => new FailingChaosPaymentAdapter(), []);
+
+      const activePaymentAdapter = useMemo(() => {
+        if (selectedAdapterType === "live") return liveAdapter;
+        if (selectedAdapterType === "chaos") return chaosAdapter;
+        return testFakeAdapter;
+      }, [selectedAdapterType, liveAdapter, testFakeAdapter, chaosAdapter]);
+
+      // Multi-tenant stores
+      const tenantAlphaDb = useMemo(() => {
+        const db = new ScopedTenantDatabase("tenant-alpha-us-east");
+        db.set("company_name", "Acme Corporation");
+        db.set("region", "us-east-1");
+        return db;
+      }, []);
+
+      const tenantBetaDb = useMemo(() => {
+        const db = new ScopedTenantDatabase("tenant-beta-eu-west");
+        db.set("company_name", "Starlight Industries GmbH");
+        db.set("region", "eu-central-1");
+        return db;
+      }, []);
+
+      // Invariant trigger state
+      const [renderOutsideProvider, setRenderOutsideProvider] = useState(false);
+
+      // Automated Vitest Simulator
+      const [testResults, setTestResults] = useState([]);
+      const [isRunningTests, setIsRunningTests] = useState(false);
+
+      const runAutomatedTestSuite = async () => {
+        setIsRunningTests(true);
+        setTestResults([]);
+        const results = [];
+
+        // Test 1: Successful payment flow
+        const fake1 = new InMemoryTestFakePaymentAdapter(0);
+        fake1.shouldFail = false;
+        const intent1 = await fake1.createIntent(4999, "usd");
+        const res1 = await fake1.confirmPayment(intent1.intentId);
+        results.push({
+          name: "CheckoutWorkflow > should succeed with valid intent",
+          status: res1.success && res1.transactionId.startsWith("txn_fake_") ? "PASS" : "FAIL",
+          details: `Confirmed txn: ${res1.transactionId} in 0ms network latency.`
+        });
+        setTestResults([...results]);
+
+        await new Promise(r => setTimeout(r, 400));
+
+        // Test 2: Injected Card Decline
+        const fake2 = new InMemoryTestFakePaymentAdapter(0);
+        fake2.shouldFail = true;
+        fake2.failureMessage = "Insufficient funds";
+        const intent2 = await fake2.createIntent(12000, "usd");
+        const res2 = await fake2.confirmPayment(intent2.intentId);
+        results.push({
+          name: "CheckoutWorkflow > should handle payment decline and display alert",
+          status: !res2.success && res2.error === "Insufficient funds" ? "PASS" : "FAIL",
+          details: `Properly declined with injected domain error message.`
+        });
+        setTestResults([...results]);
+
+        await new Promise(r => setTimeout(r, 400));
+
+        // Test 3: Multi-tenant store isolation
+        const dbA = new ScopedTenantDatabase("tenant_A");
+        const dbB = new ScopedTenantDatabase("tenant_B");
+        await dbA.set("secret_token", "ALPHA_SEC_99");
+        const readFromB = await dbB.get("secret_token");
+        results.push({
+          name: "MultiTenantSandbox > ensures zero cross-talk between sibling stores",
+          status: readFromB === null ? "PASS" : "FAIL",
+          details: `Tenant B returned null for Tenant A's private key.`
+        });
+        setTestResults([...results]);
+
+        setIsRunningTests(false);
+      };
+
+      return (
+        <TelemetryLoggerContext.Provider value={telemetryLogger}>
+          <div className="max-w-7xl mx-auto space-y-6">
+            
+            {/* HEADER */}
+            <header className="glass-card p-6 border-cyan-500/30">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <div className="flex items-center space-x-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider mb-1">
+                    <span>Level 06 • KPI 11 • Part 09</span>
+                    <span>•</span>
+                    <span className="text-emerald-400">Interactive Lab</span>
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-extrabold text-white">
+                    Context as Dependency Injection: Testing & Modular Adapters
+                  </h1>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Hexagonal Ports & Adapters architecture, test fakes, scoped multi-tenant overrides & defensive custom hook gateways.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="px-3 py-1 bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 rounded-full text-xs font-mono font-bold">
+                    IoC / DI Sandbox
+                  </span>
+                </div>
+              </div>
+
+              {/* NAVIGATION TABS */}
+              <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-gray-800">
+                {[
+                  { id: "adapters", label: "1. Adapter Swapper & DI" },
+                  { id: "tenants", label: "2. Scoped Multi-Tenant Overrides" },
+                  { id: "invariants", label: "3. Custom Hook Invariant Guard" },
+                  { id: "testing", label: "4. Automated Vitest Runner" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-2 rounded-lg text-xs transition ${
+                      activeTab === tab.id
+                        ? "tab-active glow-cyan"
+                        : "bg-gray-800/80 hover:bg-gray-700 text-gray-300"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </header>
+
+            {/* MAIN CONTENT AREA */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* LEFT / CENTER: INTERACTIVE MODULE (2 Columns) */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* TAB 1: ADAPTER SWAPPER */}
+                {activeTab === "adapters" && (
+                  <div className="glass-card p-6 border-indigo-500/30 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-1">Module A: Dynamic Adapter Polymorphism</h3>
+                      <p className="text-gray-400 text-xs">
+                        Swap the concrete implementation satisfying <code className="text-cyan-300">PaymentGatewayPort</code> without changing a single line of component code.
+                      </p>
+                    </div>
+
+                    {/* Adapter Selection Controls */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <button
+                        onClick={() => setSelectedAdapterType("live")}
+                        className={`p-3 rounded-lg border text-left text-xs transition ${
+                          selectedAdapterType === "live"
+                            ? "bg-emerald-950/60 border-emerald-500 text-emerald-200 glow-emerald"
+                            : "bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-800"
+                        }`}
+                      >
+                        <div className="font-bold text-white mb-0.5">Live Production Adapter</div>
+                        <div className="text-[11px] text-gray-400">Simulates real HTTP round-trips to Stripe Live API (~800ms)</div>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedAdapterType("fake")}
+                        className={`p-3 rounded-lg border text-left text-xs transition ${
+                          selectedAdapterType === "fake"
+                            ? "bg-cyan-950/60 border-cyan-500 text-cyan-200 glow-cyan"
+                            : "bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-800"
+                        }`}
+                      >
+                        <div className="font-bold text-white mb-0.5">In-Memory Test Fake</div>
+                        <div className="text-[11px] text-gray-400">Configurable latency & deterministic failure injection</div>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedAdapterType("chaos")}
+                        className={`p-3 rounded-lg border text-left text-xs transition ${
+                          selectedAdapterType === "chaos"
+                            ? "bg-rose-950/60 border-rose-500 text-rose-200 glow-rose"
+                            : "bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-800"
+                        }`}
+                      >
+                        <div className="font-bold text-white mb-0.5">Chaos 500 Network Crash</div>
+                        <div className="text-[11px] text-gray-400">Simulates catastrophic 502/500 gateway outages</div>
+                      </button>
+                    </div>
+
+                    {/* Test Fake Config Panel */}
+                    {selectedAdapterType === "fake" && (
+                      <div className="p-4 bg-black/40 border border-cyan-500/20 rounded-lg space-y-3">
+                        <div className="text-xs font-bold text-cyan-300">Test Fake Configuration Parameters:</div>
+                        <div className="flex flex-wrap items-center gap-4 text-xs">
+                          <label className="flex items-center space-x-2">
+                            <span className="text-gray-400">Simulated Latency:</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1000"
+                              step="50"
+                              value={fakeLatency}
+                              onChange={(e) => setFakeLatency(Number(e.target.value))}
+                              className="w-24 accent-cyan-500"
+                            />
+                            <span className="font-mono text-cyan-400 font-bold">{fakeLatency}ms</span>
+                          </label>
+
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={fakeShouldFail}
+                              onChange={(e) => setFakeShouldFail(e.target.checked)}
+                              className="accent-rose-500"
+                            />
+                            <span className="text-rose-300 font-semibold">Inject Card Decline Failure</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Live Rendered Component Inside Active Provider */}
+                    <div className="pt-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        Rendered Consumer Tree (<code className="text-cyan-300">&lt;CheckoutWidget /&gt;</code>)
+                      </div>
+                      <PaymentGatewayContext.Provider value={activePaymentAdapter}>
+                        <CheckoutWidget orderId="ord_enterprise_9081" amountCents={8999} currency="usd" />
+                      </PaymentGatewayContext.Provider>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: MULTI-TENANT SCOPED OVERRIDES */}
+                {activeTab === "tenants" && (
+                  <div className="glass-card p-6 border-indigo-500/30 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-1">Module B: Scoped Subtree Dependency Overrides</h3>
+                      <p className="text-gray-400 text-xs">
+                        Two sibling subtrees consume the exact same <code className="text-cyan-300">useTenantDatabase()</code> hook, but resolve to completely isolated, scoped in-memory databases.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Tenant Alpha Subtree */}
+                      <TenantDatabaseContext.Provider value={tenantAlphaDb}>
+                        <TenantWorkspaceCard tenantName="Tenant Alpha (US North America)" />
+                      </TenantDatabaseContext.Provider>
+
+                      {/* Tenant Beta Subtree */}
+                      <TenantDatabaseContext.Provider value={tenantBetaDb}>
+                        <TenantWorkspaceCard tenantName="Tenant Beta (EU Frankfurt)" />
+                      </TenantDatabaseContext.Provider>
+                    </div>
+
+                    <div className="p-4 bg-indigo-950/20 border border-indigo-500/30 rounded-lg text-xs text-indigo-200">
+                      💡 <strong>Architectural Invariant:</strong> Neither Tenant Alpha nor Tenant Beta have any access to each other's storage instance in the JavaScript heap, preventing cross-tenant leakage in multi-tenant SaaS dashboards.
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: CUSTOM HOOK INVARIANTS */}
+                {activeTab === "invariants" && (
+                  <div className="glass-card p-6 border-rose-500/30 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-1">Module C: Custom Hook Defensive Invariant Guard</h3>
+                      <p className="text-gray-400 text-xs">
+                        Demonstrating why raw <code className="text-rose-400">useContext()</code> should never be exposed. The custom hook gateway validates Provider presence and fails fast.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-black/40 rounded-lg border border-gray-700 flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-xs text-white">Provider Hierarchy Toggle</div>
+                        <div className="text-[11px] text-gray-400">
+                          {renderOutsideProvider ? "🚨 Component mounted WITHOUT Provider wrapper" : "✓ Component wrapped with Payment Provider"}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setRenderOutsideProvider(!renderOutsideProvider)}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
+                          renderOutsideProvider
+                            ? "bg-rose-600 hover:bg-rose-500 text-white glow-rose"
+                            : "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                        }`}
+                      >
+                        {renderOutsideProvider ? "Restore Provider Wrapper" : "Remove Provider (Trigger Invariant Error)"}
+                      </button>
+                    </div>
+
+                    <LabErrorBoundary>
+                      {renderOutsideProvider ? (
+                        // Intentional boundary violation: Render directly without Provider
+                        <CheckoutWidget orderId="ord_rogue_orphan" amountCents={1500} currency="usd" />
+                      ) : (
+                        <PaymentGatewayContext.Provider value={testFakeAdapter}>
+                          <CheckoutWidget orderId="ord_guarded_valid" amountCents={2500} currency="usd" />
+                        </PaymentGatewayContext.Provider>
+                      )}
+                    </LabErrorBoundary>
+                  </div>
+                )}
+
+                {/* TAB 4: AUTOMATED VITEST RUNNER */}
+                {activeTab === "testing" && (
+                  <div className="glass-card p-6 border-emerald-500/30 space-y-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-1">Module D: Zero-Network Vitest Execution Engine</h3>
+                        <p className="text-gray-400 text-xs">
+                          Execute high-speed unit & integration test suites leveraging in-memory deterministic Fakes.
+                        </p>
+                      </div>
+                      <button
+                        onClick={runAutomatedTestSuite}
+                        disabled={isRunningTests}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${
+                          isRunningTests
+                            ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                            : "bg-emerald-600 hover:bg-emerald-500 text-white glow-emerald"
+                        }`}
+                      >
+                        {isRunningTests ? "Running Test Suite..." : "▶ Run All Tests"}
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {testResults.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 text-xs font-mono bg-black/30 rounded-lg border border-gray-800">
+                          Click "Run All Tests" to execute the in-memory test runner.
+                        </div>
+                      ) : (
+                        testResults.map((t, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border text-xs font-mono ${
+                              t.status === "PASS"
+                                ? "bg-emerald-950/30 border-emerald-600/40 text-emerald-200"
+                                : "bg-rose-950/30 border-rose-600/40 text-rose-200"
+                            }`}
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-bold flex items-center space-x-2">
+                                <span className={t.status === "PASS" ? "text-emerald-400" : "text-rose-400"}>
+                                  {t.status === "PASS" ? "✓" : "✕"}
+                                </span>
+                                <span>{t.name}</span>
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                t.status === "PASS" ? "bg-emerald-800/80 text-emerald-100" : "bg-rose-800/80 text-rose-100"
+                              }`}>
+                                {t.status}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-gray-400 pl-4">{t.details}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* RIGHT COLUMN: LIVE TELEMETRY SPY LOG BUFFER */}
+              <div className="glass-card p-6 border-cyan-500/30 flex flex-col h-full min-h-[500px]">
+                <div className="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                  <div>
+                    <h3 className="font-bold text-sm text-white flex items-center space-x-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                      <span>Telemetry Spy Buffer</span>
+                    </h3>
+                    <span className="text-[10px] text-gray-400 font-mono">In-Memory Logger Port</span>
+                  </div>
+                  <button
+                    onClick={() => telemetryLogger.clear()}
+                    className="text-[10px] text-gray-400 hover:text-white px-2 py-1 bg-gray-800 rounded"
+                  >
+                    Clear Logs
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-[11px] font-mono">
+                  {logs.length === 0 ? (
+                    <div className="text-gray-600 text-center pt-20 italic">
+                      No telemetry events recorded. Interact with widgets on the left.
+                    </div>
+                  ) : (
+                    logs.map((log) => (
+                      <div
+                        key={log.id}
+                        className={`p-2.5 rounded border ${
+                          log.level === "error"
+                            ? "bg-rose-950/40 border-rose-700/60 text-rose-200"
+                            : log.level === "warn"
+                            ? "bg-amber-950/40 border-amber-700/60 text-amber-200"
+                            : log.level === "debug"
+                            ? "bg-gray-900 border-gray-800 text-gray-400"
+                            : "bg-cyan-950/30 border-cyan-800/50 text-cyan-200"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center text-[10px] text-gray-400 mb-1">
+                          <span className="font-bold uppercase tracking-wider">{log.event}</span>
+                          <span>{log.timestamp}</span>
+                        </div>
+                        {Object.keys(log.meta).length > 0 && (
+                          <pre className="text-[10px] text-gray-300 overflow-x-auto whitespace-pre-wrap bg-black/40 p-1.5 rounded mt-1">
+                            {JSON.stringify(log.meta, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </TelemetryLoggerContext.Provider>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

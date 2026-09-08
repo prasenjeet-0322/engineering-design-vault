@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 04 — Effect Synchronization Patterns & External Systems</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    button.purple { background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 250px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line { display: flex; gap: 8px; align-items: center; }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-setup { color: var(--accent-green); font-weight: 600; }
+    .log-cleanup { color: var(--accent-amber); font-weight: 600; }
+    .log-sync { color: var(--accent-cyan); }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #0c121e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 4px;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .canvas-preview {
+      background: #000;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 120px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Pattern 1: Imperative Media Player Bridge
+    function MediaBridge({ isPlaying, volume, onLog }) {
+      const audioRef = useRef(null);
+      const audioContextRef = useRef(null);
+      const oscRef = useRef(null);
+
+      // Effect 1: Imperative Play/Pause state synchronization
+      useEffect(() => {
+        onLog(`[MEDIA SYNC] Synchronizing playback: ${isPlaying ? "PLAYING" : "PAUSED"}`, "sync");
+
+        if (isPlaying) {
+          // Initialize Web Audio synth tone for demo
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(440, ctx.currentTime);
+            gain.gain.setValueAtTime(volume / 100 * 0.1, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+
+            audioContextRef.current = ctx;
+            oscRef.current = osc;
+          } catch (e) {}
+        }
+
+        return () => {
+          if (oscRef.current) {
+            try { oscRef.current.stop(); } catch (e) {}
+          }
+          if (audioContextRef.current) {
+            try { audioContextRef.current.close(); } catch (e) {}
+          }
+        };
+      }, [isPlaying]);
+
+      return (
+        <div style={{ padding: "14px", background: "#0c1524", borderRadius: "8px", border: "1px solid #1e293b" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span><strong>Imperative Audio State:</strong></span>
+            <span className={`badge ${isPlaying ? "badge-green" : "badge-tier"}`}>
+              {isPlaying ? "▶ SOUND ACTIVE" : "⏸ MUTED"}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    // Pattern 2: Imperative Canvas Widget
+    function CanvasWidget({ color, speed, onLog }) {
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        let animationFrameId;
+        let x = 0;
+
+        onLog(`[WIDGET SETUP] Initializing canvas renderer (color: ${color})`, "setup");
+
+        const render = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, canvas.height / 2, 16, 0, Math.PI * 2);
+          ctx.fill();
+
+          x = (x + speed) % canvas.width;
+          animationFrameId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+          onLog(`[WIDGET CLEANUP] Destroying canvas render loop`, "cleanup");
+          cancelAnimationFrame(animationFrameId);
+        };
+      }, [color, speed]);
+
+      return (
+        <div className="canvas-preview">
+          <canvas ref={canvasRef} width="400" height="100" style={{ width: "100%", height: "100%" }} />
+        </div>
+      );
+    }
+
+    // Main App
+    function App() {
+      // 1. Browser API Sync
+      const [docTitle, setDocTitle] = useState("Dashboard");
+      const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+      // 2. Media Sync
+      const [isPlaying, setIsPlaying] = useState(false);
+
+      // 3. Canvas Widget Sync
+      const [widgetMounted, setWidgetMounted] = useState(true);
+      const [canvasColor, setCanvasColor] = useState("#38bdf8");
+      const [canvasSpeed, setCanvasSpeed] = useState(2);
+
+      // Logs & Telemetry
+      const [logs, setLogs] = useState([]);
+      const [setupCount, setSetupCount] = useState(0);
+      const [cleanupCount, setCleanupCount] = useState(0);
+
+      const logMessage = (text, type) => {
+        const time = new Date().toLocaleTimeString();
+        if (type === "setup") setSetupCount(c => c + 1);
+        if (type === "cleanup") setCleanupCount(c => c + 1);
+        setLogs(prev => [{ time, text, type, id: Math.random() }, ...prev.slice(0, 39)]);
+      };
+
+      // Effect: Synchronize Browser Document Title
+      useEffect(() => {
+        document.title = `[Lab 04] ${docTitle}`;
+        logMessage(`[BROWSER API] document.title = "[Lab 04] ${docTitle}"`, "sync");
+      }, [docTitle]);
+
+      // Effect: Synchronize Window Resize Listener
+      useEffect(() => {
+        logMessage(`[BROWSER API] Subscribed to window resize event`, "setup");
+
+        const handleResize = () => {
+          setWindowWidth(window.innerWidth);
+        };
+
+        window.addEventListener("resize", handleResize);
+
+        return () => {
+          logMessage(`[BROWSER API] Unsubscribed from window resize event`, "cleanup");
+          window.removeEventListener("resize", handleResize);
+        };
+      }, []);
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 04: Effect Synchronization Patterns
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Production Architectures: Browser APIs, Imperative Media Bridges, Canvas Widgets & Observer Lifecycles
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Pattern 1: Browser APIs & Media Bridge */}
+            <div className="card">
+              <h2>
+                <span>1. Browser APIs & Imperative Media</span>
+                <span className="badge badge-green">External State</span>
+              </h2>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Document Title:</span>
+                {["Dashboard", "Analytics", "Settings", "Profile"].map(t => (
+                  <button
+                    key={t}
+                    className={docTitle === t ? "active" : ""}
+                    onClick={() => setDocTitle(t)}
+                  >
+                    "{t}"
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ padding: "12px", background: "#0c1524", borderRadius: "8px", fontSize: "0.85rem", border: "1px solid #1e293b" }}>
+                <strong>Browser Window Width:</strong> <span style={{ color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>{windowWidth}px</span>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                  Resize browser window to observe real-time DOM event synchronization.
+                </div>
+              </div>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Audio Media State:</span>
+                <button
+                  className={isPlaying ? "danger active" : "active"}
+                  onClick={() => setIsPlaying(!isPlaying)}
+                >
+                  {isPlaying ? "⏸ Stop Sound" : "▶ Play 440Hz Sine Tone"}
+                </button>
+              </div>
+
+              <MediaBridge isPlaying={isPlaying} volume={50} onLog={logMessage} />
+
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Total Setups</div>
+                  <div className="stat-val" style={{ color: "var(--accent-green)" }}>{setupCount}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Cleanups</div>
+                  <div className="stat-val" style={{ color: "var(--accent-amber)" }}>{cleanupCount}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pattern 2: Imperative Widget & Lifecycle Ledger */}
+            <div className="card">
+              <h2>
+                <span>2. Imperative Canvas Widget & Teardown</span>
+                <span className="badge badge-cyan">Widget Lifecycle</span>
+              </h2>
+
+              <div className="control-panel">
+                <button
+                  className={widgetMounted ? "danger" : "active"}
+                  onClick={() => setWidgetMounted(!widgetMounted)}
+                >
+                  {widgetMounted ? "Unmount Canvas Widget" : "Mount Canvas Widget"}
+                </button>
+                <button
+                  className={canvasColor === "#38bdf8" ? "active" : ""}
+                  onClick={() => setCanvasColor("#38bdf8")}
+                >
+                  Cyan
+                </button>
+                <button
+                  className={canvasColor === "#a855f7" ? "purple active" : "purple"}
+                  onClick={() => setCanvasColor("#a855f7")}
+                >
+                  Purple
+                </button>
+                <button
+                  className={canvasColor === "#22c55e" ? "active" : ""}
+                  onClick={() => setCanvasColor("#22c55e")}
+                >
+                  Green
+                </button>
+              </div>
+
+              {widgetMounted ? (
+                <CanvasWidget color={canvasColor} speed={canvasSpeed} onLog={logMessage} />
+              ) : (
+                <div style={{ padding: "30px", background: "#0c1524", borderRadius: "8px", textAlign: "center", color: "var(--text-muted)", fontStyle: "italic" }}>
+                  Canvas widget unmounted. RequestAnimationFrame loop canceled cleanly.
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-muted)" }}>Synchronization Ledger</span>
+                <button onClick={() => { setLogs([]); setSetupCount(0); setCleanupCount(0); }} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear Log</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No synchronization events yet.</div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className="log-line">
+                      <span className="log-time">[{log.time}]</span>
+                      <span className={`log-${log.type}`}>{log.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

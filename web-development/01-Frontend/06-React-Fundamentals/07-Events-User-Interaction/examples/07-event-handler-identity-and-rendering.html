@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 - Part 07: Handler Identity, Closures & Rendering Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-accent: #4f46e5;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-violet: #8b5cf6;
+      --code-bg: #030712;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-emerald));
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 9px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, var(--accent-indigo), #4338ca); color: white; }
+    .btn-emerald { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-emerald); }
+    .btn-rose { background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); color: var(--accent-rose); }
+    .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+
+    .telemetry-box {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-stable { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-unstable { background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+    .badge-info { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); }
+
+    .log-item {
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--accent-indigo);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .log-item.memo-pass { border-color: var(--accent-emerald); }
+    .log-item.memo-fail { border-color: var(--accent-rose); }
+    .log-item.closure { border-color: var(--accent-amber); }
+
+    /* Quiz */
+    .quiz-option {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .quiz-option:hover { border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.15); border-color: var(--accent-emerald); color: var(--accent-emerald); }
+    .quiz-option.wrong { background: rgba(244, 63, 94, 0.15); border-color: var(--accent-rose); color: var(--accent-rose); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, memo } = React;
+
+    // Memoized Child Component
+    const MemoizedChild = memo(function MemoizedChild({ onAction, label, renderId }) {
+      const renderCountRef = useRef(0);
+      renderCountRef.current++;
+
+      return (
+        <div style={{ padding: '14px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Child: <code>React.memo(&lt;Child /&gt;)</code></span>
+            <span className="badge badge-info">Renders: {renderCountRef.current}</span>
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+            Receives <code>onAction</code> prop. If prop reference changes, memo bailout fails!
+          </p>
+          <button className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '5px 10px' }} onClick={onAction}>
+            Trigger Child Action ({label})
+          </button>
+        </div>
+      );
+    });
+
+    function App() {
+      const [parentCount, setParentCount] = useState(0);
+      const [useCallbackEnabled, setUseCallbackEnabled] = useState(false);
+      const [unstablePropEnabled, setUnstablePropEnabled] = useState(false);
+      const [logs, setLogs] = useState([]);
+      const [staleLog, setStaleLog] = useState([]);
+
+      // Quiz State
+      const [activeQuiz, setActiveQuiz] = useState(0);
+      const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+      // Identity references for tracking
+      const unmemoizedHandler = () => {
+        addLog("action", "Unmemoized Handler Triggered");
+      };
+
+      const memoizedHandler = useCallback(() => {
+        addLog("action", "useCallback Handler Triggered");
+      }, []);
+
+      const activeHandler = useCallbackEnabled ? memoizedHandler : unmemoizedHandler;
+      const prevHandlerRef = useRef(activeHandler);
+
+      // Track handler identity changes across renders
+      const isSameAsPrevious = prevHandlerRef.current === activeHandler;
+      prevHandlerRef.current = activeHandler;
+
+      const addLog = (type, title, details = {}) => {
+        setLogs(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            time: new Date().toISOString().substring(14, 23),
+            type,
+            title,
+            details
+          },
+          ...prev.slice(0, 39)
+        ]);
+      };
+
+      // Stale Closure Timeout Demo
+      const triggerTimeoutCapture = () => {
+        const capturedSnapshot = parentCount;
+        addLog("closure", `⏰ Scheduled setTimeout(count=${capturedSnapshot})`);
+        
+        setTimeout(() => {
+          setStaleLog(prev => [
+            {
+              id: Math.random().toString(36).substr(2, 9),
+              time: new Date().toISOString().substring(14, 23),
+              captured: capturedSnapshot,
+              current: parentCount
+            },
+            ...prev.slice(0, 9)
+          ]);
+        }, 1500);
+      };
+
+      const quizQuestions = [
+        {
+          q: "Why does `React.memo` fail to bail out when passed an unmemoized inline arrow function?",
+          options: [
+            { text: "React.memo only works on class components", isCorrect: false },
+            { text: "Every render instantiates a new function object (`prev.onClick !== next.onClick`)", isCorrect: true },
+            { text: "Inline functions mutate React fiber DOM nodes directly", isCorrect: false },
+            { text: "React ignores functions in shallow prop equality comparisons", isCorrect: false }
+          ],
+          explanation: "React.memo performs shallow comparison (`Object.is`). A newly evaluated function expression creates a new reference on every render, causing shallow equality to evaluate to false."
+        },
+        {
+          q: "What is the primary function of `useCallback(fn, deps)`?",
+          options: [
+            { text: "It compiles the function to WebAssembly for faster execution", isCorrect: false },
+            { text: "It conditionally preserves function object identity between renders when dependencies are unchanged", isCorrect: true },
+            { text: "It prevents React from garbage-collecting the component", isCorrect: false },
+            { text: "It forces asynchronous event dispatching", isCorrect: false }
+          ],
+          explanation: "useCallback preserves referential identity so memoized child components or useEffect dependency comparisons can succeed."
+        },
+        {
+          q: "If a memoized child receives `useCallback` handler AND `data={[...items]}`, what happens?",
+          options: [
+            { text: "The child successfully skips rendering", isCorrect: false },
+            { text: "The child still re-renders because `data` produces a new array reference every render", isCorrect: true },
+            { text: "useCallback automatically stabilizes the array prop too", isCorrect: false },
+            { text: "A runtime error is thrown", isCorrect: false }
+          ],
+          explanation: "React.memo checks all props. An unstable array/object reference breaks bailout even if the callback is stabilized."
+        }
+      ];
+
+      return (
+        <div className="container">
+          {/* Header */}
+          <header className="header-card">
+            <div className="header-badge">Level 06 • KPI 05 • Part 07</div>
+            <h1 className="header-title">
+              <span>🧬</span> Handler Identity, Closures & Rendering Lab
+            </h1>
+            <p className="header-subtitle">
+              Live laboratory for inspecting JavaScript function object identity, React.memo bailouts, useCallback dependencies, and asynchronous stale closures.
+            </p>
+          </header>
+
+          {/* Top Grid: Handler Identity & React.memo Bailout Demo */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 1: Parent State & Identity Controls */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🎛️</span> Parent Component Controls
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Parent Render State:</span>
+                  <span className="badge badge-info" style={{ fontSize: '0.9rem' }}>count = {parentCount}</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="btn btn-primary" onClick={() => setParentCount(c => c + 1)}>
+                    🔄 Re-render Parent (count + 1)
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setParentCount(0)}>
+                    Reset Count
+                  </button>
+                </div>
+
+                <hr style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={useCallbackEnabled} 
+                      onChange={(e) => setUseCallbackEnabled(e.target.checked)} 
+                    />
+                    <span>Wrap Handler in <code>useCallback(..., [])</code> (Stabilize Identity)</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={unstablePropEnabled} 
+                      onChange={(e) => setUnstablePropEnabled(e.target.checked)} 
+                    />
+                    <span>Pass Unstable Array Prop (<code>data=&#123;[...items]&#125;</code>)</span>
+                  </label>
+                </div>
+
+                <div style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                  <div>Handler Identity Status: {isSameAsPrevious 
+                    ? <span className="badge badge-stable">STABLE (=== prev)</span> 
+                    : <span className="badge badge-unstable">RECREATED (!== prev)</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 2: React.memo Child Observer */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🛡️</span> React.memo Child Bailout Sandbox
+              </div>
+
+              <MemoizedChild 
+                onAction={activeHandler}
+                label={useCallbackEnabled ? "Stabilized" : "Unstable"}
+                unstableData={unstablePropEnabled ? [1, 2, 3] : null}
+              />
+
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <strong>Diagnostic Evaluation:</strong>
+                {useCallbackEnabled && !unstablePropEnabled && (
+                  <p style={{ color: 'var(--accent-emerald)', marginTop: '4px' }}>
+                    ✅ <code>React.memo</code> successfully bails out! Child skips re-rendering when parent count increments.
+                  </p>
+                )}
+                {!useCallbackEnabled && (
+                  <p style={{ color: 'var(--accent-rose)', marginTop: '4px' }}>
+                    ❌ Child re-renders on every parent state update because <code>onAction</code> is a new function instance.
+                  </p>
+                )}
+                {useCallbackEnabled && unstablePropEnabled && (
+                  <p style={{ color: 'var(--accent-amber)', marginTop: '4px' }}>
+                    ⚠️ <code>onAction</code> is stable, but <code>data</code> creates a new array reference every render, breaking memoization!
+                  </p>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Middle Grid: Stale Closure Simulator & Live Telemetry */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 3: Asynchronous Stale Closure Simulator */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>⏳</span> Stale Closure in Asynchronous Handler
+              </div>
+
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                Click "Schedule Timeout", then rapidly increment parent count. Notice how the timeout closure preserves the exact snapshot value from when it was scheduled!
+              </p>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn btn-emerald" onClick={triggerTimeoutCapture}>
+                  ⏱️ Schedule setTimeout (1.5s)
+                </button>
+                <button className="btn btn-primary" onClick={() => setParentCount(c => c + 1)}>
+                  ➕ Increment Now ({parentCount})
+                </button>
+              </div>
+
+              <div className="telemetry-box" style={{ maxHeight: '160px' }}>
+                {staleLog.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
+                    No timeouts executed yet...
+                  </div>
+                ) : (
+                  staleLog.map(item => (
+                    <div key={item.id} className="log-item closure">
+                      <span style={{ fontWeight: 600 }}>Timeout Executed at {item.time}</span>
+                      <span>Closure Captured: <strong>{item.captured}</strong> | DOM State When Executed: <strong>{item.current}</strong></span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Panel 4: Telemetry Log */}
+            <div className="panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="panel-title" style={{ border: 'none', padding: 0 }}>
+                  <span>📡</span> Live Prop & Identity Log
+                </div>
+                <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '3px 8px' }} onClick={() => setLogs([])}>
+                  Clear
+                </button>
+              </div>
+
+              <div className="telemetry-box" style={{ maxHeight: '220px' }}>
+                {logs.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>
+                    Trigger actions to inspect prop identity events...
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className={`log-item ${log.type}`}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong style={{ color: '#fff' }}>{log.title}</strong>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{log.time}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Grid: Crucible Quiz */}
+          <div className="dashboard-grid">
+            <div className="panel" style={{ gridColumn: 'span 2' }}>
+              <div className="panel-title">
+                <span>🔥</span> Crucible Identity & Rendering Challenge ({activeQuiz + 1} / {quizQuestions.length})
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
+                  {quizQuestions[activeQuiz].q}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {quizQuestions[activeQuiz].options.map((opt, i) => {
+                    let className = "quiz-option";
+                    if (selectedAnswer !== null) {
+                      if (opt.isCorrect) className += " correct";
+                      else if (selectedAnswer === i) className += " wrong";
+                    }
+                    return (
+                      <div 
+                        key={i} 
+                        className={className}
+                        onClick={() => {
+                          if (selectedAnswer === null) {
+                            setSelectedAnswer(i);
+                          }
+                        }}
+                      >
+                        <span style={{ fontFamily: 'Fira Code', fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedAnswer !== null && (
+                  <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Architect Note:</strong> {quizQuestions[activeQuiz].explanation}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedAnswer === null}
+                    style={{ opacity: selectedAnswer === null ? 0.5 : 1 }}
+                    onClick={() => {
+                      setSelectedAnswer(null);
+                      setActiveQuiz((prev) => (prev + 1) % quizQuestions.length);
+                    }}
+                  >
+                    Next Question ➡️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

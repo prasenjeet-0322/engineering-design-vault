@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 05: Component API Design, Reusability & Boundaries</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 05: Component API Design, Reusability & Boundaries</h1>
+  <p class="subtitle">Interactive laboratory exploring Semantic APIs vs Implementation Leakage, Controlled vs Uncontrolled contracts, and Substitution Tests.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('leakage')">1. Implementation Leakage vs Semantic Contract</button>
+    <button onclick="selectLab('controlled')">2. Controlled vs Uncontrolled Semantics</button>
+    <button onclick="selectLab('substitution')">3. Implementation Substitution Test</button>
+    <button onclick="selectLab('booleanExplosion')">4. Boolean Explosion vs Dimensional Modeling</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Public API Contract Design</h2>
+      <pre id="code-panel">// API Contract</pre>
+
+      <h2>Coupling & Encapsulation Analysis</h2>
+      <pre id="analysis-panel">// Analysis</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Contract: Semantic & Stable</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      leakage: {
+        code: `// ❌ Implementation Leakage (Coupled to useState):\n<Modal isOpen={open} setIsOpen={setIsOpen} internalAnimationState={anim} />\n\n// ✅ Semantic API Contract (Intent-driven):\n<Modal open={open} onClose={handleClose} />`,
+        analysis: `Flawed: Consumer is coupled to parent state mechanism (setIsOpen). If parent migrates to URL query param or state machine, API breaks.\nRefactored: Consumer expresses semantic intent (onClose). Implementation can evolve freely.`,
+        verdict: `High Stability: Component hides internal state transitions and animation timers behind a clean boolean/callback pair.`,
+        rule: `Expose what consumers need to express (intent), not what the implementation happens to contain.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Clean Semantic Boundary'
+      },
+      controlled: {
+        code: `// Controlled Mode:\n<Accordion open={open} onOpenChange={setOpen} />\n\n// Uncontrolled Mode (Self-contained):\n<Accordion defaultOpen={false} />`,
+        analysis: `Controlled: Consumer maintains authoritative state. Useful when sibling components must synchronize accordion tabs.\nUncontrolled: Accordion maintains internal useState. Simplifies one-off UI usage.`,
+        verdict: `Explicit Semantics: defaultOpen initializes state once; open provides live controlled state per render.`,
+        rule: `Never confuse defaultX (initialization) with x (current controlled value). Supporting both requires explicit contract semantics.`,
+        badgeClass: 'badge-ok',
+        badgeText: 'ℹ️ Dual Controlled/Uncontrolled API'
+      },
+      substitution: {
+        code: `// Test: Can we replace <Button> with a tooltip wrapper + tracking layer?\n// Consumer Code:\n<Button variant="primary" onClick={save}>Save</Button>\n\n// Internal evolution:\nbutton ➔ wrapper ➔ tooltip ➔ analytics span ➔ native button`,
+        analysis: `Because the public API uses standard semantic props (variant, onClick) rather than DOM-specific switches (htmlTag="button", usePointerEvents=true), internal rewrites cause zero breaking changes for consumers.`,
+        verdict: `Passes Substitution Test: Internal architecture can be completely refactored while preserving consumer code.`,
+        rule: `If an implementation change forces consumers to update props, the abstraction boundary is probably leaking.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Substitution Test Passed'
+      },
+      booleanExplosion: {
+        code: `// ❌ Boolean Explosion (2^7 = 128 states!):\n<Card compact bordered elevated horizontal interactive selectable expandable />\n\n// ✅ Modeled Dimensions:\n<Card\n  layout="horizontal"\n  density="compact"\n  elevation="raised"\n  interactive\n/>`,
+        analysis: `Boolean flags produce combinatorial state explosions where invalid permutations go untested.\nRefactored enums/dimensions collapse 128 chaotic states into 3 explicit, designed axes.`,
+        verdict: `Predictable State Space: Eliminates conflicting boolean flag collisions (e.g. compact && loose).`,
+        rule: `Model domain dimensions explicitly using enums or compound composition rather than piling on independent boolean flags.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Explicit Dimensional Model'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('analysis-panel').textContent = data.analysis;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('leakage');
+  </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 06: Component Boundaries, Decomposition & Architecture</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 06: Component Boundaries, Decomposition & Architecture</h1>
+  <p class="subtitle">Interactive sandbox demonstrating High vs Low Cohesion, Coupling, Ownership Boundaries, and the 6-Dimensional Decomposition Heuristic.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('cohesion')">1. Cohesion (High vs Low)</button>
+    <button onclick="selectLab('coupling')">2. Coupling & Change Isolation</button>
+    <button onclick="selectLab('narrowestOwner')">3. Narrowest Common Owner</button>
+    <button onclick="selectLab('productDecomp')">4. ProductPage Decomposition</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Component Hierarchy & Boundaries</h2>
+      <pre id="code-panel">// Hierarchy</pre>
+
+      <h2>Responsibility & State Mapping</h2>
+      <pre id="analysis-panel">// Mapping</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Cohesion: High | Coupling: Low</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      cohesion: {
+        code: `// ❌ Low Cohesion (God Component):\nDashboard\n ├── auth logic\n ├── chart data transformation\n ├── modal state\n ├── table sorting\n └── notifications\n\n// ✅ High Cohesion (Coherent Boundaries):\nAccordion\n ├── open/close state\n ├── toggle keyboard behavior\n ├── ARIA expanded semantics\n └── accordion panel rendering`,
+        analysis: `Low Cohesion: 5 unrelated reasons to change in one component. A change to charting breaks table sorting.\nHigh Cohesion: All internal logic directly serves one unified UI behavior.`,
+        verdict: `High Cohesion ensures easy reasoning, localized bugs, and independent testing boundaries.`,
+        rule: `One component should have a single, coherent reason to change.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ High Cohesion Established'
+      },
+      coupling: {
+        code: `// ❌ Tightly Coupled (Implementation Leaked):\n<ProfileEditor\n  validationSchema={...}\n  internalFieldState={...}\n  formReducer={...}\n  inputRefs={...}\n/>\n\n// ✅ Decoupled (Semantic Boundary):\n<ProfileEditor\n  user={user}\n  onSave={handleSave}\n/>`,
+        analysis: `Tight coupling forces consumers to understand component internals. A rewrite of the internal reducer breaks all consumers.\nDecoupled semantic contract allows full internal rewrites without consumer churn.`,
+        verdict: `Low Coupling: Consumer speaks in terms of intent and domain entities.`,
+        rule: `Dependencies should flow toward semantic abstractions, not private implementation details.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Clean Semantic Decoupling'
+      },
+      narrowestOwner: {
+        code: `// App Hierarchy:\nSearchPage (OWNS query state)\n ├── SearchInput (query, onQueryChange)\n └── SearchResults (query)\n\n// Non-consumers outside SearchPage (Header, Footer) never see query!`,
+        analysis: `Placing query in SearchPage coordinates both SearchInput and SearchResults without polluting App or global state.`,
+        verdict: `Optimal State Boundary: State lives at the narrowest legitimate common ancestor.`,
+        rule: `Do not automatically elevate state to the root. Place state where coordination is genuinely required.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Narrowest Common Owner'
+      },
+      productDecomp: {
+        code: `// ✅ Responsibility-Oriented Decomposition:\nProductPage\n ├── ProductGallery (image state, zoom)\n ├── ProductPurchasePanel (quantity, cart action)\n ├── ProductDetails (specs, description)\n ├── ProductReviews (review list, rating)\n └── RelatedProducts (recommendation carousel)`,
+        analysis: `Decomposition follows domain behavior and change boundaries, not arbitrary 3-line visual fragments.`,
+        verdict: `High Maintainability: Review system changes do not force re-rendering or code changes in ProductGallery.`,
+        rule: `Extract components around ownership, behavior, reuse, and change isolation—not line count.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Responsibility-Oriented Architecture'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('analysis-panel').textContent = data.analysis;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('cohesion');
+  </script>
+</body>
+</html>

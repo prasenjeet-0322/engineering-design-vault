@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 01 — Conditional Rendering Mental Model & Declarative Branching Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.82);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1350px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.45rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .form-input {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      width: 100%;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .telemetry-block {
+      background: #060911;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.82rem;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    .log-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .log-entry.mount {
+      border-left: 3px solid var(--success);
+      color: #a7f3d0;
+    }
+
+    .log-entry.unmount {
+      border-left: 3px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    .log-entry.update {
+      border-left: 3px solid var(--accent);
+      color: #bae6fd;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function ConditionalRenderingMasterLab() {
+      const [tab, setTab] = useState('fiberIdentity');
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <span className="badge">Level 06 — React Fundamentals (KPI 09)</span>
+              <h1>Conditional Rendering Mental Model & Fiber Tree Inspector</h1>
+            </div>
+            <span className="badge badge-success">Part 01 Lab</span>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${tab === 'fiberIdentity' ? 'active' : ''}`}
+              onClick={() => setTab('fiberIdentity')}
+            >
+              1. Fiber Identity & State Preservation
+            </button>
+            <button
+              className={`tab-btn ${tab === 'numericTrap' ? 'active' : ''}`}
+              onClick={() => setTab('numericTrap')}
+            >
+              2. The && Numeric Traps (0 & NaN)
+            </button>
+            <button
+              className={`tab-btn ${tab === 'mountVsHide' ? 'active' : ''}`}
+              onClick={() => setTab('mountVsHide')}
+            >
+              3. Conditional Mount vs CSS Hiding
+            </button>
+          </nav>
+
+          {tab === 'fiberIdentity' && <FiberIdentityLab />}
+          {tab === 'numericTrap' && <NumericTrapLab />}
+          {tab === 'mountVsHide' && <MountVsHideLab />}
+        </div>
+      );
+    }
+
+    // MODULE 1: Fiber Identity Lab
+    function FiberIdentityLab() {
+      const [mode, setMode] = useState('editorA');
+      const [useKey, setUseKey] = useState(false);
+      const [logs, setLogs] = useState([]);
+
+      const logEvent = (msg, type = 'update') => {
+        setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
+      };
+
+      return (
+        <div className="grid">
+          <div className="card">
+            <div className="card-title">
+              <span>Interactive Branch Switcher</span>
+              <span className="badge">{mode}</span>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              Type a draft message in the input below, then switch branches. Notice how state is preserved between Editor A and Editor B (same component type), but reset when switching to Viewer (different type) or when enabling explicit keys.
+            </p>
+
+            <div className="btn-group">
+              <button
+                className={`btn ${mode === 'editorA' ? 'btn' : 'btn-secondary'}`}
+                onClick={() => setMode('editorA')}
+              >
+                Branch 1: Editor A
+              </button>
+              <button
+                className={`btn ${mode === 'editorB' ? 'btn' : 'btn-secondary'}`}
+                onClick={() => setMode('editorB')}
+              >
+                Branch 2: Editor B (Same Type)
+              </button>
+              <button
+                className={`btn ${mode === 'viewer' ? 'btn-danger' : 'btn-secondary'}`}
+                onClick={() => setMode('viewer')}
+              >
+                Branch 3: Viewer (Diff Type)
+              </button>
+            </div>
+
+            <div style={{ marginTop: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={useKey}
+                  onChange={e => setUseKey(e.target.checked)}
+                />
+                <span>Attach explicit <code>key={`{mode}`}</code> (Forces State Reset)</span>
+              </label>
+            </div>
+
+            <div style={{ marginTop: '16px', padding: '16px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '12px' }}>
+              {mode === 'editorA' && (
+                <EditorPanel key={useKey ? 'editorA' : undefined} name="Editor A" onLog={logEvent} />
+              )}
+              {mode === 'editorB' && (
+                <EditorPanel key={useKey ? 'editorB' : undefined} name="Editor B" onLog={logEvent} />
+              )}
+              {mode === 'viewer' && (
+                <ViewerPanel key={useKey ? 'viewer' : undefined} name="Viewer (Different Type)" onLog={logEvent} />
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Reconciliation & Fiber Telemetry</span>
+              <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={() => setLogs([])}>
+                Clear Logs
+              </button>
+            </div>
+
+            <div className="log-stream">
+              {logs.length === 0 && <span style={{ opacity: 0.5 }}>Switch branches or type to view lifecycle events.</span>}
+              {logs.map((log, idx) => (
+                <div
+                  key={idx}
+                  className={`log-entry ${
+                    log.includes('Mounted') ? 'mount' : log.includes('Unmounted') ? 'unmount' : 'update'
+                  }`}
+                >
+                  {log}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function EditorPanel({ name, onLog }) {
+      const [draft, setDraft] = useState('');
+
+      useEffect(() => {
+        onLog(`🟢 [MOUNT] <EditorPanel name="${name}"> allocated fresh Fiber node.`, 'mount');
+        return () => {
+          onLog(`🔴 [UNMOUNT] <EditorPanel name="${name}"> Fiber destroyed & state erased.`, 'unmount');
+        };
+      }, [name]);
+
+      return (
+        <div>
+          <h4>Component: <code>&lt;EditorPanel /&gt;</code> ({name})</h4>
+          <input
+            className="form-input"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="Type confidential draft..."
+            style={{ marginTop: '8px' }}
+          />
+          <p style={{ marginTop: '6px', fontSize: '0.85rem', color: 'var(--accent)' }}>
+            Internal State (<code>draft</code>): <strong>"{draft || '(empty)'}"</strong>
+          </p>
+        </div>
+      );
+    }
+
+    function ViewerPanel({ name, onLog }) {
+      const [notes, setNotes] = useState('');
+
+      useEffect(() => {
+        onLog(`🟢 [MOUNT] <ViewerPanel> (Different Component Type) mounted.`, 'mount');
+        return () => {
+          onLog(`🔴 [UNMOUNT] <ViewerPanel> unmounted.`, 'unmount');
+        };
+      }, []);
+
+      return (
+        <div>
+          <h4>Component: <code>&lt;ViewerPanel /&gt;</code> (Different Type)</h4>
+          <input
+            className="form-input"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Viewer notes..."
+            style={{ marginTop: '8px' }}
+          />
+        </div>
+      );
+    }
+
+    // MODULE 2: Numeric Traps Lab
+    function NumericTrapLab() {
+      const [cartCount, setCartCount] = useState(0);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>The Infamous <code>&&</code> Numeric Short-Circuit Traps</span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            In JavaScript, <code>0 && &lt;Component /&gt;</code> evaluates to <code>0</code>, and <code>NaN && &lt;Component /&gt;</code> evaluates to <code>NaN</code>. React renders numbers as text nodes in the DOM!
+          </p>
+
+          <div className="btn-group">
+            <button className="btn" onClick={() => setCartCount(0)}>Set items.length = 0</button>
+            <button className="btn" onClick={() => setCartCount(3)}>Set items.length = 3</button>
+            <button className="btn btn-secondary" onClick={() => setCartCount(NaN)}>Set items.length = NaN</button>
+          </div>
+
+          <div className="grid" style={{ marginTop: '16px' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--danger)' }}>
+              <h4 style={{ color: '#fca5a5' }}>❌ Flawed Syntax: <code>{`{cartCount && <Badge />}`}</code></h4>
+              <p style={{ fontSize: '0.85rem', margin: '8px 0', opacity: 0.8 }}>Real DOM Output:</p>
+              <div style={{ background: '#000', padding: '12px', borderRadius: '6px', minHeight: '45px' }}>
+                {cartCount && <span className="badge">{cartCount} items</span>}
+              </div>
+              <p style={{ fontSize: '0.75rem', marginTop: '6px', color: '#fca5a5' }}>
+                {cartCount === 0 ? '⚠️ Notice the literal "0" rendered on the screen!' : cartCount ? 'Valid output' : '⚠️ Rendered NaN!'}
+              </p>
+            </div>
+
+            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--success)' }}>
+              <h4 style={{ color: '#86efac' }}>✅ Senior Syntax: <code>{`{cartCount > 0 && <Badge />}`}</code></h4>
+              <p style={{ fontSize: '0.85rem', margin: '8px 0', opacity: 0.8 }}>Real DOM Output:</p>
+              <div style={{ background: '#000', padding: '12px', borderRadius: '6px', minHeight: '45px' }}>
+                {cartCount > 0 && <span className="badge badge-success">{cartCount} items</span>}
+              </div>
+              <p style={{ fontSize: '0.75rem', marginTop: '6px', color: '#86efac' }}>
+                ✓ Clean render: completely empty when count is 0 or NaN.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // MODULE 3: Mount vs Hide Lab
+    function MountVsHideLab() {
+      const [isOpen, setIsOpen] = useState(false);
+      const [mountTicks, setMountTicks] = useState(0);
+      const [hideTicks, setHideTicks] = useState(0);
+
+      useEffect(() => {
+        let interval;
+        if (isOpen) {
+          interval = setInterval(() => setMountTicks(t => t + 1), 1000);
+        }
+        return () => clearInterval(interval);
+      }, [isOpen]);
+
+      useEffect(() => {
+        const interval = setInterval(() => setHideTicks(t => t + 1), 1000);
+        return () => clearInterval(interval);
+      }, []);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Conditional Mount vs CSS <code>hidden</code> Lifecycle Audit</span>
+            <button className="btn" onClick={() => setIsOpen(!isOpen)}>
+              {isOpen ? 'Close Panels' : 'Open Panels'}
+            </button>
+          </div>
+
+          <div className="grid">
+            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '12px' }}>
+              <h4>1. Conditional Mount (<code>{`{isOpen && <Panel />}`}</code>)</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0' }}>
+                Timer runs only while open. Memory released on close.
+              </p>
+              <div style={{ marginTop: '12px', minHeight: '60px' }}>
+                {isOpen ? (
+                  <div className="badge badge-success">🟢 Active Timer: {mountTicks}s</div>
+                ) : (
+                  <span style={{ opacity: 0.4 }}>Subtree unmounted (0 memory consumed)</span>
+                )}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '16px', borderRadius: '12px' }}>
+              <h4>2. CSS Hiding (<code>&lt;div hidden={'{!isOpen}'}&gt;</code>)</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0' }}>
+                Timer continuously runs in background even when closed!
+              </p>
+              <div style={{ marginTop: '12px', minHeight: '60px' }}>
+                <div hidden={!isOpen}>
+                  <div className="badge">⏱️ Hidden Active Timer: {hideTicks}s</div>
+                </div>
+                {!isOpen && (
+                  <span style={{ opacity: 0.6, fontSize: '0.8rem', color: 'var(--warning)' }}>
+                    ⚠️ Subtree is hidden from view but actively ticking in background!
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<ConditionalRenderingMasterLab />);
+  </script>
+</body>
+</html>

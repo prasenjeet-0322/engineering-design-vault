@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 01 — Why Effects Exist: React Rendering vs External Systems</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
+    }
+
+    .log-container {
+      max-height: 380px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    .comparison-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .code-panel {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function WhyEffectsExistLab() {
+      // 1. FAKE EFFECT VS PURE RENDER STATE
+      const [price, setPrice] = useState(100);
+      const [quantity, setQuantity] = useState(2);
+      
+      // Bad pattern state
+      const [badTotal, setBadTotal] = useState(0);
+      const [badRenderCount, setBadRenderCount] = useState(0);
+      
+      // Good pattern render count
+      const goodRenderCountRef = useRef(0);
+      goodRenderCountRef.current++;
+
+      // Bad effect pipeline
+      useEffect(() => {
+        setBadRenderCount(c => c + 1);
+        setBadTotal(price * quantity);
+      }, [price, quantity]);
+
+      // Good pure render calculation
+      const goodTotal = price * quantity;
+
+      // 2. REAL EXTERNAL SYNCHRONIZATION: BROWSER RESIZE
+      const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+      const [isSyncActive, setIsSyncActive] = useState(true);
+
+      // TELEMETRY
+      const [telemetry, setTelemetry] = useState([]);
+
+      const log = (source, message) => {
+        setTelemetry(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString(),
+            source,
+            message
+          },
+          ...prev.slice(0, 19)
+        ]);
+      };
+
+      // REAL EFFECT: Window resize subscription
+      useEffect(() => {
+        if (!isSyncActive) return;
+
+        const handleResize = () => {
+          setWindowWidth(window.innerWidth);
+          log("EXTERNAL_SYNC", `Window resized to ${window.innerWidth}px`);
+        };
+
+        log("SETUP", "Attached 'resize' listener to window");
+        window.addEventListener("resize", handleResize);
+
+        return () => {
+          log("CLEANUP", "Removed 'resize' listener from window");
+          window.removeEventListener("resize", handleResize);
+        };
+      }, [isSyncActive]);
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🧪 Companion Lab 01 — Why Effects Exist</span>
+                <span className="badge">KPI-06 Effects Architecture</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                Pure Render Calculations vs External System Synchronization Boundaries.
+              </p>
+            </div>
+            <button className="btn-danger" onClick={() => setTelemetry([])}>
+              Clear Telemetry
+            </button>
+          </header>
+
+          <div className="grid-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* 1. FAKE EFFECT VS PURE RENDER */}
+              <div className="card">
+                <div className="card-title">
+                  <span>1️⃣ Derived State: Fake Effect vs Pure Calculation</span>
+                </div>
+                <div className="btn-row">
+                  <button className="btn-primary" onClick={() => setQuantity(q => q + 1)}>
+                    + Increase Quantity ({quantity})
+                  </button>
+                  <button onClick={() => setPrice(p => p + 50)}>
+                    + Increase Price (${price})
+                  </button>
+                </div>
+                <div className="comparison-box">
+                  <div className="code-panel" style={{ borderColor: "var(--accent-red)" }}>
+                    <div style={{ color: "var(--accent-red)", fontWeight: "bold", marginBottom: 6 }}>
+                      ❌ Anti-Pattern (useEffect Pipeline)
+                    </div>
+                    <div>Total: <strong>${badTotal}</strong></div>
+                    <div style={{ color: "var(--text-muted)", marginTop: 4 }}>
+                      Extra Cascade Renders: <span style={{ color: "var(--accent-amber)" }}>{badRenderCount}</span>
+                    </div>
+                  </div>
+
+                  <div className="code-panel" style={{ borderColor: "var(--accent-green)" }}>
+                    <div style={{ color: "var(--accent-green)", fontWeight: "bold", marginBottom: 6 }}>
+                      ✅ Senior Model (Direct Render)
+                    </div>
+                    <div>Total: <strong>${goodTotal}</strong></div>
+                    <div style={{ color: "var(--text-muted)", marginTop: 4 }}>
+                      Direct Render Passes: <span style={{ color: "var(--accent-green)" }}>{goodRenderCountRef.current}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. REAL EXTERNAL SYSTEM SYNCHRONIZATION */}
+              <div className="card">
+                <div className="card-title">
+                  <span>2️⃣ Real Effect: Window Resize Synchronization</span>
+                  <span className="badge">{isSyncActive ? "SYNC ACTIVE" : "DISCONNECTED"}</span>
+                </div>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                  Browser <code>window</code> is an external system outside React's element tree.
+                </p>
+                <div style={{ background: "#090d16", padding: 14, borderRadius: 8, fontSize: "0.9rem" }}>
+                  Current Window Width: <strong style={{ color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>{windowWidth}px</strong>
+                </div>
+                <div className="btn-row">
+                  <button
+                    className={isSyncActive ? "btn-danger" : "btn-primary"}
+                    onClick={() => setIsSyncActive(a => !a)}
+                  >
+                    {isSyncActive ? "Disconnect Synchronization (Trigger Cleanup)" : "Establish Synchronization (Run Setup)"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: TELEMETRY LEDGER */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 Synchronization Telemetry Ledger</span>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 30 }}>
+                      Interact with controls or resize the browser window to trace synchronization events...
+                    </div>
+                  ) : (
+                    telemetry.map(entry => (
+                      <div key={entry.id} className="log-item">
+                        <div className="log-header">
+                          <span>[{entry.source}]</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{entry.time}</span>
+                        </div>
+                        <div style={{ color: "#fff", fontSize: "0.8rem" }}>{entry.message}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<WhyEffectsExistLab />);
+  </script>
+</body>
+</html>

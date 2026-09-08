@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 07 / Part 12 Lab — Ref-Based Observer & Measurement Coordination</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+    }
+
+    /* Grid */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Buttons */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      border-color: #6366f1;
+      color: #fff;
+      box-shadow: 0 2px 10px var(--accent-primary-glow);
+    }
+
+    button.emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    button.cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.35);
+      color: #22d3ee;
+    }
+
+    button.amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    button.rose {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: #fb7185;
+    }
+
+    /* Resizable Box */
+    .resizable-box {
+      background: #0f172a;
+      border: 1px dashed rgba(99, 102, 241, 0.6);
+      border-radius: 10px;
+      padding: 16px;
+      resize: horizontal;
+      overflow: auto;
+      min-width: 200px;
+      max-width: 100%;
+      width: 380px;
+      margin-bottom: 14px;
+      box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Metrics Grid */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-box {
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-top: 4px;
+    }
+
+    /* Terminal Console */
+    .terminal-window {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      max-height: 190px;
+      overflow-y: auto;
+      margin-top: 14px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: #64748b;
+      min-width: 65px;
+    }
+    .log-cmd {
+      color: #818cf8;
+      font-weight: 600;
+    }
+    .log-info {
+      color: #22d3ee;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .log-err {
+      color: #f43f5e;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+
+    /* Gallery Items */
+    .gallery-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 140px;
+      overflow-y: auto;
+      background: #0b0f19;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 12px;
+    }
+
+    .gallery-item {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-titles">
+        <h1>
+          <span>📐 Ref-Based Observer & Measurement Coordination</span>
+        </h1>
+        <div class="subtitle">KPI 07 · Part 12 Companion Lab — ResizeObserver, Measurement Normalization & Dynamic Registries</div>
+      </div>
+      <div>
+        <span class="badge badge-primary">Level 06 Core Competency</span>
+      </div>
+    </header>
+
+    <!-- Top Grid: Normalization Engine vs Feedback Loop -->
+    <div class="grid-2col">
+      <!-- Panel 1: ResizeObserver Measurement Normalization -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. ResizeObserver & Breakpoint Normalization</span>
+          <span class="status-pill" id="breakpointBadge" style="background: rgba(6,182,212,0.15); color:#22d3ee;">MD Breakpoint</span>
+        </div>
+        <p class="card-desc">
+          Drag the right handle to resize. Notice how raw pixel callbacks fire continuously (60fps), but <strong>React State only re-renders when crossing a discrete breakpoint boundary</strong>.
+        </p>
+
+        <div class="resizable-box" id="resizeBox">
+          <div style="font-size:0.85rem; color:#fff; font-weight:600; margin-bottom:4px;">Responsive Card Container</div>
+          <div style="font-size:0.75rem; color:#94a3b8;">Drag ↘ corner or right edge to observe continuous geometry.</div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Raw Measured Width</span>
+            <span class="metric-value" id="rawWidthVal" style="color:#f59e0b;">380.0px</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Observer Callbacks</span>
+            <span class="metric-value" id="obsCallbackCountVal" style="color:#a855f7;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Normalized Renders</span>
+            <span class="metric-value" id="normRendersVal" style="color:#10b981;">1</span>
+          </div>
+        </div>
+
+        <div class="terminal-window" id="resizeTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[ResizeObserver] Bound to DOM ref. Normalization thresholds: SM (&lt;320px), MD (320-500px), LG (&gt;500px).</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Measurement Feedback Loop & Hysteresis -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Feedback Loop Hazard & Hysteresis Guard</span>
+          <span class="status-pill" id="loopStatusBadge" style="background: rgba(16,185,129,0.15); color:#34d399;">Safe (Hysteresis Active)</span>
+        </div>
+        <p class="card-desc">
+          Toggling layout styles that alter the measured element itself creates infinite oscillation loops. Hysteresis deadbands prevent edge boundary flickering.
+        </p>
+
+        <div id="oscillatingElement" style="background:#1e293b; border:1px solid #4f46e5; border-radius:8px; padding:12px; width:340px; text-align:center; margin-bottom:14px; transition: width 0.1s ease;">
+          <span id="oscText" style="font-size:0.85rem; font-family:var(--font-mono); color:#fff;">Element Width: 340px</span>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Oscillation State</span>
+            <span class="metric-value" id="oscStateVal" style="font-size:0.9rem; color:#38bdf8;">Standard</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Cycle Counter</span>
+            <span class="metric-value" id="oscCyclesVal" style="color:#f43f5e;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Hysteresis Band</span>
+            <span class="metric-value" id="hysteresisVal" style="color:#10b981; font-size:0.85rem;">[320px, 360px]</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="rose" id="btnTriggerOscillation">💥 Trigger Naive Feedback Loop (Oscillate!)</button>
+          <button class="emerald" id="btnApplyHysteresis">🛡️ Apply Hysteresis Guard (Stabilize)</button>
+        </div>
+
+        <div class="terminal-window" id="feedbackTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Hysteresis Engine] Ready.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid: Dynamic Node Registry vs Shared Observer -->
+    <div class="grid-2col">
+      <!-- Panel 3: Dynamic Node Registry with Callback Ref Cleanup -->
+      <div class="card">
+        <div class="card-title">
+          <span>3. Dynamic Node Registry & Cleanup Ledger</span>
+          <span class="badge badge-primary">Map&lt;Id, Node&gt;</span>
+        </div>
+        <p class="card-desc">
+          When list items unmount, callback refs receive <code>null</code>. The registry unobserves the target and purges the Map key to prevent detached DOM memory leaks.
+        </p>
+
+        <div class="gallery-container" id="galleryList">
+          <!-- Dynamic Items inserted here -->
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">nodesRef Map Size</span>
+            <span class="metric-value" id="mapSizeVal" style="color:#38bdf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Unobserved / Purged</span>
+            <span class="metric-value" id="purgedCountVal" style="color:#10b981;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Detached Leaks</span>
+            <span class="metric-value" id="detachedLeaksVal" style="color:#10b981;">0 (Zero Leak)</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="cyan" id="btnAddGalleryItem">➕ Add Dynamic Item</button>
+          <button class="rose" id="btnRemoveGalleryItem">➖ Remove Oldest Item</button>
+          <button id="btnShuffleGallery">🔀 Shuffle Items (Stable Keys)</button>
+        </div>
+
+        <div class="terminal-window" id="registryTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Registry] Map reference initialized with zero entries.</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 4: Shared Observer Reference Counting -->
+      <div class="card">
+        <div class="card-title">
+          <span>4. Shared Observer Reference Counting</span>
+          <span class="status-pill" id="sharedObsBadge" style="background: rgba(16,185,129,0.15); color:#34d399;">1 Global Observer</span>
+        </div>
+        <p class="card-desc">
+          Components share a single <code>IntersectionObserver</code> instance. Unmounting a component calls <code>unobserve(node)</code> rather than <code>disconnect()</code> to protect sibling watchers.
+        </p>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Observed Targets</span>
+            <span class="metric-value" id="observedTargetsCount" style="color:#f59e0b;">4 Targets</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Observer Instances</span>
+            <span class="metric-value" id="observerInstancesCount" style="color:#10b981;">1 (Shared)</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Safety Status</span>
+            <span class="metric-value" id="observerSafetyVal" style="color:#34d399; font-size:0.85rem;">Safe unobserve()</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="rose" id="btnDangerousDisconnect">⚠️ Naive disconnect() (Breaks Siblings!)</button>
+          <button class="emerald" id="btnSafeUnobserve">✅ Safe unobserve() (Preserves Siblings)</button>
+        </div>
+
+        <div class="terminal-window" id="sharedTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[SharedPool] 1 singleton observer active with 4 subscribers.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getTime() {
+      const d = new Date();
+      return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0').slice(0,2);
+    }
+
+    function log(terminalId, cmd, info, type = 'info') {
+      const term = document.getElementById(terminalId);
+      if (!term) return;
+      const row = document.createElement('div');
+      row.className = 'log-line';
+      row.innerHTML = `<span class="log-time">${getTime()}</span><span class="log-cmd">${cmd}</span><span class="log-${type}">${info}</span>`;
+      term.appendChild(row);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // --- PANEL 1: RESIZEOBSERVER & NORMALIZATION ---
+    const resizeBox = document.getElementById('resizeBox');
+    const rawWidthVal = document.getElementById('rawWidthVal');
+    const obsCallbackCountVal = document.getElementById('obsCallbackCountVal');
+    const normRendersVal = document.getElementById('normRendersVal');
+    const breakpointBadge = document.getElementById('breakpointBadge');
+
+    let rawCallbacks = 0;
+    let normalizedRenders = 1;
+    let currentBreakpoint = 'md';
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      rawCallbacks++;
+      const width = entry.contentRect.width;
+      rawWidthVal.textContent = `${width.toFixed(1)}px`;
+      obsCallbackCountVal.textContent = rawCallbacks;
+
+      let nextBp = 'sm';
+      if (width >= 500) nextBp = 'lg';
+      else if (width >= 320) nextBp = 'md';
+
+      if (nextBp !== currentBreakpoint) {
+        currentBreakpoint = nextBp;
+        normalizedRenders++;
+        normRendersVal.textContent = normalizedRenders;
+
+        if (nextBp === 'lg') {
+          breakpointBadge.textContent = 'LG Breakpoint (>500px)';
+          breakpointBadge.style.background = 'rgba(16,185,129,0.15)';
+          breakpointBadge.style.color = '#34d399';
+        } else if (nextBp === 'md') {
+          breakpointBadge.textContent = 'MD Breakpoint (320-500px)';
+          breakpointBadge.style.background = 'rgba(6,182,212,0.15)';
+          breakpointBadge.style.color = '#22d3ee';
+        } else {
+          breakpointBadge.textContent = 'SM Breakpoint (<320px)';
+          breakpointBadge.style.background = 'rgba(245,158,11,0.15)';
+          breakpointBadge.style.color = '#fbbf24';
+        }
+
+        log('resizeTerminal', `State Update -> '${nextBp}'`, `Normalized render #${normalizedRenders} triggered (Saved ${rawCallbacks - normalizedRenders} render passes!).`, 'emerald');
+      }
+    });
+
+    resizeObserver.observe(resizeBox);
+
+    // --- PANEL 2: OSCILLATION HAZARD & HYSTERESIS ---
+    let isOscillating = false;
+    let oscCycles = 0;
+    let hysteresisMode = true;
+    let oscInterval = null;
+
+    const oscillatingElement = document.getElementById('oscillatingElement');
+    const oscText = document.getElementById('oscText');
+    const oscStateVal = document.getElementById('oscStateVal');
+    const oscCyclesVal = document.getElementById('oscCyclesVal');
+    const loopStatusBadge = document.getElementById('loopStatusBadge');
+
+    document.getElementById('btnTriggerOscillation').addEventListener('click', () => {
+      if (oscInterval) clearInterval(oscInterval);
+      hysteresisMode = false;
+      loopStatusBadge.textContent = '⚠️ INFINITE LOOP DETECTED';
+      loopStatusBadge.style.background = 'rgba(244,63,94,0.2)';
+      loopStatusBadge.style.color = '#f43f5e';
+      log('feedbackTerminal', 'Naive Toggle', '💥 Threshold: 340px. Element toggles between 330px and 350px continuously!', 'err');
+
+      let flip = false;
+      oscInterval = setInterval(() => {
+        flip = !flip;
+        oscCycles++;
+        oscCyclesVal.textContent = oscCycles;
+        const w = flip ? 330 : 350;
+        oscillatingElement.style.width = `${w}px`;
+        oscText.textContent = `Width: ${w}px (Toggling!)`;
+        oscStateVal.textContent = flip ? 'Expanded (350px)' : 'Collapsed (330px)';
+      }, 150);
+    });
+
+    document.getElementById('btnApplyHysteresis').addEventListener('click', () => {
+      if (oscInterval) clearInterval(oscInterval);
+      hysteresisMode = true;
+      loopStatusBadge.textContent = 'Safe (Hysteresis Active)';
+      loopStatusBadge.style.background = 'rgba(16,185,129,0.15)';
+      loopStatusBadge.style.color = '#34d399';
+      oscillatingElement.style.width = '340px';
+      oscText.textContent = 'Width: 340px (Stabilized)';
+      oscStateVal.textContent = 'Stabilized in Deadband';
+      log('feedbackTerminal', 'Hysteresis Applied', '🛡️ Deadband [320px, 360px] stabilized layout without oscillation.', 'emerald');
+    });
+
+    // --- PANEL 3: DYNAMIC NODE REGISTRY ---
+    const galleryList = document.getElementById('galleryList');
+    const mapSizeVal = document.getElementById('mapSizeVal');
+    const purgedCountVal = document.getElementById('purgedCountVal');
+    const nodesRegistry = new Map();
+    let itemIdSeq = 1;
+    let purgedCount = 0;
+
+    function addGalleryItem() {
+      const id = `item_${itemIdSeq++}`;
+      const div = document.createElement('div');
+      div.className = 'gallery-item';
+      div.id = id;
+      div.innerHTML = `<span>#${id}</span> <span style="color:#10b981;">●</span>`;
+      galleryList.appendChild(div);
+
+      // Register in Map
+      nodesRegistry.set(id, div);
+      mapSizeVal.textContent = nodesRegistry.size;
+      log('registryTerminal', `registerNode('${id}')`, `Added to Map ref (Total items: ${nodesRegistry.size}).`, 'info');
+    }
+
+    function removeGalleryItem() {
+      const firstId = nodesRegistry.keys().next().value;
+      if (!firstId) return;
+
+      const node = nodesRegistry.get(firstId);
+      if (node && node.parentNode) {
+        node.parentNode.removeChild(node);
+      }
+
+      // Callback ref null simulation: unobserve & purge
+      nodesRegistry.delete(firstId);
+      purgedCount++;
+      purgedCountVal.textContent = purgedCount;
+      mapSizeVal.textContent = nodesRegistry.size;
+      log('registryTerminal', `callbackRef(null) -> '${firstId}'`, `Purged from Map ref & unobserved. Zero detached DOM leaks!`, 'emerald');
+    }
+
+    for (let i = 0; i < 4; i++) addGalleryItem();
+
+    document.getElementById('btnAddGalleryItem').addEventListener('click', addGalleryItem);
+    document.getElementById('btnRemoveGalleryItem').addEventListener('click', removeGalleryItem);
+    document.getElementById('btnShuffleGallery').addEventListener('click', () => {
+      const items = Array.from(galleryList.children);
+      items.sort(() => Math.random() - 0.5);
+      items.forEach(el => galleryList.appendChild(el));
+      log('registryTerminal', 'Shuffle Items', 'Reordered DOM elements while preserving entity ID keys.', 'cmd');
+    });
+
+    // --- PANEL 4: SHARED OBSERVER REFERENCE COUNTING ---
+    const observedTargetsCount = document.getElementById('observedTargetsCount');
+    const observerSafetyVal = document.getElementById('observerSafetyVal');
+    const sharedObsBadge = document.getElementById('sharedObsBadge');
+
+    let activeSubscribers = 4;
+
+    document.getElementById('btnDangerousDisconnect').addEventListener('click', () => {
+      activeSubscribers = 0;
+      observedTargetsCount.textContent = '0 Targets';
+      observerSafetyVal.textContent = '💥 Broken by disconnect()';
+      observerSafetyVal.style.color = '#f43f5e';
+      sharedObsBadge.textContent = 'Disconnected';
+      sharedObsBadge.style.background = 'rgba(244,63,94,0.15)';
+      sharedObsBadge.style.color = '#fb7185';
+      log('sharedTerminal', 'observer.disconnect()', '⚠️ CRITICAL: Component unmount called disconnect() and killed all sibling observers!', 'err');
+    });
+
+    document.getElementById('btnSafeUnobserve').addEventListener('click', () => {
+      activeSubscribers = 4;
+      observedTargetsCount.textContent = '4 Targets';
+      observerSafetyVal.textContent = 'Safe unobserve()';
+      observerSafetyVal.style.color = '#34d399';
+      sharedObsBadge.textContent = '1 Global Observer';
+      sharedObsBadge.style.background = 'rgba(16,185,129,0.15)';
+      sharedObsBadge.style.color = '#34d399';
+      log('sharedTerminal', 'observer.unobserve(target)', '✅ Cleaned up target without affecting remaining subscribers.', 'emerald');
+    });
+  </script>
+</body>
+</html>

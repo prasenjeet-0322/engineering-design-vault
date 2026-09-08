@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 08 Part 16 — Forms & Controlled Inputs Capstone Synthesis Master Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.82);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+      --purple: #c084fc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1350px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.45rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .form-input {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .form-input.invalid {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .telemetry-block {
+      background: #060911;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #93c5fd;
+      overflow-x: auto;
+      max-height: 240px;
+    }
+
+    .error-summary-banner {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+
+    .error-summary-banner h4 {
+      color: #fca5a5;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    .error-summary-banner ul {
+      margin-left: 20px;
+      font-size: 0.85rem;
+      color: #fecaca;
+    }
+
+    .error-summary-banner a {
+      color: #93c5fd;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .row-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.5);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 8px;
+    }
+
+    .log-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .log-entry.accepted {
+      border-left: 3px solid var(--success);
+      color: #a7f3d0;
+    }
+
+    .log-entry.discarded {
+      border-left: 3px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    .log-entry.dispatch {
+      border-left: 3px solid var(--accent);
+      color: #bae6fd;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    function deepEqual(a, b) {
+      if (a === b) return true;
+      if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      if (keysA.length !== keysB.length) return false;
+      for (const k of keysA) {
+        if (!keysB.includes(k) || !deepEqual(a[k], b[k])) return false;
+      }
+      return true;
+    }
+
+    function MasterCapstoneLab() {
+      const [activeTab, setActiveTab] = useState('stateMachine');
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <span className="badge">Level 06 — React Fundamentals</span>
+              <h1>KPI 08: Forms & Controlled Inputs — Master Synthesis Lab</h1>
+            </div>
+            <span className="badge badge-success">🎓 100% Curriculum Complete</span>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${activeTab === 'stateMachine' ? 'active' : ''}`}
+              onClick={() => setActiveTab('stateMachine')}
+            >
+              1. 7-Dimension State Machine
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'raceTester' ? 'active' : ''}`}
+              onClick={() => setActiveTab('raceTester')}
+            >
+              2. Async Race & Currentness
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'dynamicRows' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dynamicRows')}
+            >
+              3. Dynamic UUID Identity
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'examTester' ? 'active' : ''}`}
+              onClick={() => setActiveTab('examTester')}
+            >
+              4. 20-Question Exam Simulator
+            </button>
+          </nav>
+
+          {activeTab === 'stateMachine' && <StateMachineModule />}
+          {activeTab === 'raceTester' && <RaceTesterModule />}
+          {activeTab === 'dynamicRows' && <DynamicRowsModule />}
+          {activeTab === 'examTester' && <ExamTesterModule />}
+        </div>
+      );
+    }
+
+    // MODULE 1: 7-Dimension State Machine
+    function StateMachineModule() {
+      const initialBaseline = {
+        name: 'Alice Smith',
+        email: 'alice@company.com',
+        role: 'engineer',
+      };
+
+      const [baseline, setBaseline] = useState(initialBaseline);
+      const [draft, setDraft] = useState(initialBaseline);
+      const [touched, setTouched] = useState({});
+      const [serverErrors, setServerErrors] = useState({});
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submissionSnapshot, setSubmissionSnapshot] = useState(null);
+      const [statusLog, setStatusLog] = useState([]);
+      const seqRef = useRef(0);
+
+      const errorSummaryRef = useRef(null);
+      const nameInputRef = useRef(null);
+      const emailInputRef = useRef(null);
+
+      // Pure in-render synchronous validation DAG
+      const clientErrors = useMemo(() => {
+        const errs = {};
+        if (!draft.name.trim()) errs.name = 'Full name is required.';
+        if (!draft.email.trim()) {
+          errs.email = 'Email address is required.';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
+          errs.email = 'Please provide a valid email format.';
+        }
+        return errs;
+      }, [draft]);
+
+      const isDirty = useMemo(() => !deepEqual(draft, baseline), [draft, baseline]);
+      const isValid = Object.keys(clientErrors).length === 0;
+
+      const handleFieldChange = (field, value) => {
+        setDraft(prev => ({ ...prev, [field]: value }));
+        // Clear server error for modified field
+        if (serverErrors[field]) {
+          setServerErrors(prev => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+          });
+        }
+      };
+
+      const handleBlur = (field) => {
+        setTouched(prev => ({ ...prev, [field]: true }));
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitted(true);
+
+        if (!isValid) {
+          if (errorSummaryRef.current) {
+            errorSummaryRef.current.focus();
+          }
+          return;
+        }
+
+        const snapshot = Object.freeze(JSON.parse(JSON.stringify(draft)));
+        setSubmissionSnapshot(snapshot);
+        setIsSubmitting(true);
+        const reqSeq = ++seqRef.current;
+
+        setStatusLog(prev => [
+          `[DISPATCH] Submitting Req #${reqSeq} with payload: ${JSON.stringify(snapshot)}`,
+          ...prev,
+        ]);
+
+        // Simulate network latency
+        setTimeout(() => {
+          if (reqSeq === seqRef.current) {
+            // Simulated 422 if email is test@conflict.com
+            if (snapshot.email === 'test@conflict.com') {
+              setServerErrors({ email: 'Email address already exists in database.' });
+              setIsSubmitting(false);
+              setStatusLog(prev => [`❌ [HTTP 422] Server rejected Req #${reqSeq}: Email conflict.`, ...prev]);
+              return;
+            }
+
+            // Success: update baseline to snapshot, preserve draft
+            setBaseline(snapshot);
+            setIsSubmitting(false);
+            setServerErrors({});
+            setStatusLog(prev => [
+              `✅ [HTTP 200] Req #${reqSeq} Committed. Baseline synced to snapshot.`,
+              ...prev,
+            ]);
+          }
+        }, 1500);
+      };
+
+      const handleReset = () => {
+        setDraft(baseline);
+        setTouched({});
+        setServerErrors({});
+        setIsSubmitted(false);
+        setStatusLog(prev => [`🔄 [RESET] Form draft restored to committed baseline.`, ...prev]);
+      };
+
+      return (
+        <div className="grid">
+          <div className="card">
+            <div className="card-title">
+              <span>Interactive 7-Dimension Form</span>
+              <span className={`badge ${isDirty ? 'badge' : 'badge-success'}`}>
+                {isDirty ? '● Dirty (Unsaved)' : '✓ Pristine'}
+              </span>
+            </div>
+
+            {isSubmitted && !isValid && (
+              <div
+                className="error-summary-banner"
+                ref={errorSummaryRef}
+                tabIndex={-1}
+                role="alert"
+                aria-live="assertive"
+              >
+                <h4>⚠️ Please correct the following errors before submitting:</h4>
+                <ul>
+                  {clientErrors.name && (
+                    <li>
+                      <a onClick={() => nameInputRef.current?.focus()}>{clientErrors.name}</a>
+                    </li>
+                  )}
+                  {clientErrors.email && (
+                    <li>
+                      <a onClick={() => emailInputRef.current?.focus()}>{clientErrors.email}</a>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="user-name">
+                  <span>Full Name</span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                    Touched: {touched.name ? 'true' : 'false'}
+                  </span>
+                </label>
+                <input
+                  id="user-name"
+                  ref={nameInputRef}
+                  className={`form-input ${(touched.name || isSubmitted) && clientErrors.name ? 'invalid' : ''}`}
+                  value={draft.name}
+                  onChange={e => handleFieldChange('name', e.target.value)}
+                  onBlur={() => handleBlur('name')}
+                  aria-invalid={(touched.name || isSubmitted) && Boolean(clientErrors.name)}
+                />
+                {(touched.name || isSubmitted) && clientErrors.name && (
+                  <span className="error-msg" role="alert">{clientErrors.name}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="user-email">
+                  <span>Email Address (Try: test@conflict.com)</span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                    Touched: {touched.email ? 'true' : 'false'}
+                  </span>
+                </label>
+                <input
+                  id="user-email"
+                  ref={emailInputRef}
+                  className={`form-input ${(touched.email || isSubmitted) && (clientErrors.email || serverErrors.email) ? 'invalid' : ''}`}
+                  value={draft.email}
+                  onChange={e => handleFieldChange('email', e.target.value)}
+                  onBlur={() => handleBlur('email')}
+                  aria-invalid={(touched.email || isSubmitted) && Boolean(clientErrors.email || serverErrors.email)}
+                />
+                {(touched.email || isSubmitted) && (clientErrors.email || serverErrors.email) && (
+                  <span className="error-msg" role="alert">
+                    {clientErrors.email || serverErrors.email}
+                  </span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="user-role">Role</label>
+                <select
+                  id="user-role"
+                  className="form-input"
+                  value={draft.role}
+                  onChange={e => handleFieldChange('role', e.target.value)}
+                >
+                  <option value="engineer">Senior Full Stack Engineer</option>
+                  <option value="architect">System Architect</option>
+                  <option value="manager">Engineering Manager</option>
+                </select>
+              </div>
+
+              <div className="btn-group" style={{ marginTop: '16px' }}>
+                <button type="submit" className="btn" disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting Snapshot...' : 'Submit Snapshot'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={handleReset}>
+                  Reset to Baseline
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Live Multi-Timeline Telemetry</span>
+              <span className="badge">Monotonic Seq: #{seqRef.current}</span>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Current Working Draft vs Baseline</label>
+              <div className="telemetry-block">
+                <strong>Draft:</strong> {JSON.stringify(draft, null, 2)}
+                <br />
+                <strong>Baseline:</strong> {JSON.stringify(baseline, null, 2)}
+                <br />
+                <strong>Last Snapshot:</strong> {JSON.stringify(submissionSnapshot, null, 2)}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Execution Event Log</label>
+              <div className="log-stream">
+                {statusLog.length === 0 && <span style={{ opacity: 0.5 }}>No operations recorded yet.</span>}
+                {statusLog.map((log, i) => (
+                  <div
+                    key={i}
+                    className={`log-entry ${
+                      log.includes('✅') ? 'accepted' : log.includes('❌') ? 'discarded' : 'dispatch'
+                    }`}
+                  >
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // MODULE 2: Async Race Tester
+    function RaceTesterModule() {
+      const [logs, setLogs] = useState([]);
+      const seqRef = useRef(0);
+
+      const triggerRaceScenario = (fastDelay, slowDelay) => {
+        // Dispatch slow request #1 first
+        const seq1 = ++seqRef.current;
+        setLogs(prev => [
+          `[T0] 🚀 Dispatched Req #${seq1} ("alice") with ${slowDelay}ms latency.`,
+          ...prev,
+        ]);
+
+        setTimeout(() => {
+          if (seq1 === seqRef.current) {
+            setLogs(prev => [
+              `[T_Slow] ✅ ACCEPTED Req #${seq1}: Committed value "alice".`,
+              ...prev,
+            ]);
+          } else {
+            setLogs(prev => [
+              `[T_Slow] 🚫 DISCARDED Req #${seq1} ("alice") as STALE (Current sequence is #${seqRef.current}).`,
+              ...prev,
+            ]);
+          }
+        }, slowDelay);
+
+        // Dispatch fast request #2 slightly later
+        setTimeout(() => {
+          const seq2 = ++seqRef.current;
+          setLogs(prev => [
+            `[T1] ⚡ Dispatched Req #${seq2} ("alice_smith") with ${fastDelay}ms latency.`,
+            ...prev,
+          ]);
+
+          setTimeout(() => {
+            if (seq2 === seqRef.current) {
+              setLogs(prev => [
+                `[T_Fast] ✅ ACCEPTED Req #${seq2}: Committed value "alice_smith".`,
+                ...prev,
+              ]);
+            } else {
+              setLogs(prev => [
+                `[T_Fast] 🚫 DISCARDED Req #${seq2} as STALE.`,
+                ...prev,
+              ]);
+            }
+          }, fastDelay);
+        }, 150);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Async Out-of-Order Concurrency Race Lab</span>
+            <button className="btn" onClick={() => triggerRaceScenario(400, 1800)}>
+              Trigger Out-of-Order Simulation (Req #1 Slow, Req #2 Fast)
+            </button>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            This simulator dispatches a slow request followed by a fast request to verify that the monotonic sequence guard correctly rejects the stale slow response when it resolves later.
+          </p>
+
+          <div className="log-stream" style={{ maxHeight: '350px' }}>
+            {logs.length === 0 && <span style={{ opacity: 0.5 }}>Click the button above to run the race test.</span>}
+            {logs.map((log, idx) => (
+              <div
+                key={idx}
+                className={`log-entry ${
+                  log.includes('ACCEPTED') ? 'accepted' : log.includes('DISCARDED') ? 'discarded' : 'dispatch'
+                }`}
+              >
+                {log}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // MODULE 3: Dynamic Rows
+    function DynamicRowsModule() {
+      const [useUUID, setUseUUID] = useState(true);
+      const [items, setItems] = useState([
+        { id: 'uuid-101', name: 'Database Adapter', error: 'Database port required' },
+        { id: 'uuid-102', name: 'Redis Cache Cluster', error: null },
+        { id: 'uuid-103', name: 'Auth Gateway Service', error: 'JWT Secret missing' },
+      ]);
+
+      const removeItem = (targetId, targetIdx) => {
+        if (useUUID) {
+          setItems(prev => prev.filter(item => item.id !== targetId));
+        } else {
+          setItems(prev => prev.filter((_, idx) => idx !== targetIdx));
+        }
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Dynamic Row Identity: Stable UUIDs vs Index Keys</span>
+            <div className="btn-group">
+              <button
+                className={`btn ${useUUID ? 'btn' : 'btn-secondary'}`}
+                onClick={() => setUseUUID(true)}
+              >
+                ✅ Stable UUID Keys
+              </button>
+              <button
+                className={`btn ${!useUUID ? 'btn-danger' : 'btn-secondary'}`}
+                onClick={() => setUseUUID(false)}
+              >
+                ❌ Array Index Keys (Corrupts on Delete)
+              </button>
+            </div>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Currently using: <strong>{useUUID ? 'Stable UUID Keys (item.id)' : 'Array Index Keys (key={idx})'}</strong>.
+            Delete row 1 to see how errors stay with the correct entity when using UUIDs.
+          </p>
+
+          <div>
+            {items.map((item, idx) => (
+              <div key={useUUID ? item.id : idx} className="row-item">
+                <span style={{ fontWeight: 600, width: '180px' }}>{item.name}</span>
+                <span style={{ fontSize: '0.8rem', opacity: 0.6, width: '120px' }}>
+                  ID: {item.id}
+                </span>
+                <div style={{ flex: 1 }}>
+                  {item.error ? (
+                    <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5' }}>
+                      ⚠️ {item.error}
+                    </span>
+                  ) : (
+                    <span className="badge badge-success">✓ Valid</span>
+                  )}
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                  onClick={() => removeItem(item.id, idx)}
+                >
+                  Delete Row
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // MODULE 4: 20-Question Exam Simulator
+    function ExamTesterModule() {
+      const [selectedQ, setSelectedQ] = useState(0);
+      const [revealed, setRevealed] = useState({});
+
+      const questions = [
+        {
+          q: "1. Why can a controlled input still have browser-level behavior React doesn't own?",
+          a: "The browser layout engine remains physically responsible for keyboard hardware events, IME composition buffers (e.g. Asian scripts), text selection ranges, and caret offsets."
+        },
+        {
+          q: "2. Why does defaultValue not provide continuous synchronization?",
+          a: "defaultValue sets the initial DOM node value on initial mount only; subsequent React renders ignore changes to defaultValue unless the component remounts with a new key."
+        },
+        {
+          q: "3. Why can an HTTP 200 response be stale even when network succeeded?",
+          a: "Because newer user edits or newer submit intents were initiated while the slow request was in flight over the network."
+        },
+        {
+          q: "4. Why are touched and dirty fundamentally separate concepts?",
+          a: "Touched is an interaction history flag (blur tracking); dirty is a pure mathematical inequality comparison against a baseline (draft !== baseline)."
+        },
+        {
+          q: "5. Why must dirty state have a defined baseline reference?",
+          a: "Dirty is relative; without a reference dataset (initial data, server snapshot, or reset point), mathematical inequality cannot be evaluated."
+        },
+        {
+          q: "6. Why do array index keys corrupt dynamic form metadata?",
+          a: "Deleting or reordering items shifts array positions; React reuses existing DOM nodes at those indices, shifting error and touched states onto the wrong entity."
+        },
+        {
+          q: "7. Why does AbortController.abort() not guarantee backend rollback?",
+          a: "Cancellation only terminates the client TCP socket; the payload may have already reached the server and committed to the database."
+        },
+        {
+          q: "8. When is Latest-Wins semantically valid vs invalid?",
+          a: "Valid for idempotent replace operations (search queries, draft autosaves); invalid for cumulative mutations (financial transactions, chat messages)."
+        },
+        {
+          q: "9. Why is validation not equivalent to error visibility?",
+          a: "Validation computes domain correctness; error visibility is an ergonomics policy determining when to show that error to the user."
+        },
+        {
+          q: "10. Why should pure synchronous validation be derived during render?",
+          a: "Deriving during render eliminates state duplication, prevents out-of-sync bugs, and avoids extra cascading render passes."
+        }
+      ];
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Senior Form Architect Certification Q&A</span>
+            <span className="badge">Question {selectedQ + 1} of {questions.length}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '8px 0' }}>
+            {questions.map((_, idx) => (
+              <button
+                key={idx}
+                className={`tab-btn ${selectedQ === idx ? 'active' : ''}`}
+                onClick={() => setSelectedQ(idx)}
+              >
+                Q{idx + 1}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '1.1rem', color: '#93c5fd', marginBottom: '16px' }}>
+              {questions[selectedQ].q}
+            </h3>
+
+            {revealed[selectedQ] ? (
+              <div style={{ borderLeft: '3px solid var(--success)', paddingLeft: '14px', color: '#e2e8f0', lineHeight: 1.6 }}>
+                <strong>Senior Model Answer:</strong>
+                <p style={{ marginTop: '6px' }}>{questions[selectedQ].a}</p>
+              </div>
+            ) : (
+              <button
+                className="btn btn-secondary"
+                onClick={() => setRevealed(prev => ({ ...prev, [selectedQ]: true }))}
+              >
+                Reveal Model Answer
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<MasterCapstoneLab />);
+  </script>
+</body>
+</html>

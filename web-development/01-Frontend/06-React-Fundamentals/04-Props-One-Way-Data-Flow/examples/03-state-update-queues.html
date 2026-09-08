@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 03: State Update Queues & Functional Updates</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 03: State Update Queues & Functional Updates</h1>
+  <p class="subtitle">Interactive laboratory demonstrating State Update Queue Algebra: Direct Replacements, Functional Updaters, and Batch Processing.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('mixedAlgebra')">1. Mixed Update Queue Algebra</button>
+    <button onclick="selectLab('staleVsFunctional')">2. Async Stale Closures vs Updaters</button>
+    <button onclick="selectLab('batchingSemantics')">3. Batching vs Sequential Mutation</button>
+    <button onclick="selectLab('pureUpdaters')">4. Updater Function Purity</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Queue Operations & Code</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Queue Processing Pipeline</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Mathematical Evaluation & State</h2>
+      <span id="badge" class="status-badge badge-ok">Queue Evaluation: Verified</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Engineering Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      mixedAlgebra: {
+        code: `// Initial: count = 5\nsetCount(c => c + 2); // U1: f(5) = 7\nsetCount(20);         // U2: replace with 20\nsetCount(c => c * 2); // U3: f(20) = 40`,
+        trace: `S0 = 5\nU1(S0) = 5 + 2 = 7\nU2(7) = 20 (Direct replacement overwrites intermediate value)\nU3(20) = 20 * 2 = 40\nS_final = 40`,
+        verdict: `Final State: 40. Direct value replacement acts as a constant function in the queue: U(S) = V.`,
+        rule: `S_final = U_n(...U_2(U_1(S_0))). A later direct value establishes a new baseline for subsequent updaters.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ S_final = 40'
+      },
+      staleVsFunctional: {
+        code: `// ❌ Fragile Async Closure:\nsetTimeout(() => {\n  setCount(count + 1); // Captures stale snapshot (0) -> setCount(1)\n}, 1000);\n\n// ✅ Robust Functional Transformation:\nsetTimeout(() => {\n  setCount(c => c + 1); // Dispatches transformation to latest state\n}, 1000);`,
+        trace: `If two asynchronous timers trigger concurrently, the captured direct value overwrites with 1, whereas functional updaters correctly increment sequentially from 0 -> 1 -> 2.`,
+        verdict: `Zero Lost Updates: Functional updaters eliminate dependency on the callback closure's captured state snapshot.`,
+        rule: `When state updates are triggered asynchronously or sequentially, express them as functional transformations.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Race-Condition Safe'
+      },
+      batchingSemantics: {
+        code: `function handleBatch() {\n  setCount(c => c + 1);\n  setCount(c => c + 1);\n  setCount(c => c + 1);\n  // React batches all 3 into 1 render pass\n}`,
+        trace: `1. User triggers click event.\n2. Three updates enqueued into Fiber memoizedState queue.\n3. React processes: 0 -> 1 -> 2 -> 3.\n4. Single reconciliation pass and commit to DOM (1 commit, 3 updates).`,
+        verdict: `Batching Coordinates Renders: Setter calls ≠ commits. Batching preserves all update semantics while optimizing render passes.`,
+        rule: `Batching changes how render work is coordinated; it does not erase state-update semantics.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ 1 Commit / 3 Updates'
+      },
+      pureUpdaters: {
+        code: `// ❌ Impure Updater (Side Effects inside state calculation):\nsetCount(c => {\n  analytics.track('click'); // DANGEROUS! May run multiple times\n  return c + 1;\n});\n\n// ✅ Pure State Calculation:\nanalytics.track('click');\nsetCount(c => c + 1);`,
+        trace: `Development Strict Mode and concurrent rendering may invoke updater functions multiple times to verify purity.\nSide effects inside updaters create duplicated analytics and ghost actions.`,
+        verdict: `Pure Function Guarantee: previousState -> pureCalculation -> nextState.`,
+        rule: `State updaters must be pure mathematical transformations without side effects or mutations.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Pure Transformation'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('mixedAlgebra');
+  </script>
+</body>
+</html>

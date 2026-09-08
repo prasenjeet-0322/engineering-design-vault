@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 / Part 02 — createContext, Default Values & Provider Fiber Mechanics Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 30%, #9ca3af 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .header-title p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-must-know {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .badge-kpi {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .lab-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 14px;
+    }
+
+    .card-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-header h2 span {
+      color: var(--accent-cyan);
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .btn {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: var(--accent-rose);
+    }
+
+    .btn-danger:hover {
+      background: var(--accent-rose);
+      color: #fff;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .interactive-box {
+      border: 1px dashed var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .tree-node {
+      border-left: 2px solid var(--accent-primary);
+      padding-left: 14px;
+      margin: 8px 0;
+      position: relative;
+    }
+
+    .tree-node.provider-active {
+      border-left-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.05);
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .tree-node.provider-shadowed {
+      border-left-color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.05);
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.85rem;
+    }
+
+    .telemetry-label {
+      color: var(--text-muted);
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    .code-block {
+      background: #080c14;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #d1d5db;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .tag-fiber {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--accent-purple);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .tag-provider {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .tag-default {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .pulse-render {
+      animation: pulseGlow 0.4s ease-out;
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.8); background: rgba(99, 102, 241, 0.3); }
+      100% { box-shadow: 0 0 0 10px transparent; background: transparent; }
+    }
+
+    .alert-box {
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 0.85rem;
+      margin-top: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .alert-error {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fecdd3;
+    }
+
+    .alert-info {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: #cffafe;
+    }
+  </style>
+
+  <!-- React 18 and Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useCallback, useRef } = React;
+
+    // =========================================================================
+    // CONTEXT TOKENS ALLOCATED AT MODULE SCOPE (Golden Standard)
+    // =========================================================================
+    const ContextAlpha = createContext("ALPHA_DEFAULT");
+    const ContextBeta = createContext("BETA_DEFAULT");
+    const ThemeContext = createContext("light-default");
+    const RequiredAuthContext = createContext(null);
+    const DynamicTokenContext = createContext({ session: "anonymous" });
+
+    // Custom Hook Gateway with Strategy B Guard
+    function useGuardedAuth() {
+      const auth = useContext(RequiredAuthContext);
+      if (!auth) {
+        throw new Error("[INVARIANT GUARD] useGuardedAuth must be rendered inside an <AuthProvider> boundary!");
+      }
+      return auth;
+    }
+
+    // Error Boundary for catching Strategy B exceptions
+    class GuardErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, errorMsg: "" };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, errorMsg: error.message };
+      }
+      componentDidCatch(error, info) {
+        console.error("Caught Guard Failure:", error);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="alert-box alert-error">
+              <span style={{ fontSize: "1.2rem" }}>🚨</span>
+              <div>
+                <strong>Guarded Hook Exception Caught!</strong>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", marginTop: 4 }}>
+                  {this.state.errorMsg}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // =========================================================================
+    // MAIN INTERACTIVE LAB APPLICATION
+    // =========================================================================
+    function ContextMasteryLab() {
+      const [activeTab, setActiveTab] = useState("identity");
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-title">
+              <h1>createContext, Default Values & Provider Fiber Mechanics</h1>
+              <p>KPI 11 / PART 02 — Interactive Laboratory & Fiber Reconciliation Simulator</p>
+            </div>
+            <div className="badge-bar">
+              <span className="badge badge-kpi">KPI 11</span>
+              <span className="badge badge-must-know">Must Know</span>
+            </div>
+          </header>
+
+          <div className="tabs">
+            <button className={`tab-btn ${activeTab === 'identity' ? 'active' : ''}`} onClick={() => setActiveTab('identity')}>
+              🔬 A: Context Identity
+            </button>
+            <button className={`tab-btn ${activeTab === 'defaults' ? 'active' : ''}`} onClick={() => setActiveTab('defaults')}>
+              ⚖️ B: Default vs Provider
+            </button>
+            <button className={`tab-btn ${activeTab === 'shadowing' ? 'active' : ''}`} onClick={() => setActiveTab('shadowing')}>
+              🌲 C: Nested Shadowing
+            </button>
+            <button className={`tab-btn ${activeTab === 'placement' ? 'active' : ''}`} onClick={() => setActiveTab('placement')}>
+              📍 D: Provider Placement
+            </button>
+            <button className={`tab-btn ${activeTab === 'diffing' ? 'active' : ''}`} onClick={() => setActiveTab('diffing')}>
+              ⚡ E: Value Diffing (Object.is)
+            </button>
+            <button className={`tab-btn ${activeTab === 'lifecycle' ? 'active' : ''}`} onClick={() => setActiveTab('lifecycle')}>
+              🔄 F: Rerender vs Remount
+            </button>
+            <button className={`tab-btn ${activeTab === 'isolation' ? 'active' : ''}`} onClick={() => setActiveTab('isolation')}>
+              🧩 G: Multi-Instance Isolation
+            </button>
+            <button className={`tab-btn ${activeTab === 'guard' ? 'active' : ''}`} onClick={() => setActiveTab('guard')}>
+              🛡️ I: Fail-Fast Guard (Strategy B)
+            </button>
+            <button className={`tab-btn ${activeTab === 'fiber' ? 'active' : ''}`} onClick={() => setActiveTab('fiber')}>
+              🧬 J: Fiber Tree Inspector
+            </button>
+          </div>
+
+          <main>
+            {activeTab === 'identity' && <ModuleIdentity />}
+            {activeTab === 'defaults' && <ModuleDefaults />}
+            {activeTab === 'shadowing' && <ModuleShadowing />}
+            {activeTab === 'placement' && <ModulePlacement />}
+            {activeTab === 'diffing' && <ModuleDiffing />}
+            {activeTab === 'lifecycle' && <ModuleLifecycle />}
+            {activeTab === 'isolation' && <ModuleIsolation />}
+            {activeTab === 'guard' && <ModuleGuard />}
+            {activeTab === 'fiber' && <ModuleFiberInspector />}
+          </main>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE A: CONTEXT IDENTITY & CHANNELS
+    // =========================================================================
+    function ModuleIdentity() {
+      const [alphaVal, setAlphaVal] = useState("Alpha_Token_99");
+      const [betaVal, setBetaVal] = useState("Beta_Token_42");
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module A</span> Context Object Identity & Reference Equality</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Context lookup in React Fiber uses <strong>Object Reference Identity</strong>, NOT string names. Two contexts created with identical defaults are two completely independent dependency channels.
+              </p>
+              <div className="btn-group">
+                <button className="btn" onClick={() => setAlphaVal(`Alpha_${Math.floor(Math.random()*1000)}`)}>
+                  Update ContextAlpha
+                </button>
+                <button className="btn btn-secondary" onClick={() => setBetaVal(`Beta_${Math.floor(Math.random()*1000)}`)}>
+                  Update ContextBeta
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <ContextAlpha.Provider value={alphaVal}>
+                  <div className="tree-node provider-active">
+                    <span className="tag-provider">&lt;ContextAlpha.Provider value="{alphaVal}"&gt;</span>
+                    <div className="tree-node">
+                      <ConsumerAlpha />
+                      <ConsumerBeta />
+                    </div>
+                  </div>
+                </ContextAlpha.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Identity Verification Telemetry</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">ContextAlpha Heap Address:</span>
+              <span className="telemetry-val">Ref@0x00A1</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">ContextBeta Heap Address:</span>
+              <span className="telemetry-val">Ref@0x00B2</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">ContextAlpha === ContextBeta:</span>
+              <span className="telemetry-val" style={{ color: "var(--accent-rose)" }}>false (Isolated Channels)</span>
+            </div>
+            <div className="code-block" style={{ marginTop: 16 }}>
+{`// Architectural Principle:
+const ContextA = createContext("default");
+const ContextB = createContext("default");
+
+// ContextA !== ContextB
+// Providing ContextA will NEVER satisfy a consumer of ContextB!`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ConsumerAlpha() {
+      const val = useContext(ContextAlpha);
+      return (
+        <div style={{ margin: "6px 0", fontSize: "0.85rem" }}>
+          <strong>ConsumerAlpha (useContext(ContextAlpha)):</strong> <span style={{ color: "var(--accent-emerald)" }}>{val}</span>
+        </div>
+      );
+    }
+
+    function ConsumerBeta() {
+      const val = useContext(ContextBeta);
+      return (
+        <div style={{ margin: "6px 0", fontSize: "0.85rem" }}>
+          <strong>ConsumerBeta (useContext(ContextBeta)):</strong> <span style={{ color: "var(--accent-amber)" }}>{val} (Fell back to Default!)</span>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE B: DEFAULT RESOLUTION VS PROVIDER
+    // =========================================================================
+    function ModuleDefaults() {
+      const [mounted, setMounted] = useState(true);
+      const [providerValue, setProviderValue] = useState("dark-emerald");
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module B</span> Default Value Fallback vs Provider Fiber</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                The `defaultValue` passed to `createContext` is used <strong>ONLY</strong> when zero matching Provider Fibers exist in the consumer's tree ancestry.
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${mounted ? 'btn-danger' : 'btn'}`} onClick={() => setMounted(!mounted)}>
+                  {mounted ? "Unmount <ThemeContext.Provider>" : "Mount <ThemeContext.Provider>"}
+                </button>
+                {mounted && (
+                  <button className="btn btn-secondary" onClick={() => setProviderValue(providerValue === 'dark-emerald' ? 'sunset-orange' : 'dark-emerald')}>
+                    Toggle Provider Value
+                  </button>
+                )}
+              </div>
+
+              <div className="interactive-box">
+                {mounted ? (
+                  <ThemeContext.Provider value={providerValue}>
+                    <div className="tree-node provider-active">
+                      <span className="tag-provider">&lt;ThemeContext.Provider value="{providerValue}"&gt;</span>
+                      <div className="tree-node">
+                        <ThemeConsumer label="Consumer Inside Provider Subtree" />
+                      </div>
+                    </div>
+                  </ThemeContext.Provider>
+                ) : (
+                  <div className="tree-node">
+                    <span className="tag-default">&lt;No Provider Mounted in Tree&gt;</span>
+                    <div className="tree-node">
+                      <ThemeConsumer label="Consumer Without Provider in Ancestry" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Resolution Source Inspector</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">ThemeContext Default:</span>
+              <span className="telemetry-val">"light-default"</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Provider Mounted in Ancestry:</span>
+              <span className="telemetry-val" style={{ color: mounted ? "var(--accent-emerald)" : "var(--accent-rose)" }}>
+                {mounted ? "YES (Tag: 10 ContextProvider)" : "NO (0 Providers)"}
+              </span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Resolution Source:</span>
+              <span className="telemetry-val" style={{ color: mounted ? "var(--accent-emerald)" : "var(--accent-amber)" }}>
+                {mounted ? "Provider Runtime Value" : "Context Static Default"}
+              </span>
+            </div>
+            <div className="alert-box alert-info">
+              <span>💡</span>
+              <div>
+                <strong>Senior Rule:</strong> If `<Context.Provider value={null}>` is rendered, consumers receive `null`, NOT the default value! The default is only used when the Provider is completely absent.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ThemeConsumer({ label }) {
+      const theme = useContext(ThemeContext);
+      const renders = useRef(0);
+      renders.current++;
+
+      return (
+        <div style={{ padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8 }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{label}</div>
+          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginTop: 4 }}>
+            Observed Value: <span style={{ color: "var(--accent-cyan)" }}>"{theme}"</span>
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 2 }}>
+            Render Count: {renders.current}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE C: NESTED PROVIDER SHADOWING
+    // =========================================================================
+    function ModuleShadowing() {
+      const [outerVal, setOuterVal] = useState("Outer_Scope_Global");
+      const [innerVal, setInnerVal] = useState("Inner_Scope_Scoped");
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module C</span> Nested Provider Shadowing</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                When Providers of the same Context are nested, the <strong>nearest ancestor</strong> Fiber satisfies `useContext`. The inner Provider shadows (overrides) the outer Provider for its descendant subtree.
+              </p>
+              <div className="btn-group">
+                <button className="btn" onClick={() => setOuterVal(`Outer_${Math.floor(Math.random()*100)}`)}>
+                  Update Outer Provider
+                </button>
+                <button className="btn btn-secondary" onClick={() => setInnerVal(`Inner_${Math.floor(Math.random()*100)}`)}>
+                  Update Inner Provider
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <ThemeContext.Provider value={outerVal}>
+                  <div className="tree-node provider-active">
+                    <span className="tag-provider">Outer &lt;ThemeContext.Provider value="{outerVal}"&gt;</span>
+                    <div className="tree-node">
+                      <ThemeConsumer label="Consumer A (Direct Child of Outer Provider)" />
+                      
+                      <ThemeContext.Provider value={innerVal}>
+                        <div className="tree-node provider-shadowed">
+                          <span className="tag-provider" style={{ color: "var(--accent-cyan)", borderColor: "var(--accent-cyan)" }}>
+                            Inner &lt;ThemeContext.Provider value="{innerVal}"&gt; (Shadows Outer)
+                          </span>
+                          <div className="tree-node">
+                            <ThemeConsumer label="Consumer B (Child of Inner Provider)" />
+                          </div>
+                        </div>
+                      </ThemeContext.Provider>
+
+                      <ThemeConsumer label="Consumer C (Sibling of Inner Provider - Still in Outer Scope)" />
+                    </div>
+                  </div>
+                </ThemeContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Ancestry Resolution Traces</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Consumer A Ancestry:</span>
+              <span className="telemetry-val">Resolves: "{outerVal}"</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Consumer B Ancestry:</span>
+              <span className="telemetry-val" style={{ color: "var(--accent-cyan)" }}>Resolves: "{innerVal}" (Shadowed)</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Consumer C Ancestry:</span>
+              <span className="telemetry-val">Resolves: "{outerVal}"</span>
+            </div>
+            <div className="code-block" style={{ marginTop: 16 }}>
+{`// Fiber Upward Walk:
+Consumer B -> Fiber(Inner Provider) [MATCH! Stop Walk] -> Returns InnerVal
+Consumer C -> Fiber(Outer Provider) [MATCH! Stop Walk] -> Returns OuterVal`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE D: PROVIDER PLACEMENT & ANCESTRY REACHABILITY
+    // =========================================================================
+    function ModulePlacement() {
+      const [placement, setPlacement] = useState("high"); // 'high' | 'low'
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module D</span> Provider Placement & Spatial Reachability</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Context reachability is strictly ancestry-based. Moving a Provider lower restricts access; moving it higher widens access.
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${placement === 'high' ? 'active' : 'btn-secondary'}`} onClick={() => setPlacement('high')}>
+                  Mount Provider at Top Level
+                </button>
+                <button className={`btn ${placement === 'low' ? 'active' : 'btn-secondary'}`} onClick={() => setPlacement('low')}>
+                  Mount Provider Inside Feature Subtree Only
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                {placement === 'high' ? (
+                  <ThemeContext.Provider value="Root_Scoped_Theme">
+                    <div className="tree-node provider-active">
+                      <span className="tag-provider">&lt;ThemeContext.Provider value="Root_Scoped_Theme"&gt;</span>
+                      <div className="tree-node">
+                        <ThemeConsumer label="Header Consumer (In Scope)" />
+                        <div className="tree-node">
+                          <ThemeConsumer label="Feature Consumer (In Scope)" />
+                        </div>
+                      </div>
+                    </div>
+                  </ThemeContext.Provider>
+                ) : (
+                  <div className="tree-node">
+                    <span className="tag-default">&lt;Root Container (No Provider)&gt;</span>
+                    <div className="tree-node">
+                      <ThemeConsumer label="Header Consumer (OUT OF SCOPE -> Resolves Default!)" />
+                      <ThemeContext.Provider value="Feature_Scoped_Theme">
+                        <div className="tree-node provider-active">
+                          <span className="tag-provider">&lt;ThemeContext.Provider value="Feature_Scoped_Theme"&gt;</span>
+                          <div className="tree-node">
+                            <ThemeConsumer label="Feature Consumer (In Scope)" />
+                          </div>
+                        </div>
+                      </ThemeContext.Provider>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Scope Analysis</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Placement Strategy:</span>
+              <span className="telemetry-val">{placement === 'high' ? 'Application-Wide (High)' : 'Feature-Colocated (Low)'}</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Header Component Reachability:</span>
+              <span className="telemetry-val" style={{ color: placement === 'high' ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                {placement === 'high' ? 'INCLUDED' : 'EXCLUDED (Default)'}
+              </span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Feature Component Reachability:</span>
+              <span className="telemetry-val" style={{ color: 'var(--accent-emerald)' }}>INCLUDED</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE E: VALUE DIFFING (Object.is)
+    // =========================================================================
+    function ModuleDiffing() {
+      const [dummyState, setDummyState] = useState(0);
+      const [diffMode, setDiffMode] = useState("unstable"); // 'primitive' | 'unstable' | 'memoized'
+
+      // Modes
+      const primitiveVal = "stable_string";
+      const unstableObjVal = { count: 42 }; // New reference every render pass!
+      const memoizedObjVal = useMemo(() => ({ count: 42 }), []); // Stable reference!
+
+      const activeValue = diffMode === 'primitive' 
+        ? primitiveVal 
+        : diffMode === 'unstable' 
+          ? unstableObjVal 
+          : memoizedObjVal;
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module E</span> Object.is Diffing & Propagation Traps</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                React Fiber compares `memoizedProps.value` vs `pendingProps.value` using <code>Object.is()</code>. Passing new object literals causes all consumers to re-render even if property values are identical.
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${diffMode === 'unstable' ? 'active' : 'btn-secondary'}`} onClick={() => setDiffMode('unstable')}>
+                  1. Unstable Object Literal: {"{ count: 42 }"}
+                </button>
+                <button className={`btn ${diffMode === 'memoized' ? 'active' : 'btn-secondary'}`} onClick={() => setDiffMode('memoized')}>
+                  2. Memoized Object (useMemo)
+                </button>
+                <button className={`btn ${diffMode === 'primitive' ? 'active' : 'btn-secondary'}`} onClick={() => setDiffMode('primitive')}>
+                  3. Primitive String: "stable_string"
+                </button>
+              </div>
+
+              <button className="btn btn-danger" onClick={() => setDummyState(s => s + 1)}>
+                🔥 Trigger Parent Render (No Context Change) [#{dummyState}]
+              </button>
+
+              <div className="interactive-box">
+                <DynamicTokenContext.Provider value={activeValue}>
+                  <div className="tree-node provider-active">
+                    <span className="tag-provider">&lt;DynamicTokenContext.Provider value={JSON.stringify(activeValue)}&gt;</span>
+                    <div className="tree-node">
+                      <DiffConsumer diffMode={diffMode} />
+                    </div>
+                  </div>
+                </DynamicTokenContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Object.is Equality Telemetry</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Active Mode:</span>
+              <span className="telemetry-val">{diffMode.toUpperCase()}</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Referential Stability:</span>
+              <span className="telemetry-val" style={{ color: diffMode === 'unstable' ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                {diffMode === 'unstable' ? 'UNSTABLE (New 0x00 Heap Pointer)' : 'STABLE (Same 0x00 Pointer)'}
+              </span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Consumer Render Triggered:</span>
+              <span className="telemetry-val" style={{ color: diffMode === 'unstable' ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                {diffMode === 'unstable' ? 'YES (Forced Re-Render!)' : 'NO (Bailed Out)'}
+              </span>
+            </div>
+            <div className="code-block" style={{ marginTop: 16 }}>
+{`// React Fiber Internal Check:
+const hasChanged = !Object.is(memoizedProps.value, pendingProps.value);
+// If diffMode === 'unstable', Object.is({ count: 42 }, { count: 42 }) returns FALSE!`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DiffConsumer({ diffMode }) {
+      const val = useContext(DynamicTokenContext);
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      return (
+        <div className="pulse-render" key={renderCount.current} style={{ padding: "10px 14px", background: "rgba(255,255,255,0.04)", borderRadius: 8 }}>
+          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fff" }}>
+            Consumer Subscription Node
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 4 }}>
+            Value: {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+          </div>
+          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: diffMode === 'unstable' ? 'var(--accent-rose)' : 'var(--accent-emerald)', marginTop: 6 }}>
+            Consumer Re-Renders: {renderCount.current}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE F: RERENDER VS REMOUNT
+    // =========================================================================
+    function ModuleLifecycle() {
+      const [count, setCount] = useState(0);
+      const [providerKey, setProviderKey] = useState("KEY_A");
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module F</span> Provider Re-Render vs Re-Mount</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                A <strong>Re-Render</strong> updates the Fiber with new props, preserving state. A <strong>Re-Mount</strong> (triggered by key change or conditional unmount) destroys the Fiber, resets state, and re-runs all mount effects.
+              </p>
+              <div className="btn-group">
+                <button className="btn" onClick={() => setCount(c => c + 1)}>
+                  1. Trigger Provider Re-Render (count: {count})
+                </button>
+                <button className="btn btn-danger" onClick={() => setProviderKey(k => k === 'KEY_A' ? 'KEY_B' : 'KEY_A')}>
+                  2. Change Key to Trigger Re-Mount ({providerKey})
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <LifecycleProvider key={providerKey} countValue={count} instanceKey={providerKey} />
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Lifecycle Summary</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Active Provider Key:</span>
+              <span className="telemetry-val">{providerKey}</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Provider-Owned State Preserved:</span>
+              <span className="telemetry-val" style={{ color: "var(--accent-cyan)" }}>
+                {providerKey === 'KEY_A' ? 'Active' : 'Reset on Remount'}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function LifecycleProvider({ countValue, instanceKey }) {
+      const [internalState, setInternalState] = useState(100);
+      const mountCount = useRef(0);
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      useEffect(() => {
+        mountCount.current++;
+        console.log(`[LifecycleProvider ${instanceKey}] Mounted!`);
+        return () => {
+          console.log(`[LifecycleProvider ${instanceKey}] Unmounted / Cleaned Up!`);
+        };
+      }, []);
+
+      return (
+        <div className="tree-node provider-active">
+          <span className="tag-provider">&lt;LifecycleProvider key="{instanceKey}"&gt;</span>
+          <div style={{ marginTop: 8, fontSize: "0.85rem" }}>
+            <div>External Prop Value: <strong>{countValue}</strong></div>
+            <div>Internal State: <strong>{internalState}</strong> <button className="btn btn-secondary" style={{ padding: "2px 8px", fontSize: "0.75rem", marginLeft: 6 }} onClick={() => setInternalState(s => s + 5)}>+5 Internal</button></div>
+            <div style={{ color: "var(--accent-emerald)", marginTop: 4 }}>Render Count: {renderCount.current}</div>
+            <div style={{ color: "var(--accent-purple)", marginTop: 2 }}>Mount Count: {mountCount.current}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE G: MULTI-INSTANCE ISOLATION
+    // =========================================================================
+    function ModuleIsolation() {
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module G</span> Multi-Instance Provider Isolation</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Sibling providers of the same Context operate in complete isolation. Each provides an independent ambient environment for its own descendant subtree.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <IsolatedSubtree title="Workspace A" initialTheme="emerald-theme" />
+                <IsolatedSubtree title="Workspace B" initialTheme="purple-theme" />
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Sibling Scope Architecture</h2>
+            </div>
+            <div className="code-block">
+{`<WorkspaceLayout>
+  {/* Sibling Subtree A */}
+  <ThemeContext.Provider value="emerald-theme">
+    <PanelA /> {/* Reads emerald-theme */}
+  </ThemeContext.Provider>
+
+  {/* Sibling Subtree B */}
+  <ThemeContext.Provider value="purple-theme">
+    <PanelB /> {/* Reads purple-theme */}
+  </ThemeContext.Provider>
+</WorkspaceLayout>`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function IsolatedSubtree({ title, initialTheme }) {
+      const [theme, setTheme] = useState(initialTheme);
+
+      return (
+        <ThemeContext.Provider value={theme}>
+          <div className="interactive-box">
+            <h4 style={{ fontSize: "0.9rem", color: "var(--accent-cyan)", marginBottom: 8 }}>{title}</h4>
+            <div className="btn-group" style={{ marginBottom: 10 }}>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setTheme(theme.includes('dark') ? initialTheme : `${initialTheme}-dark`)}>
+                Toggle Theme
+              </button>
+            </div>
+            <ThemeConsumer label={`Descendant of ${title}`} />
+          </div>
+        </ThemeContext.Provider>
+      );
+    }
+
+    // =========================================================================
+    // MODULE I: FAIL-FAST GUARD (Strategy B)
+    // =========================================================================
+    function ModuleGuard() {
+      const [wrapInProvider, setWrapInProvider] = useState(false);
+      const [userSession, setUserSession] = useState({ userId: "usr_enterprise_99", role: "admin" });
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module I</span> Strategy B: Fail-Fast Nullable Guard</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                For mandatory infrastructure (Auth, Billing, DB Clients), initialize `createContext(null)` and enforce provider presence with a guarded custom hook gateway that throws an explicit exception.
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${wrapInProvider ? 'btn-danger' : 'btn'}`} onClick={() => setWrapInProvider(!wrapInProvider)}>
+                  {wrapInProvider ? "Remove <RequiredAuthContext.Provider>" : "Wrap in <RequiredAuthContext.Provider>"}
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <GuardErrorBoundary key={String(wrapInProvider)}>
+                  {wrapInProvider ? (
+                    <RequiredAuthContext.Provider value={userSession}>
+                      <div className="tree-node provider-active">
+                        <span className="tag-provider">&lt;RequiredAuthContext.Provider value=&#123;userSession&#125;&gt;</span>
+                        <div className="tree-node">
+                          <GuardedConsumer />
+                        </div>
+                      </div>
+                    </RequiredAuthContext.Provider>
+                  ) : (
+                    <div className="tree-node">
+                      <span className="tag-default">&lt;No Provider in Ancestry&gt;</span>
+                      <div className="tree-node">
+                        <GuardedConsumer />
+                      </div>
+                    </div>
+                  )}
+                </GuardErrorBoundary>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Gateway Verification</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Provider Mounted:</span>
+              <span className="telemetry-val" style={{ color: wrapInProvider ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                {wrapInProvider ? 'YES' : 'NO (Throws Invariant Guard Error)'}
+              </span>
+            </div>
+            <div className="code-block" style={{ marginTop: 16 }}>
+{`// Strategy B Custom Hook Gateway:
+export function useGuardedAuth() {
+  const auth = useContext(RequiredAuthContext);
+  if (!auth) {
+    throw new Error("[INVARIANT GUARD] Missing <AuthProvider>!");
+  }
+  return auth;
+}`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function GuardedConsumer() {
+      const auth = useGuardedAuth(); // Will throw if context is null!
+
+      return (
+        <div style={{ padding: "8px 12px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: 8 }}>
+          <div style={{ fontSize: "0.85rem", color: "var(--accent-emerald)", fontWeight: 700 }}>
+            ✅ Successfully Resolved Auth Context
+          </div>
+          <div style={{ fontSize: "0.8rem", marginTop: 4 }}>
+            User ID: <strong>{auth.userId}</strong> | Role: <strong>{auth.role}</strong>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE J: FIBER RECONCILIATION & DEPENDENCY VISUALIZER
+    // =========================================================================
+    function ModuleFiberInspector() {
+      const [contextVal, setContextVal] = useState("v1.0.0");
+      const [diffCount, setDiffCount] = useState(0);
+
+      const updateVal = () => {
+        setContextVal(`v${(Math.random() * 5).toFixed(2)}`);
+        setDiffCount(d => d + 1);
+      };
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module J</span> Fiber Node & Dependencies Linked List Inspector</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Internal conceptual architecture of React Fiber nodes during Context reconciliation:
+              </p>
+              <button className="btn" onClick={updateVal}>
+                Dispatch Context Value Change [#{diffCount}]
+              </button>
+
+              <div className="interactive-box">
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "#e5e7eb" }}>
+                  <div style={{ color: "var(--accent-purple)", fontWeight: 700 }}>
+                    FiberNode (tag: 10 ContextProvider)
+                  </div>
+                  <div style={{ paddingLeft: 16, borderLeft: "2px solid var(--accent-purple)", margin: "6px 0" }}>
+                    <div>tag: <span className="tag-fiber">10 (ContextProvider)</span></div>
+                    <div>type: <span style={{ color: "var(--accent-cyan)" }}>ThemeContext.Provider</span></div>
+                    <div>pendingProps: <span style={{ color: "var(--accent-emerald)" }}>&#123; value: "{contextVal}" &#125;</span></div>
+                    <div>memoizedProps: <span style={{ color: "var(--text-muted)" }}>&#123; value: "{contextVal}" &#125;</span></div>
+                    <div>return: Fiber(Parent)</div>
+                    <div>child: Fiber(ConsumerNode)</div>
+                  </div>
+
+                  <div style={{ color: "var(--accent-cyan)", fontWeight: 700, marginTop: 12 }}>
+                    FiberNode (tag: 0 FunctionComponent - ConsumerNode)
+                  </div>
+                  <div style={{ paddingLeft: 16, borderLeft: "2px solid var(--accent-cyan)", margin: "6px 0" }}>
+                    <div>tag: <span className="tag-fiber">0 (FunctionComponent)</span></div>
+                    <div>dependencies: &#123;</div>
+                    <div style={{ paddingLeft: 16 }}>
+                      <div>lanes: 0,</div>
+                      <div>firstContext: &#123;</div>
+                      <div style={{ paddingLeft: 16 }}>
+                        <div>context: <span style={{ color: "var(--accent-amber)" }}>ThemeContext@0x00A1</span>,</div>
+                        <div>observedBits: 0b1111,</div>
+                        <div>next: null</div>
+                      </div>
+                      <div>&#125;</div>
+                    </div>
+                    <div>&#125;</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> propagateContextChange Algorithm</h2>
+            </div>
+            <div className="code-block">
+{`function propagateContextChange(workInProgress, context, renderLanes) {
+  let fiber = workInProgress.child;
+  while (fiber !== null) {
+    let list = fiber.dependencies;
+    if (list !== null) {
+      let dependency = list.firstContext;
+      while (dependency !== null) {
+        if (dependency.context === context) {
+          // Tag consumer Fiber with update lanes!
+          fiber.lanes = mergeLanes(fiber.lanes, renderLanes);
+          break;
+        }
+        dependency = dependency.next;
+      }
+    }
+    fiber = getNextFiberNode(fiber, workInProgress);
+  }
+}`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount React App
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<ContextMasteryLab />);
+  </script>
+</body>
+</html>

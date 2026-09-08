@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 13: Component Reuse, Abstraction Boundaries & Over-Engineering</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 13: Component Reuse, Abstraction Boundaries & Over-Engineering</h1>
+  <p class="subtitle">Interactive sandbox exploring Premature Abstraction, Change Boundaries, Specialization, and the Delete Test.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('prematureExtraction')">1. Premature Extraction Trap</button>
+    <button onclick="selectLab('changeBoundary')">2. Change Boundary Alignment</button>
+    <button onclick="selectLab('specialization')">3. Domain Specialization</button>
+    <button onclick="selectLab('deleteTest')">4. The Delete Test</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Abstraction Pattern & Code</h2>
+      <pre id="code-panel">// Pattern</pre>
+
+      <h2>Change Coupling & Blast Radius</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architecture Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Boundary: Cohesive & Stable</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Engineering Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      prematureExtraction: {
+        code: `// ❌ Premature Generalization (Mega Component):\n<UniversalCard mode="profile" isInvoice showPayButton onPay={...} />\n\n// ✅ True Separation (Syntax similarity ≠ Semantic similarity):\nfunction UserCard() { return <article className="surface">...</article>; }\nfunction InvoiceCard() { return <article className="surface">...</article>; }`,
+        trace: `UserCard changes when user profile features update. InvoiceCard changes when billing rules update. Merging them creates cross-domain regressions.`,
+        verdict: `Negative-Value Reuse Avoided: Duplication is far cheaper than the wrong abstraction.`,
+        rule: `Abstract stable concepts, not merely repeated syntax.`,
+        badgeClass: 'badge-warn',
+        badgeText: '⚠️ Premature Abstraction'
+      },
+      changeBoundary: {
+        code: `// Good Abstraction (Single Change Reason):\nfunction Button({ variant, children, ...props }) {\n  return <button className={styles[variant]} {...props}>{children}</button>;\n}`,
+        trace: `Button changes ONLY when design-system interaction/token requirements evolve. All consumers inherit updates without breaking API contracts.`,
+        verdict: `Stable Boundary: High cohesion with zero knowledge of caller business logic.`,
+        rule: `Things that change together should usually live together.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Stable Change Boundary'
+      },
+      specialization: {
+        code: `// Generic Primitive:\nfunction Badge({ variant, children }) { ... }\n\n// Domain Specialization Layer:\nfunction InvoiceStatusBadge({ status }) {\n  const variant = status === 'PAID' ? 'success' : 'warning';\n  return <Badge variant={variant}>{status}</Badge>;\n}`,
+        trace: `Badge remains 100% domain-neutral. InvoiceStatusBadge encapsulates the business knowledge mapping invoice states to badge styles.`,
+        verdict: `Healthy Dependency Direction: Domain Layer ➔ Generic UI Layer (never the reverse).`,
+        rule: `Specialization wraps generic primitives with domain meaning without polluting the primitive.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Clean Specialization'
+      },
+      deleteTest: {
+        code: `// ❌ Useless Wrapper Abstraction:\nfunction ContentWrapper({ children }) {\n  return <div>{children}</div>;\n}\n\n// Applying the Delete Test:\n// Removing ContentWrapper makes the tree clearer with zero lost invariants!`,
+        trace: `Zero state, zero behavior, zero styling contract, zero accessibility guarantees. Removing it eliminates indirection.`,
+        verdict: `Abstraction Removed: Abstraction is not automatically valuable unless it enforces a genuine invariant.`,
+        rule: `If deleting an abstraction clarifies ownership with zero policy loss, delete it.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ The Delete Test'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('prematureExtraction');
+  </script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 05: Production JSX Patterns & Refactoring Architecture</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-bad { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+    .badge-good { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 05: Production JSX Patterns & Refactoring Architecture</h1>
+  <p class="subtitle">Live architectural comparison between flawed production anti-patterns and senior refactored designs.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectPattern('ternaryPyramid')">1. Nested Ternary Pyramid</button>
+    <button onclick="selectPattern('inlineLogic')">2. Business Logic in JSX</button>
+    <button onclick="selectPattern('propExplosion')">3. Configuration vs Composition</button>
+    <button onclick="selectPattern('wrapperRegression')">4. Wrapper Regression</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>❌ Flawed Production Code</h2>
+      <span id="bad-badge" class="status-badge badge-bad">Anti-Pattern Detected</span>
+      <pre id="bad-code">// Anti-pattern code</pre>
+
+      <h2>Mechanical Failure Analysis</h2>
+      <pre id="failure-analysis">// Why it breaks</pre>
+    </div>
+
+    <div class="card">
+      <h2>✅ Senior Refactored Pattern</h2>
+      <span id="good-badge" class="status-badge badge-good">15-Pillar Architecture Compliant</span>
+      <pre id="good-code">// Senior refactor</pre>
+
+      <h2>Architectural Advantages</h2>
+      <pre id="advantages-analysis">// Key engineering gains</pre>
+    </div>
+  </div>
+
+  <script>
+    const patterns = {
+      ternaryPyramid: {
+        bad: `// ❌ Flawed: Nested Ternary Pyramid\nreturn (\n  <Page>\n    {loading ? (\n      <Loading />\n    ) : error ? (\n      <Error />\n    ) : empty ? (\n      <Empty />\n    ) : data ? (\n      <Results data={data} />\n    ) : (\n      <Unknown />\n    )}\n  </Page>\n);`,
+        failure: `1. Obscures state machine transitions inside nested punctuation.\n2. Inadvertently allows invalid intermediate combinations.\n3. High cognitive complexity during debugging and code review.`,
+        good: `// ✅ Senior Refactor: Explicit Control Flow / Early Return\nlet content;\nif (loading) content = <Loading />;\nelse if (error) content = <Error error={error} />;\nelse if (empty) content = <Empty />;\nelse if (data) content = <Results data={data} />;\nelse content = <Unknown />;\n\nreturn <Page>{content}</Page>;`,
+        advantages: `1. Control flow remains clearly visible as standard JavaScript statements.\n2. Easy to add telemetry or logging to individual branches.\n3. Clear, predictable JSX projection.`
+      },
+      inlineLogic: {
+        bad: `// ❌ Flawed: Business calculation inside markup\n<div>\n  {orders\n    .filter(o => o.active)\n    .sort((a, b) => b.total - a.total)\n    .map(o => (\n      <Order\n        key={o.id}\n        discount={user?.isVip ? (o.total > 1000 ? 0.2 : 0.1) : 0}\n      />\n    ))}\n</div>`,
+        failure: `1. Conflates data transformation, discount calculation rules, and UI markup.\n2. Impossible to unit-test discount logic independently of React rendering.`,
+        good: `// ✅ Senior Refactor: Preparation ➔ Projection\nconst visibleOrders = getVisibleOrders(orders);\n\nreturn (\n  <div>\n    {visibleOrders.map(order => (\n      <Order\n        key={order.id}\n        order={order}\n        discount={calculateDiscount(user, order.total)}\n      />\n    ))}\n  </div>\n);`,
+        advantages: `1. calculateDiscount() can be 100% unit-tested with pure inputs.\n2. JSX only describes layout hierarchy, not business accounting.`
+      },
+      propExplosion: {
+        bad: `// ❌ Flawed: Configuration Engine\n<Panel\n  title="Settings"\n  showHeader={true}\n  showFooter={true}\n  footerAlign="right"\n  bodyLayout="grid"\n  bodyPadding="large"\n  cancelText="Close"\n  confirmText="Save"\n/>`,
+        failure: `1. Combinatorial explosion of boolean flags.\n2. Any new layout permutation requires modifying the core Panel component.`,
+        good: `// ✅ Senior Refactor: Composition API\n<Panel>\n  <Panel.Header title="Settings" />\n  <Panel.Body layout="grid" padding="large">\n    <SettingsForm />\n  </Panel.Body>\n  <Panel.Footer>\n    <Button variant="ghost">Close</Button>\n    <Button variant="primary">Save</Button>\n  </Panel.Footer>\n</Panel>`,
+        advantages: `1. Open/Closed Principle: Caller controls layout and slot contents.\n2. Zero prop explosion in core components.`
+      },
+      wrapperRegression: {
+        bad: `// ❌ Flawed: Convenience <div> added without checking semantics\nfunction TableCells() {\n  return (\n    <div>\n      <td>Alpha</td>\n      <td>Beta</td>\n    </div>\n  );\n}`,
+        failure: `1. Corrupts <table> semantics (div inside table/tr is invalid HTML).\n2. Breaks CSS grid / flexbox parent-child relationships.`,
+        good: `// ✅ Senior Refactor: Zero-DOM Fragment\nfunction TableCells() {\n  return (\n    <>\n      <td>Alpha</td>\n      <td>Beta</td>\n    </>\n  );\n}`,
+        advantages: `1. Satisfies JSX single-root rule without injecting host DOM nodes.\n2. 100% compliant with HTML semantics and CSS layouts.`
+      }
+    };
+
+    function selectPattern(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = patterns[key];
+      document.getElementById('bad-code').textContent = data.bad;
+      document.getElementById('failure-analysis').textContent = data.failure;
+      document.getElementById('good-code').textContent = data.good;
+      document.getElementById('advantages-analysis').textContent = data.advantages;
+    }
+
+    selectPattern('ternaryPyramid');
+  </script>
+</body>
+</html>

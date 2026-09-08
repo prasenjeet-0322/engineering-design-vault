@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 04 — Part 16: State & State Updates Final Review & Mastery</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f293d;
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --accent: #06b6d4;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --code-bg: #030712;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      font-size: 0.75rem;
+      background: rgba(99, 102, 241, 0.2);
+      color: var(--primary-light);
+      padding: 4px 8px;
+      border-radius: 9999px;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+    .header p {
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 10px;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: var(--border);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    button.btn-accent {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: var(--accent);
+      color: #67e8f9;
+    }
+    button.btn-accent:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+    button.btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--error);
+      color: #fca5a5;
+    }
+    button.btn-danger:hover {
+      background: var(--error);
+      color: #fff;
+    }
+    .code-view {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .stat-badge {
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .checklist-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+      background: var(--code-bg);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .check-item input[type="checkbox"] {
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const CHECKLIST_ITEMS = [
+      "01. Explain why React state exists.",
+      "02. Explain state as persistent component memory.",
+      "03. Explain render snapshots.",
+      "04. Explain render-specific closures.",
+      "05. Explain setter semantics.",
+      "06. Explain state update queues.",
+      "07. Distinguish direct and functional updates.",
+      "08. Predict update ordering.",
+      "09. Explain batching.",
+      "10. Distinguish batching from domain atomicity.",
+      "11. Explain useState replacement semantics.",
+      "12. Explain object identity.",
+      "13. Explain immutable updates.",
+      "14. Explain structural sharing.",
+      "15. Update nested objects safely.",
+      "16. Update arrays safely.",
+      "17. Explain why mutation damages snapshot reasoning.",
+      "18. Identify canonical state.",
+      "19. Identify derived state.",
+      "20. Recognize legitimate independent draft state.",
+      "21. Identify duplicate domain facts.",
+      "22. Identify state invariants.",
+      "23. Detect impossible state combinations.",
+      "24. Model mutually exclusive states coherently.",
+      "25. Identify the authoritative state owner.",
+      "26. Apply narrowest common owner.",
+      "27. Explain state locality.",
+      "28. Explain state lifetime.",
+      "29. Distinguish render from remount.",
+      "30. Explain component identity.",
+      "31. Explain key-based identity.",
+      "32. Choose stable entity keys.",
+      "33. Diagnose index-key state corruption.",
+      "34. Explain controlled components.",
+      "35. Explain uncontrolled components.",
+      "36. Distinguish value from defaultValue.",
+      "37. Diagnose stale closures.",
+      "38. Use functional updates appropriately.",
+      "39. Recognize inappropriate effect-based derivation.",
+      "40. Recognize over-lifted state.",
+      "41. Recognize under-lifted state.",
+      "42. Recognize state that belongs outside React state.",
+      "43. Understand normalization fundamentals.",
+      "44. Recognize reducer-style transition opportunities.",
+      "45. Debug state using prediction before execution.",
+      "46. Use React DevTools to inspect state ownership.",
+      "47. Use the Profiler to investigate update propagation.",
+      "48. Trace reference identity.",
+      "49. Trace state transitions.",
+      "50. Design a minimal canonical state model."
+    ];
+
+    // Master State Machine Simulator
+    function MasterStateMachine() {
+      const [state, setState] = useState({ status: 'idle' });
+      const [history, setHistory] = useState([]);
+
+      const dispatch = (action) => {
+        let nextState = state;
+        if (action.type === 'FETCH_INIT') {
+          nextState = { status: 'loading' };
+        } else if (action.type === 'FETCH_SUCCESS') {
+          nextState = { status: 'success', data: action.payload };
+        } else if (action.type === 'FETCH_FAILURE') {
+          nextState = { status: 'error', error: action.payload };
+        } else if (action.type === 'RESET') {
+          nextState = { status: 'idle' };
+        }
+        setHistory(prev => [`[${action.type}] -> ${nextState.status}`, ...prev.slice(0, 5)]);
+        setState(nextState);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. State Machine & Invariant Guard</span>
+            <span className="badge">Deterministic Flow</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="stat-badge">
+              <span>Status:</span>
+              <strong style={{ color: 'var(--accent)', textTransform: 'uppercase' }}>{state.status}</strong>
+            </div>
+            {state.status === 'success' && <span style={{ color: 'var(--success)', fontSize: '0.85rem' }}>Payload: {JSON.stringify(state.data)}</span>}
+            {state.status === 'error' && <span style={{ color: 'var(--error)', fontSize: '0.85rem' }}>Err: {state.error}</span>}
+          </div>
+
+          <div className="btn-group">
+            <button onClick={() => dispatch({ type: 'FETCH_INIT' })}>Dispatch: FETCH_INIT</button>
+            <button className="btn-accent" onClick={() => dispatch({ type: 'FETCH_SUCCESS', payload: { users: 42, latency: '18ms' } })}>
+              Dispatch: FETCH_SUCCESS
+            </button>
+            <button className="btn-danger" onClick={() => dispatch({ type: 'FETCH_FAILURE', payload: '503 Gateway Timeout' })}>
+              Dispatch: FETCH_FAILURE
+            </button>
+            <button onClick={() => dispatch({ type: 'RESET' })}>Reset</button>
+          </div>
+
+          <div className="code-view" style={{ fontSize: '0.8rem' }}>
+            <div><strong>Transition History:</strong></div>
+            {history.map((h, i) => <div key={i}>{h}</div>)}
+            {history.length === 0 && <div style={{ color: '#64748b' }}>No transitions yet.</div>}
+          </div>
+        </div>
+      );
+    }
+
+    // Master 50-Point Checklist Interactive Component
+    function MasteryChecklist() {
+      const [checked, setChecked] = useState(() => {
+        const initial = {};
+        CHECKLIST_ITEMS.forEach((_, idx) => { initial[idx] = true; }); // Default 100% completed
+        return initial;
+      });
+
+      const toggle = (idx) => {
+        setChecked(prev => ({ ...prev, [idx]: !prev[idx] }));
+      };
+
+      const completedCount = Object.values(checked).filter(Boolean).length;
+      const pct = Math.round((completedCount / CHECKLIST_ITEMS.length) * 100);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. 50-Point Senior State Mastery Checklist</span>
+            <span className="badge">{pct}% Completed ({completedCount}/50)</span>
+          </div>
+
+          <div className="progress-bar-container">
+            <div className="progress-bar-fill" style={{ width: `${pct}%` }}></div>
+          </div>
+
+          <div className="checklist-container">
+            {CHECKLIST_ITEMS.map((item, idx) => (
+              <label key={idx} className="check-item">
+                <input
+                  type="checkbox"
+                  checked={!!checked[idx]}
+                  onChange={() => toggle(idx)}
+                />
+                <span style={{ color: checked[idx] ? '#e2e8f0' : '#64748b' }}>{item}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="btn-group">
+            <button onClick={() => {
+              const all = {};
+              CHECKLIST_ITEMS.forEach((_, idx) => { all[idx] = true; });
+              setChecked(all);
+            }}>Check All</button>
+            <button onClick={() => setChecked({})}>Uncheck All</button>
+          </div>
+        </div>
+      );
+    }
+
+    // Main Master App
+    function App() {
+      return (
+        <div>
+          <div className="header">
+            <h1>
+              <span>KPI 04 Part 16: State & State Updates Final Review</span>
+              <span className="badge">Capstone Lab</span>
+            </h1>
+            <p>
+              Complete synthesis of KPI 04: UI memory snapshots, updater queue algebra, state machine invariants, structural sharing, and the 50-point mastery index.
+            </p>
+          </div>
+
+          <div className="grid">
+            <MasterStateMachine />
+            <MasteryChecklist />
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

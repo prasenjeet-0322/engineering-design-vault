@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 15 — Effects & Synchronization Crucible</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15), rgba(34, 197, 94, 0.1));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.5rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    .terminal {
+      background: #050811;
+      border: 1px solid #1a2333;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+    }
+    .log-time { color: #64748b; }
+    .log-event { font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+    .log-warn { color: var(--accent-amber); }
+    .log-error { color: var(--accent-red); }
+    .log-success { color: var(--accent-green); }
+    .log-purple { color: var(--accent-purple); }
+
+    .result-display {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useSyncExternalStore } = React;
+
+    // --- LOG TERMINAL COMPONENT ---
+    function LogTerminal({ logs, onClear }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [logs]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Crucible Event Telemetry</span>
+            <button style={{ padding: "2px 8px", fontSize: "0.72rem" }} onClick={onClear}>Clear</button>
+          </div>
+          <div className="terminal">
+            {logs.length === 0 ? (
+              <div style={{ color: "#475569", fontStyle: "italic" }}>No crucible operations recorded yet.</div>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className="log-line">
+                  <span className="log-time">[{log.time}]</span>
+                  <span className={`log-${log.type} log-event`}>{log.event}</span>
+                  <span>{log.message}</span>
+                </div>
+              ))
+            )}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // CRUCIBLE TEST 1: ASYNC RACE CONDITIONS & CURRENTNESS GUARDS
+    // =========================================================================
+    function AsyncRaceCrucible() {
+      const [userId, setUserId] = useState("1");
+      const [mode, setMode] = useState("protected"); // "protected" vs "unprotected"
+      const [userResult, setUserResult] = useState(null);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      useEffect(() => {
+        let active = true;
+        const currentReqId = userId;
+        const delay = userId === "1" ? 1800 : 400; // User 1 is slow, User 2 is fast!
+
+        addLog("DISPATCH", `Dispatched fetch for User #${userId} (simulated delay: ${delay}ms)`, "purple");
+
+        setTimeout(() => {
+          if (mode === "protected") {
+            if (active) {
+              addLog("COMMIT [VALID]", `Committed response for User #${currentReqId}`, "success");
+              setUserResult(`User Profile #${currentReqId} (Alice/Bob)`);
+            } else {
+              addLog("DISCARD [STALE]", `Discarded stale response for User #${currentReqId}`, "warn");
+            }
+          } else {
+            // Unprotected: Stale older request overwrites newer UI state!
+            addLog("COMMIT [UNPROTECTED OVERWRITE]", `Overwrote state with User #${currentReqId}!`, "error");
+            setUserResult(`User Profile #${currentReqId} (Stale Overwrite!)`);
+          }
+        }, delay);
+
+        return () => {
+          active = false;
+          addLog("INVALIDATE", `Marked fetch for User #${currentReqId} as obsolete`, "info");
+        };
+      }, [userId, mode]);
+
+      const triggerRapidSwitch = () => {
+        setUserResult(null);
+        addLog("TRIGGER", "Rapidly switching User 1 -> User 2...", "cyan");
+        setUserId("1");
+        setTimeout(() => setUserId("2"), 150);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. Async Race Currentness vs Stale Overwrites</span>
+            <span className={`badge ${mode === "protected" ? "badge-green" : "badge-red"}`}>
+              {mode === "protected" ? "Currentness Protected" : "Unprotected (Race Prone)"}
+            </span>
+          </div>
+          <p className="card-desc">
+            Test rapid switching between slow User #1 (1800ms) and fast User #2 (400ms). In <strong>Protected</strong> mode, stale results are safely discarded. In <strong>Unprotected</strong> mode, User #1 overwrites User #2.
+          </p>
+
+          <div className="btn-group">
+            <button className={mode === "protected" ? "active" : ""} onClick={() => setMode("protected")}>
+              ✅ Protected (Active Flag Guard)
+            </button>
+            <button className={mode === "unprotected" ? "active" : ""} onClick={() => setMode("unprotected")}>
+              ❌ Unprotected Race Mode
+            </button>
+            <button onClick={triggerRapidSwitch} style={{ borderColor: "var(--accent-cyan)" }}>
+              ⚡ Run Race Simulation (User 1 → User 2)
+            </button>
+          </div>
+
+          <div className="result-display">
+            <div>Current Committed UI Display: <strong style={{ color: "var(--accent-cyan)" }}>{userResult || "Loading in-flight request..."}</strong></div>
+            <div>Active Target ID: <strong style={{ color: "#fff" }}>User #{userId}</strong></div>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // CRUCIBLE TEST 2: TWO-WAY FEEDBACK LOOP CONVERGENCE
+    // =========================================================================
+    function FeedbackLoopCrucible() {
+      const [val, setVal] = useState(100);
+      const [guard, setGuard] = useState(true);
+      const [logs, setLogs] = useState([]);
+      const circuitBreaker = useRef(0);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      // Simulated external editor
+      const externalRef = useRef({
+        value: 100,
+        listeners: new Set(),
+        setValue(v) {
+          this.value = v;
+          if (!guard) {
+            this.listeners.forEach(l => l(v)); // re-emits change event immediately!
+          }
+        },
+        onChange(fn) {
+          this.listeners.add(fn);
+          return () => this.listeners.delete(fn);
+        }
+      });
+
+      useEffect(() => {
+        const ext = externalRef.current;
+        const unsub = ext.onChange(newV => {
+          addLog("EXT EVENT", `External emitted onChange(${newV})`, "purple");
+          setVal(newV);
+        });
+        return unsub;
+      }, []);
+
+      useEffect(() => {
+        const ext = externalRef.current;
+        if (guard) {
+          if (ext.value !== val) {
+            addLog("SYNC [GUARDED]", `Synchronized state (${val}) to external`, "success");
+            ext.value = val;
+          } else {
+            addLog("BAILOUT", `Bailed out: external already holds ${val}`, "info");
+          }
+        } else {
+          circuitBreaker.current++;
+          if (circuitBreaker.current > 6) {
+            addLog("TRIPWIRE", "Emergency tripwire: feedback loop halted!", "error");
+            return;
+          }
+          addLog("SYNC [UNGUARDED]", `Blindly setting ${val} on external (step ${circuitBreaker.current})`, "warn");
+          ext.setValue(val);
+        }
+      }, [val, guard]);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. Bidirectional Sync & Feedback Loops</span>
+            <span className={`badge ${guard ? "badge-green" : "badge-red"}`}>
+              {guard ? "Value Equality Guard Active" : "Uncontrolled Feedback Loop"}
+            </span>
+          </div>
+          <p className="card-desc">
+            When synchronizing two-way with external widgets, value equality guards prevent endless ping-pong feedback oscillations.
+          </p>
+
+          <div className="btn-group">
+            <button className={guard ? "active" : ""} onClick={() => { setGuard(true); circuitBreaker.current = 0; }}>
+              🛡️ Enable Value Guard
+            </button>
+            <button className={!guard ? "active" : ""} onClick={() => { setGuard(false); circuitBreaker.current = 0; }}>
+              ⚠️ Disable Value Guard
+            </button>
+            <button onClick={() => { circuitBreaker.current = 0; setVal(v => v + 10); }}>
+              ➕ Mutate React State (+10)
+            </button>
+          </div>
+
+          <div className="result-display">
+            <div>React State: <strong style={{ color: "var(--accent-cyan)" }}>{val}</strong></div>
+            <div>External Widget Internal Value: <strong style={{ color: "var(--accent-purple)" }}>{externalRef.current.value}</strong></div>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // CRUCIBLE TEST 3: EXTERNAL STORE TEARING BENCHMARK
+    // =========================================================================
+    const crucibleStore = {
+      state: 0,
+      listeners: new Set(),
+      getState() { return this.state; },
+      dispatch(updater) {
+        this.state = typeof updater === "function" ? updater(this.state) : updater;
+        this.listeners.forEach(l => l());
+      },
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      }
+    };
+
+    function StoreTearingCrucible() {
+      const [method, setMethod] = useState("uSES");
+
+      const handleStressTest = () => {
+        let count = 0;
+        const timer = setInterval(() => {
+          crucibleStore.dispatch(s => s + 1);
+          count++;
+          if (count >= 10) clearInterval(timer);
+        }, 30);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>3. External Store Synchronization (uSES)</span>
+            <span className={`badge ${method === "uSES" ? "badge-green" : "badge-amber"}`}>
+              {method === "uSES" ? "useSyncExternalStore" : "useEffect + useState"}
+            </span>
+          </div>
+          <p className="card-desc">
+            High-frequency background mutations (10 dispatches in 300ms) evaluated across sibling subscribers to prove atomic frame consistency without tearing.
+          </p>
+
+          <div className="btn-group">
+            <button className={method === "uSES" ? "active" : ""} onClick={() => setMethod("uSES")}>
+              ✅ useSyncExternalStore
+            </button>
+            <button className={method === "adHoc" ? "active" : ""} onClick={() => setMethod("adHoc")}>
+              ⚠️ Ad-Hoc useEffect
+            </button>
+            <button onClick={handleStressTest} style={{ borderColor: "var(--accent-cyan)" }}>
+              ⚡ Dispatch 10 Rapid Mutations
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ background: "#0d131f", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Subscriber Sibling #1</span>
+              {method === "uSES" ? <StoreConsumerUSes /> : <StoreConsumerAdHoc />}
+            </div>
+            <div style={{ background: "#0d131f", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Subscriber Sibling #2</span>
+              {method === "uSES" ? <StoreConsumerUSes /> : <StoreConsumerAdHoc />}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function StoreConsumerUSes() {
+      const val = useSyncExternalStore(crucibleStore.subscribe.bind(crucibleStore), () => crucibleStore.getState());
+      return <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent-cyan)", fontFamily: "var(--font-mono)", marginTop: 4 }}>State: {val}</div>;
+    }
+
+    function StoreConsumerAdHoc() {
+      const [val, setVal] = useState(crucibleStore.getState());
+      useEffect(() => {
+        return crucibleStore.subscribe(() => setVal(crucibleStore.getState()));
+      }, []);
+      return <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent-amber)", fontFamily: "var(--font-mono)", marginTop: 4 }}>State: {val}</div>;
+    }
+
+    // =========================================================================
+    // CRUCIBLE TEST 4: MASTER RESOURCE OWNERSHIP & STRICT MODE AUDIT
+    // =========================================================================
+    let globalActiveResources = 0;
+
+    function ResourceAuditCrucible() {
+      const [mounted, setMounted] = useState(true);
+      const [activeCount, setActiveCount] = useState(0);
+
+      const updateCount = () => setActiveCount(globalActiveResources);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>4. Master Resource Ownership & Leak Audit</span>
+            <span className={`badge ${activeCount === 0 && !mounted ? "badge-green" : activeCount > 0 ? "badge-purple" : "badge-green"}`}>
+              Active Handles: {activeCount}
+            </span>
+          </div>
+          <p className="card-desc">
+            Mount and unmount this multi-resource component (WebSocket + Timer + Event Listener). Verify that upon unmount, total active allocated system handles drop to exactly <strong>0</strong>.
+          </p>
+
+          <div className="btn-group">
+            <button onClick={() => setMounted(m => !m)} style={{ borderColor: mounted ? "var(--accent-red)" : "var(--accent-green)" }}>
+              {mounted ? "Unmount All Subsystems" : "Mount Subsystems"}
+            </button>
+          </div>
+
+          <div style={{ background: "#0d131f", padding: 14, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+            {mounted ? (
+              <MultiResourceEngine onUpdate={updateCount} />
+            ) : (
+              <div style={{ color: "var(--accent-green)", fontWeight: 600 }}>
+                ✅ All external subsystems disposed. Active resources: 0
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function MultiResourceEngine({ onUpdate }) {
+      useEffect(() => {
+        globalActiveResources += 3; // Allocates: Socket, Timer, Window Listener
+        onUpdate();
+
+        const timer = setInterval(() => {}, 1000);
+        const handleResize = () => {};
+        window.addEventListener("resize", handleResize);
+
+        return () => {
+          clearInterval(timer);
+          window.removeEventListener("resize", handleResize);
+          globalActiveResources -= 3;
+          onUpdate();
+        };
+      }, []);
+
+      return (
+        <div>
+          <div style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>🟢 3 External Subsystems Synchronized</div>
+          <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 4 }}>
+            1. WebSocket Socket Handle | 2. Interval Timer #8234 | 3. Window Resize Observer
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APPLICATION
+    // =========================================================================
+    function App() {
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>⚔️</span>
+                Lab 15 — Effects & Synchronization Crucible
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 4 }}>
+                Mastery verification sandbox testing async race conditions, feedback loop convergence, external store synchronization, and zero-leak resource lifecycles.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <span className="badge badge-primary">React 18</span>
+              <span className="badge badge-green">Crucible Master</span>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            <AsyncRaceCrucible />
+            <FeedbackLoopCrucible />
+            <StoreTearingCrucible />
+            <ResourceAuditCrucible />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

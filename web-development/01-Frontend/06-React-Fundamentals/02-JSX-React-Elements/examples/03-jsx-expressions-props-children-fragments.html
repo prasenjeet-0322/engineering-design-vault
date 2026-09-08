@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 03: JSX Expressions, Children Shapes & Fragment Mechanics</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-info { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-warn { background: rgba(255, 166, 87, 0.15); color: var(--orange); border: 1px solid var(--orange); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 03: JSX Expressions, Children Shapes & Fragment Mechanics</h1>
+  <p class="subtitle">Live runtime inspection of expression slot results, the numeric 0 trap, children data normalization, and Fragment DOM topology.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectMode('zeroTrap')">1. The Numeric 0 Trap ({count && ...})</button>
+    <button onclick="selectMode('childrenShape')">2. Children Shape (Single vs Array)</button>
+    <button onclick="selectMode('fragmentTopology')">3. Fragment vs &lt;div&gt; DOM Topology</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>JSX Expression / Component Code</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>JavaScript Expression Result</h2>
+      <pre id="expr-panel">// Evaluation</pre>
+    </div>
+
+    <div class="card">
+      <h2>React Child Interpretation</h2>
+      <span id="badge" class="status-badge badge-warn">Evaluation: Rendered 0 Primitive</span>
+      <pre id="react-panel">// React processing</pre>
+
+      <h2>Final Browser DOM Result</h2>
+      <pre id="dom-panel">// Host output</pre>
+    </div>
+  </div>
+
+  <script>
+    const modes = {
+      zeroTrap: {
+        code: `const count = 0;\n\n// Developer intended: no badge when 0\nconst view = (\n  <section>\n    {count && <Badge count={count} />}\n  </section>\n);`,
+        expr: `Expression: count && <Badge count={count} />\nEvaluates:  0 && [ReactElement]\nJS Result:  0 (Number primitive)`,
+        react: `React receives numeric child 0.\nNumbers are valid renderable text nodes in React.\n➔ Text node containing "0" is created!`,
+        dom: `<section>\n  0\n</section>`,
+        badgeText: '⚠️ Warning: Unintended Numeric "0" Rendered',
+        badgeClass: 'badge-warn'
+      },
+      childrenShape: {
+        code: `// Case A: Single Child\n<Card><Button /></Card> // props.children = Object ({ type: Button })\n\n// Case B: Multiple Sibling Children\n<Card>\n  <Button />\n  <Button />\n</Card> // props.children = Array [ { type: Button }, { type: Button } ]`,
+        expr: `Case A: typeof props.children === "object" (Array.isArray() === false)\nCase B: Array.isArray(props.children) === true`,
+        react: `Calling props.children.map() directly on Case A throws TypeError!\n➔ Senior rule: Use React.Children.map() to safely iterate over heterogeneous children shapes.`,
+        dom: `<!-- Case A -->\n<div class="card"><button /></div>\n\n<!-- Case B -->\n<div class="card"><button /><button /></div>`,
+        badgeText: 'ℹ️ Opaque Data Structure Normalized',
+        badgeClass: 'badge-info'
+      },
+      fragmentTopology: {
+        code: `// Case 1: Unnecessary wrapper <div>\nreturn (\n  <div className="wrapper">\n    <dt>Term</dt>\n    <dd>Definition</dd>\n  </div>\n);\n\n// Case 2: Fragment\nreturn (\n  <>\n    <dt>Term</dt>\n    <dd>Definition</dd>\n  </>\n);`,
+        expr: `Case 1 Transpiles: _jsx("div", { ... })\nCase 2 Transpiles: _jsx(React.Fragment, { ... })`,
+        react: `React recognizes Symbol.for('react.fragment') and yields children directly to parent reconciliation without creating a host DOM node.`,
+        dom: `<!-- Case 1 (Corrupts <dl> semantics): -->\n<dl>\n  <div class="wrapper">\n    <dt>Term</dt><dd>Def</dd>\n  </div>\n</dl>\n\n<!-- Case 2 (Clean DOM Topology): -->\n<dl>\n  <dt>Term</dt>\n  <dd>Def</dd>\n</dl>`,
+        badgeText: '✅ Clean Zero-DOM Fragment Topology',
+        badgeClass: 'badge-info'
+      }
+    };
+
+    function selectMode(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = modes[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('expr-panel').textContent = data.expr;
+      document.getElementById('react-panel').textContent = data.react;
+      document.getElementById('dom-panel').textContent = data.dom;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectMode('zeroTrap');
+  </script>
+</body>
+</html>

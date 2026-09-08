@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 06 — Reconciliation & List Diffing Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.85);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+      --cyan: #06b6d4;
+      --purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-primary { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); }
+    .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); }
+
+    .nav-tabs {
+      display: flex;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active { color: var(--accent); background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); border-color: rgba(255, 255, 255, 0.15); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { opacity: 0.9; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { opacity: 0.9; }
+    .btn-cyan { background: var(--cyan); color: #090d16; font-weight: 700; }
+    .btn-cyan:hover { opacity: 0.9; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    .console-box {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      max-height: 280px;
+      overflow-y: auto;
+      color: #94a3b8;
+    }
+    .log-line { margin-bottom: 4px; line-height: 1.4; }
+    .log-render { color: #38bdf8; }
+    .log-pass1 { color: #34d399; }
+    .log-pass2 { color: #fbbf24; }
+    .log-commit { color: #a855f7; }
+    .log-warn { color: #f87171; }
+
+    .fiber-node {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 10px;
+      padding: 12px;
+      position: relative;
+      transition: all 0.3s;
+    }
+    .fiber-node.active-pass1 { border-color: #10b981; box-shadow: 0 0 16px rgba(16, 185, 129, 0.4); }
+    .fiber-node.active-pass2 { border-color: #f59e0b; box-shadow: 0 0 16px rgba(245, 158, 11, 0.4); }
+    .fiber-node.active-placement { border-color: #a855f7; background: rgba(168, 85, 247, 0.15); }
+    .fiber-node.active-deletion { border-color: #ef4444; background: rgba(239, 68, 68, 0.15); opacity: 0.6; }
+
+    .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .node-title { font-weight: 700; font-size: 0.9rem; color: #e2e8f0; }
+    .node-meta { font-family: monospace; font-size: 0.75rem; color: #94a3b8; }
+    
+    .pointer-tag {
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .pipeline-step {
+      padding: 16px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 12px;
+    }
+    .pipeline-step.highlight { border-color: var(--accent); background: rgba(56, 189, 248, 0.1); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- SOUND / FEEDBACK EFFECT SIMULATOR ---
+    function logEvent(logs, setLogs, type, text) {
+      const time = new Date().toLocaleTimeString().split(" ")[0];
+      setLogs(prev => [{ id: Math.random().toString(), time, type, text }, ...prev.slice(0, 49)]);
+    }
+
+    // =========================================================================
+    // TAB 1: TWO-PASS RECONCILIATION STEP-BY-STEP SIMULATOR
+    // =========================================================================
+    function TwoPassSimulatorTab({ logs, setLogs }) {
+      const PRESETS = [
+        {
+          name: "Linear Update (Pass 1 Fast Path)",
+          oldList: ["A", "B", "C"],
+          newList: ["A*", "B", "C"],
+          desc: "Keys match index-for-index. Pass 1 completes 100% without entering Pass 2 Map."
+        },
+        {
+          name: "Prepend Item (Linear Scan Bailout)",
+          oldList: ["A", "B", "C"],
+          newList: ["X", "A", "B", "C"],
+          desc: "Pass 1 bails out at Index 0 because X != A. Pass 2 builds Map and places X, A, B, C."
+        },
+        {
+          name: "Reorder / Swap Nodes",
+          oldList: ["A", "B", "C", "D"],
+          newList: ["B", "A", "D", "C"],
+          desc: "Pass 1 bails out at index 0. Pass 2 reuses fibers and moves A and C using lastPlacedIndex."
+        },
+        {
+          name: "Reverse Worst Case ([A,B,C,D] -> [D,C,B,A])",
+          oldList: ["A", "B", "C", "D"],
+          newList: ["D", "C", "B", "A"],
+          desc: "D stays stationary (lastPlacedIndex=3); React moves C, B, A sequentially after D!"
+        },
+        {
+          name: "Middle Deletion",
+          oldList: ["A", "B", "C", "D"],
+          newList: ["A", "C", "D"],
+          desc: "Pass 1 matches A. At index 1, C != B. Pass 2 matches C & D; marks B for Deletion."
+        }
+      ];
+
+      const [selectedPreset, setSelectedPreset] = useState(0);
+      const [step, setStep] = useState(0);
+      const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+
+      const preset = PRESETS[selectedPreset];
+
+      // Build simulation steps
+      const simulation = useMemo(() => {
+        const steps = [];
+        const oldList = preset.oldList;
+        const newList = preset.newList;
+
+        steps.push({
+          title: "T0: Initial Committed Fiber State",
+          phase: "Initial",
+          desc: `Current Fiber tree contains: [${oldList.join(" -> ")}]. Incoming elements: [${newList.join(", ")}].`,
+          pass1Index: -1,
+          pass2Index: -1,
+          lastPlacedIndex: 0,
+          map: {},
+          placed: [],
+          deleted: [],
+          workInProgress: []
+        });
+
+        // PASS 1 Linear scan
+        let newIdx = 0;
+        let lastPlaced = 0;
+        let pass1Bailed = false;
+        const placed = [];
+        const wip = [];
+
+        for (; newIdx < oldList.length && newIdx < newList.length; newIdx++) {
+          const oldKey = oldList[newIdx].replace("*", "");
+          const newKey = newList[newIdx].replace("*", "");
+
+          if (oldKey === newKey) {
+            placed.push({ key: newList[newIdx], action: "Reused in Pass 1 (Update Props)" });
+            wip.push({ key: newList[newIdx], flag: "Update", oldIndex: newIdx, newIndex: newIdx });
+            steps.push({
+              title: `Pass 1 Linear Scan: Slot ${newIdx}`,
+              phase: "Pass 1",
+              desc: `Old key "${oldList[newIdx]}" matches New key "${newList[newIdx]}". Fiber reused directly without Map!`,
+              pass1Index: newIdx,
+              pass2Index: -1,
+              lastPlacedIndex: newIdx,
+              map: {},
+              placed: [...placed],
+              deleted: [],
+              workInProgress: [...wip]
+            });
+            lastPlaced = newIdx;
+          } else {
+            pass1Bailed = true;
+            steps.push({
+              title: `Pass 1 Bailout: Key Mismatch at Slot ${newIdx}`,
+              phase: "Pass 1 Bailout",
+              desc: `Old key "${oldList[newIdx]}" != New key "${newList[newIdx]}". Pass 1 terminates. Transitioning to Pass 2 Map Lookup!`,
+              pass1Index: newIdx,
+              pass2Index: -1,
+              lastPlacedIndex: lastPlaced,
+              map: {},
+              placed: [...placed],
+              deleted: [],
+              workInProgress: [...wip]
+            });
+            break;
+          }
+        }
+
+        // Pass 2 Map Lookup
+        if (newIdx < newList.length || newIdx < oldList.length) {
+          // Construct Map of remaining old fibers
+          const remainingOld = {};
+          for (let i = newIdx; i < oldList.length; i++) {
+            const rawKey = oldList[i].replace("*", "");
+            remainingOld[rawKey] = i;
+          }
+
+          steps.push({
+            title: `Pass 2: Map Construction`,
+            phase: "Pass 2 Map",
+            desc: `Residual old fibers added to Map: { ${Object.keys(remainingOld).map(k => `"${k}": oldIndex ${remainingOld[k]}`).join(", ")} }`,
+            pass1Index: newIdx,
+            pass2Index: -1,
+            lastPlacedIndex: lastPlaced,
+            map: { ...remainingOld },
+            placed: [...placed],
+            deleted: [],
+            workInProgress: [...wip]
+          });
+
+          const currentMap = { ...remainingOld };
+          const deleted = [];
+
+          for (; newIdx < newList.length; newIdx++) {
+            const newKey = newList[newIdx].replace("*", "");
+            if (currentMap[newKey] !== undefined) {
+              const oldIndex = currentMap[newKey];
+              delete currentMap[newKey];
+
+              let flag = "Update";
+              let moveDesc = "";
+              if (oldIndex < lastPlaced) {
+                flag = "Placement (DOM Move)";
+                moveDesc = `oldIndex (${oldIndex}) < lastPlacedIndex (${lastPlaced}) -> MOVED via insertBefore!`;
+              } else {
+                flag = "Preserved in Place";
+                moveDesc = `oldIndex (${oldIndex}) >= lastPlacedIndex (${lastPlaced}) -> Stays stationary. lastPlacedIndex = ${oldIndex}`;
+                lastPlaced = oldIndex;
+              }
+
+              placed.push({ key: newList[newIdx], action: `Map Match (${flag})` });
+              wip.push({ key: newList[newIdx], flag, oldIndex, newIndex: newIdx });
+
+              steps.push({
+                title: `Pass 2 Lookup: Element "${newList[newIdx]}" at Index ${newIdx}`,
+                phase: "Pass 2 Match",
+                desc: `Found key "${newKey}" in Map (oldIndex: ${oldIndex}). ${moveDesc}`,
+                pass1Index: -1,
+                pass2Index: newIdx,
+                lastPlacedIndex: lastPlaced,
+                map: { ...currentMap },
+                placed: [...placed],
+                deleted: [...deleted],
+                workInProgress: [...wip]
+              });
+            } else {
+              // Not found in Map -> Brand New Mount
+              placed.push({ key: newList[newIdx], action: "New Fiber (Placement Mount)" });
+              wip.push({ key: newList[newIdx], flag: "Placement (Mount)", oldIndex: null, newIndex: newIdx });
+              steps.push({
+                title: `Pass 2 Mount: Element "${newList[newIdx]}" at Index ${newIdx}`,
+                phase: "Pass 2 Mount",
+                desc: `Key "${newKey}" not found in Map. Allocating new FiberNode with Placement effect tag.`,
+                pass1Index: -1,
+                pass2Index: newIdx,
+                lastPlacedIndex: lastPlaced,
+                map: { ...currentMap },
+                placed: [...placed],
+                deleted: [...deleted],
+                workInProgress: [...wip]
+              });
+            }
+          }
+
+          // Unmatched in Map -> Deletion
+          Object.keys(currentMap).forEach(key => {
+            deleted.push(key);
+          });
+
+          if (deleted.length > 0) {
+            steps.push({
+              title: `Pass 2 Deletions: Unmatched Old Fibers`,
+              phase: "Pass 2 Deletion",
+              desc: `Fibers remaining in Map [${deleted.join(", ")}] have no matching new element. Tagged with ChildDeletion!`,
+              pass1Index: -1,
+              pass2Index: -1,
+              lastPlacedIndex: lastPlaced,
+              map: {},
+              placed: [...placed],
+              deleted: [...deleted],
+              workInProgress: [...wip]
+            });
+          }
+        }
+
+        // Commit phase
+        steps.push({
+          title: "Atomic Commit Phase",
+          phase: "Commit",
+          desc: "React synchronously swaps pointers (fiberRoot.current = workInProgress) and applies DOM mutations atomically.",
+          pass1Index: -1,
+          pass2Index: -1,
+          lastPlacedIndex: lastPlaced,
+          map: {},
+          placed: [...placed],
+          deleted: steps[steps.length - 1].deleted,
+          workInProgress: [...wip]
+        });
+
+        return steps;
+      }, [preset]);
+
+      const currentStep = simulation[Math.min(step, simulation.length - 1)];
+
+      useEffect(() => {
+        setStep(0);
+        logEvent(logs, setLogs, "render", `Loaded Reconciliation Scenario: ${preset.name}`);
+      }, [selectedPreset]);
+
+      useEffect(() => {
+        let timer;
+        if (isAutoPlaying && step < simulation.length - 1) {
+          timer = setTimeout(() => {
+            setStep(s => s + 1);
+          }, 1200);
+        } else if (step >= simulation.length - 1) {
+          setIsAutoPlaying(false);
+        }
+        return () => clearTimeout(timer);
+      }, [isAutoPlaying, step, simulation.length]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>
+                  Step-by-Step Reconciler Internal State Inspector
+                </h3>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                  Inspect how React's Two-Pass Algorithm (Linear Scan + Hash Map Lookup + `lastPlacedIndex`) processes list updates.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  className="btn btn-secondary"
+                  disabled={step === 0}
+                  onClick={() => setStep(s => Math.max(0, s - 1))}
+                >
+                  ⏮ Prev Step
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setIsAutoPlaying(p => !p)}
+                >
+                  {isAutoPlaying ? "⏸ Pause" : "▶️ Play All"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  disabled={step >= simulation.length - 1}
+                  onClick={() => setStep(s => Math.min(simulation.length - 1, s + 1))}
+                >
+                  Next Step ⏭
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setStep(0)}
+                >
+                  🔄 Reset
+                </button>
+              </div>
+            </div>
+
+            {/* PRESET SELECTOR */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+              {PRESETS.map((p, i) => (
+                <button
+                  key={p.name}
+                  onClick={() => { setSelectedPreset(i); setStep(0); }}
+                  className={`btn ${selectedPreset === i ? "btn-cyan" : "btn-secondary"}`}
+                  style={{ fontSize: "0.8rem" }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+
+            {/* PIPELINE CURRENT STATUS */}
+            <div className="pipeline-step highlight">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span className="badge badge-primary">
+                  Step {step + 1} of {simulation.length}: {currentStep.phase}
+                </span>
+                <span className="node-meta">
+                  lastPlacedIndex: <strong style={{ color: "#38bdf8" }}>{currentStep.lastPlacedIndex}</strong>
+                </span>
+              </div>
+              <h4 style={{ fontSize: "1rem", color: "#f8fafc", marginBottom: "4px" }}>{currentStep.title}</h4>
+              <p style={{ color: "#cbd5e1", fontSize: "0.85rem" }}>{currentStep.desc}</p>
+            </div>
+
+            {/* FIBER TREES VISUALIZER */}
+            <div className="grid-2">
+              {/* CURRENT FIBER TREE */}
+              <div style={{ background: "#050811", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#94a3b8" }}>
+                    🌳 CURRENT FIBER TREE (Committed)
+                  </span>
+                  <span className="badge badge-secondary" style={{ fontSize: "0.7rem" }}>Singly-Linked List</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {preset.oldList.map((key, idx) => {
+                    const isPass1Active = currentStep.pass1Index === idx;
+                    const isDeleted = currentStep.deleted.includes(key.replace("*", ""));
+                    return (
+                      <div
+                        key={key}
+                        className={`fiber-node ${isPass1Active ? "active-pass1" : ""} ${isDeleted ? "active-deletion" : ""}`}
+                      >
+                        <div className="node-header">
+                          <span className="node-title">FiberNode [{key}]</span>
+                          <span className="badge badge-primary">Slot {idx}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <span className="pointer-tag">.key = "{key}"</span>
+                          <span className="pointer-tag">.sibling = {idx < preset.oldList.length - 1 ? `"${preset.oldList[idx + 1]}"` : "null"}</span>
+                          <span className="pointer-tag">.return = ListParent</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* WORK-IN-PROGRESS FIBER TREE */}
+              <div style={{ background: "#050811", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
+                    ⚡ WORK-IN-PROGRESS TREE (Reconciling)
+                  </span>
+                  <span className="badge badge-primary" style={{ fontSize: "0.7rem" }}>Double Buffering Staged</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {currentStep.workInProgress.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", textAlign: "center", padding: "30px" }}>
+                      Reconciliation not yet started for this step.
+                    </div>
+                  ) : (
+                    currentStep.workInProgress.map((item, idx) => {
+                      const isPlacement = item.flag.includes("Placement");
+                      return (
+                        <div
+                          key={item.key + idx}
+                          className={`fiber-node ${isPlacement ? "active-placement" : "active-pass1"}`}
+                        >
+                          <div className="node-header">
+                            <span className="node-title">WIP Fiber [{item.key}]</span>
+                            <span className={`badge ${isPlacement ? "badge-warning" : "badge-success"}`}>
+                              {item.flag}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                            <span className="pointer-tag">New Slot: {item.newIndex}</span>
+                            <span className="pointer-tag">Old Slot: {item.oldIndex !== null ? item.oldIndex : "NEW (null)"}</span>
+                            <span className="pointer-tag">Effect Tag: {item.flag}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* PASS 2 RESIDUAL HASH MAP INSPECTOR */}
+            {Object.keys(currentStep.map).length > 0 && (
+              <div style={{ marginTop: "16px", background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "12px 16px", borderRadius: "8px" }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fbbf24", marginBottom: "4px" }}>
+                  🗄️ Pass 2 Residual Map (`existingChildren` Hash Map)
+                </div>
+                <div style={{ fontFamily: "monospace", fontSize: "0.8rem", color: "#fef08a" }}>
+                  Map({Object.keys(currentStep.map).length}) &#123;{" "}
+                  {Object.keys(currentStep.map).map(k => `"${k}" => FiberNode(oldIndex: ${currentStep.map[k]})`).join(", ")} &#125;
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: PHASE METRICS INSPECTOR (RENDER vs RECONCILE vs COMMIT)
+    // =========================================================================
+    function PhaseMetricsTab({ logs, setLogs }) {
+      const [keyStrategy, setKeyStrategy] = useState("id");
+      const [items, setItems] = useState([
+        { id: "usr_1", name: "Alice Cooper", role: "Staff Engineer" },
+        { id: "usr_2", name: "Bob Martin", role: "Architect" },
+        { id: "usr_3", name: "Carol Danvers", role: "Lead Systems" }
+      ]);
+
+      const [metrics, setMetrics] = useState({
+        renders: 0,
+        reconciles: 0,
+        domMutations: 0,
+        domAllocations: 0,
+        domRemovals: 0
+      });
+
+      const handlePrepend = () => {
+        const newId = `usr_${Date.now().toString().slice(-4)}`;
+        setItems(prev => [{ id: newId, name: `New User (${newId})`, role: "Developer" }, ...prev]);
+        setMetrics(m => ({
+          ...m,
+          renders: m.renders + 1,
+          reconciles: m.reconciles + items.length + 1,
+          domAllocations: m.domAllocations + 1,
+          domMutations: keyStrategy === "index" ? m.domMutations + items.length + 1 : m.domMutations + 1
+        }));
+        logEvent(logs, setLogs, "pass2", `[MUTATION] Prepend item under keyStrategy="${keyStrategy}"`);
+      };
+
+      const handleReverse = () => {
+        setItems(prev => [...prev].reverse());
+        setMetrics(m => ({
+          ...m,
+          renders: m.renders + 1,
+          reconciles: m.reconciles + items.length,
+          domMutations: keyStrategy === "index" ? m.domMutations + items.length : m.domMutations + (items.length - 1)
+        }));
+        logEvent(logs, setLogs, "commit", `[MUTATION] Reverse list items under keyStrategy="${keyStrategy}"`);
+      };
+
+      const handleDelete = (id) => {
+        setItems(prev => prev.filter(x => x.id !== id));
+        setMetrics(m => ({
+          ...m,
+          renders: m.renders + 1,
+          reconciles: m.reconciles + items.length - 1,
+          domRemovals: m.domRemovals + 1,
+          domMutations: keyStrategy === "index" ? m.domMutations + items.length : m.domMutations + 1
+        }));
+        logEvent(logs, setLogs, "warn", `[MUTATION] Deleted row ${id}`);
+      };
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "8px" }}>
+              Phase Separation & DOM Mutation Counter
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Witness how stable domain keys decouple component re-renders from expensive browser DOM host mutations.
+            </p>
+
+            {/* KEY STRATEGY SELECTOR */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>Active Key Strategy:</span>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="keyStrat"
+                  checked={keyStrategy === "id"}
+                  onChange={() => setKeyStrategy("id")}
+                />
+                <span style={{ color: "#34d399", fontWeight: 600 }}>key=&#123;user.id&#125; (Stable Domain ID)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="keyStrat"
+                  checked={keyStrategy === "index"}
+                  onChange={() => setKeyStrategy("index")}
+                />
+                <span style={{ color: "#f87171", fontWeight: 600 }}>key=&#123;index&#125; (Positional Index)</span>
+              </label>
+            </div>
+
+            {/* METRICS DASHBOARD */}
+            <div className="grid-3" style={{ marginBottom: "20px" }}>
+              <div style={{ background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)", padding: "16px", borderRadius: "10px" }}>
+                <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--accent)", fontWeight: 700 }}>Phase 1: Render Calls</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, marginTop: "4px" }}>{metrics.renders}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>Pure JSX descriptor allocations</div>
+              </div>
+
+              <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "16px", borderRadius: "10px" }}>
+                <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--success)", fontWeight: 700 }}>Phase 2: Reconciled Fibers</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, marginTop: "4px" }}>{metrics.reconciles}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>Two-pass identity evaluations</div>
+              </div>
+
+              <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", padding: "16px", borderRadius: "10px" }}>
+                <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--danger)", fontWeight: 700 }}>Phase 3: Host DOM Mutations</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, marginTop: "4px" }}>{metrics.domMutations}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>`insertBefore` & attribute updates</div>
+              </div>
+            </div>
+
+            {/* CONTROLS */}
+            <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+              <button className="btn btn-primary" onClick={handlePrepend}>
+                ➕ Prepend User
+              </button>
+              <button className="btn btn-secondary" onClick={handleReverse}>
+                🔄 Reverse List
+              </button>
+              <button className="btn btn-secondary" onClick={() => setMetrics({ renders: 0, reconciles: 0, domMutations: 0, domAllocations: 0, domRemovals: 0 })}>
+                Reset Counters
+              </button>
+            </div>
+
+            {/* ACTIVE ROWS */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {items.map((user, index) => {
+                const effectiveKey = keyStrategy === "id" ? user.id : index;
+                return (
+                  <MetricUserRow
+                    key={effectiveKey}
+                    user={user}
+                    index={index}
+                    keyStrategy={keyStrategy}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MetricUserRow({ user, index, keyStrategy, onDelete }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      const mountTimestamp = useRef(performance.now()).current;
+      const instanceId = useRef(crypto.randomUUID().slice(0, 4)).current;
+      const [draft, setDraft] = useState("");
+
+      return (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#050811", padding: "12px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className="badge badge-primary">{user.id}</span>
+              <strong style={{ color: "#f8fafc" }}>{user.name}</strong>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>• {user.role}</span>
+            </div>
+            <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#64748b", marginTop: "4px" }}>
+              Fiber UUID: <span style={{ color: "#fbbf24" }}>#{instanceId}</span> | 
+              Renders: <span style={{ color: "#38bdf8" }}>{renderCount.current}</span> | 
+              Active Key: <span style={{ color: keyStrategy === "id" ? "#34d399" : "#f87171" }}>{keyStrategy === "id" ? user.id : index}</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <input
+              type="text"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="Type local row draft..."
+              style={{ background: "#1e293b", border: "1px solid #475569", color: "#f8fafc", padding: "6px 10px", borderRadius: "6px", fontSize: "0.8rem" }}
+            />
+            <button className="btn btn-danger" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => onDelete(user.id)}>
+              Delete
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: ASYNC RESOLUTION & FORM GUARDIAN
+    // =========================================================================
+    function AsyncGuardianTab({ logs, setLogs }) {
+      const [keyStrategy, setKeyStrategy] = useState("id");
+      const [transactions, setTransactions] = useState([
+        { id: "tx_101", recipient: "Acme Cloud Services", amount: "$4,500.00" },
+        { id: "tx_102", recipient: "Stripe Billing Payout", amount: "$12,850.00" },
+        { id: "tx_103", recipient: "Global Infrastructure Hosting", amount: "$1,200.00" }
+      ]);
+
+      const handlePrependTx = () => {
+        const newId = `tx_${Date.now().toString().slice(-3)}`;
+        setTransactions(prev => [{ id: newId, recipient: `Urgent Payroll Tx (${newId})`, amount: "$25,000.00" }, ...prev]);
+        logEvent(logs, setLogs, "pass2", `[ASYNC GUARDIAN] Prepend new urgent transaction ${newId}`);
+      };
+
+      const handleSortDescending = () => {
+        setTransactions(prev => [...prev].reverse());
+        logEvent(logs, setLogs, "commit", `[ASYNC GUARDIAN] Reordered transactions`);
+      };
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "8px" }}>
+              Asynchronous Promise Ownership & Form Guardian
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Test how concurrent async API resolutions behave when background list mutations or sorting occurs mid-flight.
+            </p>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>Key Strategy:</span>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="asyncKeyStrat"
+                  checked={keyStrategy === "id"}
+                  onChange={() => setKeyStrategy("id")}
+                />
+                <span style={{ color: "#34d399", fontWeight: 600 }}>key=&#123;tx.id&#125; (Async Safe)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="asyncKeyStrat"
+                  checked={keyStrategy === "index"}
+                  onChange={() => setKeyStrategy("index")}
+                />
+                <span style={{ color: "#f87171", fontWeight: 600 }}>key=&#123;index&#125; (Race Condition Vulnerable)</span>
+              </label>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+              <button className="btn btn-primary" onClick={handlePrependTx}>
+                ➕ Prepend Urgent Tx (Simulate WebSocket Push)
+              </button>
+              <button className="btn btn-secondary" onClick={handleSortDescending}>
+                🔄 Reverse Order (Simulate Live Sort)
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {transactions.map((tx, idx) => {
+                const effectiveKey = keyStrategy === "id" ? tx.id : idx;
+                return (
+                  <AsyncTxRow
+                    key={effectiveKey}
+                    tx={tx}
+                    index={idx}
+                    keyStrategy={keyStrategy}
+                    logs={logs}
+                    setLogs={setLogs}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AsyncTxRow({ tx, index, keyStrategy, logs, setLogs }) {
+      const [status, setStatus] = useState("idle"); // idle | processing | approved
+      const fiberInstanceUuid = useRef(crypto.randomUUID().slice(0, 4)).current;
+
+      const handleApprove = () => {
+        setStatus("processing");
+        logEvent(logs, setLogs, "render", `[ASYNC START] Tx #${tx.id} on Fiber #${fiberInstanceUuid} (Slot ${index})`);
+        
+        setTimeout(() => {
+          setStatus("approved");
+          logEvent(logs, setLogs, "commit", `[ASYNC COMPLETE] Promise resolved for Tx #${tx.id} on Fiber #${fiberInstanceUuid}`);
+        }, 1500);
+      };
+
+      return (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#050811", padding: "12px 16px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className="badge badge-cyan">{tx.id}</span>
+              <strong style={{ color: "#f8fafc" }}>{tx.recipient}</strong>
+              <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.85rem" }}>{tx.amount}</span>
+            </div>
+            <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#64748b", marginTop: "4px" }}>
+              Fiber UUID: <span style={{ color: "#fbbf24" }}>#{fiberInstanceUuid}</span> | Slot: <span style={{ color: "#38bdf8" }}>{index}</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {status === "idle" && (
+              <button className="btn btn-success" style={{ fontSize: "0.75rem", padding: "6px 12px" }} onClick={handleApprove}>
+                ✓ Approve Payment
+              </button>
+            )}
+            {status === "processing" && (
+              <span className="badge badge-warning" style={{ animation: "pulse 1s infinite" }}>
+                ⏳ Processing Wire (1.5s API)...
+              </span>
+            )}
+            {status === "approved" && (
+              <span className="badge badge-success">
+                ✅ Payment Approved!
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APP
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("simulator");
+      const [logs, setLogs] = useState([
+        { id: "init", time: new Date().toLocaleTimeString().split(" ")[0], type: "render", text: "Reconciliation Lab Ready. Select a tab to inspect list diffing." }
+      ]);
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+                <span className="badge badge-primary">KPI 09 — PART 06</span>
+                <span className="badge badge-success">Fiber Engine</span>
+              </div>
+              <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>Reconciliation & List Diffing Interactive Lab</h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Master React's Two-Pass Algorithm, Double Buffering, and Minimal DOM Shifts
+              </p>
+            </div>
+            <div>
+              <a href="../06-reconciliation-and-list-diffing.md" className="btn btn-secondary" style={{ textDecoration: "none" }}>
+                📖 Read Guide
+              </a>
+            </div>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${activeTab === "simulator" ? "active" : ""}`}
+              onClick={() => setActiveTab("simulator")}
+            >
+              🔍 Two-Pass Reconciler Simulator
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "metrics" ? "active" : ""}`}
+              onClick={() => setActiveTab("metrics")}
+            >
+              📊 Phase Metrics (Render vs Reconcile vs Commit)
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "async" ? "active" : ""}`}
+              onClick={() => setActiveTab("async")}
+            >
+              🛡️ Async Ownership Guardian
+            </button>
+          </nav>
+
+          <main>
+            {activeTab === "simulator" && <TwoPassSimulatorTab logs={logs} setLogs={setLogs} />}
+            {activeTab === "metrics" && <PhaseMetricsTab logs={logs} setLogs={setLogs} />}
+            {activeTab === "async" && <AsyncGuardianTab logs={logs} setLogs={setLogs} />}
+          </main>
+
+          {/* AUDIT LOG CONSOLE */}
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
+                📜 Real-Time Fiber Reconciliation & Lifecycle Audit Log
+              </span>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setLogs([])}>
+                Clear Log
+              </button>
+            </div>
+            <div className="console-box">
+              {logs.length === 0 ? (
+                <div style={{ color: "#64748b" }}>Console clear. Trigger an action above to inspect Fiber lifecycle events.</div>
+              ) : (
+                logs.map(log => (
+                  <div key={log.id} className={`log-line log-${log.type}`}>
+                    [{log.time}] {log.text}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

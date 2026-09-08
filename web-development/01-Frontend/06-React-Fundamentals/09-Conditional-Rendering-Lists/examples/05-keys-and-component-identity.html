@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 05 — Keys & Component Identity Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.85);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+      --cyan: #06b6d4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1380px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.45rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid var(--primary);
+      color: #c7d2fe;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+    }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 980px) {
+      .lab-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    button.btn {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid var(--primary);
+      color: #e0e7ff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.8rem;
+      transition: all 0.15s ease;
+    }
+
+    button.btn:hover {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    button.btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--danger);
+      color: #fca5a5;
+    }
+
+    button.btn-danger:hover {
+      background: var(--danger);
+      color: #ffffff;
+    }
+
+    button.btn-warning {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: var(--warning);
+      color: #fcd34d;
+    }
+
+    button.btn-warning:hover {
+      background: var(--warning);
+      color: #ffffff;
+    }
+
+    .key-selector {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .key-option {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--text-muted);
+    }
+
+    .key-option.selected {
+      background: var(--cyan);
+      color: #000;
+      border-color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 500px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .list-row {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .list-row.special-row {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.12);
+    }
+
+    .entity-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 150px;
+    }
+
+    .entity-id {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .entity-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #f1f5f9;
+    }
+
+    .fiber-badge {
+      font-family: monospace;
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      width: fit-content;
+      margin-top: 2px;
+    }
+
+    input.row-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 0.85rem;
+    }
+
+    input.row-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+    }
+
+    .status-panel {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .status-panel table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+
+    .status-panel th, .status-panel td {
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .status-panel th {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .alert-box {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    .alert-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--success);
+      color: #6ee7b7;
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid var(--warning);
+      color: #fde68a;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, Fragment } = React;
+
+    const INITIAL_USERS = [
+      { id: "usr_A", name: "Asha Sharma", role: "Principal Architect", isSpecial: false },
+      { id: "usr_B", name: "Ravi Patel", role: "Frontend Lead", isSpecial: false },
+      { id: "usr_C", name: "Maya Lin", role: "DevOps Engineer", isSpecial: false },
+      { id: "usr_D", name: "Zack Vance", role: "Security Architect", isSpecial: false }
+    ];
+
+    // Standard Row with local draft and instance UUID
+    function StandardRow({ user, index, keyMode }) {
+      const instanceId = useRef(crypto.randomUUID().slice(0, 6)).current;
+      const [draft, setDraft] = useState("");
+      const renders = useRef(0);
+      renders.current += 1;
+
+      return (
+        <div className="list-row">
+          <div className="entity-meta">
+            <span className="entity-id">ID: {user.id}</span>
+            <span className="entity-name">{user.name}</span>
+            <span className="fiber-badge">Fiber: #{instanceId}</span>
+          </div>
+          
+          <input
+            type="text"
+            className="row-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={`Type draft for ${user.name}...`}
+          />
+
+          <div style={{ fontSize: "0.72rem", color: "#64748b", textAlign: "right", minWidth: "90px" }}>
+            Renders: <b style={{ color: "#38bdf8" }}>{renders.current}</b><br />
+            {draft ? <span style={{ color: "#10b981" }}>Draft Dirty</span> : "Clean"}
+          </div>
+        </div>
+      );
+    }
+
+    // Special Row variant to test Component Type mutation
+    function SpecialRow({ user, index, keyMode }) {
+      const instanceId = useRef(crypto.randomUUID().slice(0, 6)).current;
+      const [draft, setDraft] = useState("");
+      const renders = useRef(0);
+      renders.current += 1;
+
+      return (
+        <div className="list-row special-row">
+          <div className="entity-meta">
+            <span className="entity-id" style={{ color: "#f59e0b" }}>⭐ SPECIAL: {user.id}</span>
+            <span className="entity-name">{user.name}</span>
+            <span className="fiber-badge" style={{ borderColor: "#f59e0b", color: "#fcd34d" }}>
+              Fiber: #{instanceId} (Special)
+            </span>
+          </div>
+          
+          <input
+            type="text"
+            className="row-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={`Special draft for ${user.name}...`}
+          />
+
+          <div style={{ fontSize: "0.72rem", color: "#64748b", textAlign: "right", minWidth: "90px" }}>
+            Renders: <b style={{ color: "#f59e0b" }}>{renders.current}</b><br />
+            {draft ? <span style={{ color: "#10b981" }}>Draft Dirty</span> : "Clean"}
+          </div>
+        </div>
+      );
+    }
+
+    // TAB 1: Ten Topology Explorer & Fiber Identity Auditor
+    function TabTopologyExplorer() {
+      const [users, setUsers] = useState(INITIAL_USERS);
+      const [keyMode, setKeyMode] = useState("id"); // "id" | "index" | "random"
+      const [pinnedId, setPinnedId] = useState(null);
+
+      // Topologies
+      const handlePrepend = () => {
+        const newId = `usr_${Math.floor(100 + Math.random() * 900)}`;
+        setUsers([{ id: newId, name: `New User (${newId})`, role: "Junior Dev", isSpecial: false }, ...users]);
+      };
+
+      const handleAppend = () => {
+        const newId = `usr_${Math.floor(100 + Math.random() * 900)}`;
+        setUsers([...users, { id: newId, name: `New User (${newId})`, role: "QA Engineer", isSpecial: false }]);
+      };
+
+      const handleDeleteFirst = () => {
+        if (users.length > 0) setUsers(users.slice(1));
+      };
+
+      const handleDeleteMiddle = () => {
+        if (users.length > 2) {
+          setUsers(users.filter((_, idx) => idx !== 1));
+        }
+      };
+
+      const handleReverse = () => {
+        setUsers([...users].reverse());
+      };
+
+      const handleToggleSpecial = () => {
+        setUsers(users.map(u => u.id === "usr_A" ? { ...u, isSpecial: !u.isSpecial } : u));
+      };
+
+      const handleTogglePin = (id) => {
+        setPinnedId(pinnedId === id ? null : id);
+      };
+
+      const handleReset = () => {
+        setUsers(INITIAL_USERS);
+        setPinnedId(null);
+      };
+
+      const pinnedUser = users.find(u => u.id === pinnedId);
+      const unpinnedUsers = users.filter(u => u.id !== pinnedId);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-title">
+              <span>Collection Mutation Topologies</span>
+              <span className="badge">10 Topologies</span>
+            </div>
+
+            <div className="key-selector">
+              <span style={{ fontSize: "0.82rem", fontWeight: "600", color: "#94a3b8" }}>Key Strategy:</span>
+              <button
+                className={`key-option ${keyMode === "id" ? "selected" : ""}`}
+                onClick={() => setKeyMode("id")}
+              >
+                key={`{user.id}`} (Stable ID)
+              </button>
+              <button
+                className={`key-option ${keyMode === "index" ? "selected" : ""}`}
+                onClick={() => setKeyMode("index")}
+              >
+                key={`{index}`} (Positional Index)
+              </button>
+              <button
+                className={`key-option ${keyMode === "random" ? "selected" : ""}`}
+                onClick={() => setKeyMode("random")}
+              >
+                key={`{Math.random()}`} (Ephemeral)
+              </button>
+            </div>
+
+            <div className="controls-panel">
+              <button className="btn" onClick={handlePrepend}>1. Prepend Head</button>
+              <button className="btn" onClick={handleAppend}>2. Append Tail</button>
+              <button className="btn-danger btn" onClick={handleDeleteFirst}>3. Delete Head</button>
+              <button className="btn-danger btn" onClick={handleDeleteMiddle}>4. Delete Middle</button>
+              <button className="btn" onClick={handleReverse}>5. Reverse Sort</button>
+              <button className="btn-warning btn" onClick={handleToggleSpecial}>
+                9. Toggle Type (Asha)
+              </button>
+              <button className="btn-warning btn" onClick={() => handleTogglePin("usr_A")}>
+                10. {pinnedId === "usr_A" ? "Unpin Asha" : "Pin Asha (Hop Parent)"}
+              </button>
+              <button className="btn" onClick={handleReset}>↺ Reset</button>
+            </div>
+
+            <div className="alert-box alert-success">
+              💡 <b>Topology Test:</b> Type draft notes in Asha and Ravi's input boxes. Observe how Fiber Instance IDs (`#xxxxxx`) stay identical during reordering with Stable IDs, but mutate when using Index keys, Random keys, or Hopping parents!
+            </div>
+
+            {pinnedUser && (
+              <div style={{ padding: "12px", background: "rgba(99,102,241,0.15)", border: "1px dashed var(--primary)", borderRadius: "10px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#a5b4fc", marginBottom: "8px" }}>
+                  📌 PINNED CONTAINER (PARENT B):
+                </div>
+                {pinnedUser.isSpecial ? (
+                  <SpecialRow key={keyMode === "id" ? pinnedUser.id : 0} user={pinnedUser} index={0} keyMode={keyMode} />
+                ) : (
+                  <StandardRow key={keyMode === "id" ? pinnedUser.id : 0} user={pinnedUser} index={0} keyMode={keyMode} />
+                )}
+              </div>
+            )}
+
+            <div className="list-container">
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", marginTop: "4px" }}>
+                📋 UNPINNED CONTAINER (PARENT A):
+              </div>
+              {unpinnedUsers.map((user, index) => {
+                const appliedKey = keyMode === "id" ? user.id : keyMode === "index" ? index : Math.random();
+                return user.isSpecial ? (
+                  <SpecialRow key={appliedKey} user={user} index={index} keyMode={keyMode} />
+                ) : (
+                  <StandardRow key={appliedKey} user={user} index={index} keyMode={keyMode} />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Fiber Identity Resolution Matrix</span>
+              <span className="badge" style={{ background: "rgba(6,182,212,0.2)", borderColor: "var(--cyan)", color: "#67e8f9" }}>
+                Tuple $\langle P, T, K \rangle$
+              </span>
+            </div>
+
+            <div className="status-panel">
+              <div style={{ color: "#38bdf8", fontWeight: "700", marginBottom: "8px" }}>
+                CURRENT IDENTITY TUPLE EVALUATION:
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Entity</th>
+                    <th>Component Type</th>
+                    <th>Rendered Key</th>
+                    <th>Parent Context</th>
+                    <th>Continuity Decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user, idx) => {
+                    const isPinned = user.id === pinnedId;
+                    const renderedKey = keyMode === "id" ? user.id : keyMode === "index" ? idx : `rand_${idx}`;
+                    const componentType = user.isSpecial ? "SpecialRow" : "StandardRow";
+                    const parentCtx = isPinned ? "PinnedBox" : "MainList";
+
+                    return (
+                      <tr key={user.id}>
+                        <td style={{ color: "#f8fafc", fontWeight: "600" }}>{user.name}</td>
+                        <td style={{ color: user.isSpecial ? "#f59e0b" : "#38bdf8" }}>{componentType}</td>
+                        <td style={{ color: "#a5b4fc", fontWeight: "700" }}>{renderedKey}</td>
+                        <td>{parentCtx}</td>
+                        <td style={{ color: keyMode === "id" && !user.isSpecial && !isPinned ? "#10b981" : "#f59e0b" }}>
+                          {keyMode === "random" ? "Destroy & Mount" : user.isSpecial ? "Type Mismatch (Remount)" : isPinned ? "Context Mismatch" : "Preserve Fiber"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: "18px", color: "#94a3b8" }}>
+                <b style={{ color: "#e2e8f0" }}>Architectural Summary:</b>
+                <ul style={{ paddingLeft: "18px", marginTop: "6px" }}>
+                  <li><b>Type Mismatch:</b> Toggling "Special" forces unmount because <code>StandardRow !== SpecialRow</code>, even with identical keys.</li>
+                  <li><b>Parent Mismatch:</b> Pinning Asha hops her from Parent A to Parent B, causing a fresh remount because keys are scoped locally.</li>
+                  <li><b>Index Mismatch:</b> Index keys preserve position instead of entity, transferring drafts across records.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // TAB 2: Intentional State Reset & Partition Playground
+    function TabStatePartition() {
+      const USERS_DATA = [
+        { id: "usr_101", name: "Asha Sharma", email: "asha@company.io", role: "Admin" },
+        { id: "usr_102", name: "Ravi Patel", email: "ravi@company.io", role: "Developer" },
+        { id: "usr_103", name: "Maya Lin", email: "maya@company.io", role: "Designer" }
+      ];
+
+      const [selectedId, setSelectedId] = useState("usr_101");
+      const [useKeyReset, setUseKeyReset] = useState(true);
+
+      const activeUser = USERS_DATA.find(u => u.id === selectedId);
+
+      // Form with local draft
+      function UserEditor({ user }) {
+        const [formData, setFormData] = useState({
+          name: user.name,
+          email: user.email,
+          role: user.role
+        });
+        const [isDirty, setIsDirty] = useState(false);
+        const mountTime = useRef(performance.now()).current;
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "rgba(0,0,0,0.3)", padding: "16px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: "700", color: "#38bdf8" }}>Editing Profile: {user.name}</span>
+              <span style={{ fontSize: "0.75rem", color: isDirty ? "#f59e0b" : "#10b981" }}>
+                {isDirty ? "● Unsaved Changes (Dirty)" : "✔ Clean"}
+              </span>
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Full Name:</label>
+              <input
+                type="text"
+                className="row-input"
+                style={{ width: "100%", marginTop: "4px" }}
+                value={formData.name}
+                onChange={e => {
+                  setFormData({ ...formData, name: e.target.value });
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Email Address:</label>
+              <input
+                type="text"
+                className="row-input"
+                style={{ width: "100%", marginTop: "4px" }}
+                value={formData.email}
+                onChange={e => {
+                  setFormData({ ...formData, email: e.target.value });
+                  setIsDirty(true);
+                }}
+              />
+            </div>
+
+            <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
+              Fiber Mounted At: {mountTime.toFixed(0)}ms
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-title">
+              <span>Intentional State Partitioning Playground</span>
+            </div>
+
+            <div className="controls-panel">
+              <span style={{ fontSize: "0.82rem", fontWeight: "600", color: "#94a3b8" }}>Select User:</span>
+              {USERS_DATA.map(u => (
+                <button
+                  key={u.id}
+                  className={`btn ${selectedId === u.id ? "btn-warning" : ""}`}
+                  onClick={() => setSelectedId(u.id)}
+                >
+                  {u.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="key-selector">
+              <button
+                className={`key-option ${useKeyReset ? "selected" : ""}`}
+                onClick={() => setUseKeyReset(true)}
+              >
+                ✅ With `key={'{user.id}'}` (Declarative Partition Reset)
+              </button>
+              <button
+                className={`key-option ${!useKeyReset ? "selected" : ""}`}
+                onClick={() => setUseKeyReset(false)}
+              >
+                ❌ Without `key` (Broken State Sticking)
+              </button>
+            </div>
+
+            {useKeyReset ? (
+              <div className="alert-box alert-success">
+                ✅ <b>Declarative Key Partition:</b> Switching users creates a new Fiber instance, cleanly dropping uncommitted draft edits and initializing fresh state from props.
+              </div>
+            ) : (
+              <div className="alert-box alert-danger">
+                ⚠️ <b>No Key Partition:</b> Edit Asha's email to "corrupted@hack.io", then click "Ravi". Notice how Ravi inherits Asha's modified email because React preserves the unkeyed Fiber!
+              </div>
+            )}
+
+            {useKeyReset ? (
+              <UserEditor key={activeUser.id} user={activeUser} />
+            ) : (
+              <UserEditor user={activeUser} />
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Architectural Comparison</span>
+            </div>
+
+            <div className="status-panel">
+              <div style={{ color: "#38bdf8", fontWeight: "700" }}>
+                WHY KEY-BASED RESET IS SUPERIOR TO useEffect:
+              </div>
+              <ul style={{ paddingLeft: "18px", marginTop: "8px", lineHeight: "1.6" }}>
+                <li><b>Single Render Pass:</b> Key reset destroys and mounts synchronously in 1 pass. <code>useEffect</code> takes 2 passes (render with stale state $\rightarrow$ effect runs $\rightarrow$ second render).</li>
+                <li><b>Zero State Flash:</b> Prevents user from seeing stale values for 1 frame.</li>
+                <li><b>Automatic Resource Teardown:</b> Destroys all child timers, subscriptions, and sub-states without writing manual cleanup code.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // TAB 3: Composite Keys & Temporary Client-Side UUID Sandbox
+    function TabCompositeKeys() {
+      const [assignments, setAssignments] = useState([
+        { teamId: "eng_core", userId: "usr_101", role: "Tech Lead" },
+        { teamId: "eng_core", userId: "usr_102", role: "DevOps" },
+        { teamId: "product_ops", userId: "usr_101", role: "Product Advisor" }
+      ]);
+
+      const [tempItems, setTempItems] = useState([
+        { clientUuid: "local_uuid_01", dbId: null, title: "Optimistic Draft Task #1", isSaving: false }
+      ]);
+
+      const handleAddOptimistic = () => {
+        const uuid = `local_${Math.floor(1000 + Math.random() * 9000)}`;
+        setTempItems([...tempItems, { clientUuid: uuid, dbId: null, title: `Draft (${uuid})`, isSaving: true }]);
+
+        // Simulate server save after 1000ms
+        setTimeout(() => {
+          setTempItems(current => current.map(item => 
+            item.clientUuid === uuid ? { ...item, dbId: `db_rec_${Math.floor(10000 + Math.random() * 90000)}`, isSaving: false } : item
+          ));
+        }, 1200);
+      };
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-title">
+              <span>Flattened Composite Key Matrix</span>
+            </div>
+
+            <div className="alert-box alert-success">
+              💡 <b>Composite Key:</b> In a flattened relation matrix, User 101 appears in both <code>eng_core</code> and <code>product_ops</code>. Using <code>key={`${'{item.teamId}::${item.userId}'}`}</code> provides guaranteed sibling uniqueness.
+            </div>
+
+            <div className="status-panel">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Team ID</th>
+                    <th>User ID</th>
+                    <th>Assigned Role</th>
+                    <th>Composite Key</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignments.map(a => (
+                    <tr key={`${a.teamId}::${a.userId}`}>
+                      <td style={{ color: "#38bdf8" }}>{a.teamId}</td>
+                      <td style={{ color: "#a5b4fc" }}>{a.userId}</td>
+                      <td style={{ color: "#f8fafc" }}>{a.role}</td>
+                      <td style={{ color: "#34d399", fontWeight: "700" }}>{`${a.teamId}::${a.userId}`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Optimistic Client UUID Transition</span>
+              <button className="btn" onClick={handleAddOptimistic}>➕ Add Optimistic Task</button>
+            </div>
+
+            <div className="alert-box alert-warning">
+              ⚡ <b>Pattern:</b> Always key by <code>item.clientUuid</code>. When the server returns <code>dbId</code>, the key remains stable, preventing focus drops and remounts!
+            </div>
+
+            <div className="list-container">
+              {tempItems.map(item => (
+                <div key={item.clientUuid} className="list-row">
+                  <div>
+                    <div style={{ color: "#38bdf8", fontWeight: "700" }}>{item.title}</div>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontFamily: "monospace" }}>
+                      Key: <b style={{ color: "#34d399" }}>{item.clientUuid}</b> | DB ID: {item.dbId ? <span style={{ color: "#38bdf8" }}>{item.dbId}</span> : <span style={{ color: "#f59e0b" }}>Pending Server...</span>}
+                    </div>
+                  </div>
+                  <input type="text" className="row-input" placeholder="Type while saving..." />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // MAIN APP
+    function App() {
+      const [activeTab, setActiveTab] = useState("topology");
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>KPI 09 Part 05 — Keys & Component Identity</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "4px" }}>
+                Interactive Fiber Identity Auditor, Ten Topologies & Declarative Partition Playground
+              </p>
+            </div>
+            <span className="badge">Senior Architecture Standard</span>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${activeTab === "topology" ? "active" : ""}`}
+              onClick={() => setActiveTab("topology")}
+            >
+              🔬 10 Topology Explorer
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "partition" ? "active" : ""}`}
+              onClick={() => setActiveTab("partition")}
+            >
+              🛡️ Declarative State Partitions
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "composite" ? "active" : ""}`}
+              onClick={() => setActiveTab("composite")}
+            >
+              🧩 Composite Keys & Client UUIDs
+            </button>
+          </nav>
+
+          <main>
+            {activeTab === "topology" && <TabTopologyExplorer />}
+            {activeTab === "partition" && <TabStatePartition />}
+            {activeTab === "composite" && <TabCompositeKeys />}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

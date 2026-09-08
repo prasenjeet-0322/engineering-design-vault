@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 04: JSX Trees, Identity, Lists & State Preservation</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-error { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 04: JSX Trees, Identity, Lists & State Preservation</h1>
+  <p class="subtitle">Live simulation comparing stable domain entity keys vs index keys during insertions, deletions, and reordering.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectScenario('stableReorder')">1. Stable Key Reorder (A B C ➔ C A B)</button>
+    <button onclick="selectScenario('indexInsertBug')">2. Index Key Insert Bug (Prepend X)</button>
+    <button onclick="selectScenario('typeReplacement')">3. Type Replacement (Login ➔ Dashboard)</button>
+    <button onclick="selectScenario('keyReset')">4. Semantic State Reset (&lt;Editor key=id /&gt;)</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>React Tree Topology (Before / After)</h2>
+      <pre id="tree-panel">// Topology</pre>
+
+      <h2>Key Identity Mapping Table</h2>
+      <pre id="mapping-panel">// Mapping</pre>
+    </div>
+
+    <div class="card">
+      <h2>Reconciler Verdict & State Continuity</h2>
+      <span id="badge" class="status-badge badge-success">Status: State Preserved</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Host DOM Operations</h2>
+      <pre id="dom-panel">// DOM Ops</pre>
+    </div>
+  </div>
+
+  <script>
+    const scenarios = {
+      stableReorder: {
+        tree: `// Render #1:\nList\n ├── Row(key="a") [input: "Task A"]\n ├── Row(key="b") [input: "Task B"]\n └── Row(key="c") [input: "Task C"]\n\n// Render #2 (Reordered):\nList\n ├── Row(key="c") [input: "Task C"]\n ├── Row(key="a") [input: "Task A"]\n └── Row(key="b") [input: "Task B"]`,
+        mapping: `Key "c" ➔ Preserved, moved position 2 ➔ 0\nKey "a" ➔ Preserved, moved position 0 ➔ 1\nKey "b" ➔ Preserved, moved position 1 ➔ 2`,
+        verdict: `✅ 100% CORRECTNESS:\nAll 3 row Fiber instances survive with their internal state and focus intact. React reconciler moves DOM nodes without destroying component lifecycles.`,
+        dom: `parentElement.insertBefore(rowC_DOM, rowA_DOM);\n// Reordered with zero state destruction`,
+        badgeClass: 'badge-success',
+        badgeText: '✅ Correct: State Attached to Entity'
+      },
+      indexInsertBug: {
+        tree: `// Render #1 (key=index):\nList\n ├── Row(key=0) [draft: "Task A"]\n ├── Row(key=1) [draft: "Task B (EDITED)"]\n └── Row(key=2) [draft: "Task C"]\n\n// Render #2 (Prepend X with key=index):\nList\n ├── Row(key=0) ➔ Receives X, INHERITS "Task A" STATE! ❌\n ├── Row(key=1) ➔ Receives A, INHERITS "Task B (EDITED)" STATE! ❌\n ├── Row(key=2) ➔ Receives B, INHERITS "Task C" STATE! ❌\n └── Row(key=3) ➔ Mounts C with fresh state`,
+        mapping: `Index 0: Was A ➔ Now X (State corrupted)\nIndex 1: Was B ➔ Now A (State corrupted)\nIndex 2: Was C ➔ Now B (State corrupted)\nIndex 3: New slot ➔ Mounts C`,
+        verdict: `❌ SEVERE CORRUPTION:\nBecause key is tied to array index rather than entity, state shifts to the wrong items when prepending or deleting from lists!`,
+        dom: `<!-- DOM inputs display wrong edited text -->\n<input value="Task A" /> (Belongs to X now!)`,
+        badgeClass: 'badge-error',
+        badgeText: '❌ Fatal: State Leaked to Wrong Entity'
+      },
+      typeReplacement: {
+        tree: `// Render #1 (Unauthenticated):\nmain\n └── Login (Local state: username="alice")\n\n// Render #2 (Authenticated):\nmain\n └── Dashboard`,
+        mapping: `Position 0: Login ➔ Dashboard\nType comparison: Login !== Dashboard (TYPE CHANGE)`,
+        verdict: `ℹ️ INTENTIONAL TEARDOWN:\nReact recognizes type change at position 0. Login is completely unmounted, its internal state is destroyed, and Dashboard mounts fresh.`,
+        dom: `mainElement.removeChild(loginDOM);\nmainElement.appendChild(dashboardDOM);`,
+        badgeClass: 'badge-success',
+        badgeText: 'ℹ️ Intentional Subtree Replacement'
+      },
+      keyReset: {
+        tree: `// Switch from Document A to Document B:\n<Editor key={doc.id} doc={doc} />\n\n// Transition:\nEditor(key="doc-1") [draft: "Unsaved changes..."]\n       │ (user clicks Doc B)\n       ▼\nEditor(key="doc-2") [draft: "Clean initial state"]`,
+        mapping: `Key changed: "doc-1" ➔ "doc-2"\nType unchanged: Editor === Editor`,
+        verdict: `✅ CLEAN STATE RESET:\nExplicit key change forces React to treat doc-2 as a brand new component instance, automatically resetting draft form state without complex useEffect resets.`,
+        dom: `container.removeChild(editor1DOM);\ncontainer.appendChild(editor2DOM);`,
+        badgeClass: 'badge-success',
+        badgeText: '✅ Semantic State Reset'
+      }
+    };
+
+    function selectScenario(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = scenarios[key];
+      document.getElementById('tree-panel').textContent = data.tree;
+      document.getElementById('mapping-panel').textContent = data.mapping;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('dom-panel').textContent = data.dom;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectScenario('stableReorder');
+  </script>
+</body>
+</html>

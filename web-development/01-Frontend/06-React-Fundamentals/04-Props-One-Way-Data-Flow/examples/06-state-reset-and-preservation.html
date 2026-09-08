@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 06: State Reset, Preservation & Component Identity</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 06: State Reset, Preservation & Component Identity</h1>
+  <p class="subtitle">Interactive laboratory verifying Component Occurrence Identity, Key-based Resets, and Entity vs Positional State Matching.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('keyReset')">1. Intentional Reset by Key</button>
+    <button onclick="selectLab('conditionalPreservation')">2. Same Type & Position Preservation</button>
+    <button onclick="selectLab('nestedDefTrap')">3. Nested Component Definition Trap</button>
+    <button onclick="selectLab('entityKeyPreserve')">4. Stable Entity Keys vs Index Reorder</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Tree Architecture & Code</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Fiber Matching & State Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Identity Diagnostic Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Identity Match: Clean Reset</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Heuristic</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      keyReset: {
+        code: `// Intentional Key-Based Boundary Reset:\n<UserEditor key={user.id} user={user} />`,
+        trace: `Render #1: user.id = 1 -> Editor key=1 (draft = 'Alice')\nUser switches to user.id = 2 -> Editor key=2\nReact recognizes NEW identity: Unmounts Editor#1, mounts fresh Editor#2 with draft = 'Bob'.`,
+        verdict: `Clean Identity Boundary: User A draft does not leak into User B session.`,
+        rule: `Use keys to establish explicit identity boundaries when switching domain entities requires clean state restart.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Intentional Key Reset'
+      },
+      conditionalPreservation: {
+        code: `// Same Component Type at Same Tree Position:\nfunction App({ isVIP }) {\n  return <div>{isVIP ? <Counter /> : <Counter />}</div>;\n}`,
+        trace: `Source code has two branches, but resulting element tree in both cases is: div -> Counter.\nReconciliation matches Fiber occurrence: Counter state persists across branch toggles!`,
+        verdict: `Tree Identity Match: React identity is derived from the resulting element tree, not the textual source branch.`,
+        rule: `If component type, key, and position remain compatible, React preserves state across parent re-renders.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ State Preserved'
+      },
+      nestedDefTrap: {
+        code: `// ❌ Nested Definition Bug:\nfunction Parent() {\n  function Child() { // RECREATED EVERY PARENT RENDER!\n    const [val, setVal] = useState('');\n    return <input value={val} onChange={e => setVal(e.target.value)} />;\n  }\n  return <Child />;\n}`,
+        trace: `Every parent render creates a fresh function object Child_A !== Child_B.\nReconciler treats this as component type change -> Destroys old Fiber and resets input on every keystroke!`,
+        verdict: `Unstable Component Type: Causes lost focus, destroyed inputs, and flickering DOM nodes.`,
+        rule: `Always define components at module scope so component type identity remains referentially stable.`,
+        badgeClass: 'badge-warn',
+        badgeText: '⚠️ Unstable Type Identity'
+      },
+      entityKeyPreserve: {
+        code: `// Stable Entity Keying:\n{items.map(item => (\n  <TaskRow key={item.id} item={item} />\n))}`,
+        trace: `Initial: [A, B, C] -> Row A, Row B, Row C\nList reordered to [C, A, B]:\nRow CFiber -> matches entity C (draft preserved)\nRow AFiber -> matches entity A (draft preserved)`,
+        verdict: `Entity Associated Memory: Draft states follow domain entities rather than volatile array indices.`,
+        rule: `Without stable keys: position -> state. With stable entity keys: entity identity -> state.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Entity-Associated State'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('keyReset');
+  </script>
+</body>
+</html>

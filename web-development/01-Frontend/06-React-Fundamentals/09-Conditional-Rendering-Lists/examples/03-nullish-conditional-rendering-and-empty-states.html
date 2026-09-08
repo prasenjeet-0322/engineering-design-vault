@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 03 — Nullish Rendering & Empty State Architecture Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.82);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1350px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.45rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .telemetry-box {
+      background: #060911;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.82rem;
+      color: #93c5fd;
+    }
+
+    .log-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .log-entry.mount {
+      border-left: 3px solid var(--success);
+      color: #a7f3d0;
+    }
+
+    .log-entry.unmount {
+      border-left: 3px solid var(--danger);
+      color: #fca5a5;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function NullishMasterLab() {
+      const [tab, setTab] = useState('matrix');
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <span className="badge">Level 06 — React Fundamentals (KPI 09)</span>
+              <h1>Nullish Rendering, Empty States & Data-Availability Lab</h1>
+            </div>
+            <span className="badge badge-success">Part 03 Lab</span>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${tab === 'matrix' ? 'active' : ''}`}
+              onClick={() => setTab('matrix')}
+            >
+              1. Data Availability Matrix
+            </button>
+            <button
+              className={`tab-btn ${tab === 'coalescing' ? 'active' : ''}`}
+              onClick={() => setTab('coalescing')}
+            >
+              2. Logical OR (||) vs Nullish (??)
+            </button>
+            <button
+              className={`tab-btn ${tab === 'nullLifecycle' ? 'active' : ''}`}
+              onClick={() => setTab('nullLifecycle')}
+            >
+              3. return null vs Unmount Lifecycle
+            </button>
+          </nav>
+
+          {tab === 'matrix' && <MatrixLab />}
+          {tab === 'coalescing' && <CoalescingLab />}
+          {tab === 'nullLifecycle' && <NullLifecycleModule />}
+        </div>
+      );
+    }
+
+    // MODULE 1: Matrix Lab
+    function MatrixLab() {
+      const [typeKey, setTypeKey] = useState('emptyArray');
+
+      const DATA_SETS = {
+        undefinedVal: undefined,
+        nullVal: null,
+        emptyArray: [],
+        numericZero: 0,
+        emptyString: '',
+        nanValue: NaN,
+        populated: [{ id: '1', name: 'Production Node Alpha' }, { id: '2', name: 'Production Node Beta' }],
+      };
+
+      const val = DATA_SETS[typeKey];
+
+      return (
+        <div className="grid">
+          <div className="card">
+            <div className="card-title">
+              <span>Raw JavaScript Data Input</span>
+              <span className="badge">{typeKey}</span>
+            </div>
+
+            <div className="btn-group">
+              <button className={`btn ${typeKey === 'undefinedVal' ? 'btn' : 'btn-secondary'}`} onClick={() => setTypeKey('undefinedVal')}>undefined (Unloaded)</button>
+              <button className={`btn ${typeKey === 'nullVal' ? 'btn' : 'btn-secondary'}`} onClick={() => setTypeKey('nullVal')}>null (404 Not Found)</button>
+              <button className={`btn ${typeKey === 'emptyArray' ? 'btn' : 'btn-secondary'}`} onClick={() => setTypeKey('emptyArray')}>[] (Loaded Empty)</button>
+              <button className={`btn ${typeKey === 'numericZero' ? 'btn' : 'btn-secondary'}`} onClick={() => setTypeKey('numericZero')}>0 (Valid Metric)</button>
+              <button className={`btn ${typeKey === 'emptyString' ? 'btn' : 'btn-secondary'}`} onClick={() => setTypeKey('emptyString')}>"" (Empty Draft)</button>
+              <button className={`btn ${typeKey === 'populated' ? 'btn' : 'btn-secondary'}`} onClick={() => setTypeKey('populated')}>[...] (Populated)</button>
+            </div>
+
+            <div className="telemetry-box" style={{ marginTop: '16px' }}>
+              <strong>Type:</strong> <code>{typeof val}</code>
+              <br />
+              <strong>Boolean(val):</strong> <code>{String(Boolean(val))}</code>
+              <br />
+              <strong>val ?? 'Fallback':</strong> <code>{JSON.stringify(val ?? 'Fallback')}</code>
+              <br />
+              <strong>val || 'Fallback':</strong> <code>{JSON.stringify(val || 'Fallback')}</code>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Resolved UI Presentation Node</span>
+            </div>
+
+            <div style={{ padding: '20px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '12px', minHeight: '160px' }}>
+              <RenderOutput val={val} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function RenderOutput({ val }) {
+      if (val === undefined) {
+        return <div><span className="badge">⏳ Skeleton Loading...</span><p style={{ marginTop: '8px', opacity: 0.6 }}>Data has not arrived from API yet.</p></div>;
+      }
+      if (val === null) {
+        return <div style={{ color: 'var(--warning)' }}><h4>🔍 404 Entity Not Found</h4><p>The requested resource does not exist in the database.</p></div>;
+      }
+      if (Array.isArray(val)) {
+        if (val.length === 0) {
+          return <div><h4>📁 0 Records Found</h4><p style={{ opacity: 0.7 }}>Successful query, but dataset contains 0 items.</p></div>;
+        }
+        return (
+          <div>
+            <h4 style={{ color: 'var(--success)' }}>Active Collection ({val.length} items):</h4>
+            <ul style={{ marginLeft: '20px', marginTop: '6px' }}>
+              {val.map(item => <li key={item.id}>{item.name}</li>)}
+            </ul>
+          </div>
+        );
+      }
+      if (typeof val === 'number') {
+        return <div><h4>Metric Value: <strong>{val}</strong></h4><p>Valid numeric data point rendered safely.</p></div>;
+      }
+      if (val === '') {
+        return <div><h4>Empty String Input</h4><p>User active text buffer is currently empty.</p></div>;
+      }
+      return <div>Unrecognized Format</div>;
+    }
+
+    // MODULE 2: Coalescing Lab
+    function CoalescingLab() {
+      const [price, setPrice] = useState(0);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Logical OR (||) vs Nullish Coalescing (??)</span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Set price to <code>0</code> (Free promotional tier). Notice how <code>||</code> corrupts valid $0 prices by falling back to $99, while <code>??</code> accurately preserves $0!
+          </p>
+
+          <div className="btn-group">
+            <button className="btn" onClick={() => setPrice(0)}>Set Price = $0.00 (Free Tier)</button>
+            <button className="btn btn-secondary" onClick={() => setPrice(null)}>Set Price = null (Unconfigured)</button>
+            <button className="btn btn-secondary" onClick={() => setPrice(49)}>Set Price = $49.00 (Standard Plan)</button>
+          </div>
+
+          <div className="grid" style={{ marginTop: '16px' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--danger)' }}>
+              <h4 style={{ color: '#fca5a5' }}>❌ Logical OR: <code>price || 99</code></h4>
+              <p style={{ fontSize: '1.2rem', fontWeight: 600, margin: '10px 0' }}>
+                Resolved Display: ${price || 99}
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#fca5a5' }}>
+                {price === 0 ? '⚠️ CRITICAL: Free $0 user charged $99 fallback price!' : 'Standard resolution'}
+              </p>
+            </div>
+
+            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--success)' }}>
+              <h4 style={{ color: '#86efac' }}>✅ Nullish Coalescing: <code>price ?? 99</code></h4>
+              <p style={{ fontSize: '1.2rem', fontWeight: 600, margin: '10px 0' }}>
+                Resolved Display: ${price ?? 99}
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#86efac' }}>
+                ✓ Accurate: Valid $0 free tier preserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // MODULE 3: Null Lifecycle
+    function NullLifecycleModule() {
+      const [isOpen, setIsOpen] = useState(false);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (msg, type = 'mount') => {
+        setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
+      };
+
+      return (
+        <div className="grid">
+          <div className="card">
+            <div className="card-title">
+              <span>return null vs Conditional Mount</span>
+              <button className="btn" onClick={() => setIsOpen(!isOpen)}>
+                Toggle State (Open: {String(isOpen)})
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px', borderRadius: '8px' }}>
+                <h4>A. Component Returns Null</h4>
+                <NullChild isOpen={isOpen} onLog={addLog} />
+              </div>
+
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '12px', borderRadius: '8px' }}>
+                <h4>B. Parent Conditionally Mounts</h4>
+                {isOpen ? <MountedChild onLog={addLog} /> : <p style={{ opacity: 0.5 }}>Unmounted</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Fiber Lifecycle Audit Log</span>
+              <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setLogs([])}>Clear</button>
+            </div>
+
+            <div className="log-stream">
+              {logs.length === 0 && <span style={{ opacity: 0.5 }}>Click Toggle State to observe Fiber lifecycle.</span>}
+              {logs.map((log, i) => (
+                <div key={i} className={`log-entry ${log.includes('Mounted') ? 'mount' : 'unmount'}`}>
+                  {log}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function NullChild({ isOpen, onLog }) {
+      useEffect(() => {
+        onLog('🟢 [NullChild] Mounted into Fiber tree.', 'mount');
+        return () => onLog('🔴 [NullChild] Unmounted.', 'unmount');
+      }, []);
+
+      if (!isOpen) return null;
+      return <div className="badge badge-success">✓ NullChild Active DOM</div>;
+    }
+
+    function MountedChild({ onLog }) {
+      useEffect(() => {
+        onLog('🟢 [MountedChild] Mounted into Fiber tree.', 'mount');
+        return () => onLog('🔴 [MountedChild] Unmounted & Cleaned up.', 'unmount');
+      }, []);
+
+      return <div className="badge badge-success">✓ MountedChild Active DOM</div>;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<NullishMasterLab />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 — Part 14: Advanced List Architecture Patterns Interactive Lab</title>
+  
+  <!-- React 18 & Babel via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #080d1a;
+      --card-bg: rgba(15, 23, 42, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #06b6d4;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.12) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    
+    .container {
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    
+    header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .badge-pattern {
+      background: rgba(139, 92, 246, 0.2);
+      color: #c084fc;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+    }
+    
+    .badge-active {
+      background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr 380px;
+      gap: 20px;
+    }
+    
+    @media (max-width: 1200px) {
+      .layout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+    }
+    
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #e2e8f0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
+    }
+    
+    .control-group {
+      margin-bottom: 18px;
+    }
+    
+    .control-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    select, input[type="text"] {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    
+    select:focus, input[type="text"]:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+    }
+    
+    .view-switcher {
+      display: flex;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 16px;
+    }
+    
+    .view-tab {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    
+    .view-tab.active {
+      background: rgba(59, 130, 246, 0.25);
+      color: #38bdf8;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+    
+    .btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: #38bdf8;
+      color: white;
+    }
+    
+    .btn-emerald {
+      background: linear-gradient(135deg, #059669, #10b981);
+      border-color: #34d399;
+      color: white;
+    }
+
+    .btn-amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+    
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+    }
+    
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      border: 1px solid var(--card-border);
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    .stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent-cyan);
+    }
+    
+    /* Table View */
+    .table-container {
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    
+    .table-header {
+      display: grid;
+      grid-template-columns: 40px 100px 1fr 100px 90px 70px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--card-border);
+      padding: 10px 14px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    .table-row {
+      display: grid;
+      grid-template-columns: 40px 100px 1fr 100px 90px 70px;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background 0.15s;
+    }
+    
+    .table-row:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .table-row.selected {
+      background: rgba(59, 130, 246, 0.12);
+    }
+    
+    /* Grid View */
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    
+    .grid-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      transition: all 0.2s;
+      position: relative;
+    }
+    
+    .grid-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+    
+    .grid-card.selected {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    /* Feed View */
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .feed-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+    }
+    
+    .feed-item.selected {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .cell-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .render-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fde047;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .log-container {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      background: #040711;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 480px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-entry {
+      line-height: 1.4;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 4px;
+    }
+
+    .log-time { color: #64748b; }
+    .log-tag { font-weight: 700; }
+    .tag-headless { color: #38bdf8; }
+    .tag-compound { color: #c084fc; }
+    .tag-snapshot { color: #34d399; }
+    .tag-render { color: #f59e0b; }
+    .tag-adapter { color: #f43f5e; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useRef, useEffect, useCallback, createContext, useContext } = React;
+
+    const DATASET = [
+      { id: "asset-101", code: "NVDA", name: "Nvidia Corporation", sector: "Semiconductors", price: 890.50, rating: "AAA" },
+      { id: "asset-102", code: "AAPL", name: "Apple Inc.", sector: "Hardware", price: 185.20, rating: "AAA" },
+      { id: "asset-103", code: "MSFT", name: "Microsoft Corporation", sector: "Software", price: 420.10, rating: "AAA" },
+      { id: "asset-104", code: "AMZN", name: "Amazon.com Inc.", sector: "Cloud/Retail", price: 178.40, rating: "AA" },
+      { id: "asset-105", code: "TSLA", name: "Tesla Inc.", sector: "Automotive", price: 195.80, rating: "BBB" },
+      { id: "asset-106", code: "GOOGL", name: "Alphabet Inc.", sector: "Search/AI", price: 168.90, rating: "AAA" }
+    ];
+
+    // 1. HEADLESS HOOK: Encapsulates all query, selection, keyboard and accessibility behavior
+    function useListModel({ items, initialSelected = [] }) {
+      const [selectedIds, setSelectedIds] = useState(() => new Set(initialSelected));
+      const [focusedIndex, setFocusedIndex] = useState(0);
+
+      const toggleSelect = useCallback((id) => {
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+      }, []);
+
+      const selectAll = useCallback((ids) => {
+        setSelectedIds(new Set(ids));
+      }, []);
+
+      const clearSelection = useCallback(() => {
+        setSelectedIds(new Set());
+      }, []);
+
+      // Semantic Prop Getter Pattern
+      const getRowProps = useCallback((item, index) => ({
+        key: item.id,
+        role: "row",
+        "aria-selected": selectedIds.has(item.id),
+        tabIndex: focusedIndex === index ? 0 : -1,
+        className: selectedIds.has(item.id) ? "selected" : "",
+        onClick: () => toggleSelect(item.id),
+        onKeyDown: (e) => {
+          if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            toggleSelect(item.id);
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setFocusedIndex(i => Math.min(items.length - 1, i + 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setFocusedIndex(i => Math.max(0, i - 1));
+          }
+        }
+      }), [selectedIds, focusedIndex, items.length, toggleSelect]);
+
+      return {
+        selectedIds,
+        focusedIndex,
+        toggleSelect,
+        selectAll,
+        clearSelection,
+        getRowProps
+      };
+    }
+
+    // 2. MAIN HUB COMPONENT
+    function ListArchitecturePatternsHub() {
+      // Active presentation view mode: 'table' | 'grid' | 'feed'
+      const [viewMode, setViewMode] = useState("table");
+      // Context Architecture Mode: 'split' (optimized) | 'mega' (unmemoized)
+      const [contextMode, setContextMode] = useState("split");
+      const [searchFilter, setSearchFilter] = useState("");
+      const [sectorFilter, setSectorFilter] = useState("ALL");
+      const [items, setItems] = useState(DATASET);
+
+      // In-flight bulk operation snapshots
+      const [snapshots, setSnapshots] = useState([]);
+
+      // Diagnostic event logs
+      const [logs, setLogs] = useState([]);
+      const addLog = useCallback((tag, message, tagClass = "tag-headless") => {
+        const time = new Date().toLocaleTimeString().split(" ")[0] + "." + Math.floor(Date.now() % 1000).toString().padStart(3, "0");
+        setLogs(prev => [{ id: crypto.randomUUID(), time, tag, message, tagClass }, ...prev.slice(0, 99)]);
+      }, []);
+
+      // Filtered items
+      const visibleItems = useMemo(() => {
+        return items.filter(item => {
+          const matchQuery = item.name.toLowerCase().includes(searchFilter.toLowerCase()) || 
+                             item.code.toLowerCase().includes(searchFilter.toLowerCase());
+          const matchSector = sectorFilter === "ALL" || item.sector === sectorFilter;
+          return matchQuery && matchSector;
+        });
+      }, [items, searchFilter, sectorFilter]);
+
+      // Instantiate the Headless Model
+      const headlessModel = useListModel({ items: visibleItems });
+
+      // Bulk Action with Immutable Snapshot Protection
+      const handleTriggerBulkArchive = () => {
+        if (headlessModel.selectedIds.size === 0) return;
+
+        // 1. CAPTURE IMMUTABLE SNAPSHOT
+        const snapshot = {
+          id: "SNAP-" + Math.floor(100 + Math.random() * 900),
+          targetIds: Array.from(headlessModel.selectedIds),
+          timestamp: new Date().toLocaleTimeString()
+        };
+
+        addLog("SNAPSHOT", `Captured snapshot ${snapshot.id} with targets: [${snapshot.targetIds.join(", ")}]`, "tag-snapshot");
+        setSnapshots(prev => [...prev, snapshot]);
+
+        // 2. Clear UI selection immediately so user can continue working
+        headlessModel.clearSelection();
+
+        // 3. Simulate Async Network Latency (1500ms)
+        setTimeout(() => {
+          addLog("SNAPSHOT", `Committed Bulk Archive for ${snapshot.id} (Entities: ${snapshot.targetIds.length})`, "tag-compound");
+          setSnapshots(prev => prev.filter(s => s.id !== snapshot.id));
+        }, 1500);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>
+                <span>💎</span> Advanced List Architecture Patterns
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Headless Hooks · Compound Components · Split Contexts · Prop Getters · Operation Snapshots
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-pattern">Level 06 · KPI 09 · Part 14</span>
+              <span className="badge badge-active">View: {viewMode.toUpperCase()}</span>
+            </div>
+          </header>
+
+          <div className="layout-grid">
+            {/* Control Panel */}
+            <div className="card">
+              <div className="card-title">
+                <span>⚙️</span> Pattern Controls
+              </div>
+
+              <div className="control-group">
+                <label>Presentation Adapter (Headless)</label>
+                <div className="view-switcher">
+                  <button 
+                    className={`view-tab ${viewMode === "table" ? "active" : ""}`}
+                    onClick={() => { setViewMode("table"); addLog("HEADLESS", "Switched projection to Table View", "tag-headless"); }}
+                  >
+                    📊 Table
+                  </button>
+                  <button 
+                    className={`view-tab ${viewMode === "grid" ? "active" : ""}`}
+                    onClick={() => { setViewMode("grid"); addLog("HEADLESS", "Switched projection to Card Grid", "tag-headless"); }}
+                  >
+                    🎴 Cards
+                  </button>
+                  <button 
+                    className={`view-tab ${viewMode === "feed" ? "active" : ""}`}
+                    onClick={() => { setViewMode("feed"); addLog("HEADLESS", "Switched projection to Metric Feed", "tag-headless"); }}
+                  >
+                    📈 Feed
+                  </button>
+                </div>
+              </div>
+
+              <div className="control-group">
+                <label>Search Query (Filter Derivation)</label>
+                <input 
+                  type="text" 
+                  placeholder="Filter by name or ticker..." 
+                  value={searchFilter} 
+                  onChange={(e) => setSearchFilter(e.target.value)} 
+                />
+              </div>
+
+              <div className="control-group">
+                <label>Sector Category</label>
+                <select value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)}>
+                  <option value="ALL">All Sectors</option>
+                  <option value="Semiconductors">Semiconductors</option>
+                  <option value="Hardware">Hardware</option>
+                  <option value="Software">Software</option>
+                  <option value="Cloud/Retail">Cloud/Retail</option>
+                  <option value="Automotive">Automotive</option>
+                  <option value="Search/AI">Search/AI</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Context Strategy</label>
+                <select value={contextMode} onChange={(e) => setContextMode(e.target.value)}>
+                  <option value="split">Split Context (Narrow Subscriptions) [OPTIMAL]</option>
+                  <option value="mega">Unmemoized Mega-Context [CASCADE TRAP]</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Bulk Operation Snapshot Action</label>
+                <button 
+                  className="btn btn-emerald" 
+                  style={{ width: "100%" }}
+                  onClick={handleTriggerBulkArchive}
+                  disabled={headlessModel.selectedIds.size === 0}
+                >
+                  ⚡ Bulk Archive ({headlessModel.selectedIds.size} Selected)
+                </button>
+                <small style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginTop: "4px", display: "block" }}>
+                  Select items, click Archive, then select another item immediately to watch snapshot isolation!
+                </small>
+              </div>
+            </div>
+
+            {/* Central Dynamic View Projection (Headless Driven) */}
+            <div className="card">
+              <div className="card-title" style={{ justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>📋</span> Projection: {viewMode.toUpperCase()} ({visibleItems.length} items)
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button 
+                    className="btn btn-sm"
+                    onClick={() => headlessModel.selectAll(visibleItems.map(i => i.id))}
+                  >
+                    Select All
+                  </button>
+                  <button 
+                    className="btn btn-sm"
+                    onClick={headlessModel.clearSelection}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div className="stats-bar">
+                <div className="stat-item">
+                  <span className="stat-label">Selected Count</span>
+                  <span className="stat-val">{headlessModel.selectedIds.size}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">In-Flight Snapshots</span>
+                  <span className="stat-val" style={{ color: snapshots.length > 0 ? "#34d399" : "#94a3b8" }}>
+                    {snapshots.length}
+                  </span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Focused Index</span>
+                  <span className="stat-val">{headlessModel.focusedIndex}</span>
+                </div>
+              </div>
+
+              {/* VIEW PROJECTION 1: TABLE */}
+              {viewMode === "table" && (
+                <div className="table-container">
+                  <div className="table-header">
+                    <div>Sel</div>
+                    <div>Ticker</div>
+                    <div>Asset Name</div>
+                    <div>Sector</div>
+                    <div>Price</div>
+                    <div>Rating</div>
+                  </div>
+                  <div>
+                    {visibleItems.map((item, idx) => (
+                      <TableRowView 
+                        key={item.id} 
+                        item={item} 
+                        index={idx} 
+                        headlessModel={headlessModel} 
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* VIEW PROJECTION 2: CARD GRID */}
+              {viewMode === "grid" && (
+                <div className="grid-container">
+                  {visibleItems.map((item, idx) => (
+                    <CardGridView 
+                      key={item.id} 
+                      item={item} 
+                      index={idx} 
+                      headlessModel={headlessModel} 
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* VIEW PROJECTION 3: FEED */}
+              {viewMode === "feed" && (
+                <div className="feed-container">
+                  {visibleItems.map((item, idx) => (
+                    <FeedRowView 
+                      key={item.id} 
+                      item={item} 
+                      index={idx} 
+                      headlessModel={headlessModel} 
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Diagnostic Telemetry Stream */}
+            <div className="card">
+              <div className="card-title" style={{ justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🔬</span> Architecture Telemetry
+                </div>
+                <button className="btn btn-sm" onClick={() => setLogs([])}>Clear</button>
+              </div>
+
+              <div className="log-container">
+                {logs.length === 0 && (
+                  <div style={{ color: "#475569", textAlign: "center", marginTop: "40px" }}>
+                    Telemetry idle. Toggle views, select rows, and trigger snapshot actions to observe architecture logs.
+                  </div>
+                )}
+                {logs.map(log => (
+                  <div key={log.id} className="log-entry">
+                    <span className="log-time">{log.time}</span>
+                    <span className={`log-tag ${log.tagClass}`}>[{log.tag}]</span>
+                    <span>{log.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Presentation View 1: Table Row
+    function TableRowView({ item, index, headlessModel }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      const rowProps = headlessModel.getRowProps(item, index);
+
+      return (
+        <div {...rowProps} className={`table-row ${rowProps.className}`}>
+          <div>
+            <input 
+              type="checkbox" 
+              checked={headlessModel.selectedIds.has(item.id)} 
+              onChange={() => headlessModel.toggleSelect(item.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div className="cell-mono" style={{ color: "#38bdf8", fontWeight: 700 }}>
+            {item.code}
+          </div>
+          <div>{item.name}</div>
+          <div style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{item.sector}</div>
+          <div className="cell-mono" style={{ color: "#34d399" }}>${item.price.toFixed(2)}</div>
+          <div>
+            <span className="render-badge">{item.rating}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Presentation View 2: Card Grid Item
+    function CardGridView({ item, index, headlessModel }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      const rowProps = headlessModel.getRowProps(item, index);
+
+      return (
+        <div {...rowProps} className={`grid-card ${rowProps.className}`}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+            <span className="cell-mono" style={{ color: "#38bdf8", fontWeight: 700 }}>{item.code}</span>
+            <span className="render-badge">{item.rating}</span>
+          </div>
+          <h4 style={{ fontSize: "0.9rem", marginBottom: "6px" }}>{item.name}</h4>
+          <div style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginBottom: "8px" }}>{item.sector}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="cell-mono" style={{ color: "#34d399", fontWeight: 700 }}>${item.price.toFixed(2)}</span>
+            <input 
+              type="checkbox" 
+              checked={headlessModel.selectedIds.has(item.id)} 
+              onChange={() => headlessModel.toggleSelect(item.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Presentation View 3: Metric Feed Item
+    function FeedRowView({ item, index, headlessModel }) {
+      const rowProps = headlessModel.getRowProps(item, index);
+
+      return (
+        <div {...rowProps} className={`feed-item ${rowProps.className}`}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <input 
+              type="checkbox" 
+              checked={headlessModel.selectedIds.has(item.id)} 
+              onChange={() => headlessModel.toggleSelect(item.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <span className="cell-mono" style={{ color: "#38bdf8", fontWeight: 700 }}>{item.code}</span>
+            <span>{item.name}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{item.sector}</span>
+            <span className="cell-mono" style={{ color: "#34d399", fontWeight: 700 }}>${item.price.toFixed(2)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Render React 18 Root
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<ListArchitecturePatternsHub />);
+  </script>
+</body>
+</html>

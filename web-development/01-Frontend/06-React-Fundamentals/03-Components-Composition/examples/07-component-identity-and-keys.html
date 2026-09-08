@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 07: Component Identity, Keys & State Preservation</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 07: Component Identity, Keys & State Preservation</h1>
+  <p class="subtitle">Interactive laboratory demonstrating Fiber State Association, Positional vs Entity Keys, and Intentional Key Resets.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('occurrences')">1. Same Type ≠ Shared State</button>
+    <button onclick="selectLab('indexTrap')">2. Index Key Failure Trap</button>
+    <button onclick="selectLab('stableKeys')">3. Stable Entity Identity</button>
+    <button onclick="selectLab('keyReset')">4. Intentional Key-Based Reset</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Tree Identity & Fiber Alignment</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>State Association & Mutation Trace</h2>
+      <pre id="analysis-panel">// Analysis</pre>
+    </div>
+
+    <div class="card">
+      <h2>Reconciler Verdict & Preservation Rule</h2>
+      <span id="badge" class="status-badge badge-ok">Identity: Stable Entity Key</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architectural Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      occurrences: {
+        code: `// App renders 2 Counter occurrences:\n<>\n  <Counter /> /* Occurrence A: count = 1 */\n  <Counter /> /* Occurrence B: count = 0 */\n</>`,
+        analysis: `State belongs to the Fiber node representing a position in the rendered tree, not the Javascript function itself.\nIncrementing Counter A modifies Fiber A's memoizedState. Fiber B remains count = 0.`,
+        verdict: `Independent State: 1 component type, 2 tree occurrences, 2 isolated hook state slots.`,
+        rule: `State belongs to a component occurrence in React's tree, not to the source function.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Instance State Isolation'
+      },
+      indexTrap: {
+        code: `// ❌ Index Keys with item removal:\n// Initial: [Alice, Bob, Carol]\nitems.map((item, index) => <Row key={index} item={item} />)\n// User edits Alice (draft = "Alice Modified")\n// Alice is deleted -> items become [Bob, Carol]`,
+        analysis: `Index 0 was Alice. Now Index 0 is Bob.\nBecause key=0 is preserved, React re-uses the existing Fiber at index 0!\nResult: Bob's row now displays "Alice Modified"!`,
+        verdict: `Catastrophic State Leak: State followed the positional index rather than the logical domain entity.`,
+        rule: `Keys should represent stable entity identity, not visual array index.`,
+        badgeClass: 'badge-warn',
+        badgeText: '⚠️ Positional Identity Bug'
+      },
+      stableKeys: {
+        code: `// ✅ Stable Entity Keys:\nitems.map(item => <Row key={item.id} item={item} />)\n// Initial: [id=1: Alice, id=2: Bob, id=3: Carol]\n// User edits Alice -> id=1 deleted -> items become [id=2: Bob, id=3: Carol]`,
+        analysis: `React compares keys: key=1 is unmounted (Fiber destroyed). key=2 and key=3 are preserved with their original local state intact.`,
+        verdict: `Correct Reconciliation: Bob and Carol retain their exact uncorrupted state.`,
+        rule: `Use stable domain IDs for keys so state accurately follows the logical entity across reorders, inserts, and deletes.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Stable Domain Identity'
+      },
+      keyReset: {
+        code: `// Intentional Key-Based State Reset:\nfunction ProfileEditor({ userId }) {\n  return <Editor key={userId} userId={userId} />;\n}\n\n// userId changes: Alice ➔ Bob`,
+        analysis: `Changing the key from key="alice" to key="bob" forces React to unmount Editor(Alice) and mount a fresh Editor(Bob).\nAll draft state, dirty flags, and local validations reset automatically.`,
+        verdict: `Deliberate Lifecycle Reset: Eliminates complex useEffect synchronization and manual state clearing.`,
+        rule: `Use key changes deliberately to signal a complete logical identity switch and state reset.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Intentional Reset via Key'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('analysis-panel').textContent = data.analysis;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('occurrences');
+  </script>
+</body>
+</html>

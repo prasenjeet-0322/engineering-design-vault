@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 02: React Element Objects, Anatomy & Symbol Security</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-valid { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-invalid { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 02: React Element Objects & Symbol Security</h1>
+  <p class="subtitle">Dissect the V8 anatomy of React Elements and explore how <code>$$typeof: Symbol.for('react.element')</code> prevents JSON injection XSS attacks.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectMode('valid')">1. Genuine React Element</button>
+    <button onclick="selectMode('injected')">2. Fake Injected JSON (Attacker Payload)</button>
+    <button onclick="selectMode('mutation')">3. Prop Mutation Test</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Element Description / Source Payload</h2>
+      <pre id="source-code">// Code snippet</pre>
+      
+      <h2>Reconciler Verification Pipeline</h2>
+      <pre id="validation-output">// Validation checks</pre>
+    </div>
+
+    <div class="card">
+      <h2>V8 Heap Inspector</h2>
+      <span id="badge" class="status-badge badge-valid">Status: Valid React Element</span>
+      <pre id="heap-inspector">// Heap properties</pre>
+
+      <h2>Architectural Meaning</h2>
+      <pre id="architectural-meaning">// Mechanical summary</pre>
+    </div>
+  </div>
+
+  <script>
+    const modes = {
+      valid: {
+        code: `const element = <button className="primary">Save</button>;`,
+        validation: `1. isValidElement(element) === true\n2. typeof element.$$typeof === "symbol"\n3. element.$$typeof === Symbol.for('react.element')\n➔ ALLOWED INTO RECONCILER PIPELINE`,
+        heap: JSON.stringify({
+          $$typeof: "Symbol(react.element)",
+          type: "button",
+          key: null,
+          ref: null,
+          props: {
+            className: "primary",
+            children: "Save"
+          },
+          _owner: null,
+          _store: {}
+        }, null, 2),
+        meaning: `The element is a genuine V8 object created via JSX runtime. Because symbols cannot be serialized in JSON, a server cannot accidentally receive and return a raw malicious element descriptor.`,
+        valid: true
+      },
+      injected: {
+        code: `// Attacker attempts to return a fake element via malicious JSON API payload:\nconst fakeJSON = JSON.parse('{\\n  "$$typeof": "react.element",\\n  "type": "script",\\n  "props": { "dangerouslySetInnerHTML": { "__html": "alert(1)" } }\\n}');`,
+        validation: `1. isValidElement(fakeJSON) === false\n2. typeof fakeJSON.$$typeof === "string" (NOT "symbol")\n3. fakeJSON.$$typeof !== Symbol.for('react.element')\n➔ REJECTED: React refuses to render raw plain objects without valid Symbol`,
+        heap: JSON.stringify({
+          $$typeof: "react.element", // String, not Symbol!
+          type: "script",
+          props: {
+            dangerouslySetInnerHTML: { __html: "alert(1)" }
+          }
+        }, null, 2),
+        meaning: `JSON.parse() cannot reconstruct JavaScript Symbols. React relies on this language invariant to guarantee that elements must be instantiated in client JavaScript code, neutralizing JSON injection XSS.`,
+        valid: false
+      },
+      mutation: {
+        code: `const element = <button disabled={false}>Save</button>;\n\ntry {\n  // In Dev mode, React freezes props:\n  Object.freeze(element.props);\n  element.props.disabled = true;\n} catch (err) {\n  console.error("Mutation failed:", err.message);\n}`,
+        validation: `1. Object.isFrozen(element.props) === true\n2. Mutation throws TypeError in strict mode\n➔ PREVENTS STALE RECONCILIATION DESYNC`,
+        heap: `TypeError: Cannot assign to read only property 'disabled' of object '#<Object>'\n\nInvariant: React elements are immutable UI snapshots.`,
+        meaning: `React elements must never be modified in-place. If inputs change, the component must execute and return a brand new React element descriptor for React to reconcile.`,
+        valid: false
+      }
+    };
+
+    function selectMode(modeKey) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = modes[modeKey];
+      document.getElementById('source-code').textContent = data.code;
+      document.getElementById('validation-output').textContent = data.validation;
+      document.getElementById('heap-inspector').textContent = data.heap;
+      document.getElementById('architectural-meaning').textContent = data.meaning;
+
+      const badge = document.getElementById('badge');
+      if (data.valid) {
+        badge.className = 'status-badge badge-valid';
+        badge.textContent = 'Status: Valid React Element';
+      } else {
+        badge.className = 'status-badge badge-invalid';
+        badge.textContent = 'Status: Invalidation / Error';
+      }
+    }
+
+    selectMode('valid');
+  </script>
+</body>
+</html>

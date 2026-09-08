@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 03 — Dependencies & Reactive Values Visualizer</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    button.purple { background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: #0d1527;
+      color: var(--accent-cyan);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+    }
+
+    tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line { display: flex; gap: 8px; align-items: center; }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-setup { color: var(--accent-green); font-weight: 600; }
+    .log-cleanup { color: var(--accent-amber); font-weight: 600; }
+    .log-noop { color: var(--text-muted); }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #0c121e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 4px;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .ref-badge {
+      background: #1e293b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Component under test: demonstrates 4 different dependency patterns
+    function DependencyLabTarget({
+      propUserId,
+      unrelatedCount,
+      objectMode, // 'inline' (recreated) or 'primitive' (structural)
+      functionMode, // 'inline' (recreated) or 'stable' (internal)
+      onLog,
+      onEvaluation
+    }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      // 1. Reactive Primitive
+      const userId = propUserId;
+
+      // 2. Object creation
+      const optionsObject = { userId, theme: "dark" };
+
+      // 3. Function creation
+      const calculateUrl = () => `/api/user/${userId}`;
+
+      // Refs to store previous dependencies for Object.is comparison visualization
+      const prevDepsRef = useRef(null);
+
+      // Effect 1: Primitive dependency [userId]
+      useEffect(() => {
+        onLog(`[SETUP] Primitive Effect synchronized for userId: "${userId}"`, "setup");
+        return () => {
+          onLog(`[CLEANUP] Primitive Effect teardown for userId: "${userId}"`, "cleanup");
+        };
+      }, [userId]);
+
+      // Effect 2: Object dependency (toggled between inline object vs primitive)
+      useEffect(() => {
+        if (objectMode === "inline") {
+          onLog(`[SETUP] Object-dependent Effect ran with options identity!`, "setup");
+          return () => onLog(`[CLEANUP] Object-dependent Effect cleaned up!`, "cleanup");
+        }
+      }, objectMode === "inline" ? [optionsObject] : [userId]);
+
+      // Perform Object.is analysis on every render
+      useEffect(() => {
+        const currentDeps = {
+          primitive: userId,
+          objectRef: optionsObject,
+          funcRef: calculateUrl,
+          unrelatedCount
+        };
+
+        if (prevDepsRef.current) {
+          const comparisons = [
+            {
+              name: "Primitive (userId)",
+              prev: JSON.stringify(prevDepsRef.current.primitive),
+              curr: JSON.stringify(currentDeps.primitive),
+              isEqual: Object.is(prevDepsRef.current.primitive, currentDeps.primitive),
+              type: "Primitive"
+            },
+            {
+              name: "Object (optionsObject)",
+              prev: "ObjectRef " + (objectMode === "inline" ? "(0xNew)" : "(0xFixed)"),
+              curr: "ObjectRef " + (objectMode === "inline" ? "(0xNew)" : "(0xFixed)"),
+              isEqual: objectMode === "inline" ? false : Object.is(prevDepsRef.current.primitive, currentDeps.primitive),
+              type: "Object (By Reference)"
+            },
+            {
+              name: "Function (calculateUrl)",
+              prev: "FunctionRef (0xPrev)",
+              curr: "FunctionRef (0xNext)",
+              isEqual: functionMode === "inline" ? false : true,
+              type: "Function (By Reference)"
+            },
+            {
+              name: "Unrelated State",
+              prev: prevDepsRef.current.unrelatedCount,
+              curr: currentDeps.unrelatedCount,
+              isEqual: Object.is(prevDepsRef.current.unrelatedCount, currentDeps.unrelatedCount),
+              type: "State"
+            }
+          ];
+
+          onEvaluation({
+            render: renderCount.current,
+            comparisons
+          });
+        } else {
+          onEvaluation({
+            render: renderCount.current,
+            comparisons: [
+              { name: "Primitive (userId)", prev: "null", curr: JSON.stringify(currentDeps.primitive), isEqual: false, type: "Primitive (Initial)" },
+              { name: "Object (optionsObject)", prev: "null", curr: "ObjectRef (0x01)", isEqual: false, type: "Object (Initial)" },
+              { name: "Function (calculateUrl)", prev: "null", curr: "FunctionRef (0x01)", isEqual: false, type: "Function (Initial)" },
+              { name: "Unrelated State", prev: "null", curr: currentDeps.unrelatedCount, isEqual: false, type: "State (Initial)" }
+            ]
+          });
+        }
+
+        prevDepsRef.current = currentDeps;
+      });
+
+      return (
+        <div style={{ padding: "16px", background: "#0c1524", borderRadius: "8px", border: "1px solid #1e293b" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Target Component Snapshot:</span>
+            <span className="ref-badge">Render #{renderCount.current}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "0.85rem" }}>
+            <div><strong>Prop userId:</strong> <span style={{ color: "var(--accent-cyan)" }}>"{userId}"</span></div>
+            <div><strong>Unrelated Count:</strong> <span style={{ color: "var(--accent-purple)" }}>{unrelatedCount}</span></div>
+            <div><strong>Object Mode:</strong> <span style={{ color: objectMode === "inline" ? "var(--accent-red)" : "var(--accent-green)" }}>{objectMode}</span></div>
+            <div><strong>Function Mode:</strong> <span style={{ color: functionMode === "inline" ? "var(--accent-red)" : "var(--accent-green)" }}>{functionMode}</span></div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [userId, setUserId] = useState("user_A");
+      const [unrelatedCount, setUnrelatedCount] = useState(0);
+      const [objectMode, setObjectMode] = useState("inline"); // 'inline' or 'primitive'
+      const [functionMode, setFunctionMode] = useState("inline");
+      const [evalData, setEvalData] = useState(null);
+      const [logs, setLogs] = useState([]);
+      const [setupCount, setSetupCount] = useState(0);
+      const [cleanupCount, setCleanupCount] = useState(0);
+
+      const logMessage = (text, type) => {
+        const time = new Date().toLocaleTimeString();
+        if (type === "setup") setSetupCount(c => c + 1);
+        if (type === "cleanup") setCleanupCount(c => c + 1);
+        setLogs(prev => [{ time, text, type, id: Math.random() }, ...prev.slice(0, 39)]);
+      };
+
+      const handleEvaluation = (data) => {
+        setEvalData(data);
+      };
+
+      const triggerRerender = () => {
+        setUnrelatedCount(c => c + 1);
+        logMessage(`[RENDER] Unrelated state changed (${unrelatedCount + 1})`, "noop");
+      };
+
+      const resetAll = () => {
+        setUserId("user_A");
+        setUnrelatedCount(0);
+        setLogs([]);
+        setSetupCount(0);
+        setCleanupCount(0);
+      };
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 03: Effect Dependency & Reactive Values Visualizer
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Interactive Deep-Dive into Object.is Comparison, Reference Identity vs Structural Equality, and Closures
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Column 1: Controls & Interactive Sandbox */}
+            <div className="card">
+              <h2>
+                <span>1. Reactive State & Dependency Controls</span>
+                <span className="badge badge-cyan">Live Simulator</span>
+              </h2>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Change Reactive Prop:</span>
+                {["user_A", "user_B", "user_C"].map(u => (
+                  <button
+                    key={u}
+                    className={userId === u ? "active" : ""}
+                    onClick={() => {
+                      setUserId(u);
+                      logMessage(`[PROP] Changed userId to "${u}"`, "noop");
+                    }}
+                  >
+                    userId = "{u}"
+                  </button>
+                ))}
+              </div>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Re-render Triggers:</span>
+                <button className="purple" onClick={triggerRerender}>
+                  ⚡ Trigger Re-render (Unrelated State)
+                </button>
+              </div>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Object Dependency Strategy:</span>
+                <button
+                  className={objectMode === "inline" ? "danger active" : "danger"}
+                  onClick={() => setObjectMode("inline")}
+                >
+                  ❌ Inline Object Literal [options]
+                </button>
+                <button
+                  className={objectMode === "primitive" ? "active" : ""}
+                  onClick={() => setObjectMode("primitive")}
+                >
+                  ✅ Primitive Extraction [userId]
+                </button>
+              </div>
+
+              <DependencyLabTarget
+                propUserId={userId}
+                unrelatedCount={unrelatedCount}
+                objectMode={objectMode}
+                functionMode={functionMode}
+                onLog={logMessage}
+                onEvaluation={handleEvaluation}
+              />
+
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Render #</div>
+                  <div className="stat-val" style={{ color: "var(--accent-purple)" }}>{evalData?.render || 1}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Setups</div>
+                  <div className="stat-val" style={{ color: "var(--accent-green)" }}>{setupCount}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Cleanups</div>
+                  <div className="stat-val" style={{ color: "var(--accent-amber)" }}>{cleanupCount}</div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-muted)" }}>Lifecycle Telemetry Log</span>
+                <button onClick={() => { setLogs([]); setSetupCount(0); setCleanupCount(0); }} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear Log</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No events yet. Trigger a re-render or switch user ID.</div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className="log-line">
+                      <span className="log-time">[{log.time}]</span>
+                      <span className={`log-${log.type}`}>{log.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 2: Object.is Deep Inspection Matrix */}
+            <div className="card">
+              <h2>
+                <span>2. Object.is Comparison Inspector</span>
+                <span className="badge badge-green">Engine Mechanics</span>
+              </h2>
+
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                React compares each dependency index using <code>Object.is(prev, next)</code>. If ANY comparison is <code>false</code>, React invalidates the previous synchronization.
+              </p>
+
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Dependency</th>
+                      <th>Previous Value</th>
+                      <th>Current Value</th>
+                      <th>Object.is</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evalData?.comparisons.map((c, i) => (
+                      <tr key={i}>
+                        <td>
+                          <strong>{c.name}</strong>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{c.type}</div>
+                        </td>
+                        <td><code>{c.prev}</code></td>
+                        <td><code>{c.curr}</code></td>
+                        <td>
+                          <span className={`badge ${c.isEqual ? "badge-green" : "badge-tier"}`}>
+                            {c.isEqual ? "TRUE (Keep)" : "FALSE (Re-sync)"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ background: "#0d1527", border: "1px dashed var(--accent-cyan)", borderRadius: "8px", padding: "14px", fontSize: "0.85rem" }}>
+                <strong style={{ color: "var(--accent-cyan)" }}>Senior Diagnostic Key:</strong>
+                <ul style={{ paddingLeft: "18px", marginTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <li><strong>Primitives:</strong> <code>Object.is("user_A", "user_A") === true</code> $\rightarrow$ No unnecessary Effect execution!</li>
+                  <li><strong>Objects:</strong> <code>Object.is(&#123;id: "A"&#125;, &#123;id: "A"&#125;) === false</code> $\rightarrow$ New reference recreated every render triggers continuous teardown/setup thrashing!</li>
+                  <li><strong>Golden Fix:</strong> Move object definitions inside the Effect callback, or depend directly on the primitive inputs.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

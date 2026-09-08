@@ -50,15 +50,17 @@
 | **KPI 01** | [React Mental Model & Programming Model](./01-React-Mental-Model-Programming-Model/README.md) | 🟡 In Progress | Declarative UI, `UI = f(s, p)`, Component vs Element vs Instance vs DOM, Render $\neq$ Paint. |
 | **KPI 02** | `02-JSX-React-Elements` | ⏳ Pending | JSX transformation, `react/jsx-runtime`, Element objects, Fragment/null/boolean rendering. |
 | **KPI 03** | `03-Components-Composition` | ⏳ Pending | Function components, boundaries, composition over inheritance, slots, compound components. |
-| **KPI 04** | `04-Props-One-Way-Data-Flow` | ⏳ Pending | Unidirectional dataflow, immutable inputs, prop drilling vs composition, TS prop design. |
-| **KPI 05** | `05-State-State-Ownership` | ⏳ Pending | `useState`, state snapshots, functional updates, batching queues, derived state vs state. |
-| **KPI 06** | `06-Rendering-Reconciliation-Identity` | ⏳ Pending | Render phase vs Commit phase, Fiber diffing heuristics, Keys, state preservation vs reset. |
+| **KPI 04** | [State & State Updates](./04-Props-One-Way-Data-Flow/README.md) | ✅ Completed | UI memory snapshots, updater queue algebra, immutability, normalization, component identity, and transition modeling. |
+
+| **KPI 05** | [Events & User Interaction](./07-Events-User-Interaction/README.md) | ✅ Completed | SyntheticEvent abstraction, interaction boundaries, closures in handlers, callback contracts, state machine transitions, async race policies, and graduation suite. |
+
+| **KPI 06 / 09** | [Conditional Rendering & Lists](./09-Conditional-Rendering-Lists/README.md) | 🟡 In Progress | Declarative tree projection, Fiber diffing heuristics, type/key identity preservation vs reset, list virtualization. |
 | **KPI 07** | `07-Events-User-Interaction` | ⏳ Pending | SyntheticEvent abstraction, event delegation, closures in handlers, React vs browser events. |
 | **KPI 08** | `08-Hooks-Mental-Model` | ⏳ Pending | Rules of Hooks, call order invariants, hook singly linked list on Fiber, stateful logic sharing. |
-| **KPI 09** | `09-useEffect-Synchronization` | ⏳ Pending | Synchronization with external systems, dependency arrays, cleanups, race conditions. |
+| **KPI 09** | [useEffect & External Synchronization](./09-useEffect-Synchronization/README.md) | ✅ Completed | Synchronization with external systems, dependency arrays, cleanups, race conditions, and avoidance of fake Effects. |
 | **KPI 10** | `10-useRef-Mutable-Values` | ⏳ Pending | Ref identity, mutable `.current`, DOM refs, imperative handles vs state, measurement. |
 | **KPI 11** | `11-Context-Dependency-Distribution` | ⏳ Pending | Dependency distribution, Provider nesting, context propagation, performance pitfalls. |
-| **KPI 12** | `12-Forms-Controlled-Uncontrolled` | ⏳ Pending | Controlled vs uncontrolled inputs, `FormData`, validation boundaries, performance in forms. |
+| **KPI 12** | [Forms & Controlled Inputs](./12-Forms-Controlled-Uncontrolled/README.md) | ✅ Completed | Controlled vs uncontrolled inputs, multi-timeline state machines, validation DAGs, baseline reconciliation. |
 | **KPI 13** | `13-Derived-State-Memoization` | ⏳ Pending | Derived data, `useMemo`, `useCallback`, `React.memo`, referential equality, memoization cost. |
 | **KPI 14** | `14-Custom-Hooks-Logic-Composition` | ⏳ Pending | Extracting stateful logic, hook composition, contract boundaries, avoiding over-abstraction. |
 | **KPI 15** | `15-Async-UI-State-Lifecycle` | ⏳ Pending | Idle/Loading/Success/Error state machines, optimistic UI, cancellation, race conditions. |

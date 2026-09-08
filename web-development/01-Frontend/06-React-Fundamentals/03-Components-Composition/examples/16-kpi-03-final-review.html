@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 16: KPI 03 Final Review & Architectural Mastery</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🏆 Lab 16: KPI 03 Final Review & Mastery Sandbox</h1>
+  <p class="subtitle">Comprehensive evaluation laboratory verifying the 6-Dimension Component Heuristic, Master Architecture Reviews, and God-Component Refactoring.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('godComponentRefactor')">1. God Component Refactoring</button>
+    <button onclick="selectLab('derivedOptimization')">2. Derived Data vs Sync Effects</button>
+    <button onclick="selectLab('contextBoundary')">3. Scoped Context vs Monolithic Bag</button>
+    <button onclick="selectLab('identityReset')">4. Intentional Reset Boundaries</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Architecture Diagnosis & Code</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Render Flow & Execution Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Status: Production Mastery</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>KPI 03 Master Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      godComponentRefactor: {
+        code: `// ❌ 1,800-line God Component with 14 props on each row\n// ✅ Senior Decomposition:\nfunction ProductDashboard() {\n  const [query, setQuery] = useState('');\n  const [selectedId, setSelectedId] = useState(null);\n  return (\n    <DashboardLayout\n      header={<SearchToolbar query={query} onQueryChange={setQuery} />}\n    >\n      <ProductTable selectedId={selectedId} onSelect={setSelectedId} />\n    </DashboardLayout>\n  );\n}`,
+        trace: `1. Dashboard owns shared query & selection state.\n2. DashboardLayout handles structural placement.\n3. ProductTable receives narrow semantic props.\n4. Change blast radius is strictly localized.`,
+        verdict: `High Cohesion, Low Coupling: Every boundary has an explicit single responsibility.`,
+        rule: `A component boundary is good when ownership is clear, inputs are explicit, outputs are semantic, identity is predictable, and changes remain localized.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Master Decomposition'
+      },
+      derivedOptimization: {
+        code: `// ❌ Synchronization Effect Anti-Pattern:\nconst [fullName, setFullName] = useState('');\nuseEffect(() => {\n  setFullName(first + ' ' + last);\n}, [first, last]);\n\n// ✅ Synchronous Pure Derivation:\nconst fullName = \`\${first} \${last}\`;`,
+        trace: `Derived state eliminates an entire re-render cycle and prevents stale fullName tearing bugs across fast keystrokes.`,
+        verdict: `Single Source of Truth: 2 state variables instead of 3. Zero synchronization glue code.`,
+        rule: `Derived data should usually remain derived during render. Never store projections as state.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Render Derivation'
+      },
+      contextBoundary: {
+        code: `// ❌ Monolithic AppContext Dump:\n<AppContext.Provider value={{ user, theme, cart, modal, filters, analytics }}>\n\n// ✅ Domain-Scoped Distribution Boundaries:\n<AuthProvider user={user}>\n  <ThemeProvider theme={theme}>\n    <CartFeature cartState={cart} />\n  </ThemeProvider>\n</AuthProvider>`,
+        trace: `Separates domain dependencies. Theme consumers are completely insulated from cart mutations and auth updates.`,
+        verdict: `Minimized Blast Radius: Context distribution matches genuine subtree domain scope.`,
+        rule: `Context distributes dependencies through a subtree; it does not replace deliberate state ownership.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Scoped Distribution'
+      },
+      identityReset: {
+        code: `// Intentional Key-Based Boundary Reset:\n<DocumentEditor key={docId} doc={doc} />`,
+        trace: `Switching docId from 'doc-A' to 'doc-B' triggers a clean unmount of doc-A Fiber occurrence and cleanly mounts doc-B with fresh initial draft state.`,
+        verdict: `Zero State Leakage: Local unsaved draft for document A cannot accidentally leak into document B.`,
+        rule: `Keys are part of component identity design, not merely warning-suppression syntax.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Identity Boundary'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('godComponentRefactor');
+  </script>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Part 09 — Form Field Dependencies & Cross-Field State Lab</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-secondary: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #1f2937;
+      --border-focus: #38bdf8;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .badge-primary {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle { color: var(--text-secondary); font-size: 1rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-group { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"], input[type="date"], input[type="password"], select {
+      width: 100%;
+      background: #0d1322;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .error-msg {
+      font-size: 0.78rem;
+      color: var(--accent-rose);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover { background: #334155; border-color: var(--accent-cyan); }
+    .btn-primary { background: #0284c7; border-color: #0369a1; }
+    .btn-primary:hover { background: #0369a1; }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .telemetry-box {
+      background: #0d1322;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .telemetry-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      word-break: break-all;
+    }
+
+    .log-list {
+      list-style: none;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+
+    .log-item {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge badge-primary">Level 06 — React Fundamentals • KPI 08 Lab</span>
+      <h1>Part 09 Diagnostic Laboratory</h1>
+      <p class="subtitle">Form Field Dependencies, Relational Invariants & Conditional Lifecycles</p>
+    </header>
+
+    <div class="grid">
+      <!-- PROBE 1: Dependent Cascade Invalidation -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🗺️ Probe 1: Dependent Cascade & Invalidation Policy</div>
+          <button class="btn" onclick="resetProbe1()">Reset</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Changing Country immediately invalidates and resets Region to maintain relational consistency.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="input-group">
+            <label>Country (Parent):</label>
+            <select id="p1Country" onchange="handleP1CountryChange(event)">
+              <option value="US" selected>United States</option>
+              <option value="CA">Canada</option>
+              <option value="IN">India</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Region / State (Child):</label>
+            <select id="p1Region" onchange="handleP1RegionChange(event)">
+              <option value="California" selected>California (US)</option>
+              <option value="New York">New York (US)</option>
+              <option value="Texas">Texas (US)</option>
+            </select>
+            <div id="p1RegionErr" class="error-msg" style="display: none;"></div>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="telemetry-box">
+            <div class="telemetry-label">Active Invariant Check</div>
+            <div class="telemetry-val" style="color: var(--accent-emerald);" id="p1InvariantVal">VALID: California ∈ US</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Available Domain Options</div>
+            <div class="telemetry-val" style="color: var(--accent-cyan);" id="p1OptionsVal">[CA, NY, TX]</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROBE 2: Conditional Visibility vs Submission Membership -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">👁️ Probe 2: Visibility vs Submission Membership</div>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Draft values are preserved in memory when hidden, but excluded from the final serialized JSON payload unless active.
+        </p>
+
+        <div class="input-group">
+          <label>Account Type:</label>
+          <select id="p2AccountType" onchange="handleP2AccountType(event)">
+            <option value="personal" selected>Personal Account</option>
+            <option value="business">Business Account</option>
+          </select>
+        </div>
+
+        <div id="p2BusinessFields" style="display: none; background: #0d1322; padding: 12px; border-radius: 6px; border: 1px solid #1f2937; margin-bottom: 14px;">
+          <div class="input-group">
+            <label>Company Name (Draft in Memory):</label>
+            <input type="text" id="p2Company" value="Acme Global Inc." oninput="updateP2Telemetry()" />
+          </div>
+          <div class="input-group">
+            <label>Corporate Tax ID:</label>
+            <input type="text" id="p2TaxId" value="US-9918231" oninput="updateP2Telemetry()" />
+          </div>
+        </div>
+
+        <div class="telemetry-box">
+          <div class="telemetry-label">Serialized Submission Payload</div>
+          <pre id="p2JsonPreview" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-cyan);"></pre>
+        </div>
+      </div>
+
+      <!-- PROBE 3: Chronological Dependency Trace -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <div class="card-title">📜 Probe 3: Dependency Graph Transition Stream</div>
+          <button class="btn" onclick="clearTimeline()">Clear Timeline</button>
+        </div>
+        <ul class="log-list" id="timelineStream">
+          <li class="log-item" style="color: var(--text-muted);"><span>DAG Dependency Engine initialized. Awaiting user interaction...</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- REGION REGISTRY ---
+    const REGIONS = {
+      US: ["California", "New York", "Texas"],
+      CA: ["Ontario", "British Columbia", "Quebec"],
+      IN: ["Telangana", "Maharashtra", "Karnataka"]
+    };
+
+    // --- PROBE 1: Dependent Cascade ---
+    let p1Country = "US";
+    let p1Region = "California";
+
+    function updateP1Telemetry() {
+      const validList = REGIONS[p1Country] || [];
+      const isValid = validList.includes(p1Region);
+      
+      const invEl = document.getElementById("p1InvariantVal");
+      invEl.textContent = isValid ? `VALID: ${p1Region} ∈ ${p1Country}` : `INVALID: ${p1Region || 'None'} ∉ ${p1Country}`;
+      invEl.style.color = isValid ? "var(--accent-emerald)" : "var(--accent-rose)";
+
+      document.getElementById("p1OptionsVal").textContent = JSON.stringify(validList);
+
+      const errEl = document.getElementById("p1RegionErr");
+      if (!isValid && p1Region) {
+        errEl.style.display = "flex";
+        errEl.textContent = `⚠️ "${p1Region}" is not a valid region in ${p1Country}`;
+      } else {
+        errEl.style.display = "none";
+      }
+    }
+
+    function handleP1CountryChange(e) {
+      p1Country = e.target.value;
+      const validList = REGIONS[p1Country] || [];
+      
+      // Populate new options
+      const regSelect = document.getElementById("p1Region");
+      regSelect.innerHTML = '<option value="">Select Region...</option>';
+      validList.forEach(r => {
+        const opt = document.createElement("option");
+        opt.value = r;
+        opt.textContent = `${r} (${p1Country})`;
+        regSelect.appendChild(opt);
+      });
+
+      // ATOMIC RESET TRANSITION
+      p1Region = "";
+      regSelect.value = "";
+      logEvent("PARENT_CHANGE", `Country mutated to "${p1Country}". Atomic child reset executed.`);
+      updateP1Telemetry();
+    }
+
+    function handleP1RegionChange(e) {
+      p1Region = e.target.value;
+      logEvent("CHILD_SELECT", `Region selected: "${p1Region}"`);
+      updateP1Telemetry();
+    }
+
+    function resetProbe1() {
+      p1Country = "US";
+      p1Region = "California";
+      document.getElementById("p1Country").value = "US";
+      const regSelect = document.getElementById("p1Region");
+      regSelect.innerHTML = `
+        <option value="California" selected>California (US)</option>
+        <option value="New York">New York (US)</option>
+        <option value="Texas">Texas (US)</option>
+      `;
+      logEvent("RESET", "Reset cascade to factory defaults");
+      updateP1Telemetry();
+    }
+
+    // --- PROBE 2: Visibility vs Submission ---
+    let p2AccountType = "personal";
+
+    function handleP2AccountType(e) {
+      p2AccountType = e.target.value;
+      const isBusiness = p2AccountType === "business";
+      document.getElementById("p2BusinessFields").style.display = isBusiness ? "block" : "none";
+      logEvent("VISIBILITY_TOGGLE", `Account type: ${p2AccountType}. Conditional UI ${isBusiness ? 'rendered' : 'hidden'}.`);
+      updateP2Telemetry();
+    }
+
+    function updateP2Telemetry() {
+      const isBusiness = p2AccountType === "business";
+      const payload = {
+        accountType: p2AccountType,
+        ...(isBusiness && {
+          companyName: document.getElementById("p2Company").value,
+          taxId: document.getElementById("p2TaxId").value
+        })
+      };
+      document.getElementById("p2JsonPreview").textContent = JSON.stringify(payload, null, 2);
+    }
+
+    // --- TIMELINE LOGGING ---
+    function logEvent(type, desc) {
+      const stream = document.getElementById("timelineStream");
+      const item = document.createElement("li");
+      item.className = "log-item";
+      item.innerHTML = `
+        <span><strong style="color: var(--accent-cyan);">${type}:</strong> ${desc}</span>
+        <span style="color: var(--text-muted);">${new Date().toLocaleTimeString()}</span>
+      `;
+      stream.prepend(item);
+    }
+
+    function clearTimeline() {
+      document.getElementById("timelineStream").innerHTML = "";
+    }
+
+    // Initialize telemetry
+    updateP1Telemetry();
+    updateP2Telemetry();
+  </script>
+</body>
+</html>

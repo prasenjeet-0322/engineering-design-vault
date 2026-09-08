@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 10 Part 08 — Ref-Based Measurement & Layout Coordination</title>
+  <!-- React 18 and Babel CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS CDN for modern aesthetics -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #090d16;
+      color: #e2e8f0;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card-hover:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.15);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.7);
+    }
+  </style>
+</head>
+<body class="min-h-screen custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('timing'); // 'timing' | 'observer' | 'feedback' | 'registry' | 'thrashing'
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Header */}
+          <header className="mb-8 border-b border-slate-800 pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                  KPI 10 • Part 08 Interactive Lab
+                </div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">
+                  Ref-Based Measurement & Layout Coordination
+                </h1>
+                <p className="text-slate-400 text-sm mt-1 max-w-3xl">
+                  Master the temporal boundary between React virtual render cycles and physical browser layout. Explore pre-paint timing, ResizeObserver streams, layout oscillation control, and entity-keyed geometry caches.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 font-mono">
+                  React 18 Concurrent
+                </span>
+                <a 
+                  href="../08-ref-based-measurement-and-layout-coordination.md" 
+                  className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg transition shadow-lg shadow-indigo-600/20 flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  Read Architecture Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <nav className="flex flex-wrap gap-2 mt-6">
+              {[
+                { id: 'timing', label: '1. useLayoutEffect vs useEffect Timing', icon: '⏱️' },
+                { id: 'observer', label: '2. Live ResizeObserver & Normalizer', icon: '📐' },
+                { id: 'feedback', label: '3. Feedback Loop & Oscillation Simulator', icon: '🔄' },
+                { id: 'registry', label: '4. Entity-Keyed Height Registry', icon: '🗂️' },
+                { id: 'thrashing', label: '5. Layout Thrashing Benchmark', icon: '⚡' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 border border-indigo-400/30'
+                      : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 border border-slate-800'
+                  }`}
+                >
+                  <span>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </header>
+
+          {/* Tab Views */}
+          <main>
+            {activeTab === 'timing' && <TimingLab />}
+            {activeTab === 'observer' && <ObserverLab />}
+            {activeTab === 'feedback' && <FeedbackLoopLab />}
+            {activeTab === 'registry' && <RegistryLab />}
+            {activeTab === 'thrashing' && <ThrashingLab />}
+          </main>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // TAB 1: Timing Lab (useLayoutEffect vs useEffect)
+    // ==========================================
+    function TimingLab() {
+      const [hookType, setHookType] = useState('useLayoutEffect'); // 'useLayoutEffect' | 'useEffect'
+      const [isOpen, setIsOpen] = useState(false);
+      const [position, setPosition] = useState({ top: 0, left: 0 });
+      const [simulatedFlicker, setSimulatedFlicker] = useState(true);
+      const [logEntries, setLogEntries] = useState([]);
+
+      const triggerRef = useRef(null);
+      const tooltipRef = useRef(null);
+
+      const addLog = (msg) => {
+        setLogEntries(prev => [...prev.slice(-8), { time: performance.now().toFixed(2), text: msg }]);
+      };
+
+      // Measure & align positioning
+      if (hookType === 'useLayoutEffect') {
+        useLayoutEffect(() => {
+          if (!isOpen || !triggerRef.current || !tooltipRef.current) return;
+          const triggerRect = triggerRef.current.getBoundingClientRect();
+          const tooltipRect = tooltipRef.current.getBoundingClientRect();
+          
+          const calculatedTop = triggerRect.bottom + 8;
+          const calculatedLeft = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+          
+          setPosition({ top: calculatedTop, left: calculatedLeft });
+          addLog(`[useLayoutEffect] Synchronous measurement: aligned to (${calculatedLeft.toFixed(1)}, ${calculatedTop.toFixed(1)}) before paint`);
+        }, [isOpen, hookType]);
+      } else {
+        useEffect(() => {
+          if (!isOpen || !triggerRef.current || !tooltipRef.current) return;
+          
+          // In useEffect, the initial paint happens with default (0,0) position, then updates in an async macro/microtask
+          const triggerRect = triggerRef.current.getBoundingClientRect();
+          const tooltipRect = tooltipRef.current.getBoundingClientRect();
+          
+          const calculatedTop = triggerRect.bottom + 8;
+          const calculatedLeft = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+
+          if (simulatedFlicker) {
+            // Artificial delay to visibly simulate how 1-frame asynchronous paint flickers on slower devices
+            const timer = setTimeout(() => {
+              setPosition({ top: calculatedTop, left: calculatedLeft });
+              addLog(`[useEffect] Post-paint asynchronous alignment: jumped after frame paint!`);
+            }, 120);
+            return () => clearTimeout(timer);
+          } else {
+            setPosition({ top: calculatedTop, left: calculatedLeft });
+            addLog(`[useEffect] Alignment scheduled post-paint`);
+          }
+        }, [isOpen, hookType, simulatedFlicker]);
+      }
+
+      const handleOpen = () => {
+        setPosition({ top: 0, left: 0 }); // reset to unmeasured origin to test flicker
+        setIsOpen(true);
+        addLog(`Trigger clicked -> Tooltip mounted at origin (0,0)`);
+      };
+
+      const handleClose = () => {
+        setIsOpen(false);
+        addLog(`Tooltip unmounted`);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Control Panel */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>⚙️</span> Timing Configuration
+              </h2>
+              
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                  Hook Synchronization Model
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setHookType('useLayoutEffect'); setIsOpen(false); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      hookType === 'useLayoutEffect'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    useLayoutEffect (Pre-Paint)
+                  </button>
+                  <button
+                    onClick={() => { setHookType('useEffect'); setIsOpen(false); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      hookType === 'useEffect'
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    useEffect (Post-Paint)
+                  </button>
+                </div>
+              </div>
+
+              {hookType === 'useEffect' && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-xs text-slate-300 font-medium">Slow Device Flicker Simulation</span>
+                  <input
+                    type="checkbox"
+                    checked={simulatedFlicker}
+                    onChange={e => setSimulatedFlicker(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-800 flex gap-2">
+                {!isOpen ? (
+                  <button
+                    onClick={handleOpen}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-indigo-600/25"
+                  >
+                    Open Floating Popover
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleClose}
+                    className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-rose-600/25"
+                  >
+                    Close Popover
+                  </button>
+                )}
+              </div>
+
+              {/* Execution Log */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs font-semibold text-slate-400">
+                  <span>Lifecycle Telemetry Log</span>
+                  <button onClick={() => setLogEntries([])} className="text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div className="bg-slate-950/90 rounded-xl p-3 border border-slate-800/80 font-mono text-xs space-y-1 h-36 overflow-y-auto custom-scrollbar">
+                  {logEntries.length === 0 ? (
+                    <span className="text-slate-600">No events recorded yet...</span>
+                  ) : (
+                    logEntries.map((log, i) => (
+                      <div key={i} className="text-slate-300 leading-tight">
+                        <span className="text-indigo-400">+{log.time}ms</span>: {log.text}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Stage */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 lg:col-span-2 relative min-h-[420px] flex flex-col justify-between overflow-hidden">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Visual Presentation Stage</h3>
+                  <p className="text-xs text-slate-400">Observe whether the floating element jumps from top-left (0,0) or arrives pre-positioned</p>
+                </div>
+                <div className="text-right">
+                  <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-mono font-bold ${
+                    hookType === 'useLayoutEffect' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  }`}>
+                    {hookType === 'useLayoutEffect' ? 'Synchronous Layout Phase' : 'Asynchronous Effect Phase'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Centered Trigger Button */}
+              <div className="flex justify-center items-center my-auto">
+                <button
+                  ref={triggerRef}
+                  onClick={() => setIsOpen(p => !p)}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all border border-indigo-400/30"
+                >
+                  🎯 Target Anchor Element
+                </button>
+              </div>
+
+              {/* Floating Tooltip / Popover */}
+              {isOpen && (
+                <div
+                  ref={tooltipRef}
+                  style={{
+                    position: 'fixed',
+                    top: `${position.top}px`,
+                    left: `${position.left}px`,
+                    transition: hookType === 'useEffect' && simulatedFlicker ? 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                  }}
+                  className={`z-50 px-4 py-3 rounded-xl bg-slate-900 text-slate-200 border shadow-2xl backdrop-blur-xl text-xs space-y-1 w-64 ${
+                    position.top === 0 && position.left === 0 
+                      ? 'border-rose-500/80 bg-rose-950/80 ring-2 ring-rose-500 shadow-rose-900/50' 
+                      : 'border-indigo-500/40 bg-slate-900/95 ring-1 ring-indigo-500/20'
+                  }`}
+                >
+                  <div className="flex justify-between items-center font-bold">
+                    <span className="text-indigo-400">Positioned Floating Node</span>
+                    {position.top === 0 && position.left === 0 ? (
+                      <span className="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded animate-pulse font-mono">UNMEASURED (0,0)</span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">ALIGNED</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    X: <code className="text-indigo-300">{position.left.toFixed(1)}px</code> | Y: <code className="text-indigo-300">{position.top.toFixed(1)}px</code>
+                  </p>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    {hookType === 'useLayoutEffect' 
+                      ? 'Measured synchronously before paint: Zero Cumulative Layout Shift (CLS).' 
+                      : 'Rendered at (0,0) then repositioned: 1-frame visual jump occurs.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Bottom Architectural Insights */}
+              <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+                <span>⚡ <strong>Senior Rule:</strong> Reserve <code>useLayoutEffect</code> exclusively for visual measurements requiring pre-paint correction.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // TAB 2: Live ResizeObserver & Normalization
+    // ==========================================
+    function ObserverLab() {
+      const containerRef = useRef(null);
+      const [rawDimensions, setRawDimensions] = useState({ width: 0, height: 0 });
+      const [renderCount, setRenderCount] = useState(0);
+      const [quantizedBucket, setQuantizedBucket] = useState('standard');
+      const [hysteresisWidth, setHysteresisWidth] = useState(0);
+      const [quantizeMode, setQuantizeMode] = useState(true);
+
+      const renderCounterRef = useRef(0);
+      renderCounterRef.current++;
+
+      // Real ResizeObserver
+      useEffect(() => {
+        const node = containerRef.current;
+        if (!node) return;
+
+        const observer = new ResizeObserver((entries) => {
+          const entry = entries[0];
+          if (!entry) return;
+
+          const { width, height } = entry.contentRect;
+          setRawDimensions({ width, height });
+
+          if (quantizeMode) {
+            // Quantize to avoid state churn on fractional micro-movements
+            let nextBucket = 'compact';
+            if (width >= 650) nextBucket = 'wide';
+            else if (width >= 400) nextBucket = 'standard';
+            
+            setQuantizedBucket(nextBucket);
+            setHysteresisWidth(Math.round(width / 20) * 20); // 20px step hysteresis
+          }
+        });
+
+        observer.observe(node);
+
+        return () => {
+          observer.disconnect();
+        };
+      }, [quantizeMode]);
+
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Telemetry Dashboard */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>📊</span> Observation Metrics
+              </h2>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex justify-between items-center">
+                  <span className="text-xs text-slate-400 font-medium">React Component Renders</span>
+                  <span className="text-sm font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                    {renderCounterRef.current} renders
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
+                  <span className="text-xs text-slate-400 font-medium block">Raw Observed Dimensions (Float)</span>
+                  <div className="flex gap-3 font-mono text-xs">
+                    <span className="text-emerald-400">W: {rawDimensions.width.toFixed(2)}px</span>
+                    <span className="text-emerald-400">H: {rawDimensions.height.toFixed(2)}px</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
+                  <span className="text-xs text-slate-400 font-medium block">Semantic Breakpoint Bucket</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider ${
+                      quantizedBucket === 'compact' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                      quantizedBucket === 'standard' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                      'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    }`}>
+                      {quantizedBucket}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      (20px Quantized: {hysteresisWidth}px)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800">
+                <label className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+                  <div>
+                    <span className="text-xs text-slate-200 font-semibold block">Enable Hysteresis & Bucketing</span>
+                    <span className="text-[10px] text-slate-500">Normalizes continuous subpixel noise</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={quantizeMode}
+                    onChange={e => setQuantizeMode(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700 focus:ring-indigo-500"
+                  />
+                </label>
+              </div>
+
+              <div className="text-xs text-slate-400 bg-slate-950/60 p-3 rounded-xl border border-slate-800 leading-relaxed">
+                💡 <strong>Core Insight:</strong> Never dump raw floating-point measurements directly into state. Classify into semantic modes (e.g. <code>compact</code> vs <code>wide</code>) to preserve render purity.
+              </div>
+            </div>
+
+            {/* Interactive Resizable Surface */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 lg:col-span-2 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-white">Live Resizeable Container Surface</h3>
+                  <span className="text-xs text-slate-400">Drag bottom-right handle or preset sizes</span>
+                </div>
+
+                {/* Preset Width Buttons */}
+                <div className="flex gap-2 mb-4">
+                  {[
+                    { label: 'Mobile (320px)', width: '320px' },
+                    { label: 'Tablet (520px)', width: '520px' },
+                    { label: 'Desktop (760px)', width: '760px' },
+                  ].map(btn => (
+                    <button
+                      key={btn.label}
+                      onClick={() => {
+                        if (containerRef.current) {
+                          containerRef.current.style.width = btn.width;
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700 transition"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Resizable Box */}
+                <div
+                  ref={containerRef}
+                  style={{ resize: 'horizontal', overflow: 'hidden', minWidth: '280px', maxWidth: '100%', width: '480px' }}
+                  className="p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-900/40 to-indigo-950/30 border border-indigo-500/30 shadow-2xl transition-colors duration-200"
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <span className="text-xs font-mono text-indigo-400 uppercase tracking-wider">Semantic Mode</span>
+                      <h4 className="text-2xl font-black text-white">{quantizedBucket.toUpperCase()} LAYOUT</h4>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold">
+                      {quantizedBucket === 'compact' ? '📱' : quantizedBucket === 'standard' ? '💻' : '🖥️'}
+                    </div>
+                  </div>
+
+                  {/* Responsive Content Adapter */}
+                  {quantizedBucket === 'compact' && (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
+                        📱 <strong>Single-Column Stack:</strong> Actions collapsed into vertical list.
+                      </div>
+                      <div className="h-8 bg-slate-800/80 rounded-lg animate-pulse"></div>
+                    </div>
+                  )}
+
+                  {quantizedBucket === 'standard' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-200">
+                        💻 <strong>Dual-Column Grid:</strong> Primary info + sidebar metrics.
+                      </div>
+                      <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300">
+                        Active Secondary Action
+                      </div>
+                    </div>
+                  )}
+
+                  {quantizedBucket === 'wide' && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs text-purple-200">
+                        🖥️ <strong>Three-Column Pro Layout</strong>
+                      </div>
+                      <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300">
+                        Analytics Panel
+                      </div>
+                      <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300">
+                        Live Stream Feeds
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-800/80 text-xs text-slate-500 flex justify-between items-center">
+                <span>ResizeObserver lifecycle: Attached once on mount, automatically detached on unmount.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // TAB 3: Feedback Loop & Oscillation Simulator
+    // ==========================================
+    function FeedbackLoopLab() {
+      const [loopMode, setLoopMode] = useState('unstable'); // 'unstable' | 'stable'
+      const [cycleCount, setCycleCount] = useState(0);
+      const [isOscillating, setIsOscillating] = useState(false);
+      const [containerWidth, setContainerWidth] = useState(480);
+      const [logs, setLogs] = useState([]);
+
+      const pingRef = useRef(null);
+
+      const addLog = (msg) => {
+        setLogs(prev => [...prev.slice(-10), { id: Date.now() + Math.random(), text: msg }]);
+      };
+
+      const triggerOscillation = () => {
+        setIsOscillating(true);
+        setCycleCount(0);
+        let step = 0;
+        let currentWidth = 480;
+
+        if (pingRef.current) clearInterval(pingRef.current);
+
+        pingRef.current = setInterval(() => {
+          step++;
+          if (loopMode === 'unstable') {
+            // Unstable Feedback: Under 500px adds 100px padding (expanding width to 580px),
+            // which triggers >550px breakpoint that removes 100px padding (dropping back to 480px)
+            if (currentWidth < 520) {
+              currentWidth = 580;
+              addLog(`[Step ${step}] Measured < 520px -> Injected +80px badge padding -> Width is now 580px`);
+            } else {
+              currentWidth = 460;
+              addLog(`[Step ${step}] Measured >= 520px -> Removed badge padding -> Width collapsed to 460px`);
+            }
+            setContainerWidth(currentWidth);
+            setCycleCount(step);
+
+            if (step >= 12) {
+              clearInterval(pingRef.current);
+              setIsOscillating(false);
+              addLog(`🛑 Safety Trip: Halted infinite oscillation loop!`);
+            }
+          } else {
+            // Stable Feedback: Hysteresis deadband ensures fixed point convergence
+            addLog(`[Step ${step}] Measured ${currentWidth}px -> Evaluated within Hysteresis Deadband (450px-550px) -> Stable fixed point achieved!`);
+            clearInterval(pingRef.current);
+            setIsOscillating(false);
+          }
+        }, 350);
+      };
+
+      const stopOscillation = () => {
+        if (pingRef.current) clearInterval(pingRef.current);
+        setIsOscillating(false);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Control Panel */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🔄</span> Loop Controller
+              </h2>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                  Feedback Function Architecture
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setLoopMode('unstable'); stopOscillation(); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      loopMode === 'unstable'
+                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Unstable Oscillation
+                  </button>
+                  <button
+                    onClick={() => { setLoopMode('stable'); stopOscillation(); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      loopMode === 'stable'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Stable Hysteresis
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Layout Cycle Count:</span>
+                  <span className="font-mono font-bold text-indigo-400">{cycleCount} cycles</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Current Computed Box:</span>
+                  <span className="font-mono font-bold text-amber-300">{containerWidth}px</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex gap-2">
+                {!isOscillating ? (
+                  <button
+                    onClick={triggerOscillation}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-indigo-600/25"
+                  >
+                    Run Layout Feedback Test
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopOscillation}
+                    className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-rose-600/25"
+                  >
+                    Abort Loop
+                  </button>
+                )}
+              </div>
+
+              {/* Event Stream */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-slate-400">Feedback Loop Step Log</span>
+                <div className="bg-slate-950/90 rounded-xl p-3 border border-slate-800 font-mono text-xs space-y-1 h-40 overflow-y-auto custom-scrollbar">
+                  {logs.length === 0 ? (
+                    <span className="text-slate-600">Click button to run test...</span>
+                  ) : (
+                    logs.map(log => (
+                      <div key={log.id} className="text-slate-300 leading-tight">
+                        {log.text}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Visual Feedback Stage */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 lg:col-span-2 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-white">Dynamic Feedback Visualization</h3>
+                  <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                    isOscillating ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {isOscillating ? '⚡ OSCILLATING' : 'IDLE'}
+                  </span>
+                </div>
+
+                {/* Oscillating Component */}
+                <div
+                  style={{ width: `${containerWidth}px`, transition: 'width 0.25s ease-out' }}
+                  className={`mx-auto p-6 rounded-2xl border transition-colors duration-200 ${
+                    containerWidth >= 520 
+                      ? 'bg-purple-950/30 border-purple-500/40 shadow-purple-900/20' 
+                      : 'bg-amber-950/30 border-amber-500/40 shadow-amber-900/20'
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      {containerWidth >= 520 ? 'EXPANDED STATE (>=520px)' : 'COMPACT STATE (<520px)'}
+                    </span>
+                    <span className="text-sm font-mono font-bold text-white">{containerWidth}px</span>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                    {loopMode === 'unstable' 
+                      ? '⚠️ This component triggers layout changes that negate the conditions that caused the transition, creating an infinite rendering flip-flop.' 
+                      : '✅ Hysteresis deadband protects state boundaries. Width transitions only occur when crossing distinct non-overlapping thresholds.'}
+                  </p>
+
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      style={{ width: `${(containerWidth / 600) * 100}%` }}
+                      className={`h-full transition-all duration-200 ${
+                        containerWidth >= 520 ? 'bg-purple-500' : 'bg-amber-500'
+                      }`}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800 text-xs text-slate-400 mt-6">
+                💡 <strong>Senior Fix:</strong> UI layout functions must be monotonic or contain deadband hysteresis to ensure control loop convergence.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // TAB 4: Entity-Keyed Height Registry
+    // ==========================================
+    function RegistryLab() {
+      const [items, setItems] = useState([
+        { id: 'item-1', title: 'Security Audit Protocol', height: 75, text: 'Initial TLS 1.3 certificate validation and key rotation routines.' },
+        { id: 'item-2', title: 'Database Migration Ledger', height: 110, text: 'Distributed consensus verification across read replicas and snapshot partitions with strict transactional serializability.' },
+        { id: 'item-3', title: 'Edge CDN Routing Policy', height: 65, text: 'Anycast DNS routing with low-latency edge caching.' },
+        { id: 'item-4', title: 'Async Worker Queue Dispatch', height: 90, text: 'Exponential backoff retry policy for idempotent webhook deliveries.' },
+      ]);
+
+      const [cachingMode, setCachingMode] = useState('entity'); // 'entity' | 'index'
+      const registryRef = useRef(new Map());
+      const [, forceRender] = useState({});
+
+      // Callback ref for measuring dynamic rows
+      const registerRow = useCallback((id, index, node) => {
+        if (!node) {
+          if (cachingMode === 'entity') registryRef.current.delete(id);
+          else registryRef.current.delete(index);
+          return;
+        }
+
+        const rect = node.getBoundingClientRect();
+        if (cachingMode === 'entity') {
+          registryRef.current.set(id, { height: rect.height, title: node.dataset.title });
+        } else {
+          registryRef.current.set(index, { height: rect.height, title: node.dataset.title });
+        }
+      }, [cachingMode]);
+
+      // Reorder items
+      const handleReorder = () => {
+        setItems(prev => {
+          const next = [...prev];
+          const [moved] = next.splice(0, 1);
+          next.push(moved);
+          return next;
+        });
+      };
+
+      const handleToggleExpand = (id) => {
+        setItems(prev => prev.map(item => {
+          if (item.id === id) {
+            return {
+              ...item,
+              expanded: !item.expanded,
+              text: item.expanded 
+                ? item.text.slice(0, 50) 
+                : item.text + ' [EXTRA DYNAMIC MEASURED CONTENT INJECTED TO ALTER DOM BOUNDS REAL-TIME]'
+            };
+          }
+          return item;
+        }));
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Control & Inspection Panel */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🗂️</span> Measurement Registry
+              </h2>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                  Cache Key Architecture
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setCachingMode('entity'); registryRef.current.clear(); forceRender({}); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      cachingMode === 'entity'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Entity ID Key (Safe)
+                  </button>
+                  <button
+                    onClick={() => { setCachingMode('index'); registryRef.current.clear(); forceRender({}); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      cachingMode === 'index'
+                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Array Index Key (Broken)
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReorder}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-indigo-600/25"
+                >
+                  🔀 Rotate / Reorder Items
+                </button>
+              </div>
+
+              {/* Cache Inspection View */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-slate-400">Live Map Registry Contents</span>
+                <div className="bg-slate-950/90 rounded-xl p-3 border border-slate-800 font-mono text-xs space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
+                  {Array.from(registryRef.current.entries()).map(([key, val]) => (
+                    <div key={String(key)} className="p-2 bg-slate-900/60 rounded border border-slate-800/80">
+                      <div className="flex justify-between items-center text-indigo-400 font-bold">
+                        <span>Key: {String(key)}</span>
+                        <span className="text-emerald-400">{val.height.toFixed(1)}px</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate">{val.title}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* List Component Stage */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 lg:col-span-2 space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-bold text-white">Dynamic Height Registered Items</h3>
+                <span className="text-xs text-slate-400">Click cards to toggle content expansion</span>
+              </div>
+
+              <div className="space-y-3">
+                {items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    data-title={item.title}
+                    ref={node => registerRow(item.id, index, node)}
+                    onClick={() => handleToggleExpand(item.id)}
+                    className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-indigo-500/40 transition cursor-pointer space-y-2 shadow-lg"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-mono flex items-center justify-center font-bold">
+                          {index + 1}
+                        </span>
+                        <h4 className="text-sm font-bold text-white">{item.title}</h4>
+                      </div>
+                      <span className="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                        ID: {item.id}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800 text-xs text-slate-400">
+                ⚠️ <strong>Key Insight:</strong> When using array index keys, reordering items assigns the first item's height to the newly placed first item, corrupting virtualized scroll offsets.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // TAB 5: Layout Thrashing Benchmark
+    // ==========================================
+    function ThrashingLab() {
+      const [testMode, setTestMode] = useState('interleaved'); // 'interleaved' | 'batched'
+      const [itemCount, setItemCount] = useState(60);
+      const [executionTime, setExecutionTime] = useState(null);
+      const [isRunning, setIsRunning] = useState(false);
+
+      const runBenchmark = () => {
+        setIsRunning(true);
+        const container = document.getElementById('thrash-grid');
+        if (!container) return;
+
+        const boxes = container.querySelectorAll('.benchmark-box');
+
+        requestAnimationFrame(() => {
+          const startTime = performance.now();
+
+          if (testMode === 'interleaved') {
+            // Anti-Pattern: Layout Thrashing (Read -> Write -> Read -> Write)
+            boxes.forEach((box, i) => {
+              box.style.width = `${100 + (i % 20)}px`; // Write
+              const w = box.getBoundingClientRect().width; // Read (Forced synchronous reflow!)
+              box.style.height = `${w * 0.8}px`; // Write
+            });
+          } else {
+            // Senior Pattern: Batched Read Phase followed by Batched Write Phase
+            const widths = [];
+            boxes.forEach((box, i) => {
+              box.style.width = `${100 + (i % 20)}px`;
+            });
+            // Read phase
+            boxes.forEach((box) => {
+              widths.push(box.getBoundingClientRect().width);
+            });
+            // Write phase
+            boxes.forEach((box, i) => {
+              box.style.height = `${widths[i] * 0.8}px`;
+            });
+          }
+
+          const duration = performance.now() - startTime;
+          setExecutionTime(duration);
+          setIsRunning(false);
+        });
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Control Panel */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-5">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>⚡</span> Thrashing Benchmark
+              </h2>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                  DOM Access Strategy
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setTestMode('interleaved'); setExecutionTime(null); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      testMode === 'interleaved'
+                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Interleaved (Thrashing)
+                  </button>
+                  <button
+                    onClick={() => { setTestMode('batched'); setExecutionTime(null); }}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition ${
+                      testMode === 'batched'
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Batched (Optimized)
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Execution Duration:</span>
+                  <span className={`font-mono font-bold ${
+                    executionTime === null ? 'text-slate-500' :
+                    testMode === 'interleaved' ? 'text-rose-400' : 'text-emerald-400'
+                  }`}>
+                    {executionTime !== null ? `${executionTime.toFixed(2)} ms` : 'Not run'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Elements Processed:</span>
+                  <span className="font-mono text-slate-300 font-bold">{itemCount} nodes</span>
+                </div>
+              </div>
+
+              <button
+                onClick={runBenchmark}
+                disabled={isRunning}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-indigo-600/25"
+              >
+                {isRunning ? 'Benchmarking Reflows...' : 'Execute DOM Mutations'}
+              </button>
+
+              <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
+                🔬 <strong>Mechanics:</strong> Interleaving writes and layout reads forces the browser engine to repeatedly perform style recalculation and geometric reflow on every single iteration.
+              </div>
+            </div>
+
+            {/* Grid Stage */}
+            <div className="glass-card rounded-2xl p-6 border border-slate-800 lg:col-span-2 flex flex-col justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white mb-3">Target DOM Node Grid</h3>
+                <div id="thrash-grid" className="grid grid-cols-6 sm:grid-cols-10 gap-2 max-h-80 overflow-y-auto custom-scrollbar p-2 bg-slate-950/60 rounded-xl border border-slate-800/80">
+                  {Array.from({ length: itemCount }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="benchmark-box h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-lg flex items-center justify-center text-[10px] font-mono text-indigo-300 font-semibold transition-all"
+                    >
+                      #{i+1}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex justify-between items-center">
+                <span>Rule: Measure all nodes first, compute coordinates in memory, then apply batch mutations.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

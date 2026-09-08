@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 - Part 05: Forms & Input Interaction Fundamentals Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-accent: #4f46e5;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-violet: #8b5cf6;
+      --code-bg: #030712;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-emerald));
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .triple-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-grid, .triple-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    /* Form Controls Styling */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #fff;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, var(--accent-indigo), #4338ca); color: white; }
+    .btn-primary:hover { background: linear-gradient(135deg, #4f46e5, #3730a3); transform: translateY(-1px); }
+
+    .btn-emerald { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-emerald); }
+    .btn-emerald:hover { background: rgba(16, 185, 129, 0.3); }
+
+    .btn-rose { background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); color: var(--accent-rose); }
+    .btn-rose:hover { background: rgba(244, 63, 94, 0.3); }
+
+    .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+    .btn-secondary:hover { background: #374151; color: white; }
+
+    /* Telemetry / Inspector */
+    .telemetry-box {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 240px;
+    }
+
+    .state-badge {
+      display: inline-flex;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-indigo);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    /* Step Timeline */
+    .timeline-item {
+      display: flex;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--accent-cyan);
+      font-size: 0.78rem;
+    }
+
+    .timeline-item.submission { border-color: var(--accent-emerald); }
+    .timeline-item.reset { border-color: var(--accent-amber); }
+
+    /* Quiz Option */
+    .quiz-option {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .quiz-option:hover { border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.15); border-color: var(--accent-emerald); color: var(--accent-emerald); }
+    .quiz-option.wrong { background: rgba(244, 63, 94, 0.15); border-color: var(--accent-rose); color: var(--accent-rose); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function App() {
+      // 1. Authoritative Controlled Form State
+      const initialForm = {
+        name: "Srikar",
+        email: "srikar@example.com",
+        newsletter: true,
+        plan: "pro",
+        bio: "Founding Full Stack Engineer"
+      };
+
+      const [form, setForm] = useState(initialForm);
+      const [lastEvent, setLastEvent] = useState(null);
+      const [renderSnapshots, setRenderSnapshots] = useState([]);
+      const [submissionLog, setSubmissionLog] = useState([]);
+      const [uncontrolledVal, setUncontrolledVal] = useState("Initial Default");
+
+      // Crucible Quiz State
+      const [activeQuiz, setActiveQuiz] = useState(0);
+      const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+      const renderCount = useRef(1);
+
+      // Record render snapshots
+      useEffect(() => {
+        setRenderSnapshots(prev => [
+          {
+            renderId: renderCount.current++,
+            time: new Date().toISOString().substring(14, 23),
+            snapshot: { ...form }
+          },
+          ...prev.slice(0, 19)
+        ]);
+      }, [form]);
+
+      // Generic Controlled Change Handler
+      const handleChange = (e) => {
+        const { name, value, type, checked, tagName } = e.target;
+        const finalValue = type === "checkbox" ? checked : value;
+
+        setLastEvent({
+          type: e.type,
+          targetTag: tagName,
+          name,
+          extractedValue: finalValue,
+          rawTargetValue: value,
+          targetChecked: checked,
+          inputType: type
+        });
+
+        setForm(prev => ({
+          ...prev,
+          [name]: finalValue
+        }));
+      };
+
+      // Form Submission Handler
+      const handleSubmit = (e) => {
+        e.preventDefault(); // Prevents default browser reload
+        setSubmissionLog(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            time: new Date().toISOString().substring(11, 23),
+            defaultPrevented: e.defaultPrevented,
+            payload: { ...form }
+          },
+          ...prev.slice(0, 9)
+        ]);
+      };
+
+      // Controlled Reset
+      const handleReset = () => {
+        setForm(initialForm);
+        setLastEvent({
+          type: "reset",
+          name: "FORM_RESET",
+          extractedValue: "Restored Initial State"
+        });
+      };
+
+      const quizQuestions = [
+        {
+          q: "Why does `<input value={name} />` without `onChange` become frozen?",
+          options: [
+            { text: "React throws a fatal runtime exception", isCorrect: false },
+            { text: "There is no state transition path to update `name` upon typing", isCorrect: true },
+            { text: "The browser automatically unmounts unattached inputs", isCorrect: false },
+            { text: "The DOM node loses its internal buffer memory", isCorrect: false }
+          ],
+          explanation: "In a controlled input, React state is the authority. Without an onChange adapter to update state, React continuously reasserts the unchanged state value on the DOM."
+        },
+        {
+          q: "What is the correct way to bind and read a controlled checkbox?",
+          options: [
+            { text: "`value={checked}` and `event.target.value`", isCorrect: false },
+            { text: "`checked={state}` and `event.target.checked`", isCorrect: true },
+            { text: "`defaultValue={true}` and `event.target.selected`", isCorrect: false },
+            { text: "`selected={state}` and `event.target.value`", isCorrect: false }
+          ],
+          explanation: "Checkboxes represent boolean state via `checked` and emit their state through `event.target.checked`. `event.target.value` is typically the string 'on'."
+        },
+        {
+          q: "Where does the `onSubmit` event handler belong?",
+          options: [
+            { text: "Directly on the submit `<button onClick={handleSubmit}>`", isCorrect: false },
+            { text: "On the wrapping `<form onSubmit={handleSubmit}>`", isCorrect: true },
+            { text: "On every single `<input>` field", isCorrect: false },
+            { text: "Inside `useEffect` on mount", isCorrect: false }
+          ],
+          explanation: "The form owns submission semantics (supporting keyboard Enter, assistive tech, and submit buttons). Placing it on <form> with `preventDefault()` is the senior standard."
+        }
+      ];
+
+      return (
+        <div className="container">
+          {/* Header */}
+          <header className="header-card">
+            <div className="header-badge">Level 06 • KPI 05 • Part 05</div>
+            <h1 className="header-title">
+              <span>📋</span> Forms & Input Interaction Fundamentals Lab
+            </h1>
+            <p className="header-subtitle">
+              Live architectural inspection of controlled input feedback loops, SyntheticEvent extraction, render snapshot timelines, and submission boundaries.
+            </p>
+          </header>
+
+          {/* Top Grid: Controlled Form + Live State & Event Inspector */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 1: Interactive Controlled Form */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>📝</span> Interactive Controlled Form
+              </div>
+
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="nameField">
+                    <span>Full Name (Text Input)</span>
+                    <span className="state-badge">value=&#123;form.name&#125;</span>
+                  </label>
+                  <input 
+                    id="nameField"
+                    className="form-input"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    placeholder="Enter full name"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="emailField">
+                    <span>Email Address (Text Input)</span>
+                    <span className="state-badge">value=&#123;form.email&#125;</span>
+                  </label>
+                  <input 
+                    id="emailField"
+                    className="form-input"
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="Enter email"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="planSelect">
+                    <span>Subscription Plan (Select)</span>
+                    <span className="state-badge">value=&#123;form.plan&#125;</span>
+                  </label>
+                  <select 
+                    id="planSelect"
+                    className="form-select"
+                    name="plan"
+                    value={form.plan}
+                    onChange={handleChange}
+                  >
+                    <option value="free">Free Tier</option>
+                    <option value="pro">Pro Architecture</option>
+                    <option value="enterprise">Enterprise Founding</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="checkbox-group">
+                    <input 
+                      type="checkbox"
+                      name="newsletter"
+                      checked={form.newsletter}
+                      onChange={handleChange}
+                    />
+                    <span>Subscribe to Architectural Updates (Checkbox: <code>checked=&#123;form.newsletter&#125;</code>)</span>
+                  </label>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="bioField">
+                    <span>Developer Bio (Textarea)</span>
+                    <span className="state-badge">value=&#123;form.bio&#125;</span>
+                  </label>
+                  <textarea 
+                    id="bioField"
+                    className="form-textarea"
+                    rows="2"
+                    name="bio"
+                    value={form.bio}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                    🚀 Submit Form (type="submit")
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={handleReset}>
+                    ♻️ Reset State
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Panel 2: Live Event & State Extraction Inspector */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🔍</span> Live Event Inspector & Form State
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Authoritative React State (Source of Truth):
+                </div>
+                <pre className="telemetry-box" style={{ color: 'var(--accent-cyan)' }}>
+                  {JSON.stringify(form, null, 2)}
+                </pre>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Last Intercepted Event Extraction:
+                </div>
+                <pre className="telemetry-box" style={{ color: 'var(--accent-amber)' }}>
+                  {lastEvent 
+                    ? JSON.stringify(lastEvent, null, 2) 
+                    : "// Interact with any input on the left to inspect extraction..."}
+                </pre>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Middle Grid: Controlled vs Uncontrolled Comparison + Render Timeline */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 3: Controlled vs Default Comparison */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>⚖️</span> Controlled (`value`) vs Uncontrolled (`defaultValue`)
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ padding: '12px', background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '8px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-indigo)', marginBottom: '4px' }}>
+                    Controlled: <code>&lt;input value=&#123;name&#125; onChange=&#123;...&#125; /&gt;</code>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Continuous 2-way loop. React re-asserts state on every render. Changing state programmatically instantly updates the input.
+                  </p>
+                </div>
+
+                <div style={{ padding: '12px', background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '8px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-amber)', marginBottom: '4px' }}>
+                    Uncontrolled: <code>&lt;input defaultValue=&#123;initial&#125; /&gt;</code>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    Initializes once on mount. DOM holds the source of truth. Subsequent state changes do not sync.
+                  </p>
+                  <input 
+                    className="form-input" 
+                    defaultValue="Uncontrolled Initial Text" 
+                    style={{ width: '100%', borderColor: 'var(--accent-amber)' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 4: Render Snapshot Timeline */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>📸</span> Render Snapshot Timeline
+              </div>
+
+              <div className="telemetry-box" style={{ maxHeight: '220px' }}>
+                {renderSnapshots.map((item, idx) => (
+                  <div key={idx} className="timeline-item">
+                    <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>#{item.renderId}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>[{item.time}]</span>
+                    <span>name: <strong>"{item.snapshot.name}"</strong></span>
+                    <span>plan: <strong>"{item.snapshot.plan}"</strong></span>
+                    <span>newsletter: <strong>{String(item.snapshot.newsletter)}</strong></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Grid: Submission Pipeline & Crucible Quiz */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 5: Submission Pipeline Inspector */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🚀</span> Form Submission Pipeline Log
+              </div>
+
+              <div className="telemetry-box" style={{ maxHeight: '220px' }}>
+                {submissionLog.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>
+                    Click "Submit Form" above to trace `onSubmit` & `preventDefault()`...
+                  </div>
+                ) : (
+                  submissionLog.map((log) => (
+                    <div key={log.id} className="timeline-item submission">
+                      <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>SUBMITTED</span>
+                      <span style={{ color: 'var(--text-muted)' }}>[{log.time}]</span>
+                      <span>defaultPrevented: <strong>{String(log.defaultPrevented)}</strong></span>
+                      <span>Payload: <code>{JSON.stringify(log.payload)}</code></span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Panel 6: Crucible Prediction Quiz */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🔥</span> Crucible Quiz Challenge ({activeQuiz + 1} / {quizQuestions.length})
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#f3f4f6' }}>
+                  {quizQuestions[activeQuiz].q}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {quizQuestions[activeQuiz].options.map((opt, i) => {
+                    let className = "quiz-option";
+                    if (selectedAnswer !== null) {
+                      if (opt.isCorrect) className += " correct";
+                      else if (selectedAnswer === i) className += " wrong";
+                    }
+                    return (
+                      <div 
+                        key={i} 
+                        className={className}
+                        onClick={() => {
+                          if (selectedAnswer === null) {
+                            setSelectedAnswer(i);
+                          }
+                        }}
+                      >
+                        <span style={{ fontFamily: 'Fira Code', fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedAnswer !== null && (
+                  <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Architect Note:</strong> {quizQuestions[activeQuiz].explanation}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedAnswer === null}
+                    style={{ opacity: selectedAnswer === null ? 0.5 : 1 }}
+                    onClick={() => {
+                      setSelectedAnswer(null);
+                      setActiveQuiz((prev) => (prev + 1) % quizQuestions.length);
+                    }}
+                  >
+                    Next Question ➡️
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 13: State Persistence, Reset Semantics & Derived Boundaries</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+      --yellow: #d29922;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .badge.preserved {
+      background: #0d281e;
+      color: var(--green);
+      border-color: #1a7f37;
+    }
+    .badge.reset {
+      background: #3c1418;
+      color: var(--red);
+      border-color: #8b181b;
+    }
+    .badge.warn {
+      background: #341a04;
+      color: var(--orange);
+      border-color: #9e6a03;
+    }
+    input[type="text"] {
+      background: #090d13;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+    .inspector {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      padding: 2px 0;
+      border-bottom: 1px dotted #1b2128;
+    }
+    .row:last-child { border-bottom: none; }
+    .val { color: var(--cyan); font-weight: bold; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 13: State Persistence, Reset Semantics & Derived Boundaries</h1>
+  <p class="subtitle">Component Occurrence Identity, Key Boundaries, and Draft Lifecycles</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // 1. Re-render vs Remount Lifecycle
+    function CounterChild() {
+      const [count, setCount] = useState(0);
+      return (
+        <div className="inspector">
+          <div className="row">
+            <span>Child State (count):</span>
+            <span className="val">{count}</span>
+          </div>
+          <button style={{ marginTop: "4px" }} onClick={() => setCount(c => c + 1)}>Increment Child (+1)</button>
+        </div>
+      );
+    }
+
+    function ReRenderVsRemountSection() {
+      const [parentCount, setParentCount] = useState(0);
+      const [remountKey, setRemountKey] = useState(0);
+
+      return (
+        <div className="card">
+          <h2>
+            1. Re-render vs Remount
+            <span className="badge preserved">Identity Inspector</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Re-rendering parent preserves child state. Forcing key change destroys occurrence and reinitializes state.
+          </p>
+          <CounterChild key={remountKey} />
+          <div className="btn-group">
+            <button className="primary" onClick={() => setParentCount(p => p + 1)}>
+              Rerender Parent (Parent renders: {parentCount})
+            </button>
+            <button className="danger" onClick={() => setRemountKey(k => k + 1)}>
+              Force Remount (Key: {remountKey})
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Draft Initialization vs Key Identity Reset
+    function UserDraftEditor({ user }) {
+      const [draft, setDraft] = useState(user.name);
+
+      return (
+        <div style={{ marginTop: "6px" }}>
+          <label style={{ fontSize: "12px", color: "#8b949e" }}>Local Draft Input (Initialized from props):</label>
+          <input
+            type="text"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+          />
+          <div className="row" style={{ fontSize: "12px" }}>
+            <span>Incoming prop: <code>{user.name}</code></span>
+            <span>Current draft state: <code className="val">"{draft}"</code></span>
+          </div>
+        </div>
+      );
+    }
+
+    function DraftLifecycleSection() {
+      const [userId, setUserId] = useState("u1");
+      const users = {
+        u1: { id: "u1", name: "Alice" },
+        u2: { id: "u2", name: "Bob" }
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            2. Draft Lifecycle & Entity Key
+            <span className="badge ok">key={userId}</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Changing <code>userId</code> resets the editor occurrence because <code>key={userId}</code> establishes a new entity lifecycle.
+          </p>
+          <UserDraftEditor key={userId} user={users[userId]} />
+          <div className="btn-group" style={{ marginTop: "12px" }}>
+            <button className="primary" onClick={() => setUserId(userId === "u1" ? "u2" : "u1")}>
+              Switch User (Currently: {users[userId].name})
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. List Identity: Index Key vs Stable ID Key
+    function ListIdentitySection() {
+      const [items, setItems] = useState([
+        { id: "101", title: "Review RFC 402" },
+        { id: "102", title: "Fix Fiber Reconciler" },
+        { id: "103", title: "Write Diagnostic Lab" }
+      ]);
+      const [useIndexKey, setUseIndexKey] = useState(false);
+
+      const reverseList = () => {
+        setItems(prev => [...prev].reverse());
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            3. List Identity: Index vs Stable ID Key
+            <span className={`badge ${useIndexKey ? "warn" : "ok"}`}>
+              {useIndexKey ? "key={index} (Buggy)" : "key={item.id} (Stable)"}
+            </span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Type a comment into any row's input, then reverse. Notice how <code>key=&#123;index&#125;</code> attaches state to position rather than entity.
+          </p>
+          <div className="btn-group">
+            <button className="primary" onClick={reverseList}>Reverse List Order</button>
+            <button onClick={() => setUseIndexKey(!useIndexKey)}>
+              Toggle Key Mode: {useIndexKey ? "INDEX KEY" : "STABLE ID KEY"}
+            </button>
+          </div>
+          <div className="inspector">
+            {items.map((item, index) => {
+              const assignedKey = useIndexKey ? index : item.id;
+              return (
+                <div key={assignedKey} style={{ marginBottom: "8px", borderBottom: "1px dotted #21262d", paddingBottom: "4px" }}>
+                  <div style={{ fontSize: "12px", color: "var(--cyan)" }}>
+                    {item.title} <span style={{ color: "#8b949e" }}>[ID: {item.id}, Key: {assignedKey}]</span>
+                  </div>
+                  <input type="text" placeholder={`Draft note for ${item.title}...`} style={{ marginTop: "4px", marginBottom: "0" }} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <ReRenderVsRemountSection />
+          <DraftLifecycleSection />
+          <ListIdentitySection />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

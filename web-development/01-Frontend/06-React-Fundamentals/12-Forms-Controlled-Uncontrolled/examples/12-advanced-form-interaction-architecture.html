@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 08 Part 12 — Advanced Form Interaction Architecture Simulator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.75);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1250px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 950px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(51, 65, 85, 0.8);
+      color: #cbd5e1;
+      border: 1px solid #475569;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn-warning {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .code-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .pill-idle { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+    .pill-submitting { background: rgba(56, 189, 248, 0.2); color: #38bdf8; animation: pulse 1.5s infinite; }
+    .pill-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-conflict { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .pill-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+
+    .modal {
+      background: #1e293b;
+      border: 2px solid #f59e0b;
+      border-radius: 16px;
+      max-width: 650px;
+      width: 100%;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useRef, useMemo, useEffect } = React;
+
+    const INITIAL_DATA = {
+      id: "org_9041",
+      version: 4,
+      companyName: "Acme Cloud Systems",
+      billingEmail: "admin@acme.com",
+      planTier: "growth",
+      maxSeats: 25,
+      country: "US",
+      taxId: "US-998811"
+    };
+
+    function formReducer(state, action) {
+      switch (action.type) {
+        case "FIELD_CHANGED": {
+          const nextDraft = { ...state.draft, [action.field]: action.value };
+          // Cascading child invariant: Changing country clears taxId
+          if (action.field === "country" && action.value !== state.draft.country) {
+            nextDraft.taxId = action.value === "CA" ? "CA-GST-001" : action.value === "UK" ? "GB-VAT-992" : "US-998811";
+          }
+          const nextServerErrors = { ...state.serverErrors };
+          delete nextServerErrors[action.field];
+          return {
+            ...state,
+            draft: nextDraft,
+            serverErrors: nextServerErrors,
+            globalError: null
+          };
+        }
+        case "FIELD_BLURRED":
+          return {
+            ...state,
+            touched: { ...state.touched, [action.field]: true }
+          };
+        case "SUBMIT_STARTED":
+          return {
+            ...state,
+            status: "submitting",
+            serverErrors: {},
+            globalError: null
+          };
+        case "SUBMIT_SUCCEEDED":
+          return {
+            ...state,
+            baseline: action.committed,
+            status: "success",
+            serverLatest: null,
+            serverErrors: {},
+            globalError: null
+          };
+        case "SUBMIT_FAILED_409":
+          return {
+            ...state,
+            status: "conflict",
+            serverLatest: action.serverRecord,
+            globalError: "HTTP 409 Conflict: Record version mismatch."
+          };
+        case "SUBMIT_FAILED_422":
+          return {
+            ...state,
+            status: "error",
+            serverErrors: action.fieldErrors
+          };
+        case "CONFLICT_RESOLVED":
+          return {
+            ...state,
+            draft: action.merged,
+            baseline: action.merged,
+            status: "idle",
+            serverLatest: null,
+            globalError: null
+          };
+        case "RESET_TO_BASELINE":
+          return {
+            ...state,
+            draft: state.baseline,
+            touched: {},
+            status: "idle",
+            serverErrors: {},
+            globalError: null
+          };
+        default:
+          return state;
+      }
+    }
+
+    function App() {
+      const [state, dispatch] = useReducer(formReducer, {
+        draft: INITIAL_DATA,
+        baseline: INITIAL_DATA,
+        serverLatest: null,
+        touched: {},
+        status: "idle",
+        serverErrors: {},
+        globalError: null
+      });
+
+      // Simulation Controls
+      const [autosaveEnabled, setAutosaveEnabled] = useState(false);
+      const [autosaveState, setAutosaveState] = useState("idle");
+      const [inFlightSnapshot, setInFlightSnapshot] = useState(null);
+      const [logs, setLogs] = useState([]);
+
+      const requestSeqRef = useRef(0);
+      const autosaveTimerRef = useRef(null);
+
+      const addLog = (msg, type = "info") => {
+        setLogs(prev => [{
+          id: Math.random(),
+          timestamp: new Date().toLocaleTimeString(),
+          msg,
+          type
+        }, ...prev.slice(0, 6)]);
+      };
+
+      // Pure Derived State
+      const isDirty = useMemo(() => {
+        return (
+          state.draft.companyName !== state.baseline.companyName ||
+          state.draft.billingEmail !== state.baseline.billingEmail ||
+          state.draft.planTier !== state.baseline.planTier ||
+          state.draft.maxSeats !== state.baseline.maxSeats ||
+          state.draft.country !== state.baseline.country ||
+          state.draft.taxId !== state.baseline.taxId
+        );
+      }, [state.draft, state.baseline]);
+
+      const clientErrors = useMemo(() => {
+        const errs = {};
+        if (!state.draft.companyName.trim()) {
+          errs.companyName = "Company name is required.";
+        }
+        if (!state.draft.billingEmail.trim()) {
+          errs.billingEmail = "Billing email is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.draft.billingEmail)) {
+          errs.billingEmail = "Invalid email format.";
+        }
+        if (state.draft.planTier === "enterprise" && state.draft.maxSeats < 20) {
+          errs.maxSeats = "Enterprise plan requires at least 20 seats.";
+        }
+        return errs;
+      }, [state.draft]);
+
+      const isValid = Object.keys(clientErrors).length === 0;
+
+      // Autosave Pipeline
+      useEffect(() => {
+        if (!autosaveEnabled || !isDirty || !isValid || state.status === "submitting") return;
+
+        if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+        setAutosaveState("debouncing");
+
+        autosaveTimerRef.current = setTimeout(async () => {
+          setAutosaveState("saving");
+          const snap = structuredClone(state.draft);
+          setInFlightSnapshot(snap);
+          addLog(`Autosave dispatched snapshot for "${snap.companyName}"`, "warn");
+
+          await new Promise(r => setTimeout(r, 1200));
+          dispatch({ type: "SUBMIT_SUCCEEDED", committed: { ...snap, version: state.baseline.version + 1 } });
+          setInFlightSnapshot(null);
+          setAutosaveState("saved");
+          addLog("Autosave completed (HTTP 200). Baseline updated!", "success");
+        }, 1500);
+
+        return () => {
+          if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+        };
+      }, [state.draft, isDirty, isValid, autosaveEnabled]);
+
+      const handleSubmit = async (e, forceConflict = false) => {
+        if (e) e.preventDefault();
+        if (!isValid || state.status === "submitting") return;
+
+        dispatch({ type: "SUBMIT_STARTED" });
+        const currentReqId = ++requestSeqRef.current;
+        const snapshot = structuredClone(state.draft);
+        setInFlightSnapshot(snapshot);
+        addLog(`Request #${currentReqId} started: submitting snapshot...`, "info");
+
+        try {
+          await new Promise(r => setTimeout(r, 1400));
+
+          if (currentReqId !== requestSeqRef.current) return;
+
+          if (forceConflict || snapshot.companyName.toLowerCase().includes("conflict")) {
+            dispatch({
+              type: "SUBMIT_FAILED_409",
+              serverRecord: {
+                ...snapshot,
+                version: state.baseline.version + 1,
+                companyName: "Acme Global Enterprise (Remote Server Edit)",
+                maxSeats: 80
+              }
+            });
+            addLog(`Request #${currentReqId} rejected with HTTP 409 Conflict!`, "warn");
+          } else {
+            dispatch({
+              type: "SUBMIT_SUCCEEDED",
+              committed: { ...snapshot, version: state.baseline.version + 1 }
+            });
+            addLog(`Request #${currentReqId} committed (HTTP 200)! Baseline updated.`, "success");
+          }
+        } finally {
+          if (currentReqId === requestSeqRef.current) {
+            setInFlightSnapshot(null);
+          }
+        }
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>KPI 08 Part 12 — Advanced Form Interaction Architecture</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "4px" }}>
+                5-Layer Model, Debounced Autosave Pipelines, and HTTP 409 Concurrency Conflict Resolution
+              </p>
+            </div>
+            <div className="badge">Level 06 — React Fundamentals</div>
+          </header>
+
+          {/* HTTP 409 Conflict Resolution Modal */}
+          {state.status === "conflict" && state.serverLatest && (
+            <div className="modal-backdrop">
+              <div className="modal">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h2 style={{ fontSize: "1.2rem", color: "#fcd34d" }}>⚠️ HTTP 409 Concurrency Version Conflict</h2>
+                  <span className="pill pill-conflict">Version {state.serverLatest.version} vs Draft {state.draft.version}</span>
+                </div>
+                <p style={{ color: "#cbd5e1", fontSize: "0.85rem" }}>
+                  Another administrator saved modifications to this account while your edits were in-flight. Choose how to reconcile the differences:
+                </p>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "rgba(15, 23, 42, 0.8)", padding: "16px", borderRadius: "10px", border: "1px solid #334155" }}>
+                  <div>
+                    <h4 style={{ color: "#38bdf8", marginBottom: "8px" }}>Your In-Memory Draft</h4>
+                    <p style={{ fontSize: "0.85rem" }}>Company: <strong>{state.draft.companyName}</strong></p>
+                    <p style={{ fontSize: "0.85rem" }}>Seats: <strong>{state.draft.maxSeats}</strong></p>
+                    <p style={{ fontSize: "0.85rem" }}>Tier: <strong>{state.draft.planTier}</strong></p>
+                  </div>
+                  <div>
+                    <h4 style={{ color: "#f59e0b", marginBottom: "8px" }}>Remote Server Truth</h4>
+                    <p style={{ fontSize: "0.85rem" }}>Company: <strong>{state.serverLatest.companyName}</strong></p>
+                    <p style={{ fontSize: "0.85rem" }}>Seats: <strong>{state.serverLatest.maxSeats}</strong></p>
+                    <p style={{ fontSize: "0.85rem" }}>Tier: <strong>{state.serverLatest.planTier}</strong></p>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                  <button
+                    className="btn btn-warning"
+                    onClick={() => {
+                      dispatch({ type: "CONFLICT_RESOLVED", merged: { ...state.draft, version: state.serverLatest.version + 1 } });
+                      addLog("Resolved conflict: Forced local draft overwrite", "warn");
+                    }}
+                  >
+                    Overwrite Server with My Draft
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      dispatch({ type: "CONFLICT_RESOLVED", merged: state.serverLatest });
+                      addLog("Resolved conflict: Accepted remote server record", "info");
+                    }}
+                  >
+                    Accept Remote Server Record
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid">
+            {/* Left Card: Main Form */}
+            <div className="card">
+              <div className="card-title">
+                <span>Enterprise Account Controller</span>
+                <span className={`pill pill-${state.status}`}>{state.status.toUpperCase()}</span>
+              </div>
+
+              {state.status === "success" && (
+                <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", padding: "10px", borderRadius: "8px", color: "#6ee7b7", fontSize: "0.85rem" }}>
+                  ✓ Changes committed to server database (Version {state.baseline.version}).
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} noValidate>
+                <div className="form-group" style={{ marginBottom: "12px" }}>
+                  <label>Company Legal Name *</label>
+                  <input
+                    type="text"
+                    value={state.draft.companyName}
+                    onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "companyName", value: e.target.value })}
+                    onBlur={() => dispatch({ type: "FIELD_BLURRED", field: "companyName" })}
+                  />
+                  {state.touched.companyName && clientErrors.companyName && (
+                    <span style={{ color: "#f87171", fontSize: "0.8rem" }}>{clientErrors.companyName}</span>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "12px" }}>
+                  <label>Billing Email Address *</label>
+                  <input
+                    type="email"
+                    value={state.draft.billingEmail}
+                    onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "billingEmail", value: e.target.value })}
+                    onBlur={() => dispatch({ type: "FIELD_BLURRED", field: "billingEmail" })}
+                  />
+                  {state.touched.billingEmail && clientErrors.billingEmail && (
+                    <span style={{ color: "#f87171", fontSize: "0.8rem" }}>{clientErrors.billingEmail}</span>
+                  )}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                  <div className="form-group">
+                    <label>Country (Cascading Invariant)</label>
+                    <select
+                      value={state.draft.country}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "country", value: e.target.value })}
+                    >
+                      <option value="US">United States (US)</option>
+                      <option value="CA">Canada (CA)</option>
+                      <option value="UK">United Kingdom (UK)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Assigned Tax ID</label>
+                    <input type="text" value={state.draft.taxId} readOnly style={{ opacity: 0.8 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "12px", marginBottom: "16px" }}>
+                  <div className="form-group">
+                    <label>Plan Subscription Tier</label>
+                    <select
+                      value={state.draft.planTier}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "planTier", value: e.target.value })}
+                    >
+                      <option value="startup">Startup</option>
+                      <option value="growth">Growth</option>
+                      <option value="enterprise">Enterprise (Min 20 seats)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Max Seats</label>
+                    <input
+                      type="number"
+                      value={state.draft.maxSeats}
+                      onChange={(e) => dispatch({ type: "FIELD_CHANGED", field: "maxSeats", value: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                {clientErrors.maxSeats && (
+                  <div style={{ color: "#f87171", fontSize: "0.8rem", marginBottom: "12px" }}>
+                    ⚠️ {clientErrors.maxSeats}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button type="submit" className="btn btn-primary" disabled={state.status === "submitting" || !isDirty} style={{ flex: 1 }}>
+                    {state.status === "submitting" ? "Committing Snapshot..." : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => dispatch({ type: "RESET_TO_BASELINE" })}
+                    disabled={!isDirty || state.status === "submitting"}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </form>
+
+              <hr style={{ borderColor: "#1e293b", margin: "6px 0" }} />
+
+              {/* Simulation Sandbox Controls */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "#cbd5e1" }}>
+                  ⚙️ Advanced Interaction Scenarios:
+                </span>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <button className="btn btn-warning" style={{ fontSize: "0.8rem" }} onClick={() => handleSubmit(null, true)}>
+                    Trigger 409 Version Conflict
+                  </button>
+                  <button
+                    className={`btn ${autosaveEnabled ? "btn-primary" : "btn-secondary"}`}
+                    style={{ fontSize: "0.8rem" }}
+                    onClick={() => setAutosaveEnabled(!autosaveEnabled)}
+                  >
+                    Autosave: {autosaveEnabled ? `ON (${autosaveState})` : "OFF"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Card: 5-Layer Deep Inspector */}
+            <div className="card">
+              <div className="card-title">
+                <span>5-Layer State Inspector</span>
+                <span className="badge">Audit Trace</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Layer 4 Status:</span>
+                  <span style={{ fontWeight: 600, color: "#38bdf8" }}>{state.status.toUpperCase()}</span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Layer 2 isDirty:</span>
+                  <span style={{ fontWeight: 600, color: isDirty ? "#f59e0b" : "#10b981" }}>{String(isDirty)}</span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Layer 5 Server Version:</span>
+                  <span style={{ fontWeight: 600, color: "#a5b4fc" }}>v{state.baseline.version}</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>In-Flight Submission Snapshot (Layer 4 Frozen):</label>
+                <div className="code-box">
+                  {inFlightSnapshot ? JSON.stringify(inFlightSnapshot, null, 2) : "// No network request currently in-flight"}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Committed Baseline State (Layer 5 Server Truth):</label>
+                <div className="code-box">
+                  {JSON.stringify(state.baseline, null, 2)}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Temporal Execution Audit Log:</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "140px", overflowY: "auto" }}>
+                  {logs.length === 0 ? (
+                    <span style={{ fontSize: "0.8rem", color: "#64748b" }}>No execution actions dispatched yet.</span>
+                  ) : (
+                    logs.map(log => (
+                      <div
+                        key={log.id}
+                        style={{
+                          fontSize: "0.75rem",
+                          fontFamily: "monospace",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          background: log.type === "warn" ? "rgba(245, 158, 11, 0.2)" : log.type === "success" ? "rgba(16, 185, 129, 0.2)" : "rgba(15, 23, 42, 0.8)",
+                          color: log.type === "warn" ? "#fcd34d" : log.type === "success" ? "#6ee7b7" : "#94a3b8"
+                        }}
+                      >
+                        [{log.timestamp}] {log.msg}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

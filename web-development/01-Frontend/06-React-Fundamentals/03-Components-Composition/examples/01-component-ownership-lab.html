@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 01: React Components as Units of UI Ownership</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-owner { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-error { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 01: React Components as Units of UI Ownership</h1>
+  <p class="subtitle">Inspect state boundaries, the Narrowest Common Owner principle, independent component occurrences, and God Component decomposition.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('occurrences')">1. Same Type vs Distinct Occurrences</button>
+    <button onclick="selectLab('ownership')">2. Narrowest Common Owner</button>
+    <button onclick="selectLab('extraction')">3. Markup Extraction vs State Extraction</button>
+    <button onclick="selectLab('godComponent')">4. God Component Decomposition</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Architecture & Component Tree</h2>
+      <pre id="tree-panel">// Tree</pre>
+
+      <h2>Data Flow & Prop Contracts</h2>
+      <pre id="contract-panel">// Contract</pre>
+    </div>
+
+    <div class="card">
+      <h2>State Ownership & Fiber Reality</h2>
+      <span id="badge" class="status-badge badge-owner">State Boundary: Isolated Fiber</span>
+      <pre id="state-panel">// State</pre>
+
+      <h2>Senior Architectural Principle</h2>
+      <pre id="principle-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      occurrences: {
+        tree: `// Usage:\n<App>\n  <Counter id="A" />\n  <Counter id="B" />\n</App>\n\n// Hierarchy:\nApp\n ├── Counter(occurrence A, Fiber A)\n └── Counter(occurrence B, Fiber B)`,
+        contract: `Component Type: function Counter()\nProps: {}\nCallbacks: none`,
+        state: `Fiber A (memoizedState: count = 5)\nFiber B (memoizedState: count = 0)\n\n➔ Updating Counter A modifies ONLY Fiber A's state link.\n➔ Counter B remains unaffected.`,
+        principle: `The component type is shared JavaScript code; state belongs to the specific component OCCURRENCE tracked by its Fiber in the runtime tree.`,
+        badgeClass: 'badge-owner',
+        badgeText: '✅ Independent Local State'
+      },
+      ownership: {
+        tree: `// Narrowest Common Owner Hierarchy:\nDashboard (OWNS query state)\n ├── SearchBox (receives query, emits onQueryChange)\n ├── Results   (receives query, renders filtered items)\n └── Summary   (receives query, renders match count)`,
+        contract: `Dashboard ➔ SearchBox: { query, onQueryChange }\nDashboard ➔ Results:   { query }\nDashboard ➔ Summary:   { query }`,
+        state: `State location: Dashboard (useState(""))\nConsumers: SearchBox, Results, Summary\nCoordination: Single source of truth.`,
+        principle: `State should live at the narrowest common ancestor that coordinates all consumers. Do not duplicate state across siblings.`,
+        badgeClass: 'badge-owner',
+        badgeText: '✅ Single Source of Truth'
+      },
+      extraction: {
+        tree: `// Version A: Controlled (Form owns state)\nForm (owns value)\n └── Input (receives value, onChange)\n\n// Version B: Uncontrolled (Input owns state)\nForm\n └── Input (owns internal value, emits onSubmit)`,
+        contract: `Version A: <Input value={v} onChange={setV} />\nVersion B: <Input onSubmit={handleDone} />`,
+        state: `Version A: Form Fiber holds value state\nVersion B: Input Fiber holds value state`,
+        principle: `Component extraction is an architectural ownership decision. Moving markup is trivial; moving state changes component contracts and testability.`,
+        badgeClass: 'badge-owner',
+        badgeText: 'ℹ️ Contract Boundary Explicit'
+      },
+      godComponent: {
+        tree: `// ❌ God Component (1,200 lines, 17 state hooks)\nAdminDashboard (owns auth, filters, tables, modals, pagination)\n\n// ✅ Senior Decomposition:\nAdminPage\n ├── AdminHeader (user context)\n ├── FilterBar   (filter state)\n ├── OrderTable  (pure tabular presentation)\n ├── Pagination  (page/limit state)\n └── EditModal   (isolated modal form state)`,
+        contract: `Clean composition interfaces replacing 30+ granular configuration props.`,
+        state: `Modal state moved to EditModal.\nFilter state moved to FilterBar.\nTable becomes pure presentation component.`,
+        principle: `Deconstruct God Components by responsibility density and change boundaries, not merely by splitting file line counts.`,
+        badgeClass: 'badge-owner',
+        badgeText: '✅ Clean Responsibility Domains'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('tree-panel').textContent = data.tree;
+      document.getElementById('contract-panel').textContent = data.contract;
+      document.getElementById('state-panel').textContent = data.state;
+      document.getElementById('principle-panel').textContent = data.principle;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('occurrences');
+  </script>
+</body>
+</html>

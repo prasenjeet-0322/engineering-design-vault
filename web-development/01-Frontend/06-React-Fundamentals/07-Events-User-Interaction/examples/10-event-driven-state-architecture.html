@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 - Part 10: Event-Driven State Architecture Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-accent: #4f46e5;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-violet: #8b5cf6;
+      --code-bg: #030712;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-emerald));
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, var(--accent-indigo), #4338ca); color: white; }
+    .btn-emerald { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-emerald); }
+    .btn-rose { background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); color: var(--accent-rose); }
+    .btn-amber { background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); color: var(--accent-amber); }
+    .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan));
+      transition: width 0.2s ease;
+    }
+
+    .telemetry-box {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+
+    .log-item {
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--accent-indigo);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .log-item.transition { border-color: var(--accent-cyan); }
+    .log-item.race { border-color: var(--accent-amber); }
+    .log-item.error { border-color: var(--accent-rose); }
+
+    /* Quiz */
+    .quiz-option {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .quiz-option:hover { border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.15); border-color: var(--accent-emerald); color: var(--accent-emerald); }
+    .quiz-option.wrong { background: rgba(244, 63, 94, 0.15); border-color: var(--accent-rose); color: var(--accent-rose); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useRef } = React;
+
+    // File Upload Reducer
+    const initialUploadState = {
+      status: "idle", // "idle" | "ready" | "uploading" | "success" | "error"
+      file: null,
+      progress: 0,
+      errorMsg: null
+    };
+
+    function uploadReducer(state, action) {
+      switch (state.status) {
+        case "idle":
+          if (action.type === "FILE_SELECTED") {
+            return { ...state, status: "ready", file: action.file, progress: 0, errorMsg: null };
+          }
+          return state;
+
+        case "ready":
+          if (action.type === "UPLOAD_REQUESTED") {
+            return { ...state, status: "uploading", progress: 0 };
+          }
+          if (action.type === "FILE_SELECTED") {
+            return { ...state, file: action.file };
+          }
+          return state;
+
+        case "uploading":
+          if (action.type === "UPLOAD_PROGRESS") {
+            return { ...state, progress: action.progress };
+          }
+          if (action.type === "UPLOAD_SUCCEEDED") {
+            return { ...state, status: "success", progress: 100 };
+          }
+          if (action.type === "UPLOAD_FAILED") {
+            return { ...state, status: "error", errorMsg: action.error };
+          }
+          return state; // Guard: ignore new file selections while uploading
+
+        case "error":
+          if (action.type === "RETRY_REQUESTED") {
+            return { ...state, status: "uploading", progress: 0, errorMsg: null };
+          }
+          if (action.type === "FILE_SELECTED") {
+            return { ...state, status: "ready", file: action.file, progress: 0, errorMsg: null };
+          }
+          return state;
+
+        case "success":
+          if (action.type === "FILE_SELECTED") {
+            return { ...state, status: "ready", file: action.file, progress: 0 };
+          }
+          if (action.type === "RESET") {
+            return initialUploadState;
+          }
+          return state;
+
+        default:
+          return state;
+      }
+    }
+
+    function App() {
+      const [uploadState, dispatch] = useReducer(uploadReducer, initialUploadState);
+      const [logs, setLogs] = useState([]);
+
+      // Search Race Simulator State
+      const [searchQuery, setSearchQuery] = useState("");
+      const [searchResult, setSearchResult] = useState(null);
+      const [activeRequestId, setActiveRequestId] = useState(0);
+      const requestCounter = useRef(0);
+
+      // Quiz State
+      const [activeQuiz, setActiveQuiz] = useState(0);
+      const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+      const addLog = (type, title, payload = {}) => {
+        setLogs(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            time: new Date().toISOString().substring(14, 23),
+            type,
+            title,
+            payload
+          },
+          ...prev.slice(0, 39)
+        ]);
+      };
+
+      // File Upload Simulation
+      const startUpload = (simulateFailure = false) => {
+        dispatch({ type: "UPLOAD_REQUESTED" });
+        addLog("transition", "🚀 ACTION: UPLOAD_REQUESTED");
+
+        let p = 0;
+        const interval = setInterval(() => {
+          p += 25;
+          if (p < 100) {
+            dispatch({ type: "UPLOAD_PROGRESS", progress: p });
+            addLog("transition", `📈 ACTION: UPLOAD_PROGRESS (${p}%)`);
+          } else {
+            clearInterval(interval);
+            if (simulateFailure) {
+              dispatch({ type: "UPLOAD_FAILED", error: "Upload failed: Server connection reset (500)" });
+              addLog("error", "💥 ACTION: UPLOAD_FAILED");
+            } else {
+              dispatch({ type: "UPLOAD_SUCCEEDED" });
+              addLog("transition", "✅ ACTION: UPLOAD_SUCCEEDED");
+            }
+          }
+        }, 300);
+      };
+
+      // Async Race Condition Search Simulation
+      const triggerSearch = (query, delayMs) => {
+        const thisReqId = ++requestCounter.current;
+        setSearchQuery(query);
+        setActiveRequestId(thisReqId);
+        addLog("race", `🔍 INITIATED Request #${thisReqId}: "${query}" (Latency: ${delayMs}ms)`);
+
+        setTimeout(() => {
+          // Request Identity Guard: Only commit if this request is still active
+          if (thisReqId === requestCounter.current) {
+            setSearchResult(`Results for "${query}" (Req #${thisReqId})`);
+            addLog("transition", `🎯 COMMITTED Latest Request #${thisReqId}: "${query}"`);
+          } else {
+            addLog("race", `🛑 DISCARDED Stale Request #${thisReqId}: "${query}" (Superseded by #${requestCounter.current})`);
+          }
+        }, delayMs);
+      };
+
+      const quizQuestions = [
+        {
+          q: "What is the key difference between an Event and State?",
+          options: [
+            { text: "Events are strings; State is always an object", isCorrect: false },
+            { text: "An Event describes something that happened (historical fact); State describes what is true now (current condition)", isCorrect: true },
+            { text: "State only exists in Class components", isCorrect: false },
+            { text: "Events can only be triggered by pointer clicks", isCorrect: false }
+          ],
+          explanation: "Events are point-in-time facts (e.g. UPLOAD_FAILED). State is the durable condition derived from those events (e.g. status='error')."
+        },
+        {
+          q: "Why is 'request order != response order' dangerous in async autocomplete search?",
+          options: [
+            { text: "Older slow responses ('cat') can resolve after newer responses ('car') and overwrite fresh data", isCorrect: true },
+            { text: "It violates browser DOM security sandbox policies", isCorrect: false },
+            { text: "React throws an invariant exception when promises resolve out of order", isCorrect: false },
+            { text: "It causes memory fragmentation in IndexedDB", isCorrect: false }
+          ],
+          explanation: "Asynchronous network race conditions cause stale responses to overwrite newer UI state unless guarded by Request Identity / tokens."
+        },
+        {
+          q: "Why shouldn't a reducer function perform a `fetch()` network request?",
+          options: [
+            { text: "Because reducers must be pure deterministic functions (state + action -> nextState)", isCorrect: true },
+            { text: "Because fetch is not available in Node.js", isCorrect: false },
+            { text: "Because useReducer forbids async keyword in TypeScript", isCorrect: false },
+            { text: "Reducers run inside a Web Worker thread", isCorrect: false }
+          ],
+          explanation: "Pure state transition functions must remain free of side effects to ensure predictable, testable, and replayable execution."
+        }
+      ];
+
+      return (
+        <div className="container">
+          {/* Header */}
+          <header className="header-card">
+            <div className="header-badge">Level 06 • KPI 05 • Part 10</div>
+            <h1 className="header-title">
+              <span>🏗️</span> Event-Driven State Architecture Lab
+            </h1>
+            <p className="header-subtitle">
+              Interactive diagnostic laboratory for inspecting pure reducer state transitions, async network race condition resolution, and request identity tokens.
+            </p>
+          </header>
+
+          {/* Top Grid: File Upload State Machine & Async Race Simulator */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 1: File Upload State Machine */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>📤</span> File Upload State Machine (Pure Reducer)
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ padding: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Status: <code>{uploadState.status}</code></span>
+                    {uploadState.file && <span style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)' }}>{uploadState.file}</span>}
+                  </div>
+
+                  <div className="progress-bar-container">
+                    <div className="progress-bar-fill" style={{ width: `${uploadState.progress}%` }}></div>
+                  </div>
+                </div>
+
+                {uploadState.errorMsg && (
+                  <div style={{ color: 'var(--accent-rose)', fontSize: '0.78rem' }}>
+                    ⚠️ {uploadState.errorMsg}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => dispatch({ type: "FILE_SELECTED", file: "architecture_spec.pdf" })}
+                  >
+                    📁 Select "spec.pdf"
+                  </button>
+
+                  <button 
+                    className="btn btn-primary"
+                    disabled={uploadState.status !== "ready"}
+                    onClick={() => startUpload(false)}
+                  >
+                    🚀 Start Upload
+                  </button>
+
+                  <button 
+                    className="btn btn-rose"
+                    disabled={uploadState.status !== "ready"}
+                    onClick={() => startUpload(true)}
+                  >
+                    💥 Upload (Simulate 500)
+                  </button>
+
+                  {uploadState.status === "error" && (
+                    <button className="btn btn-amber" onClick={() => startUpload(false)}>
+                      🔄 Retry Upload
+                    </button>
+                  )}
+
+                  {uploadState.status === "success" && (
+                    <button className="btn btn-emerald" onClick={() => dispatch({ type: "RESET" })}>
+                      ✨ Reset Upload State
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 2: Async Race Condition Simulator */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🏎️</span> Async Race Condition & Request Identity
+              </div>
+
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                Test simulated out-of-order responses. Triggering "Slow Query 'cat'" (2s) followed immediately by "Fast Query 'car'" (0.5s) will safely discard the stale response!
+              </p>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-amber" onClick={() => triggerSearch("cat", 2000)}>
+                  🐢 Query "cat" (2000ms)
+                </button>
+                <button className="btn btn-cyan" style={{ background: 'rgba(6, 182, 212, 0.2)', color: 'var(--accent-cyan)', border: '1px solid rgba(6, 182, 212, 0.4)' }} onClick={() => triggerSearch("car", 500)}>
+                  ⚡ Query "car" (500ms)
+                </button>
+              </div>
+
+              <div style={{ padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Committed Search Result:</div>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--accent-emerald)', marginTop: '4px' }}>
+                  {searchResult || "// No search executed yet"}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Middle Grid: Live Telemetry */}
+          <div className="dashboard-grid">
+            <div className="panel" style={{ gridColumn: 'span 2' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="panel-title" style={{ border: 'none', padding: 0 }}>
+                  <span>📡</span> Architecture & Event Telemetry Feed
+                </div>
+                <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '3px 8px' }} onClick={() => setLogs([])}>
+                  Clear Feed
+                </button>
+              </div>
+
+              <div className="telemetry-box" style={{ maxHeight: '200px' }}>
+                {logs.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '30px 0' }}>
+                    Trigger upload actions or async searches above to inspect pure state transitions...
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className={`log-item ${log.type}`}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong style={{ color: '#fff' }}>{log.title}</strong>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{log.time}</span>
+                      </div>
+                      {Object.keys(log.payload).length > 0 && (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                          {JSON.stringify(log.payload)}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Grid: Crucible Quiz */}
+          <div className="dashboard-grid">
+            <div className="panel" style={{ gridColumn: 'span 2' }}>
+              <div className="panel-title">
+                <span>🔥</span> Crucible Interaction Architecture Challenge ({activeQuiz + 1} / {quizQuestions.length})
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
+                  {quizQuestions[activeQuiz].q}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {quizQuestions[activeQuiz].options.map((opt, i) => {
+                    let className = "quiz-option";
+                    if (selectedAnswer !== null) {
+                      if (opt.isCorrect) className += " correct";
+                      else if (selectedAnswer === i) className += " wrong";
+                    }
+                    return (
+                      <div 
+                        key={i} 
+                        className={className}
+                        onClick={() => {
+                          if (selectedAnswer === null) {
+                            setSelectedAnswer(i);
+                          }
+                        }}
+                      >
+                        <span style={{ fontFamily: 'Fira Code', fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedAnswer !== null && (
+                  <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Architect Note:</strong> {quizQuestions[activeQuiz].explanation}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedAnswer === null}
+                    style={{ opacity: selectedAnswer === null ? 0.5 : 1 }}
+                    onClick={() => {
+                      setSelectedAnswer(null);
+                      setActiveQuiz((prev) => (prev + 1) % quizQuestions.length);
+                    }}
+                  >
+                    Next Question ➡️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

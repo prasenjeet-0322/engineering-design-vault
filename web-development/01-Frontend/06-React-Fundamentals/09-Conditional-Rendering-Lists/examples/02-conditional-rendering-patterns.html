@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 02 — Conditional Rendering Patterns & Branch Architecture Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.82);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1350px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.45rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .form-input {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      width: 100%;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .telemetry-box {
+      background: #060911;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.82rem;
+      color: #93c5fd;
+    }
+
+    .overlay-banner {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid var(--accent);
+      color: #bae6fd;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .highlight-box {
+      border: 2px dashed var(--warning);
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .stable-box {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function BranchPatternsMasterLab() {
+      const [tab, setTab] = useState('stateMachine');
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <span className="badge">Level 06 — React Fundamentals (KPI 09)</span>
+              <h1>Conditional Rendering Patterns & Branch Architecture Lab</h1>
+            </div>
+            <span className="badge badge-success">Part 02 Lab</span>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${tab === 'stateMachine' ? 'active' : ''}`}
+              onClick={() => setTab('stateMachine')}
+            >
+              1. 6-State Dashboard Machine
+            </button>
+            <button
+              className={`tab-btn ${tab === 'wrapperTrap' ? 'active' : ''}`}
+              onClick={() => setTab('wrapperTrap')}
+            >
+              2. Conditional Wrapper Trap
+            </button>
+            <button
+              className={`tab-btn ${tab === 'refreshOverlay' ? 'active' : ''}`}
+              onClick={() => setTab('refreshOverlay')}
+            >
+              3. Non-Destructive Refresh
+            </button>
+            <button
+              className={`tab-btn ${tab === 'polymorphic' ? 'active' : ''}`}
+              onClick={() => setTab('polymorphic')}
+            >
+              4. Polymorphic Dispatch Map
+            </button>
+          </nav>
+
+          {tab === 'stateMachine' && <StateMachineLab />}
+          {tab === 'wrapperTrap' && <WrapperTrapLab />}
+          {tab === 'refreshOverlay' && <RefreshOverlayLab />}
+          {tab === 'polymorphic' && <PolymorphicLab />}
+        </div>
+      );
+    }
+
+    // MODULE 1: 6-State Dashboard Machine
+    function StateMachineLab() {
+      const [status, setStatus] = useState('idle');
+
+      return (
+        <div className="grid">
+          <div className="card">
+            <div className="card-title">
+              <span>State Machine Controller</span>
+              <span className="badge">{status.toUpperCase()}</span>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              Select a state to see how the single discriminated status projects cleanly onto mutually exclusive UI branches without boolean explosion.
+            </p>
+
+            <div className="btn-group">
+              <button className={`btn ${status === 'idle' ? 'btn' : 'btn-secondary'}`} onClick={() => setStatus('idle')}>Idle</button>
+              <button className={`btn ${status === 'loading' ? 'btn' : 'btn-secondary'}`} onClick={() => setStatus('loading')}>Initial Loading</button>
+              <button className={`btn ${status === 'success' ? 'btn' : 'btn-secondary'}`} onClick={() => setStatus('success')}>Success</button>
+              <button className={`btn ${status === 'empty' ? 'btn' : 'btn-secondary'}`} onClick={() => setStatus('empty')}>Empty</button>
+              <button className={`btn ${status === 'error' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setStatus('error')}>Error (500)</button>
+              <button className={`btn ${status === 'unauthorized' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setStatus('unauthorized')}>401 Unauthorized</button>
+            </div>
+
+            <div style={{ marginTop: '16px', minHeight: '140px', padding: '16px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '12px' }}>
+              <DashboardViewport status={status} />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              <span>Branch Topology Architecture</span>
+            </div>
+
+            <div className="telemetry-box">
+              <strong>Active State:</strong> <code>{`{ kind: "${status}" }`}</code>
+              <br /><br />
+              <strong>Control Flow:</strong> <code>switch (state.kind)</code>
+              <br /><br />
+              <strong>Guarantees:</strong>
+              <ul style={{ marginLeft: '18px', marginTop: '6px' }}>
+                <li>Zero possibility of simultaneous Spinner + Error banner.</li>
+                <li>Exhaustive type-safe branch partition.</li>
+                <li>Clean component boundary for each discrete state.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DashboardViewport({ status }) {
+      switch (status) {
+        case 'idle':
+          return <div><h3>Ready</h3><p style={{ opacity: 0.7 }}>Click 'Success' or 'Initial Loading' to simulate workflow.</p></div>;
+        case 'loading':
+          return <div><span className="badge">⏳ Fetching Telemetry...</span><div style={{ height: '8px', background: 'var(--primary)', borderRadius: '4px', marginTop: '12px', animation: 'pulse 1s infinite' }}></div></div>;
+        case 'success':
+          return <div><h4 style={{ color: 'var(--success)' }}>✓ Production Cluster Active</h4><p>3 Nodes Online | CPU 14% | Latency 12ms</p></div>;
+        case 'empty':
+          return <div><h4>No Records Found</h4><p style={{ opacity: 0.7 }}>There are no telemetry events in this time window.</p></div>;
+        case 'error':
+          return <div style={{ color: 'var(--danger)' }}><h4>⚠️ HTTP 500: Database Connection Failed</h4><p>Remote replica unreachable.</p></div>;
+        case 'unauthorized':
+          return <div style={{ color: 'var(--warning)' }}><h4>🔒 401 Session Expired</h4><p>Please re-authenticate to view cluster metrics.</p></div>;
+        default:
+          return <div>Unknown State</div>;
+      }
+    }
+
+    // MODULE 2: Wrapper Trap
+    function WrapperTrapLab() {
+      const [isWrapped, setIsWrapped] = useState(false);
+      const [useClass, setUseClass] = useState(false);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>The Conditional Wrapper Trap Inspector</span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Type a message in the input. Notice how <strong>changing the parent wrapper DOM node</strong> unmounts the input and wipes out your text, while <strong>toggling a CSS class on a stable container</strong> preserves your state!
+          </p>
+
+          <div className="btn-group">
+            <button className="btn" onClick={() => setIsWrapped(!isWrapped)}>
+              1. Toggle Destructive Wrapper Tag (Current: {isWrapped ? 'Wrapped in <div>' : 'Direct'})
+            </button>
+            <button className="btn btn-secondary" onClick={() => setUseClass(!useClass)}>
+              2. Toggle Non-Destructive Class (Current: {useClass ? 'Wide Class' : 'Normal Class'})
+            </button>
+          </div>
+
+          <div className="grid" style={{ marginTop: '16px' }}>
+            <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--danger)' }}>
+              <h4 style={{ color: '#fca5a5' }}>❌ Structural Wrapper Shift</h4>
+              <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '6px 0' }}>Code: <code>{`{isWrapped ? <div><Input/></div> : <Input/>}`}</code></p>
+              {isWrapped ? (
+                <div className="highlight-box">
+                  <DraftInputBox label="Input inside Wrapper" />
+                </div>
+              ) : (
+                <DraftInputBox label="Unwrapped Input" />
+              )}
+            </div>
+
+            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--success)' }}>
+              <h4 style={{ color: '#86efac' }}>✅ Stable Structural Hierarchy</h4>
+              <p style={{ fontSize: '0.8rem', opacity: 0.8, margin: '6px 0' }}>Code: <code>{`<div className={useClass ? "wide" : "normal"}><Input/></div>`}</code></p>
+              <div className={useClass ? "highlight-box" : "stable-box"}>
+                <DraftInputBox label="Input inside Stable Container" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DraftInputBox({ label }) {
+      const [val, setVal] = useState('');
+      return (
+        <div>
+          <label style={{ fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>{label}</label>
+          <input className="form-input" value={val} onChange={e => setVal(e.target.value)} placeholder="Type draft..." />
+          <p style={{ fontSize: '0.8rem', marginTop: '4px', color: 'var(--accent)' }}>
+            State: <strong>"{val || '(empty)'}"</strong>
+          </p>
+        </div>
+      );
+    }
+
+    // MODULE 3: Non-Destructive Refresh
+    function RefreshOverlayLab() {
+      const [items, setItems] = useState(['Node Alpha (Healthy)', 'Node Beta (Healthy)']);
+      const [isRefreshing, setIsRefreshing] = useState(false);
+      const [mode, setMode] = useState('overlay'); // 'overlay' | 'spinner'
+
+      const triggerRefresh = () => {
+        setIsRefreshing(true);
+        setTimeout(() => {
+          setItems(prev => [...prev, `Node ${String.fromCharCode(65 + prev.length)} (Healthy)`]);
+          setIsRefreshing(false);
+        }, 1500);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Non-Destructive Refresh vs Destructive Spinner</span>
+            <button className="btn" disabled={isRefreshing} onClick={triggerRefresh}>
+              {isRefreshing ? 'Refreshing...' : 'Trigger 1.5s Background Polling'}
+            </button>
+          </div>
+
+          <div className="btn-group">
+            <button className={`btn ${mode === 'overlay' ? 'btn' : 'btn-secondary'}`} onClick={() => setMode('overlay')}>
+              ✅ Non-Destructive Refresh Overlay
+            </button>
+            <button className={`btn ${mode === 'spinner' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setMode('spinner')}>
+              ❌ Destructive Full-Screen Spinner
+            </button>
+          </div>
+
+          <div style={{ marginTop: '16px', minHeight: '160px', position: 'relative', background: 'rgba(15, 23, 42, 0.6)', padding: '20px', borderRadius: '12px' }}>
+            {mode === 'spinner' && isRefreshing ? (
+              <div style={{ textAlign: 'center', padding: '30px' }}>
+                <span className="badge">⏳ Reloading entire grid from server...</span>
+                <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '8px' }}>User context and scroll position destroyed!</p>
+              </div>
+            ) : (
+              <div>
+                {isRefreshing && mode === 'overlay' && (
+                  <div className="overlay-banner">
+                    ⚡ Refreshing latest telemetry...
+                  </div>
+                )}
+                <h4>Active Cluster Nodes ({items.length})</h4>
+                <ul style={{ marginTop: '10px', marginLeft: '20px' }}>
+                  {items.map((node, i) => <li key={i} style={{ marginBottom: '4px' }}>{node}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // MODULE 4: Polymorphic Dispatch Map
+    function PolymorphicLab() {
+      const [type, setType] = useState('chart');
+
+      const WIDGETS = {
+        chart: () => <div className="badge badge-success">📈 Live Line Chart: 142 req/sec</div>,
+        metric: () => <div className="badge">📊 Metric Card: 99.98% Uptime</div>,
+        feed: () => <div className="badge">📝 Audit Log: User 'alice' logged in</div>,
+      };
+
+      const Component = WIDGETS[type] || (() => <div style={{ color: 'var(--danger)' }}>⚠️ Unsupported Type</div>);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>Polymorphic Component Dispatch Registry</span>
+          </div>
+
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Select a widget type to demonstrate $O(1)$ constant-time component dispatch without sprawling <code>if-else</code> ladders.
+          </p>
+
+          <div className="btn-group">
+            <button className={`btn ${type === 'chart' ? 'btn' : 'btn-secondary'}`} onClick={() => setType('chart')}>Line Chart</button>
+            <button className={`btn ${type === 'metric' ? 'btn' : 'btn-secondary'}`} onClick={() => setType('metric')}>Metric Card</button>
+            <button className={`btn ${type === 'feed' ? 'btn' : 'btn-secondary'}`} onClick={() => setType('feed')}>Audit Feed</button>
+            <button className={`btn ${type === 'unknown' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setType('unknown')}>Unknown (Fallback Test)</button>
+          </div>
+
+          <div style={{ marginTop: '16px', padding: '20px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '12px' }}>
+            <h4>Resolved Dynamic Component:</h4>
+            <div style={{ marginTop: '10px' }}>
+              <Component />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<BranchPatternsMasterLab />);
+  </script>
+</body>
+</html>

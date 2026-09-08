@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 13 — Interaction State Machines & Async Workflows</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    /* STATE MACHINE VISUAL GRAPH */
+    .state-graph {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .state-node {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid var(--border-color);
+      background: #111827;
+      color: var(--text-muted);
+      text-align: center;
+      min-width: 100px;
+      transition: all 0.3s ease;
+    }
+
+    .state-node.active {
+      border-color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.15);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+      transform: scale(1.05);
+    }
+
+    .state-node.active.success {
+      border-color: var(--accent-green);
+      background: rgba(34, 197, 94, 0.15);
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+    }
+
+    .state-node.active.error {
+      border-color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.15);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+    }
+
+    .state-arrow {
+      color: var(--border-color);
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
+    }
+
+    button.btn-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-amber);
+      color: #fcd34d;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .log-container {
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    .state-tree {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    .timeline-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: #0b111c;
+      border: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .metric-num {
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useRef, useEffect } = React;
+
+    // --- STATE MACHINE REDUCER ---
+    const initialMachineState = {
+      status: "idle", // idle | submitting | succeeded | failed | cancelled
+      requestId: 0,
+      data: null,
+      error: null
+    };
+
+    function interactionMachineReducer(state, action) {
+      switch (state.status) {
+        case "idle":
+          if (action.type === "SUBMIT") {
+            return {
+              status: "submitting",
+              requestId: action.requestId,
+              data: null,
+              error: null
+            };
+          }
+          return state;
+
+        case "submitting":
+          if (action.type === "CANCEL") {
+            return {
+              status: "cancelled",
+              requestId: state.requestId,
+              data: null,
+              error: "Operation cancelled by user."
+            };
+          }
+          if (action.type === "SUCCESS") {
+            // Guard: Only active request token can transition to success
+            if (action.requestId !== state.requestId) {
+              console.warn(`[STALE REJECTED] Req ${action.requestId} arrived, but active is ${state.requestId}`);
+              return state;
+            }
+            return {
+              status: "succeeded",
+              requestId: action.requestId,
+              data: action.data || { payload: "Saved order #90210" },
+              error: null
+            };
+          }
+          if (action.type === "FAILURE") {
+            if (action.requestId !== state.requestId) return state;
+            return {
+              status: "failed",
+              requestId: action.requestId,
+              data: null,
+              error: action.error || "500 Internal Server Gateway Error"
+            };
+          }
+          return state;
+
+        case "failed":
+          if (action.type === "RETRY") {
+            return {
+              status: "submitting",
+              requestId: action.requestId,
+              data: null,
+              error: null
+            };
+          }
+          if (action.type === "RESET") {
+            return initialMachineState;
+          }
+          return state;
+
+        case "succeeded":
+        case "cancelled":
+          if (action.type === "RESET" || action.type === "SUBMIT") {
+            if (action.type === "SUBMIT") {
+              return {
+                status: "submitting",
+                requestId: action.requestId,
+                data: null,
+                error: null
+              };
+            }
+            return initialMachineState;
+          }
+          return state;
+
+        default:
+          return state;
+      }
+    }
+
+    function AsyncStateMachineLab() {
+      const [state, dispatch] = useReducer(interactionMachineReducer, initialMachineState);
+      const [telemetry, setTelemetry] = useState([]);
+      const [raceAStatus, setRaceAStatus] = useState("idle");
+      const [raceBStatus, setRaceBStatus] = useState("idle");
+      const [isMounted, setIsMounted] = useState(true);
+      const requestCounterRef = useRef(0);
+      const abortControllerRef = useRef(null);
+
+      const dispatchWithTrace = (action) => {
+        const prevStatus = state.status;
+        dispatch(action);
+        setTelemetry(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString(),
+            action: action.type,
+            prev: prevStatus,
+            activeReq: state.requestId,
+            actionReq: action.requestId || "-"
+          },
+          ...prev.slice(0, 15)
+        ]);
+      };
+
+      // EVENT HANDLERS
+      const handleSubmit = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT", requestId: reqId });
+        
+        setTimeout(() => {
+          if (abortControllerRef.current?.signal.aborted) return;
+          dispatchWithTrace({ type: "SUCCESS", requestId: reqId });
+        }, 1200);
+      };
+
+      const handleFailSubmit = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT", requestId: reqId });
+        
+        setTimeout(() => {
+          dispatchWithTrace({
+            type: "FAILURE",
+            requestId: reqId,
+            error: "Payment Authorization Timeout (HTTP 504)"
+          });
+        }, 900);
+      };
+
+      const handleRetry = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "RETRY", requestId: reqId });
+        setTimeout(() => {
+          dispatchWithTrace({ type: "SUCCESS", requestId: reqId });
+        }, 1000);
+      };
+
+      const handleCancel = () => {
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        dispatchWithTrace({ type: "CANCEL" });
+      };
+
+      // ASYNC RACE SIMULATOR (Request A slow, Request B fast)
+      const triggerRaceScenario = () => {
+        setRaceAStatus("in-flight (slow 3000ms)");
+        setRaceBStatus("in-flight (fast 800ms)");
+
+        const reqA = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT", requestId: reqA });
+
+        // Request B fired 300ms later
+        setTimeout(() => {
+          const reqB = ++requestCounterRef.current;
+          dispatchWithTrace({ type: "SUBMIT", requestId: reqB });
+
+          // Request B finishes first after 800ms
+          setTimeout(() => {
+            setRaceBStatus("COMMITTED (Req #" + reqB + ")");
+            dispatchWithTrace({ type: "SUCCESS", requestId: reqB, data: { payload: "Results for Req #" + reqB } });
+          }, 800);
+        }, 300);
+
+        // Request A finally arrives after 3000ms
+        setTimeout(() => {
+          setRaceAStatus("REJECTED / STALE (Req #" + reqA + ")");
+          dispatchWithTrace({ type: "SUCCESS", requestId: reqA, data: { payload: "Results for Req #" + reqA } });
+        }, 3000);
+      };
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🧪 Companion Lab 13 — Interaction State Machines & Async Workflows</span>
+                <span className="badge">KPI-05 Senior Level</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                Visual State Graph, Transition Guards, Stale Request Rejection & Production Incident Simulators.
+              </p>
+            </div>
+            <div className="metric-grid" style={{ minWidth: 340 }}>
+              <div className="metric-box">
+                <div className="metric-num">{state.status.toUpperCase()}</div>
+                <div className="metric-label">Machine State</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{state.requestId}</div>
+                <div className="metric-label">Active Request Token</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{telemetry.length}</div>
+                <div className="metric-label">Transitions Traced</div>
+              </div>
+            </div>
+          </header>
+
+          {/* INTERACTIVE STATE MACHINE GRAPH */}
+          <div className="card">
+            <div className="card-title">
+              <span>🗺️ Interaction State Machine Visualizer</span>
+              <span className="badge">Deterministic Finite Graph</span>
+            </div>
+            <div className="state-graph">
+              <div className={`state-node ${state.status === "idle" ? "active" : ""}`}>
+                IDLE
+              </div>
+              <span className="state-arrow">──SUBMIT──►</span>
+              <div className={`state-node ${state.status === "submitting" ? "active" : ""}`}>
+                SUBMITTING
+              </div>
+              <span className="state-arrow">──SUCCESS──►</span>
+              <div className={`state-node ${state.status === "succeeded" ? "active success" : ""}`}>
+                SUCCEEDED
+              </div>
+            </div>
+            <div className="state-graph" style={{ marginTop: -8 }}>
+              <div style={{ minWidth: 100 }}></div>
+              <span className="state-arrow" style={{ opacity: 0 }}>───────────</span>
+              <div className={`state-node ${state.status === "cancelled" ? "active" : ""}`} style={{ minWidth: 100 }}>
+                CANCELLED
+              </div>
+              <span className="state-arrow">──FAILURE──►</span>
+              <div className={`state-node ${state.status === "failed" ? "active error" : ""}`}>
+                FAILED
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* LEFT COLUMN: CONTROLS & PRODUCTION INCIDENTS */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* PRIMARY STATE MACHINE CONTROLLER */}
+              <div className="card">
+                <div className="card-title">
+                  <span>🕹️ Event Dispatcher & Transition Guards</span>
+                  <span className="badge">Guarded Transitions</span>
+                </div>
+                <div className="btn-row">
+                  <button
+                    className="btn-primary"
+                    disabled={state.status === "submitting"}
+                    onClick={handleSubmit}
+                  >
+                    ⚡ Dispatch: SUBMIT (Success)
+                  </button>
+                  <button
+                    className="btn-danger"
+                    disabled={state.status === "submitting"}
+                    onClick={handleFailSubmit}
+                  >
+                    ⚠️ Dispatch: SUBMIT (Failure)
+                  </button>
+                  <button
+                    className="btn-warning"
+                    disabled={state.status !== "submitting"}
+                    onClick={handleCancel}
+                  >
+                    🛑 Dispatch: CANCEL
+                  </button>
+                  <button
+                    className="btn-primary"
+                    disabled={state.status !== "failed"}
+                    onClick={handleRetry}
+                  >
+                    🔄 Dispatch: RETRY
+                  </button>
+                  <button
+                    onClick={() => dispatchWithTrace({ type: "RESET" })}
+                  >
+                    ↩️ RESET
+                  </button>
+                </div>
+
+                {state.error && (
+                  <div style={{ background: "rgba(239, 68, 68, 0.18)", border: "1px solid var(--accent-red)", padding: 12, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-red)", fontWeight: 600, fontSize: "0.85rem" }}>
+                      State Machine Failure State (Preserved for retry)
+                    </div>
+                    <div style={{ color: "#fca5a5", fontSize: "0.8rem", marginTop: 4 }}>
+                      {state.error}
+                    </div>
+                  </div>
+                )}
+
+                {state.data && (
+                  <div style={{ background: "rgba(34, 197, 94, 0.18)", border: "1px solid var(--accent-green)", padding: 12, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-green)", fontWeight: 600, fontSize: "0.85rem" }}>
+                      ✅ Success Payload Acknowledged
+                    </div>
+                    <pre style={{ fontSize: "0.78rem", color: "#bbf7d0", marginTop: 4 }}>
+                      {JSON.stringify(state.data, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* ASYNC RACE CONDITION SIMULATOR */}
+              <div className="card">
+                <div className="card-title">
+                  <span>🏎️ Async Race Simulator (Out-of-Order Responses)</span>
+                  <button className="btn-warning" onClick={triggerRaceScenario}>
+                    Run Out-of-Order Race
+                  </button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: "0.82rem" }}>
+                  <div className="timeline-step">
+                    <span>Request A (Slow 3000ms):</span>
+                    <strong style={{ color: "var(--accent-amber)" }}>{raceAStatus}</strong>
+                  </div>
+                  <div className="timeline-step">
+                    <span>Request B (Fast 800ms):</span>
+                    <strong style={{ color: "var(--accent-green)" }}>{raceBStatus}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* IMPOSSIBLE STATE COMPARISON */}
+              <div className="card">
+                <div className="card-title">
+                  <span>💥 Boolean Explosion vs Discriminated Union</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: "0.8rem" }}>
+                  <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--accent-red)", padding: 10, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-red)", fontWeight: 600, marginBottom: 4 }}>❌ 4 Booleans (2⁴ = 16 states)</div>
+                    <pre style={{ color: "#fca5a5", fontSize: "0.75rem" }}>
+isLoading: true<br />
+isSuccess: true<br />
+isError: true<br />
+isCancelled: true<br />
+⚠️ IMPOSSIBLE CONTRADICTION
+                    </pre>
+                  </div>
+                  <div style={{ background: "rgba(34, 197, 94, 0.1)", border: "1px solid var(--accent-green)", padding: 10, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-green)", fontWeight: 600, marginBottom: 4 }}>✅ Discriminated State</div>
+                    <pre style={{ color: "#bbf7d0", fontSize: "0.75rem" }}>
+status: "{state.status}"<br />
+requestId: {state.requestId}<br />
+Invariants: 100% Guaranteed
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: STATE SNAPSHOT & TELEMETRY */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card">
+                <div className="card-title">
+                  <span>🔍 Authoritative Machine State Snapshot</span>
+                  <span className="badge">Discriminated Union</span>
+                </div>
+                <pre className="state-tree">
+{JSON.stringify(state, null, 2)}
+                </pre>
+              </div>
+
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 State Machine Transition Ledger</span>
+                  <button onClick={() => setTelemetry([])} style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                    Clear
+                  </button>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>
+                      Dispatch an event to observe legal transitions...
+                    </div>
+                  ) : (
+                    telemetry.map(log => (
+                      <div key={log.id} className="log-item">
+                        <div className="log-header">
+                          <span>⚡ {log.action}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{log.time}</span>
+                        </div>
+                        <div style={{ color: "var(--text-muted)", display: "flex", gap: 12 }}>
+                          <span>Prev: <strong>{log.prev}</strong></span>
+                          <span>Active Req: <strong>{log.activeReq}</strong></span>
+                          <span>Action Req: <strong>{log.actionReq}</strong></span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<AsyncStateMachineLab />);
+  </script>
+</body>
+</html>

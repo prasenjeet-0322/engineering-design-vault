@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 — Part 12: Advanced List Architecture Diagnostic Lab</title>
+  
+  <!-- React 18 & Babel via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(18, 26, 43, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #06b6d4;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    
+    .header-title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .header-title p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .badge-primary {
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+    }
+    
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    
+    @media (max-width: 1024px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      backdrop-filter: blur(12px);
+      padding: 18px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 10px;
+    }
+    
+    .panel-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    
+    button {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    button:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    button.active-tab {
+      background: rgba(59, 130, 246, 0.3);
+      border-color: rgba(59, 130, 246, 0.6);
+      color: #93c5fd;
+    }
+    
+    button.btn-primary {
+      background: rgba(59, 130, 246, 0.25);
+      border-color: rgba(59, 130, 246, 0.5);
+      color: #93c5fd;
+    }
+    
+    button.btn-emerald {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+    }
+    
+    button.btn-danger {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fca5a5;
+    }
+
+    /* Views Layouts */
+    .table-view {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    
+    .table-view th {
+      background: rgba(15, 23, 42, 0.8);
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-muted);
+    }
+    
+    .table-view td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    
+    .table-view tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .kanban-board {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    
+    .kanban-col {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .kanban-col-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .card-item {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .grid-view-layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    
+    .grid-tile {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dirty-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      font-weight: 600;
+    }
+
+    .log-box {
+      background: #070b12;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px;
+      height: 180px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useMemo, useCallback } = React;
+
+    const INITIAL_USERS = [
+      { id: "u-101", name: "Asha Sharma", role: "Engineering Lead", status: "active" },
+      { id: "u-102", name: "Bob Martinez", role: "Systems Architect", status: "active" },
+      { id: "u-103", name: "Carol Davis", role: "Frontend Engineer", status: "inactive" },
+      { id: "u-104", name: "David Kim", role: "DevOps Engineer", status: "active" }
+    ];
+
+    function AdvancedListArchitectureLab() {
+      // 1. Normalized Canonical Entity Store
+      const [entitiesById, setEntitiesById] = useState(() => {
+        const map = {};
+        INITIAL_USERS.forEach(u => { map[u.id] = u; });
+        return map;
+      });
+      const [allIds, setAllIds] = useState(() => INITIAL_USERS.map(u => u.id));
+
+      // 2. Collection Registries (Persisted across View Switches)
+      const [selectedIds, setSelectedIds] = useState(new Set(["u-101"]));
+      const [draftsById, setDraftsById] = useState({
+        "u-101": { name: "Asha Sharma (Lead Architect)" }
+      });
+      const [activeView, setActiveView] = useState("table"); // "table" | "kanban" | "grid"
+
+      // 3. Selection Intent Model Toggle
+      const [useIntentModel, setUseIntentModel] = useState(false);
+      const [excludedIds, setExcludedIds] = useState(new Set());
+      const [isSelectAllActive, setIsSelectAllActive] = useState(false);
+
+      // Audit Log
+      const [logs, setLogs] = useState([
+        "🟢 Initialized normalized entity store with 4 canonical records."
+      ]);
+      const addLog = (msg) => {
+        const time = new Date().toLocaleTimeString().split(" ")[0];
+        setLogs(prev => [`[${time}] ${msg}`, ...prev.slice(0, 30)]);
+      };
+
+      // Semantic Commands
+      const handleToggleSelect = useCallback((id) => {
+        if (!useIntentModel) {
+          setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        } else {
+          if (isSelectAllActive) {
+            setExcludedIds(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          } else {
+            setSelectedIds(prev => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          }
+        }
+        addLog(`🔘 Dispatched onSelect("${id}")`);
+      }, [useIntentModel, isSelectAllActive]);
+
+      const handleDraftChange = useCallback((id, newName) => {
+        setDraftsById(prev => ({
+          ...prev,
+          [id]: { ...prev[id], name: newName }
+        }));
+        addLog(`📝 Dispatched onDraftChange("${id}", "${newName}")`);
+      }, []);
+
+      const handleCommitDraft = useCallback((id) => {
+        const draft = draftsById[id];
+        if (!draft) return;
+        setEntitiesById(prev => ({
+          ...prev,
+          [id]: { ...prev[id], ...draft }
+        }));
+        setDraftsById(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        addLog(`💾 Committed draft for entity "${id}" into canonical store!`);
+      }, [draftsById]);
+
+      const handleDelete = useCallback((id) => {
+        setAllIds(prev => prev.filter(i => i !== id));
+        setEntitiesById(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setDraftsById(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        addLog(`❌ Dispatched onDelete("${id}") -> Purged from all registries.`);
+      }, []);
+
+      const isItemSelected = (id) => {
+        if (useIntentModel && isSelectAllActive) {
+          return !excludedIds.has(id);
+        }
+        return selectedIds.has(id);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-title">
+              <h1>Advanced List Architecture Diagnostic Lab</h1>
+              <p>Multi-View Projections, Normalized Entity Stores, Command Contracts & Intent Selection</p>
+            </div>
+            <span className="badge badge-primary">Level 06 · KPI 09 · Part 12</span>
+          </header>
+
+          {/* View Switcher & Toolbar */}
+          <div className="panel" style={{ marginBottom: "20px" }}>
+            <div className="panel-header">
+              <span className="panel-title">🔀 Multi-View Projections (Shared Normalized Store)</span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                Active View: <strong style={{ color: "#38bdf8" }}>{activeView.toUpperCase()}</strong>
+              </span>
+            </div>
+            <div className="btn-group">
+              <button 
+                className={activeView === "table" ? "active-tab" : ""} 
+                onClick={() => { setActiveView("table"); addLog("🔀 Switched projection to Table View"); }}
+              >
+                📊 Table View
+              </button>
+              <button 
+                className={activeView === "kanban" ? "active-tab" : ""} 
+                onClick={() => { setActiveView("kanban"); addLog("🔀 Switched projection to Kanban Board"); }}
+              >
+                📋 Kanban Board
+              </button>
+              <button 
+                className={activeView === "grid" ? "active-tab" : ""} 
+                onClick={() => { setActiveView("grid"); addLog("🔀 Switched projection to Grid View"); }}
+              >
+                🪟 Grid View
+              </button>
+            </div>
+          </div>
+
+          {/* Active View Container */}
+          <div className="panel" style={{ marginBottom: "20px" }}>
+            <div className="panel-header">
+              <span className="panel-title">
+                {activeView === "table" && "📊 User Directory Table Projection"}
+                {activeView === "kanban" && "📋 Status Partitioned Kanban Projection"}
+                {activeView === "grid" && "🪟 Member Profile Grid Projection"}
+              </span>
+              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                Selected: {allIds.filter(id => isItemSelected(id)).length} / {allIds.length}
+              </span>
+            </div>
+
+            {activeView === "table" && (
+              <table className="table-view">
+                <thead>
+                  <tr>
+                    <th>Select</th>
+                    <th>User ID</th>
+                    <th>Name / Live Draft</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allIds.map(id => {
+                    const entity = entitiesById[id];
+                    const draft = draftsById[id];
+                    const isSelected = isItemSelected(id);
+                    const isDirty = draft !== undefined && draft.name !== entity.name;
+                    return (
+                      <tr key={id} style={{ background: isSelected ? "rgba(59,130,246,0.1)" : "transparent" }}>
+                        <td>
+                          <input type="checkbox" checked={isSelected} onChange={() => handleToggleSelect(id)} />
+                        </td>
+                        <td style={{ fontFamily: "monospace", color: "#38bdf8" }}>{id}</td>
+                        <td>
+                          <input 
+                            type="text" 
+                            value={draft?.name ?? entity.name} 
+                            onChange={e => handleDraftChange(id, e.target.value)}
+                            style={{ background: "#070b12", border: "1px solid var(--card-border)", color: "#fff", padding: "4px 8px", borderRadius: "4px" }}
+                          />
+                          {isDirty && <span className="dirty-badge" style={{ marginLeft: "6px" }}>Unsaved Draft</span>}
+                        </td>
+                        <td>{entity.role}</td>
+                        <td>
+                          <span style={{ color: entity.status === "active" ? "#34d399" : "#94a3b8" }}>
+                            {entity.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {isDirty && (
+                              <button className="btn-emerald" onClick={() => handleCommitDraft(id)}>Save</button>
+                            )}
+                            <button className="btn-danger" onClick={() => handleDelete(id)}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {activeView === "kanban" && (
+              <div className="kanban-board">
+                <div className="kanban-col">
+                  <div className="kanban-col-title">🟢 Active Users</div>
+                  {allIds.filter(id => entitiesById[id].status === "active").map(id => (
+                    <KanbanCard 
+                      key={id} 
+                      id={id} 
+                      entity={entitiesById[id]} 
+                      draft={draftsById[id]} 
+                      isSelected={isItemSelected(id)}
+                      onSelect={handleToggleSelect}
+                      onDraftChange={handleDraftChange}
+                      onCommit={handleCommitDraft}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+                <div className="kanban-col">
+                  <div className="kanban-col-title">⚪ Inactive Users</div>
+                  {allIds.filter(id => entitiesById[id].status === "inactive").map(id => (
+                    <KanbanCard 
+                      key={id} 
+                      id={id} 
+                      entity={entitiesById[id]} 
+                      draft={draftsById[id]} 
+                      isSelected={isItemSelected(id)}
+                      onSelect={handleToggleSelect}
+                      onDraftChange={handleDraftChange}
+                      onCommit={handleCommitDraft}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeView === "grid" && (
+              <div className="grid-view-layout">
+                {allIds.map(id => {
+                  const entity = entitiesById[id];
+                  const draft = draftsById[id];
+                  const isSelected = isItemSelected(id);
+                  const isDirty = draft !== undefined && draft.name !== entity.name;
+                  return (
+                    <div 
+                      key={id} 
+                      className="grid-tile"
+                      style={{ borderLeft: isSelected ? "4px solid var(--accent-blue)" : "1px solid var(--card-border)" }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#38bdf8" }}>#{id}</span>
+                        {isDirty && <span className="dirty-badge">Draft</span>}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={draft?.name ?? entity.name} 
+                        onChange={e => handleDraftChange(id, e.target.value)}
+                        style={{ background: "#070b12", border: "1px solid var(--card-border)", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" }}
+                      />
+                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{entity.role}</div>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "auto" }}>
+                        <button onClick={() => handleToggleSelect(id)}>
+                          {isSelected ? "Deselect" : "Select"}
+                        </button>
+                        {isDirty && (
+                          <button className="btn-emerald" onClick={() => handleCommitDraft(id)}>Save</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Registries & Command Audit Log */}
+          <div className="grid-2">
+            
+            {/* Normalized Registries Inspector */}
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">🗄️ Normalized Store Registries</span>
+              </div>
+              <div style={{ fontSize: "11px", fontFamily: "JetBrains Mono", lineHeight: "1.6" }}>
+                <div><strong>Selected IDs Set:</strong> [{Array.from(selectedIds).join(", ")}]</div>
+                <div style={{ marginTop: "8px" }}><strong>Drafts Dictionary (`draftsById`):</strong></div>
+                <pre style={{ background: "#070b12", padding: "8px", borderRadius: "6px", marginTop: "4px", color: "#fbbf24" }}>
+                  {JSON.stringify(draftsById, null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            {/* Live Command Stream */}
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">📜 Semantic Command Audit Stream</span>
+                <button onClick={() => setLogs([])}>Clear</button>
+              </div>
+              <div className="log-box">
+                {logs.map((log, i) => (
+                  <div key={i} style={{ marginBottom: "4px", color: "#38bdf8" }}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    function KanbanCard({ id, entity, draft, isSelected, onSelect, onDraftChange, onCommit, onDelete }) {
+      const isDirty = draft !== undefined && draft.name !== entity.name;
+      return (
+        <div className="card-item" style={{ borderLeft: isSelected ? "3px solid #3b82f6" : "1px solid var(--card-border)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+            <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#38bdf8" }}>#{id}</span>
+            {isDirty && <span className="dirty-badge">Unsaved Draft</span>}
+          </div>
+          <input 
+            type="text" 
+            value={draft?.name ?? entity.name} 
+            onChange={e => onDraftChange(id, e.target.value)}
+            style={{ width: "100%", background: "#070b12", border: "1px solid var(--card-border)", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", marginBottom: "6px" }}
+          />
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px" }}>{entity.role}</div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={() => onSelect(id)}>{isSelected ? "Deselect" : "Select"}</button>
+            {isDirty && <button className="btn-emerald" onClick={() => onCommit(id)}>Save</button>}
+            <button className="btn-danger" onClick={() => onDelete(id)}>Del</button>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<AdvancedListArchitectureLab />);
+  </script>
+</body>
+</html>

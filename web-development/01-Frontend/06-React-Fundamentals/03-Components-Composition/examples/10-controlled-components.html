@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 10: Controlled vs Uncontrolled Components</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 10: Controlled vs Uncontrolled Components</h1>
+  <p class="subtitle">Interactive sandbox demonstrating Value vs DefaultValue, Feedback Loops, Uncontrolled Ref Access, and Mode-Switching Traps.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('controlledFeedback')">1. Controlled Feedback Loop</button>
+    <button onclick="selectLab('defaultValueTrap')">2. value vs defaultValue Trap</button>
+    <button onclick="selectLab('uncontrolledRef')">3. Uncontrolled + Ref Pattern</button>
+    <button onclick="selectLab('hybridMode')">4. Hybrid Component Contract</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Component Contract & Pattern</h2>
+      <pre id="code-panel">// Pattern</pre>
+
+      <h2>State Authority & Mutation Flow</h2>
+      <pre id="flow-panel">// Flow</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Ownership: Single Authority</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      controlledFeedback: {
+        code: `// Controlled Component Contract:\nfunction SearchInput({ value, onChange }) {\n  return (\n    <input\n      value={value}\n      onChange={e => onChange(e.target.value)}\n    />\n  );\n}`,
+        flow: `User types 'A' ➔ DOM input event ➔ onChange('A') ➔ Parent state updates ➔ Parent re-renders ➔ value='A' passed down ➔ DOM updated.`,
+        verdict: `Complete External Authority: The parent controls validation, formatting, reset, and sibling coordination.`,
+        rule: `A controlled component receives the current value from its owner and reports changes.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Controlled Authority'
+      },
+      defaultValueTrap: {
+        code: `// ❌ Misunderstanding defaultValue:\n<input defaultValue={name} />\n// Parent updates: setName("Bob")`,
+        flow: `defaultValue initializes input on mount (e.g. "Alice"). Later changes to prop 'name' DO NOT update the DOM value because the input is uncontrolled.`,
+        verdict: `Initialization ≠ Continuous Synchronization: defaultValue sets initial state once; value provides continuous control.`,
+        rule: `Never assume changing defaultValue will re-synchronize an active uncontrolled input.`,
+        badgeClass: 'badge-warn',
+        badgeText: '⚠️ Initialization Trap'
+      },
+      uncontrolledRef: {
+        code: `// Uncontrolled + Ref for Submit Extraction:\nfunction QuickForm() {\n  const inputRef = useRef(null);\n  const submit = () => console.log(inputRef.current.value);\n  return <input ref={inputRef} defaultValue="Alice" />;\n}`,
+        flow: `Input tracks local keystrokes without triggering parent re-renders. On submit, inputRef directly reads the DOM node's current value.`,
+        verdict: `High Performance for Isolated Inputs: Avoids keystroke re-render cascades when parent coordination is unnecessary.`,
+        rule: `Keep components uncontrolled when continuous external coordination is not required.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Isolated Uncontrolled'
+      },
+      hybridMode: {
+        code: `// Dual-Mode Component Contract:\nfunction CustomInput({ value, defaultValue, onChange }) {\n  const isControlled = value !== undefined;\n  const [internalVal, setInternalVal] = useState(defaultValue ?? "");\n  const current = isControlled ? value : internalVal;\n  // ...\n}`,
+        flow: `If value prop is provided, acts as Controlled. If omitted, acts as Uncontrolled using internal state.`,
+        verdict: `Explicit Dual Contract: Avoid switching between modes during a single component occurrence's lifetime.`,
+        rule: `A component should never casually switch between uncontrolled and controlled modes across renders.`,
+        badgeClass: 'badge-ok',
+        badgeText: 'ℹ️ Dual-Mode Contract'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('flow-panel').textContent = data.flow;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('controlledFeedback');
+  </script>
+</body>
+</html>

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 14 — Event-Driven Async Interaction Patterns</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
+    }
+
+    button.btn-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-amber);
+      color: #fcd34d;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .policy-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.82rem;
+    }
+
+    .policy-header {
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+    }
+
+    .log-container {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .metric-num {
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    function AsyncPatternsLab() {
+      // 1. POLICY METRICS
+      const [eventsCount, setEventsCount] = useState(0);
+      const [immediateCount, setImmediateCount] = useState(0);
+      const [debouncedCount, setDebouncedCount] = useState(0);
+      const [throttledCount, setThrottledCount] = useState(0);
+
+      // 2. RACE SIMULATION
+      const [activeRequestId, setActiveRequestId] = useState(0);
+      const [latestResults, setLatestResults] = useState("None");
+      const [raceLogs, setRaceLogs] = useState([]);
+      const requestSeqRef = useRef(0);
+
+      // 3. OPTIMISTIC MUTATION
+      const [likes, setLikes] = useState(42);
+      const [isLiked, setIsLiked] = useState(false);
+      const [optimisticStatus, setOptimisticStatus] = useState("idle");
+
+      // REFS FOR POLICIES
+      const debounceTimerRef = useRef(null);
+      const throttleLastRef = useRef(0);
+
+      // TELEMETRY
+      const [telemetry, setTelemetry] = useState([]);
+
+      const logEvent = (entry) => {
+        setTelemetry(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString(),
+            ...entry
+          },
+          ...prev.slice(0, 15)
+        ]);
+      };
+
+      // EVENT POLICY HANDLER
+      const handleUserInteraction = () => {
+        setEventsCount(prev => prev + 1);
+
+        // Immediate policy
+        setImmediateCount(prev => prev + 1);
+
+        // Debounce policy (350ms)
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+          setDebouncedCount(prev => prev + 1);
+          logEvent({ policy: "DEBOUNCE", action: "Executed after 350ms quiet" });
+        }, 350);
+
+        // Throttle policy (400ms window)
+        const now = performance.now();
+        if (now - throttleLastRef.current > 400) {
+          throttleLastRef.current = now;
+          setThrottledCount(prev => prev + 1);
+          logEvent({ policy: "THROTTLE", action: "Executed at start of 400ms interval" });
+        }
+      };
+
+      const triggerBurst = () => {
+        for (let i = 0; i < 6; i++) {
+          setTimeout(() => {
+            handleUserInteraction();
+          }, i * 40);
+        }
+      };
+
+      // OUT-OF-ORDER RACE GENERATOR
+      const triggerRaceRequest = (label, delay) => {
+        const reqId = ++requestSeqRef.current;
+        setActiveRequestId(reqId);
+        logEvent({ policy: "RACE", action: `Dispatched ${label} (Req #${reqId}, delay ${delay}ms)` });
+
+        setTimeout(() => {
+          const isCurrent = reqId === requestSeqRef.current;
+          if (isCurrent) {
+            setLatestResults(`${label} (Req #${reqId})`);
+            logEvent({ policy: "RACE", action: `ACCEPTED ${label} (Req #${reqId})` });
+          } else {
+            logEvent({ policy: "RACE", action: `REJECTED STALE ${label} (Req #${reqId} != current #${requestSeqRef.current})` });
+          }
+        }, delay);
+      };
+
+      // OPTIMISTIC MUTATION WITH ROLLBACK
+      const handleOptimisticToggleLike = (simulateFail = false) => {
+        const prevLikes = likes;
+        const prevLiked = isLiked;
+        const nextLiked = !prevLiked;
+        const nextLikes = nextLiked ? prevLikes + 1 : prevLikes - 1;
+
+        // Instant optimistic update
+        setIsLiked(nextLiked);
+        setLikes(nextLikes);
+        setOptimisticStatus("optimistic-pending");
+        logEvent({ policy: "OPTIMISTIC", action: `Projected state: ${nextLikes} likes` });
+
+        setTimeout(() => {
+          if (simulateFail) {
+            // Rollback
+            setIsLiked(prevLiked);
+            setLikes(prevLikes);
+            setOptimisticStatus("error-rolled-back");
+            logEvent({ policy: "OPTIMISTIC", action: `Server 500: Rolled back to ${prevLikes} likes` });
+          } else {
+            setOptimisticStatus("confirmed");
+            logEvent({ policy: "OPTIMISTIC", action: "Server 200: Confirmed authoritative state" });
+          }
+        }, 1000);
+      };
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🧪 Companion Lab 14 — Event-Driven Async Patterns</span>
+                <span className="badge">KPI-05 Senior Level</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                Debounce vs Throttle Policies, Stale Request Race Rejection, and Optimistic Rollback Recovery.
+              </p>
+            </div>
+            <div className="metric-grid" style={{ minWidth: 340 }}>
+              <div className="metric-box">
+                <div className="metric-num">{eventsCount}</div>
+                <div className="metric-label">Raw Events</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{debouncedCount}</div>
+                <div className="metric-label">Debounced Ops</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{throttledCount}</div>
+                <div className="metric-label">Throttled Ops</div>
+              </div>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            {/* LEFT COLUMN: INTERACTIVE POLICY SANDBOXES */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* 1. EVENT POLICY VISUALIZER */}
+              <div className="card">
+                <div className="card-title">
+                  <span>⚡ Event Policy Visualizer (Rate Management)</span>
+                  <span className="badge">Immediate / Debounce / Throttle</span>
+                </div>
+                <div className="btn-row">
+                  <button className="btn-primary" onClick={handleUserInteraction}>
+                    👆 Single Interaction Event
+                  </button>
+                  <button className="btn-warning" onClick={triggerBurst}>
+                    🔥 Burst 6 Rapid Events (240ms)
+                  </button>
+                  <button onClick={() => {
+                    setEventsCount(0); setImmediateCount(0); setDebouncedCount(0); setThrottledCount(0);
+                  }}>
+                    Reset
+                  </button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  <div className="policy-box">
+                    <div className="policy-header"><span>Immediate</span><span>{immediateCount} ops</span></div>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.74rem" }}>1 event = 1 execution (Lowest latency)</span>
+                  </div>
+                  <div className="policy-box">
+                    <div className="policy-header"><span>Debounce (350ms)</span><span>{debouncedCount} ops</span></div>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.74rem" }}>Waits for quiet period</span>
+                  </div>
+                  <div className="policy-box">
+                    <div className="policy-header"><span>Throttle (400ms)</span><span>{throttledCount} ops</span></div>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.74rem" }}>Limits max rate</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. OUT-OF-ORDER ASYNC RACE SIMULATOR */}
+              <div className="card">
+                <div className="card-title">
+                  <span>🏎️ Out-of-Order Async Race (Latest-Wins Token Invariant)</span>
+                  <span className="badge">Active Req: #{activeRequestId}</span>
+                </div>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                  Trigger slow Request A followed by fast Request B to witness stale response rejection.
+                </p>
+                <div className="btn-row">
+                  <button className="btn-primary" onClick={() => triggerRaceRequest("Query 'react'", 2400)}>
+                    1. Slow Req A (2400ms)
+                  </button>
+                  <button className="btn-warning" onClick={() => triggerRaceRequest("Query 'react hooks'", 600)}>
+                    2. Fast Req B (600ms)
+                  </button>
+                  <button onClick={() => triggerRaceRequest("Query 'react 19'", 1200)}>
+                    3. Medium Req C (1200ms)
+                  </button>
+                </div>
+                <div style={{ background: "#090d16", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)", fontSize: "0.85rem" }}>
+                  <span>Committed Authoritative Results: </span>
+                  <strong style={{ color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>{latestResults}</strong>
+                </div>
+              </div>
+
+              {/* 3. OPTIMISTIC MUTATION WITH ROLLBACK */}
+              <div className="card">
+                <div className="card-title">
+                  <span>❤️ Optimistic UI & Rollback Reconciliation</span>
+                  <span className="badge">Status: {optimisticStatus}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#090d16", padding: 14, borderRadius: 8 }}>
+                  <div>
+                    <div style={{ fontSize: "1.2rem", fontWeight: "bold" }}>{likes} Likes</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      {isLiked ? "❤️ You liked this" : "🤍 Click to like"}
+                    </div>
+                  </div>
+                  <div className="btn-row">
+                    <button className="btn-primary" onClick={() => handleOptimisticToggleLike(false)}>
+                      👍 Like (Success)
+                    </button>
+                    <button className="btn-danger" onClick={() => handleOptimisticToggleLike(true)}>
+                      💥 Like (Server 500 Rollback)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: TELEMETRY LEDGER */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 Async Operation & Policy Telemetry Ledger</span>
+                  <button onClick={() => setTelemetry([])} style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                    Clear
+                  </button>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>
+                      Interact with policies or triggers to trace execution logs...
+                    </div>
+                  ) : (
+                    telemetry.map(log => (
+                      <div key={log.id} className="log-item">
+                        <div className="log-header">
+                          <span>[{log.policy}] {log.action}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{log.time}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<AsyncPatternsLab />);
+  </script>
+</body>
+</html>

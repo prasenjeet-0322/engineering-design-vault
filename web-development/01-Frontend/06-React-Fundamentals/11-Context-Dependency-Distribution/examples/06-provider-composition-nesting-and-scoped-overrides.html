@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 11 — Part 06 Companion Lab: Provider Composition, Nesting & Scoped Overrides</title>
+  <!-- React 18 & Babel via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-primary: #0a0d14;
+      --bg-secondary: #121622;
+      --bg-tertiary: #1a2035;
+      --bg-card: rgba(22, 28, 45, 0.85);
+      --bg-card-hover: rgba(30, 38, 60, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(99, 102, 241, 0.35);
+      --border-glow: rgba(99, 102, 241, 0.6);
+      
+      --accent-indigo: #6366f1;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.7);
+      --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #171f38 0%, var(--bg-primary) 70%);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    code, pre, .mono {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-indigo);
+    }
+
+    /* Container */
+    .app-container {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Header */
+    .header-panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-purple), var(--accent-emerald));
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-title-area h1 {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .header-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .authors-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      color: #c7d2fe;
+      font-weight: 500;
+    }
+
+    .badge-pill {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--accent-emerald);
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Tab Navigation */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 24px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-button {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tab-button:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-button.active {
+      color: #ffffff;
+      background: var(--accent-indigo);
+      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);
+    }
+
+    /* Grid Layouts */
+    .lab-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+    }
+
+    @media (max-width: 1200px) {
+      .lab-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card System */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: var(--shadow-md);
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Interactive Scope Visualizer Canvas */
+    .scope-box {
+      border: 2px dashed;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .scope-label {
+      position: absolute;
+      top: -12px;
+      left: 16px;
+      background: var(--bg-secondary);
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: 'Fira Code', monospace;
+      letter-spacing: 0.05em;
+      border: 1px solid;
+    }
+
+    .scope-tier-1 {
+      border-color: var(--accent-indigo);
+      background: rgba(99, 102, 241, 0.04);
+    }
+    .scope-tier-1 .scope-label {
+      border-color: var(--accent-indigo);
+      color: #a5b4fc;
+    }
+
+    .scope-tier-2 {
+      border-color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.05);
+    }
+    .scope-tier-2 .scope-label {
+      border-color: var(--accent-cyan);
+      color: #67e8f9;
+    }
+
+    .scope-tier-3 {
+      border-color: var(--accent-purple);
+      background: rgba(168, 85, 247, 0.06);
+    }
+    .scope-tier-3 .scope-label {
+      border-color: var(--accent-purple);
+      color: #d8b4fe;
+    }
+
+    /* Buttons & Controls */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent-indigo);
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: #4f46e5;
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-color: var(--border-subtle);
+    }
+    .btn-secondary:hover {
+      background: #232d4b;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: var(--accent-rose);
+    }
+    .btn-danger:hover {
+      background: rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--accent-emerald);
+    }
+    .btn-success:hover {
+      background: rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 0.78rem;
+    }
+
+    /* Probe Component Widget */
+    .probe-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .probe-card:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .probe-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .render-badge {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      color: var(--text-secondary);
+      font-family: 'Fira Code', monospace;
+    }
+
+    .val-pill {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.8rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    .val-dark { background: #1e1b4b; color: #a5b4fc; border: 1px solid #4338ca; }
+    .val-light { background: #f8fafc; color: #0f172a; border: 1px solid #cbd5e1; }
+    .val-cyberpunk { background: #3b0764; color: #f472b6; border: 1px solid #c026d3; }
+    .val-forest { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+    .val-amber { background: #451a03; color: #fcd34d; border: 1px solid #d97706; }
+
+    /* Telemetry Console */
+    .telemetry-panel {
+      background: #090c14;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      height: 620px;
+    }
+
+    .telemetry-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .telemetry-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .telemetry-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-item {
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--border-subtle);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .log-item.info { border-left-color: var(--accent-cyan); }
+    .log-item.warn { border-left-color: var(--accent-amber); }
+    .log-item.error { border-left-color: var(--accent-rose); }
+    .log-item.success { border-left-color: var(--accent-emerald); }
+
+    .log-time {
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Stack Simulation Table */
+    .stack-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-top: 12px;
+    }
+    .stack-table th, .stack-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .stack-table th {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .stack-table tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Custom Callout Box */
+    .callout {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      color: #c7d2fe;
+      margin: 12px 0;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      flex-direction: column;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px 14px;
+      min-width: 110px;
+    }
+    .stat-pill .label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .stat-pill .value {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      font-family: 'Fira Code', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useReducer, useRef, useId, useCallback, memo } = React;
+
+    // ==========================================
+    // CONTEXT DEFINITIONS (MODULE SCOPE)
+    // ==========================================
+    const ThemeContext = createContext("default-system-theme");
+    const TenantContext = createContext({ tenantId: "default-tenant", name: "Global Base", tier: "Free" });
+    const DocumentStateContext = createContext(null);
+    const DocumentDispatchContext = createContext(null);
+    const AuthContext = createContext(null);
+
+    // ==========================================
+    // LOGGING BUS
+    // ==========================================
+    const logListeners = new Set();
+    function emitLog(type, message, metadata = {}) {
+      const entry = {
+        id: Math.random().toString(36).substring(2, 9),
+        time: new Date().toLocaleTimeString(),
+        type,
+        message,
+        metadata
+      };
+      logListeners.forEach(fn => fn(entry));
+    }
+
+    // ==========================================
+    // MODULE 1: MULTI-TIER PROVIDER SHADOWING
+    // ==========================================
+    function ThemeProbe({ label, id }) {
+      const theme = useContext(ThemeContext);
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      const getValClass = (v) => {
+        if (v === 'dark') return 'val-dark';
+        if (v === 'light') return 'val-light';
+        if (v === 'cyberpunk') return 'val-cyberpunk';
+        if (v === 'forest') return 'val-forest';
+        if (v === 'amber') return 'val-amber';
+        return 'val-dark';
+      };
+
+      return (
+        <div className="probe-card">
+          <div>
+            <div className="probe-title">
+              <span>{label}</span>
+              <span className="render-badge">renders: {renderCount.current}</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Component ID: <code className="mono">{id}</code>
+            </div>
+          </div>
+          <div>
+            <span className={`val-pill ${getValClass(theme)}`}>{theme}</span>
+          </div>
+        </div>
+      );
+    }
+
+    function MultiTierShadowingModule() {
+      const [rootTheme, setRootTheme] = useState("dark");
+      const [midTheme, setMidTheme] = useState("cyberpunk");
+      const [innerTheme, setInnerTheme] = useState("forest");
+      const [enableMid, setEnableMid] = useState(true);
+      const [enableInner, setEnableInner] = useState(true);
+
+      const themes = ["dark", "light", "cyberpunk", "forest", "amber"];
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">
+              <span>🌳</span>
+              <span>1. Multi-Tier Provider Shadowing & Nearest Resolution</span>
+            </div>
+            <span className="badge-pill">O(1) Stack Resolution</span>
+          </div>
+
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            Inspect how <code>useContext(ThemeContext)</code> resolves strictly against the <strong>nearest ancestor Provider</strong> in the Fiber tree. Inner providers shadow outer values without mutating outer state.
+          </p>
+
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.8rem', color: '#a5b4fc', fontWeight: 600 }}>Root Provider:</span>
+              <select 
+                value={rootTheme} 
+                onChange={e => {
+                  setRootTheme(e.target.value);
+                  emitLog('info', `Root Provider value updated -> ${e.target.value}`);
+                }}
+                className="btn btn-secondary btn-sm"
+              >
+                {themes.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ fontSize: '0.8rem', color: '#67e8f9', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input type="checkbox" checked={enableMid} onChange={e => setEnableMid(e.target.checked)} />
+                Mid Provider:
+              </label>
+              {enableMid && (
+                <select 
+                  value={midTheme} 
+                  onChange={e => {
+                    setMidTheme(e.target.value);
+                    emitLog('info', `Mid Provider value updated -> ${e.target.value}`);
+                  }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  {themes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label style={{ fontSize: '0.8rem', color: '#d8b4fe', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input type="checkbox" checked={enableInner} onChange={e => setEnableInner(e.target.checked)} />
+                Leaf Provider:
+              </label>
+              {enableInner && (
+                <select 
+                  value={innerTheme} 
+                  onChange={e => {
+                    setInnerTheme(e.target.value);
+                    emitLog('info', `Leaf Provider value updated -> ${e.target.value}`);
+                  }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  {themes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
+            </div>
+          </div>
+
+          {/* Scope Tree */}
+          <ThemeContext.Provider value={rootTheme}>
+            <div className="scope-box scope-tier-1">
+              <span className="scope-label">ROOT SCOPE [value="{rootTheme}"]</span>
+              <ThemeProbe label="App Header Consumer (Root Level)" id="consumer-root-1" />
+
+              {enableMid ? (
+                <ThemeContext.Provider value={midTheme}>
+                  <div className="scope-box scope-tier-2" style={{ marginTop: '14px' }}>
+                    <span className="scope-label">MID-TIER OVERRIDE [value="{midTheme}"]</span>
+                    <ThemeProbe label="Dashboard Widget Consumer (Mid Level)" id="consumer-mid-1" />
+
+                    {enableInner ? (
+                      <ThemeContext.Provider value={innerTheme}>
+                        <div className="scope-box scope-tier-3" style={{ marginTop: '14px' }}>
+                          <span className="scope-label">LEAF OVERRIDE [value="{innerTheme}"]</span>
+                          <ThemeProbe label="Isolated Modal Preview Consumer (Leaf Level)" id="consumer-leaf-1" />
+                        </div>
+                      </ThemeContext.Provider>
+                    ) : (
+                      <div style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', marginTop: '10px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>[Leaf Provider Unmounted - Consumers fall back to Mid-Tier]</span>
+                        <ThemeProbe label="Fallback Consumer (In place of Leaf)" id="consumer-leaf-fallback" />
+                      </div>
+                    )}
+                  </div>
+                </ThemeContext.Provider>
+              ) : (
+                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', marginTop: '14px' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>[Mid-Tier Provider Unmounted - Children fall back to Root]</span>
+                  <ThemeProbe label="Fallback Consumer (In place of Mid)" id="consumer-mid-fallback" />
+                </div>
+              )}
+
+              <ThemeProbe label="App Footer Consumer (Root Level Sibling)" id="consumer-root-2" />
+            </div>
+          </ThemeContext.Provider>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 2: MULTI-INSTANCE REDUCER ISOLATION
+    // ==========================================
+    function docReducer(state, action) {
+      switch (action.type) {
+        case 'TYPING':
+          return { ...state, content: action.payload, edits: state.edits + 1, lastSaved: 'Unsaved' };
+        case 'SAVE':
+          return { ...state, lastSaved: new Date().toLocaleTimeString(), dirty: false };
+        case 'RESET':
+          return { content: '', edits: 0, lastSaved: 'Never' };
+        default:
+          return state;
+      }
+    }
+
+    function DocumentFeatureProvider({ children, initialDocId }) {
+      const [state, dispatch] = useReducer(docReducer, {
+        docId: initialDocId,
+        content: `Draft payload for ${initialDocId}...`,
+        edits: 0,
+        lastSaved: 'Initial'
+      });
+      const instanceId = useRef(Math.random().toString(36).substring(2, 6)).current;
+
+      return (
+        <DocumentStateContext.Provider value={{ ...state, instanceId }}>
+          <DocumentDispatchContext.Provider value={dispatch}>
+            {children}
+          </DocumentDispatchContext.Provider>
+        </DocumentStateContext.Provider>
+      );
+    }
+
+    function DocumentEditorWidget({ title }) {
+      const state = useContext(DocumentStateContext);
+      const dispatch = useContext(DocumentDispatchContext);
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '16px', flex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{title}</span>
+            <span className="render-badge">renders: {renderCount.current}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <span className="val-pill" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', fontSize: '0.72rem' }}>
+              Instance #{state.instanceId}
+            </span>
+            <span className="val-pill" style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7', fontSize: '0.72rem' }}>
+              Saved: {state.lastSaved}
+            </span>
+          </div>
+
+          <textarea 
+            value={state.content}
+            onChange={e => dispatch({ type: 'TYPING', payload: e.target.value })}
+            rows="3"
+            style={{
+              width: '100%',
+              background: '#090d18',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '6px',
+              padding: '8px',
+              color: 'var(--text-primary)',
+              fontFamily: 'Fira Code',
+              fontSize: '0.8rem',
+              resize: 'none',
+              marginBottom: '10px'
+            }}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Edits: <strong style={{ color: 'var(--text-primary)' }}>{state.edits}</strong>
+            </span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button 
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  dispatch({ type: 'SAVE' });
+                  emitLog('success', `[Instance #${state.instanceId}] Document saved.`);
+                }}
+              >
+                Save
+              </button>
+              <button 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  dispatch({ type: 'RESET' });
+                  emitLog('warn', `[Instance #${state.instanceId}] Document reset.`);
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MultiInstanceModule() {
+      return (
+        <div className="card" style={{ marginTop: '24px' }}>
+          <div className="card-header">
+            <div className="card-title">
+              <span>🗂️</span>
+              <span>2. Multi-Instance Sibling Providers (Context Token != State Singleton)</span>
+            </div>
+            <span className="badge-pill">Independent Heaps</span>
+          </div>
+
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            Both panes consume the <strong>exact same Context definition tokens</strong> (<code>DocumentStateContext</code> & <code>DocumentDispatchContext</code>). Yet each <code>DocumentFeatureProvider</code> allocates its own separate <code>useReducer</code> fiber memory. Typing in Pane A never triggers a re-render in Pane B!
+          </p>
+
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <DocumentFeatureProvider initialDocId="DOC-Alpha-101">
+              <DocumentEditorWidget title="Editor Pane A (Doc Alpha)" />
+            </DocumentFeatureProvider>
+
+            <DocumentFeatureProvider initialDocId="DOC-Beta-202">
+              <DocumentEditorWidget title="Editor Pane B (Doc Beta)" />
+            </DocumentFeatureProvider>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 3: KEYED PROVIDER RESET TELEMETRY
+    // ==========================================
+    function KeyedProviderModule() {
+      const [currentDocKey, setCurrentDocKey] = useState("doc-v1");
+      const [remountCount, setRemountCount] = useState(0);
+
+      const handleKeySwitch = (newKey) => {
+        setCurrentDocKey(newKey);
+        setRemountCount(c => c + 1);
+        emitLog('warn', `Provider key changed to '${newKey}' -> Triggered complete Fiber destruction & state re-initialization`);
+      };
+
+      return (
+        <div className="card" style={{ marginTop: '24px' }}>
+          <div className="card-header">
+            <div className="card-title">
+              <span>🔑</span>
+              <span>3. Keyed Provider Identity & State Partitioning</span>
+            </div>
+            <span className="badge-pill">Fiber Key Invariant</span>
+          </div>
+
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            Changing the <code>key</code> prop on a Provider forces React to unmount the old Fiber node and mount a completely fresh Provider instance. This cleanly destroys stale reducer state, WebSocket connections, and subscriptions.
+          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Select Document Target:</span>
+            <button 
+              className={`btn btn-sm ${currentDocKey === 'doc-v1' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleKeySwitch('doc-v1')}
+            >
+              Document #1 (Key: doc-v1)
+            </button>
+            <button 
+              className={`btn btn-sm ${currentDocKey === 'doc-v2' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleKeySwitch('doc-v2')}
+            >
+              Document #2 (Key: doc-v2)
+            </button>
+            <button 
+              className={`btn btn-sm ${currentDocKey === 'doc-v3' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => handleKeySwitch('doc-v3')}
+            >
+              Document #3 (Key: doc-v3)
+            </button>
+            <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Remounts: <strong style={{ color: 'var(--accent-amber)' }}>{remountCount}</strong>
+            </span>
+          </div>
+
+          <DocumentFeatureProvider key={currentDocKey} initialDocId={currentDocKey.toUpperCase()}>
+            <DocumentEditorWidget title={`Keyed Scoped Editor [Mounted with key="${currentDocKey}"]`} />
+          </DocumentFeatureProvider>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 4: INVERTED DEPENDENCY ERROR BOUNDARY
+    // ==========================================
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        emitLog('error', `Dependency Ordering Crash: ${error.message}`);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid var(--accent-rose)', borderRadius: '8px', padding: '16px', color: '#fecdd3' }}>
+              <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span>💥</span>
+                <span>Runtime Dependency Crash Caught by ErrorBoundary</span>
+              </div>
+              <div style={{ fontFamily: 'Fira Code', fontSize: '0.8rem', background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '4px' }}>
+                {this.state.error?.message}
+              </div>
+              <p style={{ fontSize: '0.75rem', marginTop: '8px', color: 'var(--text-muted)' }}>
+                Fix: Structurally compose <code>&lt;AuthProvider&gt;</code> outside of <code>&lt;AnalyticsFeatureProvider&gt;</code> so AuthContext is available during render.
+              </p>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    function useAuth() {
+      const context = useContext(AuthContext);
+      if (!context) {
+        throw new Error("useAuth must be consumed strictly within an <AuthProvider> hierarchy!");
+      }
+      return context;
+    }
+
+    function AnalyticsConsumer() {
+      const user = useAuth();
+      return (
+        <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid var(--accent-emerald)', padding: '10px 14px', borderRadius: '6px', fontSize: '0.85rem' }}>
+          ✅ Analytics telemetry active for user: <strong>{user.name}</strong> ({user.role})
+        </div>
+      );
+    }
+
+    function InvertedDependencyModule() {
+      const [isInverted, setIsInverted] = useState(false);
+      const [resetKey, setResetKey] = useState(0);
+
+      const toggleOrder = (inverted) => {
+        setIsInverted(inverted);
+        setResetKey(k => k + 1);
+        emitLog('info', `Switched Provider Hierarchy to: ${inverted ? 'INVERTED (Analytics -> Auth)' : 'CORRECT (Auth -> Analytics)'}`);
+      };
+
+      return (
+        <div className="card" style={{ marginTop: '24px' }}>
+          <div className="card-header">
+            <div className="card-title">
+              <span>⚠️</span>
+              <span>4. Provider Composition Dependency Ordering</span>
+            </div>
+            <span className="badge-pill">DAG Invariant</span>
+          </div>
+
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            When Provider A consumes Provider B during render, Provider B <strong>must sit structurally above Provider A</strong> in the JSX hierarchy. Inverting this hierarchy violates the Directed Acyclic Graph (DAG) and triggers runtime failures.
+          </p>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <button 
+              className={`btn btn-sm ${!isInverted ? 'btn-success' : 'btn-secondary'}`}
+              onClick={() => toggleOrder(false)}
+            >
+              ✅ Correct Composition: &lt;AuthProvider&gt; ➔ &lt;Analytics&gt;
+            </button>
+            <button 
+              className={`btn btn-sm ${isInverted ? 'btn-danger' : 'btn-secondary'}`}
+              onClick={() => toggleOrder(true)}
+            >
+              ❌ Inverted Composition: &lt;Analytics&gt; ➔ &lt;AuthProvider&gt;
+            </button>
+          </div>
+
+          <ErrorBoundary key={resetKey}>
+            {!isInverted ? (
+              <AuthContext.Provider value={{ name: "Srikar Kudurmalla", role: "Founding Engineer" }}>
+                <div style={{ border: '1px dashed var(--accent-indigo)', padding: '12px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#a5b4fc', fontFamily: 'Fira Code' }}>&lt;AuthProvider value="Srikar"&gt;</span>
+                  <div style={{ marginTop: '8px' }}>
+                    <AnalyticsConsumer />
+                  </div>
+                </div>
+              </AuthContext.Provider>
+            ) : (
+              <div style={{ border: '1px dashed var(--accent-rose)', padding: '12px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '0.72rem', color: '#fca5a5', fontFamily: 'Fira Code' }}>&lt;AnalyticsFeatureWithoutAuthParent&gt;</span>
+                <div style={{ marginTop: '8px' }}>
+                  {/* Fails because AuthProvider is NOT an ancestor */}
+                  <AnalyticsConsumer />
+                </div>
+              </div>
+            )}
+          </ErrorBoundary>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 5: FIBER CONTEXT STACK VISUALIZER
+    // ==========================================
+    function FiberStackVisualizerModule() {
+      const [step, setStep] = useState(0);
+
+      const steps = [
+        {
+          label: "1. Begin Root (pushProvider Root)",
+          cursor: "valueCursor = 'dark'",
+          stack: ["Stack: ['default-system-theme']"],
+          action: "React enters <ThemeContext.Provider value='dark'> during beginWork. Pushes previous default to fiber stack, assigns 'dark' to valueCursor."
+        },
+        {
+          label: "2. Begin Mid Tier (pushProvider Mid)",
+          cursor: "valueCursor = 'cyberpunk'",
+          stack: ["Stack: ['default-system-theme', 'dark']"],
+          action: "React enters <ThemeContext.Provider value='cyberpunk'>. Pushes 'dark' onto fiber stack, updates valueCursor to 'cyberpunk'."
+        },
+        {
+          label: "3. Render Leaf Consumer",
+          cursor: "valueCursor = 'cyberpunk'",
+          stack: ["Stack: ['default-system-theme', 'dark']"],
+          action: "Leaf Component calls useContext(ThemeContext). React reads directly from valueCursor -> 'cyberpunk'. Instant O(1) resolution!"
+        },
+        {
+          label: "4. Complete Mid Tier (popProvider Mid)",
+          cursor: "valueCursor = 'dark'",
+          stack: ["Stack: ['default-system-theme']"],
+          action: "React finishes mid-tier subtree in completeWork. Pops 'dark' from fiber stack back into valueCursor."
+        },
+        {
+          label: "5. Complete Root (popProvider Root)",
+          cursor: "valueCursor = 'default-system-theme'",
+          stack: ["Stack: []"],
+          action: "React finishes root provider. Pops 'default-system-theme' back into valueCursor. Stack is now empty."
+        }
+      ];
+
+      return (
+        <div className="card" style={{ marginTop: '24px' }}>
+          <div className="card-header">
+            <div className="card-title">
+              <span>🥞</span>
+              <span>5. Fiber Context Stack Mechanics (pushProvider & popProvider)</span>
+            </div>
+            <span className="badge-pill">Internal Engine</span>
+          </div>
+
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+            Walk through how React's Fiber reconciler maintains an internal <strong>value cursor stack</strong> during Depth-First-Search (DFS) traversal to achieve $O(1)$ context lookups without tree scanning.
+          </p>
+
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {steps.map((s, idx) => (
+              <button
+                key={idx}
+                className={`btn btn-sm ${step === idx ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => {
+                  setStep(idx);
+                  emitLog('info', `Fiber Stack Step ${idx + 1}: ${s.label}`);
+                }}
+              >
+                Step {idx + 1}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ background: '#090d18', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontWeight: 700, color: 'var(--accent-cyan)', fontSize: '0.9rem' }}>
+                {steps[step].label}
+              </span>
+              <span className="mono" style={{ color: 'var(--accent-emerald)', fontSize: '0.82rem' }}>
+                {steps[step].cursor}
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-primary)', marginBottom: '12px' }}>
+              {steps[step].action}
+            </p>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', fontFamily: 'Fira Code', fontSize: '0.78rem', color: '#c7d2fe' }}>
+              {steps[step].stack.map((item, i) => (
+                <div key={i}>{item}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // TELEMETRY PANEL COMPONENT
+    // ==========================================
+    function TelemetryPanel() {
+      const [logs, setLogs] = useState([]);
+      const [filter, setFilter] = useState('ALL');
+
+      useEffect(() => {
+        const handler = (entry) => {
+          setLogs(prev => [entry, ...prev.slice(0, 49)]);
+        };
+        logListeners.add(handler);
+        return () => logListeners.delete(handler);
+      }, []);
+
+      const filteredLogs = logs.filter(l => {
+        if (filter === 'ALL') return true;
+        return l.type.toUpperCase() === filter;
+      });
+
+      return (
+        <div className="telemetry-panel">
+          <div className="telemetry-header">
+            <div className="telemetry-title">
+              <span>📡</span>
+              <span>Telemetry & Fiber Bus</span>
+            </div>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setLogs([])}>Clear</button>
+            </div>
+          </div>
+
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', gap: '6px' }}>
+            {['ALL', 'INFO', 'SUCCESS', 'WARN', 'ERROR'].map(f => (
+              <button 
+                key={f}
+                className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.7rem', padding: '2px 6px' }}
+                onClick={() => setFilter(f)}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          <div className="telemetry-body">
+            {filteredLogs.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>
+                Awaiting telemetry events...
+              </div>
+            ) : (
+              filteredLogs.map(l => (
+                <div key={l.id} className={`log-item ${l.type}`}>
+                  <span className="log-time">[{l.time}]</span>
+                  <span>{l.message}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN APP ROOT
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('interactive');
+
+      return (
+        <div className="app-container">
+          {/* Header Panel */}
+          <div className="header-panel">
+            <div className="header-top">
+              <div className="header-title-area">
+                <h1>KPI 11 — Part 06: Provider Composition, Nesting & Scoped Overrides</h1>
+                <div className="header-subtitle">
+                  <span>Level 06 — React Fundamentals</span>
+                  <span>•</span>
+                  <span>Interactive Deep Diagnostic Lab</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                <div className="authors-badge">
+                  <span>👑 Lead Architect: Srikar Kudurmalla</span>
+                  <span>•</span>
+                  <span>Co-Author: Prasenjeet</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span className="badge-pill">15-Pillar Gold Standard</span>
+                  <span className="badge-pill" style={{ borderColor: 'rgba(99,102,241,0.4)', color: '#a5b4fc', background: 'rgba(99,102,241,0.1)' }}>React 18 Fiber</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="tab-bar">
+            <button 
+              className={`tab-button ${activeTab === 'interactive' ? 'active' : ''}`}
+              onClick={() => setActiveTab('interactive')}
+            >
+              <span>🔬</span> Interactive Lab Modules
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'summary' ? 'active' : ''}`}
+              onClick={() => setActiveTab('summary')}
+            >
+              <span>📋</span> Architecture & Invariants Summary
+            </button>
+          </div>
+
+          {/* Main Grid */}
+          <div className="lab-grid">
+            <div>
+              {activeTab === 'interactive' ? (
+                <>
+                  <MultiTierShadowingModule />
+                  <MultiInstanceModule />
+                  <KeyedProviderModule />
+                  <InvertedDependencyModule />
+                  <FiberStackVisualizerModule />
+                </>
+              ) : (
+                <div className="card">
+                  <div className="card-header">
+                    <div className="card-title">
+                      <span>🏛️</span>
+                      <span>Part 06 Core Architectural Invariants</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                    <div className="stat-pill">
+                      <span className="label">Resolution Complexity</span>
+                      <span className="value" style={{ color: 'var(--accent-emerald)' }}>O(1)</span>
+                    </div>
+                    <div className="stat-pill">
+                      <span className="label">Stack Invariant</span>
+                      <span className="value" style={{ color: 'var(--accent-cyan)' }}>LIFO Cursor</span>
+                    </div>
+                    <div className="stat-pill">
+                      <span className="label">Provider Heap Scope</span>
+                      <span className="value" style={{ color: 'var(--accent-purple)' }}>Per-Instance</span>
+                    </div>
+                    <div className="stat-pill">
+                      <span className="label">DAG Constraint</span>
+                      <span className="value" style={{ color: 'var(--accent-rose)' }}>Strict Parent</span>
+                    </div>
+                  </div>
+
+                  <table className="stack-table">
+                    <thead>
+                      <tr>
+                        <th>Concept</th>
+                        <th>Core Mechanism</th>
+                        <th>Architectural Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Nearest Provider</strong></td>
+                        <td>Fiber stack cursor during beginWork</td>
+                        <td>Determines exact contextual value; inner shadows outer without mutation.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Context Token != Singleton</strong></td>
+                        <td>Single Context object, multiple mounted Provider fibers</td>
+                        <td>Enables independent multi-instance features (tabs, panes, modals).</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Dependency DAG</strong></td>
+                        <td>Parent-to-child context accessibility</td>
+                        <td>Inverting provider order causes runtime null pointer / context guard errors.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Keyed Remount</strong></td>
+                        <td>Changing React element <code>key</code> prop</td>
+                        <td>Destroys existing fiber state tree, initializing clean state partition.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Right Telemetry Column */}
+            <div>
+              <TelemetryPanel />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

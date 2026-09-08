@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 07: State Updates, Event Boundaries & Batching</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 12px;
+      border: 1px solid #21262d;
+      margin: 8px 0;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.primary:hover {
+      background: #388bfd;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+    .log-box {
+      background: #04070b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 160px;
+      overflow-y: auto;
+      color: #8b949e;
+      margin-top: auto;
+    }
+    .log-entry {
+      margin-bottom: 4px;
+      border-bottom: 1px dotted #21262d;
+      padding-bottom: 2px;
+    }
+    .log-entry.render { color: var(--purple); font-weight: bold; }
+    .log-entry.snapshot { color: var(--orange); }
+    .log-entry.queue { color: var(--green); }
+    .log-entry.event { color: var(--cyan); }
+    .metric {
+      display: inline-block;
+      margin-right: 16px;
+      font-size: 13px;
+    }
+    .metric strong {
+      color: #fff;
+      font-size: 15px;
+    }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 07: State Updates, Event Boundaries & Batching</h1>
+  <p class="subtitle">Interactive Diagnostic Sandbox for Render Snapshots, Update Queues, and Automatic Batching</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const { flushSync } = ReactDOM;
+
+    function DirectVsFunctionalSection() {
+      const [count, setCount] = useState(0);
+      const [renderPass, setRenderPass] = useState(1);
+      const [logs, setLogs] = useState([]);
+      const renderCount = useRef(1);
+
+      useEffect(() => {
+        renderCount.current += 1;
+      });
+
+      const addLog = (text, type = 'snapshot') => {
+        setLogs(prev => [...prev.slice(-8), { text, type, id: Date.now() + Math.random() }]);
+      };
+
+      const handleDirectTriple = () => {
+        addLog(`[Click Direct ×3] Current Snapshot count = ${count}`, 'event');
+        addLog(`1st setter: setCount(${count} + 1) => enqueued ${count + 1}`, 'queue');
+        setCount(count + 1);
+        addLog(`2nd setter: setCount(${count} + 1) => enqueued ${count + 1}`, 'queue');
+        setCount(count + 1);
+        addLog(`3rd setter: setCount(${count} + 1) => enqueued ${count + 1}`, 'queue');
+        setCount(count + 1);
+        addLog(`Immediate inspect: count in closure is still ${count}`, 'snapshot');
+      };
+
+      const handleFunctionalTriple = () => {
+        addLog(`[Click Functional ×3] Current Snapshot count = ${count}`, 'event');
+        addLog(`1st setter: setCount(c => c + 1)`, 'queue');
+        setCount(c => c + 1);
+        addLog(`2nd setter: setCount(c => c + 1)`, 'queue');
+        setCount(c => c + 1);
+        addLog(`3rd setter: setCount(c => c + 1)`, 'queue');
+        setCount(c => c + 1);
+        addLog(`Immediate inspect: count in closure is still ${count}`, 'snapshot');
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            1. Direct vs. Functional Updates
+            <span className="badge">Render #{renderCount.current}</span>
+          </h2>
+          <div style={{ margin: "8px 0" }}>
+            <span className="metric">Committed Count: <strong>{count}</strong></span>
+          </div>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 10px 0" }}>
+            Compare direct evaluation <code>setCount(count + 1)</code> against functional updater composition <code>setCount(c =&gt; c + 1)</code>.
+          </p>
+          <div className="btn-group">
+            <button className="primary" onClick={handleDirectTriple}>Direct ×3 (+1 only)</button>
+            <button className="primary" onClick={handleFunctionalTriple}>Functional ×3 (+3)</button>
+            <button onClick={() => { setCount(0); setLogs([]); }}>Reset</button>
+          </div>
+          <div className="log-box">
+            {logs.length === 0 ? <div style={{ fontStyle: "italic" }}>No actions recorded yet. Click a button.</div> : null}
+            {logs.map(log => (
+              <div key={log.id} className={`log-entry ${log.type}`}>{log.text}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function BatchingAndClosuresSection() {
+      const [valA, setValA] = useState(0);
+      const [valB, setValB] = useState(0);
+      const [status, setStatus] = useState("idle");
+      const [logs, setLogs] = useState([]);
+      const renders = useRef(0);
+      renders.current += 1;
+
+      const addLog = (text, type = 'event') => {
+        setLogs(prev => [...prev.slice(-8), { text, type, id: Date.now() + Math.random() }]);
+      };
+
+      const handleSyncBatch = () => {
+        addLog(`[Sync Event Handler] Dispatched 3 setters`, 'event');
+        setValA(a => a + 1);
+        setValB(b => b + 1);
+        setStatus("synced");
+        addLog(`All 3 queued in 1 batch. React will render once.`, 'queue');
+      };
+
+      const handleAsyncTimeoutBatch = () => {
+        addLog(`[setTimeout Boundary] Triggered async timer (0ms)`, 'event');
+        setTimeout(() => {
+          addLog(`[Inside setTimeout] Dispatched 2 setters in async callback`, 'event');
+          setValA(a => a + 10);
+          setValB(b => b + 10);
+          setStatus("async-batched");
+        }, 50);
+      };
+
+      const handleFlushSync = () => {
+        addLog(`[flushSync] Forcing immediate synchronous render flush`, 'snapshot');
+        flushSync(() => {
+          setValA(a => a + 100);
+        });
+        addLog(`After flushSync: valA state update already committed to DOM!`, 'queue');
+        flushSync(() => {
+          setValB(b => b + 100);
+        });
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            2. Automatic Batching & flushSync
+            <span className="badge">Total Renders: {renders.current}</span>
+          </h2>
+          <div style={{ margin: "8px 0" }}>
+            <span className="metric">Val A: <strong>{valA}</strong></span>
+            <span className="metric">Val B: <strong>{valB}</strong></span>
+            <span className="metric">Status: <strong>{status}</strong></span>
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={handleSyncBatch}>Sync Batch (3 setters)</button>
+            <button onClick={handleAsyncTimeoutBatch}>Async Timeout Batch</button>
+            <button className="danger" onClick={handleFlushSync}>flushSync Escape Hatch</button>
+          </div>
+          <div className="log-box">
+            {logs.length === 0 ? <div style={{ fontStyle: "italic" }}>Interact to observe batching behavior.</div> : null}
+            {logs.map(log => (
+              <div key={log.id} className={`log-entry ${log.type}`}>{log.text}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function MixedQueueCalculator() {
+      const [currentVal, setCurrentVal] = useState(0);
+      const [queueSteps, setQueueSteps] = useState([]);
+      const [simulatedResult, setSimulatedResult] = useState(0);
+
+      const runComplexMixedQueue = () => {
+        const initial = currentVal;
+        const steps = [
+          { label: "setCount(count + 1) [Direct]", run: (s) => initial + 1 },
+          { label: "setCount(count + 1) [Direct]", run: (s) => initial + 1 },
+          { label: "setCount(c => c + 1) [Functional]", run: (s) => s + 1 },
+          { label: "setCount(100) [Direct Override]", run: (s) => 100 },
+          { label: "setCount(c => c * 2) [Functional]", run: (s) => s * 2 },
+        ];
+
+        let acc = initial;
+        const traces = [];
+        traces.push(`Initial S0 = ${initial}`);
+
+        // Step 1
+        acc = initial + 1;
+        traces.push(`U1 (Direct: ${initial}+1): ${acc}`);
+        // Step 2
+        acc = initial + 1;
+        traces.push(`U2 (Direct: ${initial}+1): ${acc}`);
+        // Step 3
+        acc = acc + 1;
+        traces.push(`U3 (Functional: +1): ${acc}`);
+        // Step 4
+        acc = 100;
+        traces.push(`U4 (Direct: 100): ${acc}`);
+        // Step 5
+        acc = acc * 2;
+        traces.push(`U5 (Functional: *2): ${acc}`);
+
+        setQueueSteps(traces);
+        setSimulatedResult(acc);
+
+        // Actually enqueue in React
+        setCurrentVal(initial + 1);
+        setCurrentVal(initial + 1);
+        setCurrentVal(c => c + 1);
+        setCurrentVal(100);
+        setCurrentVal(c => c * 2);
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            3. Crucible Queue Algebra Simulator
+            <span className="badge">Final: {currentVal}</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 10px 0" }}>
+            Simulate: <code>U1(Direct) → U2(Direct) → U3(+1) → U4(100) → U5(*2)</code>
+          </p>
+          <div className="btn-group">
+            <button className="primary" onClick={runComplexMixedQueue}>Execute Mixed Queue</button>
+            <button onClick={() => { setCurrentVal(0); setQueueSteps([]); }}>Reset to 0</button>
+          </div>
+          <div className="log-box">
+            {queueSteps.length === 0 ? <div style={{ fontStyle: "italic" }}>Click "Execute Mixed Queue" to run algebraic reduction.</div> : null}
+            {queueSteps.map((step, idx) => (
+              <div key={idx} className="log-entry queue">{step}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <DirectVsFunctionalSection />
+          <BatchingAndClosuresSection />
+          <MixedQueueCalculator />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

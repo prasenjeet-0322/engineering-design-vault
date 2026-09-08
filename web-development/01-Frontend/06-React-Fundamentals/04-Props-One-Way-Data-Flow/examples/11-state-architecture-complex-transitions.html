@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 11: State Architecture & Complex Transitions</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+      --yellow: #d29922;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .badge.ok {
+      background: #0d281e;
+      color: var(--green);
+      border-color: #1a7f37;
+    }
+    .badge.invalid {
+      background: #3c1418;
+      color: var(--red);
+      border-color: #8b181b;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+    .inspector {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      padding: 2px 0;
+      border-bottom: 1px dotted #1b2128;
+    }
+    .row:last-child { border-bottom: none; }
+    .val { color: var(--cyan); font-weight: bold; }
+    .log-box {
+      background: #04070b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 140px;
+      overflow-y: auto;
+      color: #8b949e;
+      margin-top: auto;
+    }
+    .log-entry { margin-bottom: 3px; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 11: State Architecture & Complex Transitions</h1>
+  <p class="subtitle">Interactive Diagnostic Sandbox for State Invariants, Finite Transitions, and Coherent State Modeling</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // 1. Boolean Explosion vs Explicit State Machine
+    function StateMachineSection() {
+      // Flawed Boolean Approach state:
+      const [boolLoading, setBoolLoading] = useState(false);
+      const [boolError, setBoolError] = useState(false);
+      const [boolSuccess, setBoolSuccess] = useState(false);
+
+      // Explicit State Machine Approach:
+      const [request, setRequest] = useState({
+        status: "idle", // "idle" | "loading" | "success" | "error"
+        data: null,
+        error: null
+      });
+
+      const handleBuggyFetch = () => {
+        // Simulates bug where previous error wasn't cleared
+        setBoolLoading(true);
+        setBoolError(true); // Contradictory impossible state: loading AND error!
+      };
+
+      const handleExplicitSubmit = () => {
+        setRequest({ status: "loading", data: null, error: null });
+        setTimeout(() => {
+          setRequest({ status: "success", data: "Payload #4029", error: null });
+        }, 600);
+      };
+
+      const handleExplicitFail = () => {
+        setRequest({ status: "loading", data: null, error: null });
+        setTimeout(() => {
+          setRequest({ status: "error", data: null, error: "Network Gateway Timeout" });
+        }, 600);
+      };
+
+      const isBooleanStateInvalid = boolLoading && boolError;
+
+      return (
+        <div className="card">
+          <h2>
+            1. Impossible States vs State Machine
+            <span className={`badge ${isBooleanStateInvalid ? "invalid" : "ok"}`}>
+              {isBooleanStateInvalid ? "INVALID BOOLEAN STATE" : "Valid State"}
+            </span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Multiple booleans permit impossible combinations. Explicit status restricts the model to valid states.
+          </p>
+          <div className="inspector">
+            <div className="row">
+              <span>Boolean Model:</span>
+              <span style={{ color: isBooleanStateInvalid ? "var(--red)" : "inherit" }}>
+                loading: {String(boolLoading)}, error: {String(boolError)}, success: {String(boolSuccess)}
+              </span>
+            </div>
+            <div className="row">
+              <span>Explicit Request Status:</span>
+              <span className="val">{request.status.toUpperCase()}</span>
+            </div>
+            <div className="row">
+              <span>Payload / Error:</span>
+              <span>{request.data || request.error || "(None)"}</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button className="danger" onClick={handleBuggyFetch}>Trigger Impossible Boolean State</button>
+            <button className="primary" onClick={handleExplicitSubmit}>Explicit Submit (Success)</button>
+            <button onClick={handleExplicitFail}>Explicit Submit (Failure)</button>
+            <button onClick={() => {
+              setBoolLoading(false); setBoolError(false); setBoolSuccess(false);
+              setRequest({ status: "idle", data: null, error: null });
+            }}>Reset</button>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Transactional Multi-Field Transition
+    function TransactionalSection() {
+      const [checkout, setCheckout] = useState({
+        step: 1,
+        address: "123 Main St",
+        paymentMethod: "Credit Card",
+        status: "idle",
+        error: null
+      });
+
+      const [cartItems] = useState([
+        { id: 1, name: "Keyboard", price: 100 },
+        { id: 2, name: "Mouse", price: 50 }
+      ]);
+
+      // Derived total price - NOT stored in state
+      const derivedTotal = cartItems.reduce((sum, item) => sum + item.price, 0);
+
+      const nextStep = () => {
+        setCheckout(prev => ({
+          ...prev,
+          step: Math.min(prev.step + 1, 3),
+          error: null
+        }));
+      };
+
+      const prevStep = () => {
+        setCheckout(prev => ({
+          ...prev,
+          step: Math.max(prev.step - 1, 1),
+          error: null
+        }));
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            2. Transactional Checkout Architecture
+            <span className="badge ok">Step {checkout.step} of 3</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            State transitions atomically advance steps, clear step-local errors, while total price is derived on the fly.
+          </p>
+          <div className="inspector">
+            <div className="row">
+              <span>Current Step:</span>
+              <span className="val">{checkout.step === 1 ? "1: Shipping" : checkout.step === 2 ? "2: Payment" : "3: Review & Submit"}</span>
+            </div>
+            <div className="row">
+              <span>Derived Cart Total:</span>
+              <span className="val">${derivedTotal}</span>
+            </div>
+            <div className="row">
+              <span>Payment Selected:</span>
+              <span>{checkout.paymentMethod}</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button onClick={prevStep} disabled={checkout.step === 1}>Previous Step</button>
+            <button className="primary" onClick={nextStep} disabled={checkout.step === 3}>Next Step</button>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Queue Algebra Trace
+    function QueueAlgebraSection() {
+      const [val, setVal] = useState(5);
+      const [traces, setTraces] = useState([]);
+
+      const handleFunctionalChain = () => {
+        setTraces([
+          "Initial snapshot: 5",
+          "Queued U1: c => c + 2",
+          "Queued U2: c => c * 3",
+          "Result: (5 + 2) * 3 = 21"
+        ]);
+        setVal(c => c + 2);
+        setVal(c => c * 3);
+      };
+
+      const handleDirectChain = () => {
+        setTraces([
+          "Initial snapshot: 5",
+          `Queued direct U1: ${val} + 2 = 7`,
+          `Queued direct U2: ${val} * 3 = 15`,
+          "Result: 15 (Second direct assignment overwrites first)"
+        ]);
+        setVal(val + 2);
+        setVal(val * 3);
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            3. Queue Algebra & Update Intent
+            <span className="badge">Value: {val}</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Compare functional updater composition <code>c =&gt; c + 2</code> followed by <code>c =&gt; c * 3</code> against direct closures.
+          </p>
+          <div className="btn-group">
+            <button className="primary" onClick={handleFunctionalChain}>Run Functional Chain</button>
+            <button onClick={handleDirectChain}>Run Direct Closure Chain</button>
+            <button onClick={() => { setVal(5); setTraces([]); }}>Reset (5)</button>
+          </div>
+          <div className="log-box">
+            {traces.length === 0 ? <div style={{ fontStyle: "italic" }}>Click a button to evaluate queue algebra.</div> : null}
+            {traces.map((t, i) => (
+              <div key={i} className="log-entry" style={{ color: "var(--cyan)" }}>{t}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <StateMachineSection />
+          <TransactionalSection />
+          <QueueAlgebraSection />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

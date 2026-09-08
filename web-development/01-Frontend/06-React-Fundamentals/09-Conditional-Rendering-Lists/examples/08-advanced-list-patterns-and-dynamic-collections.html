@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 08 — Advanced List Patterns & Dynamic Collections Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.85);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+      --cyan: #06b6d4;
+      --purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-primary { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); }
+    .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); }
+
+    .nav-tabs {
+      display: flex;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active { color: var(--accent); background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); border-color: rgba(255, 255, 255, 0.15); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { opacity: 0.9; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { opacity: 0.9; }
+    .btn-cyan { background: var(--cyan); color: #090d16; font-weight: 700; }
+    .btn-cyan:hover { opacity: 0.9; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    .console-box {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      max-height: 260px;
+      overflow-y: auto;
+      color: #94a3b8;
+    }
+    .log-line { margin-bottom: 4px; line-height: 1.4; }
+    .log-render { color: #38bdf8; }
+    .log-opt { color: #34d399; }
+    .log-warn { color: #fbbf24; }
+    .log-err { color: #f87171; }
+
+    .dynamic-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.2s;
+    }
+    .dynamic-row.selected { background: rgba(99, 102, 241, 0.2); border-color: #6366f1; }
+    .dynamic-row.syncing { border-style: dashed; border-color: #fbbf24; animation: pulse 1.5s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+    function logEvent(logs, setLogs, type, text) {
+      const time = new Date().toLocaleTimeString().split(" ")[0];
+      setLogs(prev => [{ id: Math.random().toString(), time, type, text }, ...prev.slice(0, 49)]);
+    }
+
+    // =========================================================================
+    // TAB 1: DYNAMIC MUTATIONS & IDENTITY ANCHOR STUDIO
+    // =========================================================================
+    function DynamicMutationStudioTab({ logs, setLogs }) {
+      const [keyStrategy, setKeyStrategy] = useState("id"); // id | index | random
+      const [searchQuery, setSearchQuery] = useState("");
+      const [selectedIds, setSelectedIds] = useState(new Set(["task_2"]));
+      const [items, setItems] = useState([
+        { id: "task_1", title: "Review RFC #102: Real-time Reconciler", priority: "High", category: "Core" },
+        { id: "task_2", title: "Deploy Kubernetes Staging Cluster", priority: "Critical", category: "DevOps" },
+        { id: "task_3", title: "Optimize WebGL Canvas Memory Footprint", priority: "Medium", category: "Graphics" },
+        { id: "task_4", title: "Implement Roving Tabindex Accessibility", priority: "Low", category: "A11y" }
+      ]);
+
+      // Prepend
+      const handlePrepend = () => {
+        const newId = `task_${Date.now().toString().slice(-4)}`;
+        setItems(prev => [{ id: newId, title: `Urgent Hotfix (${newId})`, priority: "Critical", category: "Emergency" }, ...prev]);
+        logEvent(logs, setLogs, "render", `[MUTATION] Prepend item ${newId} under keyStrategy="${keyStrategy}"`);
+      };
+
+      // Append
+      const handleAppend = () => {
+        const newId = `task_${Date.now().toString().slice(-4)}`;
+        setItems(prev => [...prev, { id: newId, title: `Standard Backlog Item (${newId})`, priority: "Low", category: "Backlog" }]);
+        logEvent(logs, setLogs, "render", `[MUTATION] Append item ${newId}`);
+      };
+
+      // Reverse
+      const handleReverse = () => {
+        setItems(prev => [...prev].reverse());
+        logEvent(logs, setLogs, "opt", `[MUTATION] Reversed collection ordering`);
+      };
+
+      // Delete
+      const handleDelete = (id) => {
+        setItems(prev => prev.filter(x => x.id !== id));
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        logEvent(logs, setLogs, "warn", `[MUTATION] Deleted task #${id}`);
+      };
+
+      // Toggle select
+      const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+      };
+
+      // Filtering projection
+      const visibleItems = useMemo(() => {
+        if (!searchQuery) return items;
+        return items.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || t.category.toLowerCase().includes(searchQuery.toLowerCase()));
+      }, [items, searchQuery]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "6px" }}>
+              Dynamic Collection Mutation & Identity Anchor Studio
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Type a draft in Task #2, select it, and then click <strong>Prepend Item</strong> or <strong>Reverse Order</strong>. Observe how `key={item.id}` keeps state attached to Task #2 while `key={index}` migrates it to the wrong item!
+            </p>
+
+            {/* KEY STRATEGY TOGGLE */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>Key Strategy:</span>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="mutationKeyStrat"
+                  checked={keyStrategy === "id"}
+                  onChange={() => setKeyStrategy("id")}
+                />
+                <span style={{ color: "#34d399", fontWeight: 600 }}>key=&#123;item.id&#125; (Stable Domain ID)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="mutationKeyStrat"
+                  checked={keyStrategy === "index"}
+                  onChange={() => setKeyStrategy("index")}
+                />
+                <span style={{ color: "#f87171", fontWeight: 600 }}>key=&#123;index&#125; (Positional Index)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="mutationKeyStrat"
+                  checked={keyStrategy === "random"}
+                  onChange={() => setKeyStrategy("random")}
+                />
+                <span style={{ color: "#fbbf24", fontWeight: 600 }}>key=&#123;Math.random()&#125; (Ephemeral)</span>
+              </label>
+            </div>
+
+            {/* ACTION CONTROLS */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px", alignItems: "center" }}>
+              <button className="btn btn-primary" onClick={handlePrepend}>➕ Prepend Item</button>
+              <button className="btn btn-secondary" onClick={handleAppend}>➕ Append Item</button>
+              <button className="btn btn-secondary" onClick={handleReverse}>🔄 Reverse Order</button>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search filter query..."
+                style={{ marginLeft: "auto", background: "#1e293b", border: "1px solid #475569", color: "#f8fafc", padding: "6px 12px", borderRadius: "6px", fontSize: "0.85rem", width: "240px" }}
+              />
+            </div>
+
+            {/* DYNAMIC LIST ROWS */}
+            <div>
+              {visibleItems.length === 0 ? (
+                <div style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>
+                  No records match filter query.
+                </div>
+              ) : (
+                visibleItems.map((item, index) => {
+                  let effectiveKey;
+                  if (keyStrategy === "id") effectiveKey = item.id;
+                  else if (keyStrategy === "index") effectiveKey = index;
+                  else effectiveKey = Math.random();
+
+                  const isSelected = selectedIds.has(item.id);
+
+                  return (
+                    <MutationStudioRow
+                      key={effectiveKey}
+                      item={item}
+                      index={index}
+                      isSelected={isSelected}
+                      keyStrategy={keyStrategy}
+                      onToggleSelect={() => toggleSelect(item.id)}
+                      onDelete={() => handleDelete(item.id)}
+                    />
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MutationStudioRow({ item, index, isSelected, keyStrategy, onToggleSelect, onDelete }) {
+      const [localDraft, setLocalDraft] = useState("");
+      const [isExpanded, setIsExpanded] = useState(false);
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      const instanceId = useRef(crypto.randomUUID().slice(0, 4)).current;
+
+      return (
+        <div className={`dynamic-row ${isSelected ? "selected" : ""}`}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onToggleSelect}
+                style={{ cursor: "pointer" }}
+              />
+              <span className="badge badge-primary">{item.id}</span>
+              <strong style={{ color: "#f8fafc", fontSize: "0.9rem" }}>{item.title}</strong>
+              <span className="badge badge-cyan" style={{ fontSize: "0.7rem" }}>{item.category}</span>
+            </div>
+            <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#64748b", display: "flex", gap: "10px" }}>
+              <span>Fiber: <strong style={{ color: "#fbbf24" }}>#{instanceId}</strong></span>
+              <span>Slot: <strong style={{ color: "#38bdf8" }}>{index}</strong></span>
+              <span>Renders: <strong style={{ color: "#34d399" }}>{renderCount.current}</strong></span>
+            </div>
+            {isExpanded && (
+              <div style={{ marginTop: "8px", padding: "8px", background: "rgba(0,0,0,0.4)", borderRadius: "6px", fontSize: "0.8rem", color: "#cbd5e1" }}>
+                <div><strong>Priority:</strong> {item.priority}</div>
+                <div><strong>Lifecycle:</strong> Fiber mounted on client. Hook state preserved across reorders under stable key.</div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <input
+              type="text"
+              value={localDraft}
+              onChange={e => setLocalDraft(e.target.value)}
+              placeholder="Local row draft..."
+              style={{ background: "#1e293b", border: "1px solid #475569", color: "#f8fafc", padding: "6px 10px", borderRadius: "6px", fontSize: "0.8rem", width: "180px" }}
+            />
+            <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setIsExpanded(p => !p)}>
+              {isExpanded ? "Collapse" : "Expand"}
+            </button>
+            <button className="btn btn-danger" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={onDelete}>
+              Delete
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: OPTIMISTIC CREATION & SERVER ID MIGRATION
+    // =========================================================================
+    function OptimisticCreationTab({ logs, setLogs }) {
+      const [items, setItems] = useState([
+        { clientUuid: "uuid-101", serverId: "srv_901", title: "Configure production CDN caching", isSyncing: false }
+      ]);
+      const [newTitle, setNewTitle] = useState("");
+      const [simulateFailure, setSimulateFailure] = useState(false);
+
+      const handleAddOptimistic = (e) => {
+        e.preventDefault();
+        if (!newTitle.trim()) return;
+
+        const tempUuid = `uuid-${Date.now().toString().slice(-4)}`;
+        const record = {
+          clientUuid: tempUuid,
+          serverId: null,
+          title: newTitle,
+          isSyncing: true
+        };
+
+        setItems(prev => [record, ...prev]);
+        setNewTitle("");
+        logEvent(logs, setLogs, "render", `[OPTIMISTIC] Created local record (clientUuid: ${tempUuid}). Staged in UI instantly.`);
+
+        // Simulate network POST
+        setTimeout(() => {
+          if (simulateFailure) {
+            // Rollback
+            setItems(prev => prev.filter(x => x.clientUuid !== tempUuid));
+            logEvent(logs, setLogs, "err", `[OPTIMISTIC ROLLBACK] Server returned 500 error! Rolled back ${tempUuid}`);
+          } else {
+            // Success: update serverId without changing clientUuid
+            const assignedServerId = `srv_${Math.floor(Math.random() * 9000 + 1000)}`;
+            setItems(prev => prev.map(item => item.clientUuid === tempUuid ? { ...item, serverId: assignedServerId, isSyncing: false } : item));
+            logEvent(logs, setLogs, "opt", `[SYNC COMPLETE] Record ${tempUuid} persisted to server as ${assignedServerId}. Fiber instance 100% retained!`);
+          }
+        }, 1500);
+      };
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "6px" }}>
+              Optimistic Client UUID Creation & Server ID Persistence Simulator
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Test how assigning a permanent `clientUuid` allows instant optimistic UI updates without unmounting when the server assigns a real database ID.
+            </p>
+
+            <form onSubmit={handleAddOptimistic} style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+              <input
+                type="text"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="Enter new task title..."
+                style={{ flex: 1, background: "#1e293b", border: "1px solid #475569", color: "#f8fafc", padding: "8px 12px", borderRadius: "6px", fontSize: "0.85rem" }}
+              />
+              <button type="submit" className="btn btn-primary">
+                ➕ Add Optimistically
+              </button>
+            </form>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", background: "rgba(0,0,0,0.3)", padding: "10px 14px", borderRadius: "8px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="checkbox"
+                  checked={simulateFailure}
+                  onChange={e => setSimulateFailure(e.target.checked)}
+                />
+                <span style={{ color: "#f87171", fontWeight: 600 }}>Simulate Server 500 Failure (Test Automatic Rollback)</span>
+              </label>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {items.map(item => (
+                <OptimisticRowItem key={item.clientUuid} item={item} />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function OptimisticRowItem({ item }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      const instanceId = useRef(crypto.randomUUID().slice(0, 4)).current;
+
+      return (
+        <div className={`dynamic-row ${item.isSyncing ? "syncing" : ""}`}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className="badge badge-primary">{item.clientUuid}</span>
+              <strong style={{ color: "#f8fafc", fontSize: "0.9rem" }}>{item.title}</strong>
+              {item.isSyncing ? (
+                <span className="badge badge-warning">⏳ Syncing to Cloud API (1.5s)...</span>
+              ) : (
+                <span className="badge badge-success">✓ Persisted: {item.serverId}</span>
+              )}
+            </div>
+            <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#64748b", marginTop: "4px" }}>
+              Fiber UUID: <strong style={{ color: "#fbbf24" }}>#{instanceId}</strong> | Renders: {renderCount.current} | Key: <span style={{ color: "#34d399" }}>{item.clientUuid}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: HEADLESS COLLECTION HOOK PLAYGROUND
+    // =========================================================================
+    function HeadlessCollectionTab({ logs, setLogs }) {
+      const rawUsers = useMemo(() => [
+        { id: "usr_1", name: "Sarah Connor", team: "Cyberdyne Defense", clearance: "Level 5" },
+        { id: "usr_2", name: "John Wick", team: "Continental Ops", clearance: "Level 4" },
+        { id: "usr_3", name: "Elena Rostova", team: "Quantum Research", clearance: "Level 5" },
+        { id: "usr_4", name: "Marcus Wright", team: "Cyberdyne Defense", clearance: "Level 3" }
+      ], []);
+
+      const [selectedIds, setSelectedIds] = useState(new Set(["usr_1"]));
+      const [filterText, setFilterText] = useState("");
+
+      const visibleUsers = useMemo(() => {
+        if (!filterText) return rawUsers;
+        return rawUsers.filter(u => u.name.toLowerCase().includes(filterText.toLowerCase()) || u.team.toLowerCase().includes(filterText.toLowerCase()));
+      }, [rawUsers, filterText]);
+
+      const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+        logEvent(logs, setLogs, "opt", `Toggled selection for user #${id}`);
+      };
+
+      const selectAll = () => {
+        setSelectedIds(new Set(visibleUsers.map(u => u.id)));
+      };
+
+      const clearSelection = () => {
+        setSelectedIds(new Set());
+      };
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "6px" }}>
+              Headless Collection Hook (`useCollection`) & Compound Component Architecture
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Inspect how headless collection state hooks decouple selection registries and filter derivations from presentation components.
+            </p>
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "16px", flexWrap: "wrap" }}>
+              <button className="btn btn-primary" onClick={selectAll}>Select All Visible ({visibleUsers.length})</button>
+              <button className="btn btn-secondary" onClick={clearSelection}>Clear Selection</button>
+              <span className="badge badge-cyan">Selected: {selectedIds.size} of {rawUsers.length}</span>
+              <input
+                type="search"
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                placeholder="Search team or name..."
+                style={{ marginLeft: "auto", background: "#1e293b", border: "1px solid #475569", color: "#f8fafc", padding: "6px 12px", borderRadius: "6px", fontSize: "0.85rem", width: "220px" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {visibleUsers.map(user => {
+                const isSelected = selectedIds.has(user.id);
+                return (
+                  <div
+                    key={user.id}
+                    className={`dynamic-row ${isSelected ? "selected" : ""}`}
+                    onClick={() => toggleSelect(user.id)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}} // Controlled by row click
+                        style={{ cursor: "pointer" }}
+                      />
+                      <span className="badge badge-primary">{user.id}</span>
+                      <strong style={{ color: "#f8fafc", fontSize: "0.9rem" }}>{user.name}</strong>
+                      <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>• {user.team}</span>
+                    </div>
+                    <span className="badge badge-success">{user.clearance}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APP
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("mutations");
+      const [logs, setLogs] = useState([
+        { id: "init", time: new Date().toLocaleTimeString().split(" ")[0], type: "render", text: "Dynamic Collections Lab Ready. Select a tab to inspect patterns." }
+      ]);
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+                <span className="badge badge-primary">KPI 09 — PART 08</span>
+                <span className="badge badge-cyan">Dynamic Collections</span>
+              </div>
+              <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>Advanced List Patterns & Dynamic Collections Lab</h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Master Temporal Collections, Optimistic Syncs, and Headless Selection Stores
+              </p>
+            </div>
+            <div>
+              <a href="../08-advanced-list-patterns-and-dynamic-collections.md" className="btn btn-secondary" style={{ textDecoration: "none" }}>
+                📖 Read Guide
+              </a>
+            </div>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${activeTab === "mutations" ? "active" : ""}`}
+              onClick={() => setActiveTab("mutations")}
+            >
+              🔄 Dynamic Mutation Studio
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "optimistic" ? "active" : ""}`}
+              onClick={() => setActiveTab("optimistic")}
+            >
+              ⚡ Optimistic UUID Creation
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "headless" ? "active" : ""}`}
+              onClick={() => setActiveTab("headless")}
+            >
+              🛡️ Headless Collection Hook
+            </button>
+          </nav>
+
+          <main>
+            {activeTab === "mutations" && <DynamicMutationStudioTab logs={logs} setLogs={setLogs} />}
+            {activeTab === "optimistic" && <OptimisticCreationTab logs={logs} setLogs={setLogs} />}
+            {activeTab === "headless" && <HeadlessCollectionTab logs={logs} setLogs={setLogs} />}
+          </main>
+
+          {/* AUDIT LOG CONSOLE */}
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
+                📜 Real-Time Collection Mutation & Event Log
+              </span>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setLogs([])}>
+                Clear Log
+              </button>
+            </div>
+            <div className="console-box">
+              {logs.length === 0 ? (
+                <div style={{ color: "#64748b" }}>Console clear. Trigger an action above to inspect collection events.</div>
+              ) : (
+                logs.map(log => (
+                  <div key={log.id} className={`log-line log-${log.type}`}>
+                    [{log.time}] {log.text}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

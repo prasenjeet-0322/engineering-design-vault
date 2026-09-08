@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 05 — Effects vs Events, Derived Data & Render-Time Logic</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+
+    input {
+      background: #0d1527;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #fff;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+    input:focus { outline: none; border-color: var(--accent-cyan); }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 250px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line { display: flex; gap: 8px; align-items: center; }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-render { color: var(--accent-purple); font-weight: 600; }
+    .log-effect { color: var(--accent-amber); font-weight: 600; }
+    .log-event { color: var(--accent-green); font-weight: 600; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #0c121e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 4px;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const INITIAL_PRODUCTS = [
+      { id: 1, name: "React System Architecture Manual", price: 49 },
+      { id: 2, name: "Full-Stack Distributed Design Vault", price: 89 },
+      { id: 3, name: "Advanced TypeScript Mechanics Guide", price: 39 },
+      { id: 4, name: "Concurrent React & Scheduler Engine", price: 69 }
+    ];
+
+    // Implementation A: ANTI-PATTERN (Effects for Derived Data & Event-as-State)
+    function AntiPatternComponent({ onLog }) {
+      const [query, setQuery] = useState("");
+      const [filtered, setFiltered] = useState([]);
+      const [totalPrice, setTotalPrice] = useState(0);
+      const [submitRequested, setSubmitRequested] = useState(false);
+      const [submitStatus, setSubmitStatus] = useState("idle");
+
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      // Effect 1: Deriving filtered list via Effect
+      useEffect(() => {
+        onLog("ANTI-PATTERN", `[EFFECT #1] Deriving filtered products for query: "${query}"`, "effect");
+        const list = INITIAL_PRODUCTS.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+        setFiltered(list); // Triggers another render!
+      }, [query]);
+
+      // Effect 2: Deriving total price via Effect
+      useEffect(() => {
+        onLog("ANTI-PATTERN", `[EFFECT #2] Calculating total price for ${filtered.length} items`, "effect");
+        const sum = filtered.reduce((acc, p) => acc + p.price, 0);
+        setTotalPrice(sum); // Triggers yet another render!
+      }, [filtered]);
+
+      // Effect 3: Submitting form via Effect (Event-as-State)
+      useEffect(() => {
+        if (submitRequested) {
+          onLog("ANTI-PATTERN", `[EFFECT #3] Executing submit command from state flag!`, "effect");
+          setSubmitStatus("Submitting...");
+          setTimeout(() => {
+            setSubmitStatus("Submitted Successfully!");
+            setSubmitRequested(false);
+          }, 800);
+        }
+      }, [submitRequested]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}>
+            <span style={{ color: "var(--text-muted)" }}>Cascading Render Count:</span>
+            <span style={{ color: "var(--accent-red)", fontFamily: "var(--font-mono)", fontWeight: "700" }}>
+              {renderCount.current} Renders
+            </span>
+          </div>
+
+          <input
+            placeholder="Search products..."
+            value={query}
+            onChange={(e) => {
+              onLog("ANTI-PATTERN", `[EVENT] User typed "${e.target.value}"`, "event");
+              setQuery(e.target.value);
+            }}
+          />
+
+          <div style={{ fontSize: "0.85rem" }}>
+            <strong>Matching Items:</strong> {filtered.length} | <strong>Total:</strong> ${totalPrice}
+          </div>
+
+          <button
+            className="danger"
+            onClick={() => {
+              onLog("ANTI-PATTERN", `[EVENT] Clicked submit -> setSubmitRequested(true)`, "event");
+              setSubmitRequested(true);
+            }}
+          >
+            Submit Order (via State Flag)
+          </button>
+          <div style={{ fontSize: "0.75rem", color: "var(--accent-amber)" }}>Status: {submitStatus}</div>
+        </div>
+      );
+    }
+
+    // Implementation B: SENIOR PATTERN (Pure Render Calculation + Direct Event Handler)
+    function SeniorPatternComponent({ onLog }) {
+      const [query, setQuery] = useState("");
+      const [submitStatus, setSubmitStatus] = useState("idle");
+
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      // 1. Render Lane: Pure calculation during render (0 extra renders!)
+      const filtered = INITIAL_PRODUCTS.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      const totalPrice = filtered.reduce((acc, p) => acc + p.price, 0);
+
+      // 2. Event Lane: Direct command in handler
+      const handleSubmit = () => {
+        onLog("SENIOR", `[EVENT] Direct submit command triggered in handler!`, "event");
+        setSubmitStatus("Submitting...");
+        setTimeout(() => {
+          setSubmitStatus("Submitted Successfully!");
+        }, 800);
+      };
+
+      // 3. Effect Lane: Only genuine external synchronization (document.title)
+      useEffect(() => {
+        document.title = `Cart ($${totalPrice}) - Senior Lab 05`;
+        onLog("SENIOR", `[EFFECT] Synchronized document.title with total price ($${totalPrice})`, "effect");
+      }, [totalPrice]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}>
+            <span style={{ color: "var(--text-muted)" }}>Clean Render Count:</span>
+            <span style={{ color: "var(--accent-green)", fontFamily: "var(--font-mono)", fontWeight: "700" }}>
+              {renderCount.current} Renders (1:1 with Input)
+            </span>
+          </div>
+
+          <input
+            placeholder="Search products..."
+            value={query}
+            onChange={(e) => {
+              onLog("SENIOR", `[EVENT] User typed "${e.target.value}"`, "event");
+              setQuery(e.target.value);
+            }}
+          />
+
+          <div style={{ fontSize: "0.85rem" }}>
+            <strong>Matching Items:</strong> {filtered.length} | <strong>Total:</strong> ${totalPrice}
+          </div>
+
+          <button
+            className="active"
+            onClick={handleSubmit}
+          >
+            Submit Order (Direct Command)
+          </button>
+          <div style={{ fontSize: "0.75rem", color: "var(--accent-cyan)" }}>Status: {submitStatus}</div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [logsA, setLogsA] = useState([]);
+      const [logsB, setLogsB] = useState([]);
+
+      const logMessage = (target, text, type) => {
+        const time = new Date().toLocaleTimeString();
+        const entry = { id: Math.random(), time, text, type };
+        if (target === "ANTI-PATTERN") {
+          setLogsA(prev => [entry, ...prev.slice(0, 29)]);
+        } else {
+          setLogsB(prev => [entry, ...prev.slice(0, 29)]);
+        }
+      };
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 05: Effects vs Events & Derived Data Sandbox
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Direct Side-by-Side Comparison: Chained Effects / Event-as-State vs Pure Render Lane & Event Commands
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Column 1: Anti-Pattern */}
+            <div className="card">
+              <h2>
+                <span>1. Anti-Pattern: Chained Effects</span>
+                <span className="badge badge-tier">3 Renders per Key</span>
+              </h2>
+
+              <AntiPatternComponent onLog={logMessage} />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-muted)" }}>Telemetry Log (Anti-Pattern)</span>
+                <button onClick={() => setLogsA([])} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logsA.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Type in the search box to observe cascading renders.</div>
+                ) : (
+                  logsA.map(l => (
+                    <div key={l.id} className="log-line">
+                      <span className="log-time">[{l.time}]</span>
+                      <span className={`log-${l.type}`}>{l.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 2: Senior Pattern */}
+            <div className="card">
+              <h2>
+                <span>2. Senior Pattern: 3-Lane Architecture</span>
+                <span className="badge badge-green">1 Render per Key</span>
+              </h2>
+
+              <SeniorPatternComponent onLog={logMessage} />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-muted)" }}>Telemetry Log (Senior Pattern)</span>
+                <button onClick={() => setLogsB([])} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logsB.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Type in the search box to observe pure render derivation.</div>
+                ) : (
+                  logsB.map(l => (
+                    <div key={l.id} className="log-line">
+                      <span className="log-time">[{l.time}]</span>
+                      <span className={`log-${l.type}`}>{l.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

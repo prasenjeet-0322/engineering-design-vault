@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 12: Component Composition Patterns</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 12: Component Composition Patterns</h1>
+  <p class="subtitle">Interactive sandbox exploring Inversion of Control, Named Slots, Render Functions, and Boolean Prop Explosion Refactoring.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('booleanRefactor')">1. Boolean Explosion Refactor</button>
+    <button onclick="selectLab('namedSlots')">2. Named Slots & Layout Contracts</button>
+    <button onclick="selectLab('renderProps')">3. Render Functions (Data Injection)</button>
+    <button onclick="selectLab('compoundUI')">4. Compound Components Architecture</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Pattern Architecture & Code</h2>
+      <pre id="code-panel">// Architecture</pre>
+
+      <h2>Ownership & Inversion Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Composition Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Ownership: Inverted Structure</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architectural Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      booleanRefactor: {
+        code: `// ❌ Boolean Prop Explosion (1024 state variations):\n<Modal showIcon showHeader showCancel primaryVariant="danger" ... />\n\n// ✅ Semantic Composition (Inversion of Control):\n<Modal>\n  <Modal.Header><WarningIcon /><Modal.Title>Delete</Modal.Title></Modal.Header>\n  <Modal.Body>Are you sure?</Modal.Body>\n  <Modal.Footer><Button variant="danger">Confirm</Button></Modal.Footer>\n</Modal>`,
+        trace: `Modal owns backdrop and focus trapping. Caller supplies exact header, body, and action buttons without modal needing 20+ boolean flags.`,
+        verdict: `High Extensibility: Eliminates combinatorial state bugs while keeping Modal's behavior invariants intact.`,
+        rule: `Composition is inversion of control for UI structure: component owns behavior, caller owns content.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Clean Semantic Composition'
+      },
+      namedSlots: {
+        code: `// Explicit Slot Pattern:\nfunction PageSection({ header, actions, children }) {\n  return (\n    <section>\n      <header><div>{header}</div><div>{actions}</div></header>\n      <main>{children}</main>\n    </section>\n  );\n}\n\n<PageSection header={<h2>Users</h2>} actions={<CreateUserButton />}>\n  <UserTable />\n</PageSection>`,
+        trace: `PageSection owns responsive layout and semantic markup; caller injects concrete Header, Action buttons, and Table content into designated slots.`,
+        verdict: `Clear Boundaries: No prop drilling; Layout remains decoupled from the specific 'User' business domain.`,
+        rule: `Use named slots when the component has multiple semantically distinct structural regions.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Named Slots Pattern'
+      },
+      renderProps: {
+        code: `// Dynamic Data Render Function:\nfunction DataList({ items, children }) {\n  return <ul>{items.map(item => <li key={item.id}>{children(item)}</li>)}</ul>;\n}\n\n<DataList items={users}>\n  {user => <UserRow user={user} badge="Admin" />}\n</DataList>`,
+        trace: `DataList owns list semantics and iteration; Caller receives 'user' item at render time and completely controls how that user is visually represented.`,
+        verdict: `Behavior/Presentation Split: Allows complex list or virtualization abstractions without hardcoding row presentation.`,
+        rule: `Use a render function when the receiving component must pass component-owned data to caller-controlled rendering.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Render Function Pattern'
+      },
+      compoundUI: {
+        code: `// Compound Component System:\n<Tabs defaultValue="account">\n  <Tabs.List>\n    <Tabs.Tab value="account">Account</Tabs.Tab>\n    <Tabs.Tab value="security">Security</Tabs.Tab>\n  </Tabs.List>\n  <Tabs.Panel value="account"><AccountForm /></Tabs.Panel>\n  <Tabs.Panel value="security"><SecurityForm /></Tabs.Panel>\n</Tabs>`,
+        trace: `Tabs root coordinates active tab state. List, Tab, and Panel communicate through internal context to present an intuitive, declarative public API.`,
+        verdict: `Expressive Domain API: Groups related components around a shared conceptual abstraction with zero prop configuration glue.`,
+        rule: `Compound components expose structural arrangement to callers while maintaining cohesive internal behavioral invariants.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Compound Component API'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('booleanRefactor');
+  </script>
+</body>
+</html>

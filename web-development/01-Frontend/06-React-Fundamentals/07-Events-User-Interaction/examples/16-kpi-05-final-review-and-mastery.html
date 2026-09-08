@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 16 — KPI 05 Final Review & Mastery</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(56, 189, 248, 0.15));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .exam-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .exam-q {
+      font-weight: 600;
+      color: var(--accent-cyan);
+      font-size: 0.88rem;
+    }
+
+    .exam-answer {
+      background: rgba(56, 189, 248, 0.08);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      color: #d1d5db;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-green {
+      background-color: #15803d;
+      border-color: var(--accent-green);
+    }
+
+    .log-container {
+      max-height: 480px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef } = React;
+
+    const GRADUATION_QUESTIONS = [
+      {
+        id: 1,
+        title: "Examination 1 — Queue Update Algebra",
+        prompt: "What is the final state after setCount(count + 1); setCount(count + 1); setCount(c => c + 1); on initial count=0?",
+        answer: "Final count is 2. The first two set operations enqueue replace with 1 (from closure snapshot 0+1). The third functional update takes the queued 1 and computes 1 + 1 = 2."
+      },
+      {
+        id: 2,
+        title: "Examination 2 — Out-of-Order Stale Response",
+        prompt: "Why can Req A (1000ms) and Req B (200ms) corrupt the UI without request identity?",
+        answer: "Req B completes at 200ms. Req A completes at 1000ms. Without request identity tokens, Req A's stale response commits second, overwriting the newer Req B data."
+      },
+      {
+        id: 3,
+        title: "Examination 3 — Debounce vs Latest-Wins in Search",
+        prompt: "Why is debounce alone insufficient for search-as-you-type?",
+        answer: "Debounce reduces keystroke invocation rates, but does not prevent out-of-order network latency. A slow debounced request can still resolve after a newer debounced request."
+      },
+      {
+        id: 4,
+        title: "Examination 4 — Payment Mutations vs Latest-Wins",
+        prompt: "Why is latest-wins dangerous for payments?",
+        answer: "Payments are independent financial side-effects. Discarding a prior payment because another was started can lead to unacknowledged charges and double-billing."
+      },
+      {
+        id: 5,
+        title: "Examination 5 — Nested Card Propagation",
+        prompt: "How should a Card click (open details) vs Delete button click be architected?",
+        answer: "Prefer component decomposition (CardContent separate from CardActions) or explicit event.stopPropagation() on the delete handler."
+      },
+      {
+        id: 6,
+        title: "Examination 6 — Disabled Button vs Idempotency",
+        prompt: "Why does <button disabled={loading}> not guarantee mutation uniqueness?",
+        answer: "Disabled buttons are client UI presentation guards. They do not protect against multi-tab submissions, network retries, script replays, or browser crashes."
+      },
+      {
+        id: 7,
+        title: "Examination 7 — Form State Dimensions",
+        prompt: "What are the 5 distinct concerns of a production form?",
+        answer: "1. Form values, 2. Interaction metadata (touched/dirty), 3. Derived validation, 4. Submission lifecycle (idle/submitting/success/error), 5. Server/remote errors."
+      },
+      {
+        id: 8,
+        title: "Examination 8 — Dynamic Entity Keys",
+        prompt: "Why can key={index} cause input state bugs during row deletions?",
+        answer: "Index identifies array position rather than entity identity. Removing an item shifts indices, causing React to reuse existing component instances for different data."
+      }
+    ];
+
+    function FinalMasteryLab() {
+      const [telemetry, setTelemetry] = useState([]);
+      const [revealedAnswers, setRevealedAnswers] = useState({});
+
+      const toggleAnswer = (id) => {
+        setRevealedAnswers(prev => ({ ...prev, [id]: !prev[id] }));
+        setTelemetry(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString(),
+            action: `Toggled Examination #${id} solution`
+          },
+          ...prev.slice(0, 15)
+        ]);
+      };
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🏆 Companion Lab 16 — KPI 05 Final Review & Mastery</span>
+                <span className="badge">Graduation Suite</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                Comprehensive Graduation Self-Assessment Suite & Architectural Decision Verification.
+              </p>
+            </div>
+            <button className="btn-green" onClick={() => {
+              const all = {};
+              GRADUATION_QUESTIONS.forEach(q => { all[q.id] = true; });
+              setRevealedAnswers(all);
+            }}>
+              Reveal All 8 Solutions
+            </button>
+          </header>
+
+          <div className="grid-2">
+            {/* LEFT COLUMN: 8 GRADUATION EXAMINATION CARDS */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div className="card">
+                <div className="card-title">
+                  <span>🎓 Graduation Examination Questions (KPI 05)</span>
+                  <span className="badge">8 Core Pillars</span>
+                </div>
+                {GRADUATION_QUESTIONS.map(q => (
+                  <div key={q.id} className="exam-box">
+                    <div className="exam-q">{q.title}</div>
+                    <div style={{ fontSize: "0.82rem", color: "#f3f4f6" }}>{q.prompt}</div>
+                    <div className="btn-row" style={{ marginTop: 4 }}>
+                      <button
+                        style={{ fontSize: "0.75rem", padding: "3px 8px" }}
+                        onClick={() => toggleAnswer(q.id)}
+                      >
+                        {revealedAnswers[q.id] ? "Hide Solution" : "Verify Architectural Reasoning"}
+                      </button>
+                    </div>
+                    {revealedAnswers[q.id] && (
+                      <div className="exam-answer">
+                        <strong>Solution: </strong> {q.answer}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: RECAP & TELEMETRY */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card">
+                <div className="card-title">
+                  <span>🗺️ Senior Interaction Pipeline Recap</span>
+                </div>
+                <pre style={{ background: "#090d16", padding: 12, borderRadius: 8, fontSize: "0.76rem", color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>
+USER INTENT
+  ↓
+EVENT DISPATCH (target / currentTarget / propagation)
+  ↓
+EVENT HANDLER (closure snapshot)
+  ↓
+STATE TRANSITION (direct / functional / machine)
+  ↓
+RENDER (new snapshot)
+  ↓
+COMMIT (DOM updates)
+  ↓
+ASYNC WORK (debounce / throttle / latest-wins / queue)
+  ↓
+CURRENTNESS CHECK (active request identity token)
+  ↓
+UI TRUTH
+                </pre>
+              </div>
+
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 Graduation Activity Log</span>
+                  <button onClick={() => setTelemetry([])} style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                    Clear
+                  </button>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>
+                      Interact with the examination cards to verify solutions...
+                    </div>
+                  ) : (
+                    telemetry.map(log => (
+                      <div key={log.id} className="log-item">
+                        <div className="log-header">
+                          <span>{log.action}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{log.time}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<FinalMasteryLab />);
+  </script>
+</body>
+</html>

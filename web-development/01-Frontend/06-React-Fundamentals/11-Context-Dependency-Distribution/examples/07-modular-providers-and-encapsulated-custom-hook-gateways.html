@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 11 — Part 07: Modular Providers & Encapsulated Custom Hook Gateways Lab</title>
+  <!-- React 18 and Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg-base: #0a0d14;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(28, 36, 56, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: #6366f1;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.06) 0%, transparent 60%);
+      background-attachment: fixed;
+    }
+
+    header {
+      padding: 1.5rem 2rem;
+      background: rgba(10, 13, 20, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge-tier {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 1rem;
+      overflow-x: auto;
+    }
+
+    .nav-tab-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .nav-tab-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+
+    .nav-tab-btn.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25));
+      border-color: var(--border-active);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .code-box {
+      background: #06090e;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    .btn {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #c7d2fe;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn:hover {
+      background: rgba(99, 102, 241, 0.35);
+      border-color: #818cf8;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+    }
+
+    .btn-emerald:hover {
+      background: rgba(16, 185, 129, 0.35);
+      border-color: #34d399;
+      color: #fff;
+    }
+
+    .btn-rose {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+    }
+
+    .btn-rose:hover {
+      background: rgba(244, 63, 94, 0.35);
+      border-color: #fb7185;
+      color: #fff;
+    }
+
+    .render-badge {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .render-badge.highlight {
+      background: rgba(244, 63, 94, 0.2);
+      color: #fb7185;
+      border-color: #f43f5e;
+      animation: pulse 0.4s ease-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+
+    .input-text {
+      width: 100%;
+      background: #090d16;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .input-text:focus {
+      border-color: var(--accent-indigo);
+    }
+
+    .editor-textarea {
+      width: 100%;
+      min-height: 120px;
+      background: #080c14;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 0.75rem;
+      color: #e2e8f0;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+      resize: vertical;
+      outline: none;
+      line-height: 1.4;
+    }
+
+    .editor-textarea:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    .error-box {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      font-family: 'Fira Code', monospace;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+    }
+
+    .status-pill.online {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pill.offline {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    footer {
+      margin-top: auto;
+      padding: 1.5rem 2rem;
+      background: rgba(10, 13, 20, 0.8);
+      border-top: 1px solid var(--border-subtle);
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useContext, createContext, useCallback, useMemo, useRef } = React;
+
+    // ==========================================
+    // 1. FEATURE IMPLEMENTATION: DOCUMENT EDITOR
+    // ==========================================
+
+    // Action Types
+    const EDITOR_ACTIONS = {
+      INIT: 'INIT',
+      UPDATE_CONTENT: 'UPDATE_CONTENT',
+      SAVE_START: 'SAVE_START',
+      SAVE_SUCCESS: 'SAVE_SUCCESS',
+      SAVE_FAILURE: 'SAVE_FAILURE',
+      UNDO: 'UNDO',
+      REDO: 'REDO',
+      CLEAR: 'CLEAR',
+    };
+
+    function editorReducer(state, action) {
+      switch (action.type) {
+        case EDITOR_ACTIONS.INIT:
+          return {
+            ...state,
+            documentId: action.payload.documentId,
+            content: action.payload.content,
+            isDirty: false,
+          };
+        case EDITOR_ACTIONS.UPDATE_CONTENT:
+          return {
+            ...state,
+            content: action.payload.text,
+            isDirty: true,
+            lastSavedTimestamp: null,
+            history: [...state.history, state.content],
+          };
+        case EDITOR_ACTIONS.SAVE_START:
+          return { ...state, isSaving: true, lastError: null };
+        case EDITOR_ACTIONS.SAVE_SUCCESS:
+          return {
+            ...state,
+            isSaving: false,
+            isDirty: false,
+            lastSavedTimestamp: action.payload.timestamp,
+          };
+        case EDITOR_ACTIONS.SAVE_FAILURE:
+          return { ...state, isSaving: false, lastError: action.payload.error };
+        case EDITOR_ACTIONS.CLEAR:
+          return { ...state, content: '', isDirty: true };
+        default:
+          return state;
+      }
+    }
+
+    function createInitialState(documentId, initialContent = '') {
+      return {
+        documentId,
+        content: initialContent,
+        isSaving: false,
+        isDirty: false,
+        lastSavedTimestamp: null,
+        lastError: null,
+        history: [],
+      };
+    }
+
+    // Private Context Descriptors (Unexported in real enterprise repo)
+    const DocumentEditorStateContext = createContext(null);
+    const DocumentEditorDispatchContext = createContext(null);
+
+    // Feature Modular Provider (Composition Root)
+    function DocumentEditorProvider({ documentId, initialContent = '', children }) {
+      const [state, dispatch] = useReducer(
+        editorReducer,
+        documentId,
+        (id) => createInitialState(id, initialContent)
+      );
+
+      return (
+        <DocumentEditorStateContext.Provider value={state}>
+          <DocumentEditorDispatchContext.Provider value={dispatch}>
+            {children}
+          </DocumentEditorDispatchContext.Provider>
+        </DocumentEditorStateContext.Provider>
+      );
+    }
+
+    // ==========================================
+    // 2. CUSTOM HOOK GATEWAYS & INVARIANT GUARDS
+    // ==========================================
+
+    // Read-Only State Gateway Hook
+    function useDocumentEditorState() {
+      const context = useContext(DocumentEditorStateContext);
+      if (context === null) {
+        throw new Error(
+          "❌ [useDocumentEditorState]: Invariant Violation! Hook consumed outside <DocumentEditorProvider>."
+        );
+      }
+      return context;
+    }
+
+    // Semantic Action/Command Gateway Hook
+    function useDocumentEditorCommands() {
+      const dispatch = useContext(DocumentEditorDispatchContext);
+      if (dispatch === null) {
+        throw new Error(
+          "❌ [useDocumentEditorCommands]: Invariant Violation! Hook consumed outside <DocumentEditorProvider>."
+        );
+      }
+
+      const updateContent = useCallback((text) => {
+        dispatch({ type: EDITOR_ACTIONS.UPDATE_CONTENT, payload: { text } });
+      }, [dispatch]);
+
+      const saveDocument = useCallback(async () => {
+        dispatch({ type: EDITOR_ACTIONS.SAVE_START });
+        try {
+          await new Promise((res) => setTimeout(res, 800));
+          dispatch({
+            type: EDITOR_ACTIONS.SAVE_SUCCESS,
+            payload: { timestamp: new Date().toLocaleTimeString() },
+          });
+          return true;
+        } catch (err) {
+          dispatch({ type: EDITOR_ACTIONS.SAVE_FAILURE, payload: { error: "Network timeout" } });
+          return false;
+        }
+      }, [dispatch]);
+
+      const clearContent = useCallback(() => {
+        dispatch({ type: EDITOR_ACTIONS.CLEAR });
+      }, [dispatch]);
+
+      return useMemo(() => ({
+        updateContent,
+        saveDocument,
+        clearContent,
+      }), [updateContent, saveDocument, clearContent]);
+    }
+
+    // Derived Selection / Metric Hook
+    function useDocumentEditorMetrics() {
+      const state = useDocumentEditorState();
+      const wordCount = state.content.trim() ? state.content.trim().split(/\s+/).length : 0;
+      const charCount = state.content.length;
+      return { wordCount, charCount, isDirty: state.isDirty, isSaving: state.isSaving };
+    }
+
+    // Combined Facade Hook (Coupled Anti-pattern for leaf action triggers)
+    function useDocumentEditor() {
+      const state = useDocumentEditorState();
+      const commands = useDocumentEditorCommands();
+      return { state, commands };
+    }
+
+    // ==========================================
+    // 3. ERROR BOUNDARY COMPONENT
+    // ==========================================
+    class LabErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, info) {
+        console.error("ErrorBoundary caught:", error, info);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="error-box">
+              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>🚨 Invariant Caught by Error Boundary:</div>
+              <div>{this.state.error?.message}</div>
+              <button 
+                className="btn btn-secondary" 
+                style={{ marginTop: '0.75rem' }}
+                onClick={() => this.setState({ hasError: false, error: null })}
+              >
+                Reset Boundary
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ==========================================
+    // 4. MODULE A & B COMPONENTS
+    // ==========================================
+
+    function IsolatedSaveButton() {
+      const { saveDocument } = useDocumentEditorCommands();
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button className="btn btn-emerald" onClick={saveDocument}>
+            💾 Save Document (Isolated Command)
+          </button>
+          <span className="render-badge">
+            Renders: {renderCount.current}
+          </span>
+        </div>
+      );
+    }
+
+    function CoupledSaveButton() {
+      const { state, commands } = useDocumentEditor();
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button className="btn btn-rose" onClick={commands.saveDocument}>
+            💾 Save Document (Coupled State+Command)
+          </button>
+          <span className="render-badge highlight">
+            Renders: {renderCount.current}
+          </span>
+        </div>
+      );
+    }
+
+    function EditorTextCanvas() {
+      const state = useDocumentEditorState();
+      const { updateContent } = useDocumentEditorCommands();
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Document Canvas ({state.documentId})
+            </span>
+            <span className="render-badge">Canvas Renders: {renderCount.current}</span>
+          </div>
+          <textarea
+            className="editor-textarea"
+            value={state.content}
+            onChange={(e) => updateContent(e.target.value)}
+            placeholder="Type content here to test re-render distribution across subscribers..."
+          />
+        </div>
+      );
+    }
+
+    function EditorStatusPill() {
+      const { wordCount, charCount, isDirty, isSaving } = useDocumentEditorMetrics();
+      const state = useDocumentEditorState();
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderTop: '1px solid var(--border-subtle)', marginTop: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <span>Words: <strong style={{ color: '#fff' }}>{wordCount}</strong></span>
+            <span>Chars: <strong style={{ color: '#fff' }}>{charCount}</strong></span>
+            <span>Status: {isSaving ? <span style={{ color: '#f59e0b' }}>Saving...</span> : isDirty ? <span style={{ color: '#f43f5e' }}>Unsaved Changes</span> : <span style={{ color: '#10b981' }}>Saved ({state.lastSavedTimestamp || 'clean'})</span>}</span>
+          </div>
+          <span className="render-badge">Renders: {renderCount.current}</span>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 5. MAIN LAB APP CONTAINER
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('telemetry');
+      const [isProviderMounted, setIsProviderMounted] = useState(true);
+      const [docKey, setDocKey] = useState('doc-1');
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          <header>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#6366f1', boxShadow: '0 0 10px #6366f1' }}></div>
+              <div>
+                <h1 style={{ fontSize: '1.15rem', fontWeight: 800 }}>KPI 11 — Part 07: Modular Providers & Gateways Lab</h1>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Enterprise Pattern: Encapsulated Custom Hooks, Private Contexts & Invariant Guards</p>
+              </div>
+            </div>
+            <span className="badge-tier">Tier: 🔴 Must Know</span>
+          </header>
+
+          <div className="container">
+            {/* Nav Tabs */}
+            <div className="nav-tabs">
+              <button 
+                className={`nav-tab-btn ${activeTab === 'telemetry' ? 'active' : ''}`}
+                onClick={() => setActiveTab('telemetry')}
+              >
+                🔬 Lab A: Re-render Isolation Telemetry
+              </button>
+              <button 
+                className={`nav-tab-btn ${activeTab === 'guards' ? 'active' : ''}`}
+                onClick={() => setActiveTab('guards')}
+              >
+                🛡️ Lab B: Fail-Fast Invariant Guards
+              </button>
+              <button 
+                className={`nav-tab-btn ${activeTab === 'multi-instance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('multi-instance')}
+              >
+                📦 Lab C: Multi-Instance Heap Partition
+              </button>
+              <button 
+                className={`nav-tab-btn ${activeTab === 'architecture' ? 'active' : ''}`}
+                onClick={() => setActiveTab('architecture')}
+              >
+                🏛️ Lab D: Architecture & Codemod Matrix
+              </button>
+            </div>
+
+            {/* TAB 1: RE-RENDER TELEMETRY */}
+            {activeTab === 'telemetry' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div className="card">
+                  <div className="card-header">
+                    <div className="card-title">
+                      <span>Keystroke Render Propagation Probe</span>
+                    </div>
+                    <button className="btn btn-secondary" onClick={() => setDocKey(`doc-${Date.now()}`)}>
+                      🔄 Reset Document Fiber Key
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                    Type in the document canvas below. Observe how <code>useDocumentEditorCommands()</code> isolates <strong>IsolatedSaveButton</strong> from re-renders (Renders: 1), while consuming the combined <code>useDocumentEditor()</code> causes <strong>CoupledSaveButton</strong> to re-render on every keystroke!
+                  </p>
+
+                  <DocumentEditorProvider key={docKey} documentId="financial-report-2026" initialContent="Annual growth projection: +24.8%...">
+                    <div className="grid-2">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <EditorTextCanvas />
+                        <EditorStatusPill />
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
+                          Subscriber Comparison Benchmarks:
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.05)', padding: '0.75rem', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>✅ Enterprise Standard: Isolated Command Gateway</span>
+                          <IsolatedSaveButton />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(244, 63, 94, 0.05)', padding: '0.75rem', borderRadius: '6px', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#fda4af', fontWeight: 600 }}>❌ Anti-Pattern: Coupled Facade Hook in Leaf Button</span>
+                          <CoupledSaveButton />
+                        </div>
+                      </div>
+                    </div>
+                  </DocumentEditorProvider>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: INVARIANT GUARDS */}
+            {activeTab === 'guards' && (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-title">
+                    <span>Fail-Fast Invariant Guard Sandbox</span>
+                  </div>
+                  <button 
+                    className={`btn ${isProviderMounted ? 'btn-rose' : 'btn-emerald'}`}
+                    onClick={() => setIsProviderMounted(!isProviderMounted)}
+                  >
+                    {isProviderMounted ? 'Unmount <DocumentEditorProvider>' : 'Mount <DocumentEditorProvider>'}
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                  Enterprise hooks must throw immediate, descriptive errors when rendered outside their Provider. Toggle the Provider mounting to see the Invariant Guard fail-fast mechanism in action.
+                </p>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  Status: {isProviderMounted ? <span className="status-pill online">Provider Active in Fiber Tree</span> : <span className="status-pill offline">Provider Missing (Null Context)</span>}
+                </div>
+
+                <LabErrorBoundary>
+                  {isProviderMounted ? (
+                    <DocumentEditorProvider documentId="guard-test-doc" initialContent="Provider is mounted safely.">
+                      <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1.25rem', borderRadius: '8px' }}>
+                        <EditorTextCanvas />
+                        <EditorStatusPill />
+                      </div>
+                    </DocumentEditorProvider>
+                  ) : (
+                    <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1.25rem', borderRadius: '8px' }}>
+                      <EditorTextCanvas />
+                    </div>
+                  )}
+                </LabErrorBoundary>
+              </div>
+            )}
+
+            {/* TAB 3: MULTI-INSTANCE PARTITION */}
+            {activeTab === 'multi-instance' && (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-title">
+                    <span>Multi-Instance Memory Heap Isolation</span>
+                  </div>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                  Two independent <code>DocumentEditorProvider</code> instances mounted side-by-side. Keystrokes and saves in Instance A do not affect Instance B, proving that Context Tokens back isolated runtime Fiber memory heaps.
+                </p>
+
+                <div className="grid-2">
+                  <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '1.25rem', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--accent-indigo)', marginBottom: '0.75rem' }}>
+                      📦 Instance 1: Document Alpha (doc-001)
+                    </div>
+                    <DocumentEditorProvider documentId="doc-001" initialContent="Alpha workspace draft notes...">
+                      <EditorTextCanvas />
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <IsolatedSaveButton />
+                      </div>
+                      <EditorStatusPill />
+                    </DocumentEditorProvider>
+                  </div>
+
+                  <div style={{ background: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.2)', padding: '1.25rem', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '0.75rem' }}>
+                      📦 Instance 2: Document Beta (doc-002)
+                    </div>
+                    <DocumentEditorProvider documentId="doc-002" initialContent="Beta workspace marketing copy...">
+                      <EditorTextCanvas />
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <IsolatedSaveButton />
+                      </div>
+                      <EditorStatusPill />
+                    </DocumentEditorProvider>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: ARCHITECTURE MATRIX */}
+            {activeTab === 'architecture' && (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-title">
+                    <span>Modular Feature Architecture & Ast Codemod Reference</span>
+                  </div>
+                </div>
+
+                <div className="grid-2">
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--accent-cyan)' }}>
+                      Module Boundary Rules
+                    </h3>
+                    <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.7', paddingLeft: '1.2rem' }}>
+                      <li><strong>Private Tokens:</strong> <code>createContext</code> descriptors are never exported from <code>index.ts</code>.</li>
+                      <li><strong>Encapsulated Reducers:</strong> Reducer dispatch and action strings remain hidden within the feature module.</li>
+                      <li><strong>Semantic Commands:</strong> Expose named business actions like <code>saveDocument()</code>, never raw <code>dispatch()</code>.</li>
+                      <li><strong>Fail-Fast Guards:</strong> Validate <code>context !== null</code> in every custom hook call site.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--accent-indigo)' }}>
+                      JSCodeshift AST Codemod
+                    </h3>
+                    <div className="code-box">
+{`// AST Transform: useContext(RawContext) -> useFeatureHook()
+root.find(j.CallExpression, {
+  callee: { name: 'useContext' },
+  arguments: [{ name: 'EditorStateContext' }]
+}).replaceWith(
+  j.callExpression(j.identifier('useEditorState'), [])
+);`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <footer>
+            Level 06 — React Fundamentals | KPI 11: Context & Dependency Distribution | Lead Architect: Srikar Kudurmalla & Prasenjeet
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

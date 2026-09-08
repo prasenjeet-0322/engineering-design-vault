@@ -18,11 +18,11 @@ JSX is neither HTML nor a template language; it is a direct syntactic extension 
 
 | Part & File | Focus & Engineering Scope | Scaffolded Spec |
 | :--- | :--- | :---: |
-| [01. JSX Mental Model & Compilation Mechanics](./01-jsx-compilation-mental-model.md) | JSX as JavaScript syntax, modern `react/jsx-runtime` vs legacy `React.createElement`, Babel/SWC transformation output, JSX expressions vs statements. | 📋 Scaffolded |
-| [02. React Element Objects & Tree Immutability](./02-element-objects-immutability.md) | V8 Heap representation of React Elements, `$$typeof: Symbol.for('react.element')`, `type`, `props`, `key`, `ref`, frozen immutability, Element vs Component vs Instance. | 📋 Scaffolded |
-| [03. Expressions, Props, Children & Fragments](./03-conditional-rendering-fragments.md) | Expression slots `{ }`, prop spreading, `children` normalization (single vs array vs function), `React.Fragment` vs `<>` syntax, keyed fragments. | 📋 Scaffolded |
-| [04. Conditional UI, Lists & Element Identity](./04-lists-and-keys-foundations.md) | Truthy/Falsy short-circuit traps (`0 && <Component />`, `NaN`), ternary vs early return, list keys reconciliation mechanics, why index keys break stateful inputs. | 📋 Scaffolded |
-| [05. JSX Production Traps, Crucible & Senior Defense](./05-jsx-crucible-production-traps.md) | Dynamic tags (`<Tag />` vs `<tag />`), XSS security & JSON injection protection, Anti-patterns teardown, Decision matrices, Invariant set, Senior interview defense. | 📋 Scaffolded |
+| [01. JSX Mental Model & Compilation Mechanics](./01-jsx-compilation-mental-model.md) | JSX as JavaScript syntax, modern `react/jsx-runtime` vs legacy `React.createElement`, Babel/SWC transformation output, JSX expressions vs statements. | ✅ Completed |
+| [02. React Element Objects & Tree Immutability](./02-element-objects-immutability.md) | V8 Heap representation of React Elements, `$$typeof: Symbol.for('react.element')`, `type`, `props`, `key`, `ref`, frozen immutability, Element vs Component vs Instance. | ✅ Completed |
+| [03. Expressions, Props, Children & Fragments](./03-conditional-rendering-fragments.md) | Expression slots `{ }`, prop spreading, `children` normalization (single vs array vs function), `React.Fragment` vs `<>` syntax, keyed fragments. | ✅ Completed |
+| [04. Conditional UI, Lists & Element Identity](./04-lists-and-keys-foundations.md) | Truthy/Falsy short-circuit traps (`0 && <Component />`, `NaN`), ternary vs early return, list keys reconciliation mechanics, why index keys break stateful inputs. | ✅ Completed |
+| [05. JSX Production Traps, Crucible & Senior Defense](./05-jsx-crucible-production-traps.md) | Dynamic tags (`<Tag />` vs `<tag />`), XSS security & JSON injection protection, Anti-patterns teardown, Decision matrices, Invariant set, Senior interview defense. | ✅ Completed |
 
 ---
 

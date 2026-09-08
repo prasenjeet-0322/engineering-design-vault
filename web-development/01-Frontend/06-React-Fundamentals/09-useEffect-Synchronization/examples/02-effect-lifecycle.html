@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 02 — Effect Lifecycle: Setup, Cleanup & Re-Synchronization</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    button.danger:hover { background: rgba(239, 68, 68, 0.3); }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-setup { color: var(--accent-green); font-weight: 600; }
+    .log-cleanup { color: var(--accent-amber); font-weight: 600; }
+    .log-error { color: var(--accent-red); font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #0c121e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 4px;
+    }
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .state-machine-box {
+      background: #0d1527;
+      border: 1px dashed var(--accent-cyan);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .badge-active-room {
+      background: rgba(168, 85, 247, 0.2);
+      border: 1px solid var(--accent-purple);
+      color: #c084fc;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Simulated External Notification / Socket Service
+    class MockChatServer {
+      constructor() {
+        this.activeSockets = new Map();
+        this.listeners = new Set();
+      }
+
+      connect(roomId, instanceId) {
+        const socketId = `sock_${Math.random().toString(36).substr(2, 6)}`;
+        const record = { socketId, roomId, instanceId, connectedAt: Date.now() };
+        this.activeSockets.set(socketId, record);
+        this.notify();
+        return {
+          socketId,
+          disconnect: () => {
+            this.activeSockets.delete(socketId);
+            this.notify();
+          }
+        };
+      }
+
+      addListener(cb) {
+        this.listeners.add(cb);
+        return () => this.listeners.delete(cb);
+      }
+
+      notify() {
+        const list = Array.from(this.activeSockets.values());
+        this.listeners.forEach(cb => cb(list));
+      }
+    }
+
+    const chatServer = new MockChatServer();
+
+    // Lab Component 1: Chat Room Synchronization
+    function ChatRoom({ roomId, roomKey, onLog, isStrictMode }) {
+      const effectCount = useRef(0);
+
+      useEffect(() => {
+        const instanceId = ++effectCount.current;
+        onLog(`[SETUP #${instanceId}] Synchronizing with room: "${roomId}" (key: ${roomKey})`, "setup");
+
+        const connection = chatServer.connect(roomId, instanceId);
+
+        return () => {
+          onLog(`[CLEANUP #${instanceId}] Disconnecting from room: "${roomId}" (Socket: ${connection.socketId})`, "cleanup");
+          connection.disconnect();
+        };
+      }, [roomId, roomKey]);
+
+      return (
+        <div style={{ padding: "16px", background: "#0c1524", borderRadius: "8px", border: "1px solid #1e293b" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span style={{ fontSize: "0.9rem", color: "var(--text-muted)" }}>Mounted Component:</span>
+            <span className="badge-active-room">ChatRoom (key="{roomKey}")</span>
+          </div>
+          <p style={{ fontSize: "1.1rem", fontWeight: "600", color: "#fff" }}>
+            Active Channel: <span style={{ color: "var(--accent-cyan)" }}>#{roomId}</span>
+          </p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "6px" }}>
+            When <code>roomId</code> changes, React runs cleanup for the previous room before running setup for the new room.
+          </p>
+        </div>
+      );
+    }
+
+    // Lab Component 2: Timer Leak vs Clean Teardown
+    function LeakyTimer({ onTick }) {
+      useEffect(() => {
+        const id = setInterval(() => {
+          onTick();
+        }, 1000);
+        // BUG: Missing clearInterval cleanup!
+      }, []);
+
+      return (
+        <div style={{ color: "var(--accent-red)", fontSize: "0.85rem", padding: "8px", background: "rgba(239, 68, 68, 0.1)", borderRadius: "6px" }}>
+          ⚠️ Leaky Timer mounted without cleanup! Unmounting will NOT stop the browser interval.
+        </div>
+      );
+    }
+
+    function CleanTimer({ onTick }) {
+      useEffect(() => {
+        const id = setInterval(() => {
+          onTick();
+        }, 1000);
+        return () => {
+          clearInterval(id);
+        };
+      }, []);
+
+      return (
+        <div style={{ color: "var(--accent-green)", fontSize: "0.85rem", padding: "8px", background: "rgba(34, 197, 94, 0.1)", borderRadius: "6px" }}>
+          ✅ Clean Timer mounted with matching <code>clearInterval(id)</code> cleanup!
+        </div>
+      );
+    }
+
+    // Main Dashboard
+    function App() {
+      // Chat Room State
+      const [roomId, setRoomId] = useState("general");
+      const [roomKey, setRoomKey] = useState("A");
+      const [isMounted, setIsMounted] = useState(true);
+      const [activeSockets, setActiveSockets] = useState([]);
+      const [logs, setLogs] = useState([]);
+      const [setupCount, setSetupCount] = useState(0);
+      const [cleanupCount, setCleanupCount] = useState(0);
+
+      // Timer State
+      const [timerMode, setTimerMode] = useState("clean"); // 'clean' or 'leaky'
+      const [timerMounted, setTimerMounted] = useState(false);
+      const [totalTicks, setTotalTicks] = useState(0);
+      const [activeTickRate, setActiveTickRate] = useState(0);
+      const recentTicks = useRef(0);
+
+      // Listen to external server
+      useEffect(() => {
+        return chatServer.addListener((list) => {
+          setActiveSockets(list);
+        });
+      }, []);
+
+      // Calculate ticks/sec
+      useEffect(() => {
+        const rateInterval = setInterval(() => {
+          setActiveTickRate(recentTicks.current);
+          recentTicks.current = 0;
+        }, 1000);
+        return () => clearInterval(rateInterval);
+      }, []);
+
+      const logMessage = (text, type) => {
+        const time = new Date().toLocaleTimeString();
+        if (type === "setup") setSetupCount(c => c + 1);
+        if (type === "cleanup") setCleanupCount(c => c + 1);
+        setLogs(prev => [{ time, text, type, id: Math.random() }, ...prev.slice(0, 49)]);
+      };
+
+      const handleTick = () => {
+        setTotalTicks(t => t + 1);
+        recentTicks.current += 1;
+      };
+
+      const clearLogs = () => {
+        setLogs([]);
+        setSetupCount(0);
+        setCleanupCount(0);
+      };
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 02: Effect Lifecycle Diagnostic Lab
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Interactive Verification of Setup, Cleanup, Re-Synchronization, and Resource Symmetry
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Experiment 1: Chat Room Synchronization */}
+            <div className="card">
+              <h2>
+                <span>1. Room Synchronization & Identity</span>
+                <span className="badge badge-green">External Connection</span>
+              </h2>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Room Prop:</span>
+                {["general", "engineering", "design", "random"].map(r => (
+                  <button
+                    key={r}
+                    className={roomId === r ? "active" : ""}
+                    onClick={() => setRoomId(r)}
+                  >
+                    #{r}
+                  </button>
+                ))}
+              </div>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Component Identity:</span>
+                <button
+                  className={roomKey === "A" ? "active" : ""}
+                  onClick={() => setRoomKey("A")}
+                >
+                  key="A"
+                </button>
+                <button
+                  className={roomKey === "B" ? "active" : ""}
+                  onClick={() => setRoomKey("B")}
+                >
+                  key="B"
+                </button>
+                <button
+                  className={isMounted ? "danger" : "active"}
+                  onClick={() => setIsMounted(!isMounted)}
+                >
+                  {isMounted ? "Unmount Component" : "Mount Component"}
+                </button>
+              </div>
+
+              {isMounted ? (
+                <ChatRoom
+                  key={roomKey}
+                  roomId={roomId}
+                  roomKey={roomKey}
+                  onLog={logMessage}
+                />
+              ) : (
+                <div style={{ padding: "16px", background: "#131b2e", borderRadius: "8px", color: "var(--text-muted)", fontStyle: "italic", textAlign: "center" }}>
+                  Component is unmounted. All Effect cleanups should have executed.
+                </div>
+              )}
+
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Total Setups</div>
+                  <div className="stat-val" style={{ color: "var(--accent-green)" }}>{setupCount}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Cleanups</div>
+                  <div className="stat-val" style={{ color: "var(--accent-amber)" }}>{cleanupCount}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Active Sockets</div>
+                  <div className="stat-val" style={{ color: activeSockets.length > 1 ? "var(--accent-red)" : "var(--accent-cyan)" }}>
+                    {activeSockets.length}
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Symmetry Delta</div>
+                  <div className="stat-val" style={{ color: (setupCount - cleanupCount === (isMounted ? 1 : 0)) ? "var(--accent-green)" : "var(--accent-red)" }}>
+                    {setupCount - cleanupCount}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-muted)" }}>Telemetry Audit Log</span>
+                <button onClick={clearLogs} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear Log</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No lifecycle events recorded yet. Switch rooms or unmount to observe.</div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className="log-line">
+                      <span className="log-time">[{log.time}]</span>
+                      <span className={`log-${log.type}`}>{log.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Experiment 2: Timer Multiplication Incident */}
+            <div className="card">
+              <h2>
+                <span>2. Timer Multiplication Incident Sandbox</span>
+                <span className="badge badge-tier">Leak Simulation</span>
+              </h2>
+
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Demonstrates Section 31–32: What happens when an Effect acquires an external timer without returning <code>clearInterval</code> on cleanup.
+              </p>
+
+              <div className="control-panel">
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Implementation:</span>
+                <button
+                  className={timerMode === "clean" ? "active" : ""}
+                  onClick={() => setTimerMode("clean")}
+                >
+                  ✅ Clean (with clearInterval)
+                </button>
+                <button
+                  className={timerMode === "leaky" ? "danger active" : "danger"}
+                  onClick={() => setTimerMode("leaky")}
+                >
+                  ❌ Leaky (missing cleanup)
+                </button>
+              </div>
+
+              <div className="control-panel">
+                <button
+                  className={timerMounted ? "danger" : "active"}
+                  onClick={() => setTimerMounted(!timerMounted)}
+                >
+                  {timerMounted ? "Unmount Timer Component" : "Mount Timer Component"}
+                </button>
+                <button onClick={() => setTotalTicks(0)} style={{ fontSize: "0.8rem" }}>
+                  Reset Tick Counter
+                </button>
+              </div>
+
+              {timerMounted ? (
+                timerMode === "clean" ? (
+                  <CleanTimer onTick={handleTick} />
+                ) : (
+                  <LeakyTimer onTick={handleTick} />
+                )
+              ) : (
+                <div style={{ padding: "12px", background: "#131b2e", borderRadius: "8px", color: "var(--text-muted)", textAlign: "center", fontSize: "0.85rem" }}>
+                  Timer component unmounted. If you used the "Leaky" mode, observe if ticks continue to fire!
+                </div>
+              )}
+
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Current Tick Rate</div>
+                  <div className="stat-val" style={{ color: activeTickRate > 1 ? "var(--accent-red)" : "var(--accent-cyan)" }}>
+                    {activeTickRate} ticks/sec
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Total Ticks</div>
+                  <div className="stat-val" style={{ color: "var(--accent-purple)" }}>{totalTicks}</div>
+                </div>
+              </div>
+
+              <div className="state-machine-box">
+                <strong style={{ color: "var(--accent-cyan)" }}>Production Incident Analysis:</strong>
+                <span>
+                  • In <strong>Clean Mode</strong>: Mounting adds 1 interval (1 tick/sec). Unmounting clears it (0 ticks/sec).
+                </span>
+                <span>
+                  • In <strong>Leaky Mode</strong>: Every time you Mount $\rightarrow$ Unmount $\rightarrow$ Mount, a new interval leaks into the browser event loop. The tick rate permanently multiplies (2, 3, 4 ticks/sec)!
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

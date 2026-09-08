@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 - Part 04: Event Arguments & Handler Contracts Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-accent: #4f46e5;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-violet: #8b5cf6;
+      --code-bg: #030712;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-emerald));
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    /* Interaction Patterns Sandbox */
+    .pattern-card {
+      background: var(--bg-tertiary);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .pattern-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      background: rgba(31, 41, 55, 0.9);
+    }
+
+    .pattern-card.danger {
+      border-left: 4px solid var(--accent-rose);
+    }
+
+    .pattern-card.warning {
+      border-left: 4px solid var(--accent-amber);
+    }
+
+    .pattern-card.success {
+      border-left: 4px solid var(--accent-emerald);
+    }
+
+    .pattern-card.info {
+      border-left: 4px solid var(--accent-cyan);
+    }
+
+    .pattern-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .pattern-tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .tag-danger { background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+    .tag-warning { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .tag-success { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-info { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.3); }
+
+    .code-block {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.82rem;
+      background: var(--code-bg);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e5e7eb;
+      overflow-x: auto;
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-indigo), #4338ca);
+      color: white;
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #4f46e5, #3730a3); transform: translateY(-1px); }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: var(--accent-emerald);
+    }
+    .btn-emerald:hover { background: rgba(16, 185, 129, 0.3); }
+
+    .btn-rose {
+      background: rgba(244, 63, 94, 0.2);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: var(--accent-rose);
+    }
+    .btn-rose:hover { background: rgba(244, 63, 94, 0.3); }
+
+    .btn-cyan {
+      background: rgba(6, 182, 212, 0.2);
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      color: var(--accent-cyan);
+    }
+    .btn-cyan:hover { background: rgba(6, 182, 212, 0.3); }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+    .btn-secondary:hover { background: #374151; color: white; }
+
+    /* 3-Layer Visualizer */
+    .flow-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #0d131f;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.85rem;
+    }
+
+    .flow-badge {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .flow-arrow {
+      text-align: center;
+      color: var(--accent-cyan);
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+
+    /* Live Telemetry Log */
+    .telemetry-log {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      height: 280px;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-item {
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--accent-indigo);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .log-item.event-log { border-color: var(--accent-cyan); }
+    .log-item.adapter-log { border-color: var(--accent-amber); }
+    .log-item.domain-log { border-color: var(--accent-emerald); }
+    .log-item.error-log { border-color: var(--accent-rose); background: rgba(244, 63, 94, 0.05); }
+
+    .log-time {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+
+    /* User Row Table Component */
+    .user-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .user-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .user-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Quiz Card */
+    .quiz-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .quiz-option {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .quiz-option:hover {
+      border-color: var(--accent-indigo);
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    .quiz-option.correct {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--accent-emerald);
+      color: var(--accent-emerald);
+    }
+
+    .quiz-option.wrong {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: var(--accent-rose);
+      color: var(--accent-rose);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, memo } = React;
+
+    // Component: App Root
+    function App() {
+      const [logs, setLogs] = useState([]);
+      const [users, setUsers] = useState([
+        { id: "u1", name: "Asha Sharma", role: "Staff Architect" },
+        { id: "u2", name: "Ravi Kumar", role: "Senior Engineer" },
+        { id: "u3", name: "Maya Patel", role: "DevOps Specialist" },
+      ]);
+      const [renderCount, setRenderCount] = useState(0);
+      const [activeQuiz, setActiveQuiz] = useState(0);
+      const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+      const addLog = (type, title, payload) => {
+        setLogs(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            time: new Date().toISOString().substring(11, 23),
+            type,
+            title,
+            payload: typeof payload === 'object' ? JSON.stringify(payload) : String(payload)
+          },
+          ...prev.slice(0, 49)
+        ]);
+      };
+
+      const clearLogs = () => setLogs([]);
+
+      // Domain handlers
+      const handleDeleteUser = (userId) => {
+        addLog("domain-log", "🏛️ DOMAIN ACTION: deleteUser(userId)", {
+          receivedType: typeof userId,
+          value: userId,
+          isEventObject: userId && typeof userId === 'object' && 'nativeEvent' in userId
+        });
+        setUsers(prev => prev.filter(u => u.id !== userId));
+      };
+
+      const handleViewUser = (user) => {
+        addLog("domain-log", "👤 DOMAIN ACTION: viewUser(userObject)", {
+          id: user.id,
+          name: user.name,
+          role: user.role
+        });
+      };
+
+      // Quiz Questions
+      const quizQuestions = [
+        {
+          q: "What does `onClick={deleteUser}` pass to `deleteUser`?",
+          options: [
+            { text: "The selected entity's ID", isCorrect: false },
+            { text: "The React SyntheticEvent object", isCorrect: true },
+            { text: "Nothing (undefined)", isCorrect: false },
+            { text: "The button's DOM node", isCorrect: false }
+          ],
+          explanation: "React always invokes plain event handlers with the SyntheticEvent as the 1st parameter."
+        },
+        {
+          q: "Why is `<button onClick={deleteUser(id)}>` problematic?",
+          options: [
+            { text: "It fails to compile in TypeScript", isCorrect: false },
+            { text: "It executes immediately during component rendering", isCorrect: true },
+            { text: "It deletes all users at once", isCorrect: false },
+            { text: "React automatically cancels immediate function calls", isCorrect: false }
+          ],
+          explanation: "Parentheses mean 'CALL IT NOW'. The function evaluates during render, assigning its return value (undefined) to onClick."
+        },
+        {
+          q: "What is the primary role of `onClick={() => onDelete(user.id)}`?",
+          options: [
+            { text: "It prevents memory leaks in React", isCorrect: false },
+            { text: "It is an adapter bridging React's (event)=>void contract to (id)=>void", isCorrect: true },
+            { text: "It enables concurrent rendering mode", isCorrect: false },
+            { text: "It forces a full component remount", isCorrect: false }
+          ],
+          explanation: "The inline arrow function acts as an adapter, closing over the render-scope ID and discarding the unneeded DOM event."
+        }
+      ];
+
+      return (
+        <div className="container">
+          {/* Header */}
+          <header className="header-card">
+            <div className="header-badge">Level 06 • KPI 05 • Part 04</div>
+            <h1 className="header-title">
+              <span>🎯</span> Event Arguments & Handler Contracts Lab
+            </h1>
+            <p className="header-subtitle">
+              Interactive diagnostic laboratory for inspecting adapter closures, argument timing, and decoupled 3-layer component contracts.
+            </p>
+          </header>
+
+          {/* Main Grid */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 1: Handler Timing & Adapter Simulator */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>⚡</span> Handler Attachment & Invocation Pitfalls
+              </div>
+
+              {/* Pattern A: Direct Function Ref */}
+              <div className="pattern-card warning">
+                <div className="pattern-header">
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>1. Direct Reference: `onClick={fn}`</span>
+                  <span className="pattern-tag tag-warning">Receives Event</span>
+                </div>
+                <div className="code-block">&lt;button onClick=&#123;handleDirect&#125;&gt;Direct Click&lt;/button&gt;</div>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={(e) => {
+                    addLog("event-log", "⚡ React Direct Handler Invocation", {
+                      argType: typeof e,
+                      constructor: e.constructor.name,
+                      targetTag: e.target.tagName,
+                      clientX: e.clientX,
+                      note: "React supplied the SyntheticEvent object as 1st param!"
+                    });
+                  }}
+                >
+                  Trigger `onClick={handleDirect}`
+                </button>
+              </div>
+
+              {/* Pattern B: Immediate Call on Render */}
+              <div className="pattern-card danger">
+                <div className="pattern-header">
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>2. Immediate Render Call: `onClick={fn()}`</span>
+                  <span className="pattern-tag tag-danger">Critical Bug</span>
+                </div>
+                <div className="code-block">&lt;button onClick=&#123;handleImmediate("u1")&#125;&gt;Immediate&lt;/button&gt;</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    className="btn btn-rose"
+                    onClick={() => {
+                      addLog("error-log", "💥 SIMULATION: fn() executed during render!", {
+                        symptom: "Execution occurred before user clicked!",
+                        assignedValue: "undefined",
+                        risk: "Uncontrolled state update loops / instant deletion on mount"
+                      });
+                    }}
+                  >
+                    Simulate Render-Time Execution
+                  </button>
+                </div>
+              </div>
+
+              {/* Pattern C: Proper Adapter */}
+              <div className="pattern-card success">
+                <div className="pattern-header">
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>3. Inline Adapter: `onClick=&#123;() => fn(id)&#125;`</span>
+                  <span className="pattern-tag tag-success">Senior Standard</span>
+                </div>
+                <div className="code-block">&lt;button onClick=&#123;() =&gt; deleteUser(user.id)&#125;&gt;Adapter&lt;/button&gt;</div>
+                <button 
+                  className="btn btn-emerald"
+                  onClick={() => {
+                    addLog("adapter-log", "🔄 Adapter Closed Over Render Scope", {
+                      closedOverId: "u1",
+                      eventForwarded: false,
+                      semanticContract: "deleteUser('u1')"
+                    });
+                    handleDeleteUser("u1");
+                  }}
+                >
+                  Trigger Semantic Adapter (`"u1"`)
+                </button>
+              </div>
+
+              {/* Pattern D: Combined Event + Domain */}
+              <div className="pattern-card info">
+                <div className="pattern-header">
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>4. Combined: `onClick=&#123;(e) => fn(id, e)&#125;`</span>
+                  <span className="pattern-tag tag-info">Domain + Context</span>
+                </div>
+                <div className="code-block">&lt;button onClick=&#123;(e) =&gt; onAction(id, e)&#125;&gt;Combined&lt;/button&gt;</div>
+                <button 
+                  className="btn btn-cyan"
+                  onClick={(e) => {
+                    addLog("adapter-log", "📦 Combined Adapter Invocation", {
+                      domainId: "u2",
+                      modifierShift: e.shiftKey,
+                      pointerType: e.nativeEvent.pointerType || "mouse",
+                      contract: "onAction(id, event)"
+                    });
+                  }}
+                >
+                  Trigger Combined (`"u2"`, shift-aware)
+                </button>
+              </div>
+
+            </div>
+
+            {/* Panel 2: 3-Layer Contract & Entity Table */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🏗️</span> Three-Layer Architecture Sandbox
+              </div>
+
+              {/* 3-Layer Architectural Pipeline */}
+              <div className="flow-diagram">
+                <div className="flow-step">
+                  <span className="flow-badge" style={{ background: 'rgba(6, 182, 212, 0.2)', color: 'var(--accent-cyan)' }}>Layer 1</span>
+                  <span><strong>UI / React Event:</strong> Browser SyntheticEvent (`e.target`, `clientX`)</span>
+                </div>
+                <div className="flow-arrow">▼ Adapter Translation</div>
+                <div className="flow-step">
+                  <span className="flow-badge" style={{ background: 'rgba(245, 158, 11, 0.2)', color: 'var(--accent-amber)' }}>Layer 2</span>
+                  <span><strong>Component Interaction:</strong> `UserRow` emits semantic `onDelete(userId)`</span>
+                </div>
+                <div className="flow-arrow">▼ Domain Action</div>
+                <div className="flow-step">
+                  <span className="flow-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: 'var(--accent-emerald)' }}>Layer 3</span>
+                  <span><strong>Application State:</strong> State reducer updates collection (no DOM coupling)</span>
+                </div>
+              </div>
+
+              {/* Interactive Entity Table */}
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Active User Entities ({users.length})
+                  </span>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ fontSize: '0.72rem', padding: '4px 10px' }}
+                    onClick={() => {
+                      setUsers([
+                        { id: "u1", name: "Asha Sharma", role: "Staff Architect" },
+                        { id: "u2", name: "Ravi Kumar", role: "Senior Engineer" },
+                        { id: "u3", name: "Maya Patel", role: "DevOps Specialist" },
+                      ]);
+                      addLog("domain-log", "♻️ Reset Entities to Initial State", { count: 3 });
+                    }}
+                  >
+                    Reset List
+                  </button>
+                </div>
+
+                <table className="user-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name & Role</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map(user => (
+                      <tr key={user.id}>
+                        <td style={{ fontFamily: 'Fira Code', color: 'var(--accent-cyan)' }}>{user.id}</td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{user.name}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{user.role}</div>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button 
+                              className="btn btn-secondary"
+                              style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+                              onClick={() => handleViewUser(user)}
+                            >
+                              Inspect
+                            </button>
+                            <button 
+                              className="btn btn-rose"
+                              style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+                              onClick={() => handleDeleteUser(user.id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {users.length === 0 && (
+                      <tr>
+                        <td colSpan="3" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                          All users deleted. Click "Reset List" above.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Grid: Live Telemetry & Crucible Quiz */}
+          <div className="dashboard-grid">
+            
+            {/* Live Telemetry Inspector */}
+            <div className="panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="panel-title" style={{ border: 'none', padding: 0 }}>
+                  <span>📡</span> Live Argument & Contract Telemetry
+                </div>
+                <button 
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+                  onClick={clearLogs}
+                >
+                  Clear Feed
+                </button>
+              </div>
+
+              <div className="telemetry-log">
+                {logs.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '100px' }}>
+                    Click any action above to inspect event argument extraction and handler contracts...
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div key={log.id} className={`log-item ${log.type}`}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong style={{ color: '#fff' }}>{log.title}</strong>
+                        <span className="log-time">{log.time}</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', wordBreak: 'break-all' }}>
+                        {log.payload}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Crucible Quiz */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🔥</span> Crucible Prediction Challenge ({activeQuiz + 1} / {quizQuestions.length})
+              </div>
+
+              <div className="quiz-container">
+                <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#f3f4f6' }}>
+                  {quizQuestions[activeQuiz].q}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {quizQuestions[activeQuiz].options.map((opt, i) => {
+                    let className = "quiz-option";
+                    if (selectedAnswer !== null) {
+                      if (opt.isCorrect) className += " correct";
+                      else if (selectedAnswer === i) className += " wrong";
+                    }
+                    return (
+                      <div 
+                        key={i} 
+                        className={className}
+                        onClick={() => {
+                          if (selectedAnswer === null) {
+                            setSelectedAnswer(i);
+                            addLog(
+                              opt.isCorrect ? "domain-log" : "error-log",
+                              `🧪 Crucible Answer: ${opt.isCorrect ? 'CORRECT' : 'INCORRECT'}`,
+                              { explanation: quizQuestions[activeQuiz].explanation }
+                            );
+                          }
+                        }}
+                      >
+                        <span style={{ fontFamily: 'Fira Code', fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedAnswer !== null && (
+                  <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Architect Note:</strong> {quizQuestions[activeQuiz].explanation}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedAnswer === null}
+                    style={{ opacity: selectedAnswer === null ? 0.5 : 1 }}
+                    onClick={() => {
+                      setSelectedAnswer(null);
+                      setActiveQuiz((prev) => (prev + 1) % quizQuestions.length);
+                    }}
+                  >
+                    Next Question ➡️
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

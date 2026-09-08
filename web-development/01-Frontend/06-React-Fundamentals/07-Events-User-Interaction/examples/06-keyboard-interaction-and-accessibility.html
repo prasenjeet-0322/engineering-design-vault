@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 - Part 06: Keyboard Interaction & Accessibility Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-accent: #4f46e5;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-violet: #8b5cf6;
+      --code-bg: #030712;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    .header-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-indigo), var(--accent-cyan), var(--accent-emerald));
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent-indigo);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    /* Focus & Keyboards */
+    .form-input {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      outline: none;
+      width: 100%;
+      transition: all 0.15s ease;
+    }
+
+    .form-input:focus-visible {
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--accent-cyan);
+      outline-offset: 2px;
+    }
+
+    .btn-primary { background: linear-gradient(135deg, var(--accent-indigo), #4338ca); color: white; }
+    .btn-emerald { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: var(--accent-emerald); }
+    .btn-rose { background: rgba(244, 63, 94, 0.2); border: 1px solid rgba(244, 63, 94, 0.4); color: var(--accent-rose); }
+    .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+
+    .custom-div-btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      background: var(--bg-tertiary);
+      border: 1px dashed var(--accent-amber);
+      color: var(--accent-amber);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+    }
+    .custom-div-btn:focus-visible {
+      outline: 2px solid var(--accent-amber);
+      outline-offset: 2px;
+    }
+
+    .telemetry-box {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 250px;
+    }
+
+    .key-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+    }
+
+    .log-item {
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--accent-indigo);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .log-item.keydown { border-color: var(--accent-cyan); }
+    .log-item.keyup { border-color: var(--accent-amber); }
+    .log-item.action { border-color: var(--accent-emerald); }
+
+    /* Modal Overlay */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-accent);
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Quiz */
+    .quiz-option {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .quiz-option:hover { border-color: var(--accent-indigo); background: rgba(99, 102, 241, 0.1); }
+    .quiz-option.correct { background: rgba(16, 185, 129, 0.15); border-color: var(--accent-emerald); color: var(--accent-emerald); }
+    .quiz-option.wrong { background: rgba(244, 63, 94, 0.15); border-color: var(--accent-rose); color: var(--accent-rose); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function App() {
+      const [keyLogs, setKeyLogs] = useState([]);
+      const [activeElementTag, setActiveElementTag] = useState("BODY");
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [paletteOpen, setPaletteOpen] = useState(false);
+      const [nativeClickCount, setNativeClickCount] = useState(0);
+      const [customClickCount, setCustomClickCount] = useState(0);
+
+      // Quiz State
+      const [activeQuiz, setActiveQuiz] = useState(0);
+      const [selectedAnswer, setSelectedAnswer] = useState(null);
+
+      const modalInputRef = useRef(null);
+
+      // Track active element focus changes
+      useEffect(() => {
+        const updateFocus = () => {
+          if (document.activeElement) {
+            const tag = document.activeElement.tagName;
+            const id = document.activeElement.id ? `#${document.activeElement.id}` : "";
+            const role = document.activeElement.getAttribute("role") ? `[role=${document.activeElement.getAttribute("role")}]` : "";
+            setActiveElementTag(`${tag}${id}${role}`);
+          }
+        };
+
+        window.addEventListener("focusin", updateFocus);
+        return () => window.removeEventListener("focusin", updateFocus);
+      }, []);
+
+      // Global Command Palette Shortcut Listener (with input guard)
+      useEffect(() => {
+        const handleGlobalKeyDown = (e) => {
+          const isModifier = e.metaKey || e.ctrlKey;
+          
+          if (isModifier && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            setPaletteOpen(prev => !prev);
+            logKey("action", "🌐 Global Command Shortcut (Meta+K / Ctrl+K)", { target: e.target.tagName });
+            return;
+          }
+
+          if (e.key === "Escape" && paletteOpen) {
+            setPaletteOpen(false);
+            logKey("action", "🌐 Command Palette Closed via Escape");
+          }
+        };
+
+        window.addEventListener("keydown", handleGlobalKeyDown);
+        return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+      }, [paletteOpen]);
+
+      // Focus management when modal opens
+      useEffect(() => {
+        if (isModalOpen && modalInputRef.current) {
+          modalInputRef.current.focus();
+        }
+      }, [isModalOpen]);
+
+      const logKey = (type, title, details = {}) => {
+        setKeyLogs(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            time: new Date().toISOString().substring(14, 23),
+            type,
+            title,
+            details
+          },
+          ...prev.slice(0, 39)
+        ]);
+      };
+
+      const handleKeyInspection = (e) => {
+        logKey(e.type === "keydown" ? "keydown" : "keyup", `${e.type.toUpperCase()}: "${e.key}"`, {
+          key: e.key,
+          code: e.code,
+          repeat: e.repeat,
+          modifiers: {
+            shift: e.shiftKey,
+            ctrl: e.ctrlKey,
+            alt: e.altKey,
+            meta: e.metaKey
+          },
+          target: e.target.tagName
+        });
+      };
+
+      const quizQuestions = [
+        {
+          q: "What is the key difference between `event.key` and `event.code`?",
+          options: [
+            { text: "`event.key` is boolean; `event.code` is string", isCorrect: false },
+            { text: "`event.key` represents the logical character/intent; `event.code` represents physical hardware key position", isCorrect: true },
+            { text: "`event.code` only works on macOS Safari", isCorrect: false },
+            { text: "`event.key` is deprecated in modern React", isCorrect: false }
+          ],
+          explanation: "event.key gives the layout-aware character (e.g. 'Z', 'Escape'), whereas event.code gives the physical keyboard scan code (e.g. 'KeyZ', 'Escape')."
+        },
+        {
+          q: "Why is `<button>` superior to `<div role='button' tabIndex={0}>`?",
+          options: [
+            { text: "Native `<button>` automatically handles Enter and Space keyboard activation, focus rings, and screen readers", isCorrect: true },
+            { text: "The browser deletes `<div>` elements during hydration", isCorrect: false },
+            { text: "Only native `<button>` can use `onClick`", isCorrect: false },
+            { text: "Native buttons load 10x faster in Webpack bundles", isCorrect: false }
+          ],
+          explanation: "The platform already provides keyboard activation (<kbd>Enter</kbd> & <kbd>Space</kbd>), standard focus styling, disabled semantics, and accessibility trees for native buttons."
+        },
+        {
+          q: "Why must global shortcut listeners inspect `document.activeElement`?",
+          options: [
+            { text: "To prevent interrupting user text typing inside `<input>` or `<textarea>`", isCorrect: true },
+            { text: "To bypass React's SyntheticEvent batching queue", isCorrect: false },
+            { text: "To force a synchronous commit phase", isCorrect: false },
+            { text: "Because `window` event listeners cannot read event properties", isCorrect: false }
+          ],
+          explanation: "Unconditional single-letter global listeners (like 'k') intercept normal typing inside text fields unless guarded."
+        }
+      ];
+
+      return (
+        <div className="container">
+          {/* Header */}
+          <header className="header-card">
+            <div className="header-badge">Level 06 • KPI 05 • Part 06</div>
+            <h1 className="header-title">
+              <span>⌨️</span> Keyboard Interaction & Accessibility Lab
+            </h1>
+            <p className="header-subtitle">
+              Interactive diagnostic laboratory for inspecting keyboard scan codes, active focus targets, native vs custom controls, and scoped modal dismissal.
+            </p>
+          </header>
+
+          {/* Top Grid: Key Inspector & Focus Status */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 1: Live Keystroke Inspection Target */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🎯</span> Keystroke Inspection Sandbox
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Focus this input and press any key combinations (try Shift, Arrows, Escape, held keys):
+                </label>
+                <input 
+                  id="inspectInput"
+                  className="form-input"
+                  placeholder="Type here to inspect keyboard events..."
+                  onKeyDown={handleKeyInspection}
+                  onKeyUp={handleKeyInspection}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                <span className="key-badge">Try: Meta + K</span>
+                <span className="key-badge">Try: Hold ArrowDown (repeat)</span>
+                <span className="key-badge">Try: Escape</span>
+                <span className="key-badge">Try: Tab / Shift+Tab</span>
+              </div>
+
+              <div style={{ padding: '10px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.2)', fontSize: '0.8rem' }}>
+                📍 <strong>Active Focus:</strong> <code style={{ color: 'var(--accent-cyan)' }}>{activeElementTag}</code>
+              </div>
+            </div>
+
+            {/* Panel 2: Live Keyboard Telemetry */}
+            <div className="panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="panel-title" style={{ border: 'none', padding: 0 }}>
+                  <span>📡</span> Live Keystroke Telemetry
+                </div>
+                <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '4px 8px' }} onClick={() => setKeyLogs([])}>
+                  Clear
+                </button>
+              </div>
+
+              <div className="telemetry-box">
+                {keyLogs.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '80px' }}>
+                    Press any keys in the inspection field to observe event stream...
+                  </div>
+                ) : (
+                  keyLogs.map(log => (
+                    <div key={log.id} className={`log-item ${log.type}`}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong style={{ color: '#fff' }}>{log.title}</strong>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{log.time}</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                        {JSON.stringify(log.details)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Middle Grid: Native <button> vs Custom <div> & Modal Escape Scope */}
+          <div className="dashboard-grid">
+            
+            {/* Panel 3: Semantic Button vs Clickable Div */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>⚔️</span> Native <code>&lt;button&gt;</code> vs Custom <code>&lt;div&gt;</code>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-emerald)', marginBottom: '6px' }}>
+                    1. Native &lt;button&gt; (Accessible by default: Tab, Enter, Space):
+                  </div>
+                  <button 
+                    id="nativeButton"
+                    className="btn btn-emerald" 
+                    onClick={() => {
+                      setNativeClickCount(c => c + 1);
+                      logKey("action", `Native Button Activated (Count: ${nativeClickCount + 1})`);
+                    }}
+                  >
+                    Native Button (Activated: {nativeClickCount})
+                  </button>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-amber)', marginBottom: '6px' }}>
+                    2. Custom &lt;div role="button" tabIndex=&#123;0&#125;&gt; (Needs manual key handling!):
+                  </div>
+                  <div 
+                    id="customDivButton"
+                    role="button"
+                    tabIndex={0}
+                    className="custom-div-btn"
+                    onClick={() => {
+                      setCustomClickCount(c => c + 1);
+                      logKey("action", `Custom Div Activated by Click (Count: ${customClickCount + 1})`);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setCustomClickCount(c => c + 1);
+                        logKey("action", `Custom Div Activated by Keyboard [${e.key}] (Count: ${customClickCount + 1})`);
+                      }
+                    }}
+                  >
+                    Custom Div Button (Activated: {customClickCount})
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    ⚠️ Without explicit Enter/Space onKeyDown handlers, custom divs fail keyboard accessibility!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 4: Scoped Modal Dismissal & Command Palette */}
+            <div className="panel">
+              <div className="panel-title">
+                <span>🛡️</span> Scoped Modal & Shortcut Manager
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Test overlay dismissal and focus management. Pressing <kbd>Escape</kbd> inside a modal should close only the modal without leaking.
+                </p>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    id="openModalBtn"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setIsModalOpen(true);
+                      logKey("action", "Modal Opened - Focus shifted to internal input");
+                    }}
+                  >
+                    Open Modal (Focus Trap Test)
+                  </button>
+
+                  <button 
+                    id="togglePaletteBtn"
+                    className="btn btn-secondary"
+                    onClick={() => setPaletteOpen(p => !p)}
+                  >
+                    Toggle Command Palette (Meta+K)
+                  </button>
+                </div>
+
+                {paletteOpen && (
+                  <div style={{ padding: '12px', background: 'rgba(6, 182, 212, 0.1)', border: '1px solid var(--accent-cyan)', borderRadius: '8px' }}>
+                    <strong style={{ color: 'var(--accent-cyan)' }}>🚀 Command Palette Active</strong>
+                    <div style={{ fontSize: '0.78rem', marginTop: '4px' }}>Press <kbd>Escape</kbd> or <kbd>Meta+K</kbd> to close.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom Grid: Crucible Quiz */}
+          <div className="dashboard-grid">
+            <div className="panel" style={{ gridColumn: 'span 2' }}>
+              <div className="panel-title">
+                <span>🔥</span> Crucible Accessibility Challenge ({activeQuiz + 1} / {quizQuestions.length})
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f3f4f6' }}>
+                  {quizQuestions[activeQuiz].q}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {quizQuestions[activeQuiz].options.map((opt, i) => {
+                    let className = "quiz-option";
+                    if (selectedAnswer !== null) {
+                      if (opt.isCorrect) className += " correct";
+                      else if (selectedAnswer === i) className += " wrong";
+                    }
+                    return (
+                      <div 
+                        key={i} 
+                        className={className}
+                        onClick={() => {
+                          if (selectedAnswer === null) {
+                            setSelectedAnswer(i);
+                          }
+                        }}
+                      >
+                        <span style={{ fontFamily: 'Fira Code', fontWeight: 600 }}>{String.fromCharCode(65 + i)}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedAnswer !== null && (
+                  <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    💡 <strong>Architect Note:</strong> {quizQuestions[activeQuiz].explanation}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedAnswer === null}
+                    style={{ opacity: selectedAnswer === null ? 0.5 : 1 }}
+                    onClick={() => {
+                      setSelectedAnswer(null);
+                      setActiveQuiz((prev) => (prev + 1) % quizQuestions.length);
+                    }}
+                  >
+                    Next Question ➡️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Overlay Component */}
+          {isModalOpen && (
+            <div 
+              className="modal-backdrop"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setIsModalOpen(false);
+                  logKey("action", "Modal closed via scoped Escape key handler");
+                }
+              }}
+            >
+              <div className="modal-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '1.1rem', color: '#fff' }}>🛡️ Accessible Dialog</h3>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '2px 8px' }}
+                    onClick={() => setIsModalOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  This dialog intercepts <kbd>Escape</kbd> and traps focus. Notice that pressing Escape closes only this modal.
+                </p>
+                <input 
+                  id="modalInput"
+                  ref={modalInputRef}
+                  className="form-input" 
+                  placeholder="Modal internal input (auto-focused)..."
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                  <button className="btn btn-emerald" onClick={() => setIsModalOpen(false)}>Confirm Action</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

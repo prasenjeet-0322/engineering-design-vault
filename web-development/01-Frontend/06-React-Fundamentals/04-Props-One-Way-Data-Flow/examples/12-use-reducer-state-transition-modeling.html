@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 12: useReducer & State Transition Modeling</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+      --yellow: #d29922;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .badge.success {
+      background: #0d281e;
+      color: var(--green);
+      border-color: #1a7f37;
+    }
+    .badge.error {
+      background: #3c1418;
+      color: var(--red);
+      border-color: #8b181b;
+    }
+    .badge.loading {
+      background: #341a04;
+      color: var(--orange);
+      border-color: #9e6a03;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #f85149;
+      color: #fff;
+    }
+    .inspector {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      padding: 2px 0;
+      border-bottom: 1px dotted #1b2128;
+    }
+    .row:last-child { border-bottom: none; }
+    .val { color: var(--cyan); font-weight: bold; }
+    .log-box {
+      background: #04070b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 140px;
+      overflow-y: auto;
+      color: #8b949e;
+      margin-top: auto;
+    }
+    .log-entry { margin-bottom: 3px; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 12: useReducer & State Transition Modeling</h1>
+  <p class="subtitle">Interactive Diagnostic Sandbox for Pure Reducers, Action Intent, and Finite State Transitions</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useReducer, useState } = React;
+
+    // 1. Request State Machine Reducer
+    const requestInitialState = { status: "idle", data: null, error: null };
+
+    function requestReducer(state, action) {
+      switch (action.type) {
+        case "requestStarted":
+          return { status: "loading", data: null, error: null };
+        case "requestSucceeded":
+          return { status: "success", data: action.data, error: null };
+        case "requestFailed":
+          return { status: "error", data: null, error: action.error };
+        case "reset":
+          return requestInitialState;
+        default:
+          return state;
+      }
+    }
+
+    function RequestStateMachineSection() {
+      const [state, dispatch] = useReducer(requestReducer, requestInitialState);
+      const [history, setHistory] = useState([]);
+
+      const handleFetch = (succeed = true) => {
+        dispatch({ type: "requestStarted" });
+        setHistory(prev => [...prev.slice(-4), `Action: requestStarted -> status: loading`]);
+
+        setTimeout(() => {
+          if (succeed) {
+            dispatch({ type: "requestSucceeded", data: "Data Record #9931" });
+            setHistory(prev => [...prev.slice(-4), `Action: requestSucceeded -> status: success`]);
+          } else {
+            dispatch({ type: "requestFailed", error: "503 Service Unavailable" });
+            setHistory(prev => [...prev.slice(-4), `Action: requestFailed -> status: error`]);
+          }
+        }, 600);
+      };
+
+      const badgeClass = state.status === "success" ? "success" : state.status === "error" ? "error" : state.status === "loading" ? "loading" : "";
+
+      return (
+        <div className="card">
+          <h2>
+            1. Request Finite State Machine
+            <span className={`badge ${badgeClass}`}>{state.status.toUpperCase()}</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            The reducer enforces clean state transitions: <code>idle → loading → success | error</code>.
+          </p>
+          <div className="inspector">
+            <div className="row">
+              <span>Current Status:</span>
+              <span className="val">{state.status}</span>
+            </div>
+            <div className="row">
+              <span>Data Payload:</span>
+              <span>{state.data ? JSON.stringify(state.data) : "null"}</span>
+            </div>
+            <div className="row">
+              <span>Error Payload:</span>
+              <span style={{ color: state.error ? "var(--red)" : "inherit" }}>{state.error || "null"}</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={() => handleFetch(true)}>Dispatch: Fetch Success</button>
+            <button className="danger" onClick={() => handleFetch(false)}>Dispatch: Fetch Failure</button>
+            <button onClick={() => { dispatch({ type: "reset" }); setHistory([]); }}>Reset</button>
+          </div>
+          <div className="log-box">
+            {history.length === 0 ? <div style={{ fontStyle: "italic" }}>Dispatch actions to observe history.</div> : null}
+            {history.map((h, i) => (
+              <div key={i} className="log-entry" style={{ color: "var(--cyan)" }}>{h}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Shopping Cart Reducer with Action Payloads
+    const initialCart = {
+      items: [
+        { id: "p1", name: "Mechanical Keyboard", price: 120, quantity: 1 },
+        { id: "p2", name: "Ergonomic Mouse", price: 60, quantity: 2 }
+      ]
+    };
+
+    function cartReducer(state, action) {
+      switch (action.type) {
+        case "itemAdded":
+          return {
+            ...state,
+            items: [...state.items, action.item]
+          };
+        case "itemRemoved":
+          return {
+            ...state,
+            items: state.items.filter(item => item.id !== action.id)
+          };
+        case "quantityChanged":
+          return {
+            ...state,
+            items: state.items.map(item =>
+              item.id === action.id ? { ...item, quantity: Math.max(1, action.quantity) } : item
+            )
+          };
+        case "reset":
+          return initialCart;
+        default:
+          return state;
+      }
+    }
+
+    function CartSection() {
+      const [state, dispatch] = useReducer(cartReducer, initialCart);
+
+      // Derived totals
+      const totalUnits = state.items.reduce((sum, item) => sum + item.quantity, 0);
+      const totalPrice = state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      const handleAddSample = () => {
+        const nextId = "p" + (state.items.length + 1);
+        dispatch({
+          type: "itemAdded",
+          item: { id: nextId, name: `USB-C Hub (${nextId})`, price: 40, quantity: 1 }
+        });
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            2. Shopping Cart Transition Model
+            <span className="badge success">${totalPrice} Total</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Dispatches domain actions (<code>itemAdded</code>, <code>quantityChanged</code>, <code>itemRemoved</code>).
+          </p>
+          <div className="inspector">
+            {state.items.map(item => (
+              <div key={item.id} className="row" style={{ alignItems: "center" }}>
+                <span>{item.name} (${item.price} ea):</span>
+                <span>
+                  Qty: {item.quantity}
+                  <button style={{ marginLeft: "6px", padding: "1px 6px" }} onClick={() => dispatch({ type: "quantityChanged", id: item.id, quantity: item.quantity + 1 })}>+</button>
+                  <button style={{ marginLeft: "4px", padding: "1px 6px" }} onClick={() => dispatch({ type: "quantityChanged", id: item.id, quantity: item.quantity - 1 })}>-</button>
+                  <button style={{ marginLeft: "6px", padding: "1px 6px", color: "var(--red)" }} onClick={() => dispatch({ type: "itemRemoved", id: item.id })}>✕</button>
+                </span>
+              </div>
+            ))}
+            <div className="row" style={{ marginTop: "6px", borderTop: "1px solid var(--border)", paddingTop: "4px" }}>
+              <span>Total Units / Price:</span>
+              <span className="val">{totalUnits} items — ${totalPrice}</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={handleAddSample}>Add New Item</button>
+            <button onClick={() => dispatch({ type: "reset" })}>Reset Cart</button>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <RequestStateMachineSection />
+          <CartSection />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

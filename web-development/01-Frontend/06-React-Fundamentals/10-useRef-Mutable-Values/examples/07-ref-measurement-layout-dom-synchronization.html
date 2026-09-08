@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 07 / Part 07 Lab — Ref Measurement, Layout & DOM Synchronization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.8);
+      --bg-card-hover: rgba(30, 41, 59, 0.9);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.3);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.3);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.3);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--border-active);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Telemetry Counters */
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 20px;
+      font-size: 0.8rem;
+    }
+
+    .telemetry-cell {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .telemetry-label {
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* Buttons */
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    button {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .btn-primary:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: var(--accent-primary);
+    }
+
+    .btn-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      color: #38bdf8;
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+    .btn-cyan:hover {
+      background: rgba(6, 182, 212, 0.25);
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .btn-emerald:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: var(--accent-emerald);
+    }
+
+    .btn-rose {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+    .btn-rose:hover {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: var(--accent-rose);
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border-color: var(--border-subtle);
+    }
+    .btn-reset:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Interactive Geometry Containers */
+    .resizable-target {
+      padding: 24px;
+      background: rgba(30, 41, 59, 0.7);
+      border: 2px dashed rgba(99, 102, 241, 0.5);
+      border-radius: 12px;
+      resize: both;
+      overflow: auto;
+      min-height: 120px;
+      margin-bottom: 14px;
+      position: relative;
+    }
+
+    .floating-tooltip {
+      position: absolute;
+      background: var(--accent-primary);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      pointer-events: none;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      transition: top 0.05s ease, left 0.05s ease;
+    }
+
+    /* Terminal Console */
+    .terminal {
+      background: #070a11;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 2px 0;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .log-tag {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tag-meas { background: rgba(6, 182, 212, 0.2); color: #38bdf8; }
+    .tag-layout { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .tag-render { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+    .tag-obs { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .tag-warn { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+
+    .log-text {
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    /* Quiz */
+    .quiz-question {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .quiz-btn {
+      text-align: left;
+      justify-content: flex-start;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .quiz-btn:hover {
+      background: rgba(30, 41, 59, 0.8);
+      color: #fff;
+      border-color: var(--border-active);
+    }
+
+    .quiz-feedback {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .feedback-correct { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--accent-emerald); color: #34d399; }
+    .feedback-wrong { background: rgba(244, 63, 94, 0.2); border: 1px solid var(--accent-rose); color: #fb7185; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="header-titles">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="badge badge-primary">KPI 07 · Part 07</span>
+        <span class="badge badge-live">Layout Measurement Engine</span>
+      </div>
+      <h1>Ref Measurement, Layout & DOM Synchronization</h1>
+      <p class="subtitle">getBoundingClientRect, ResizeObserver, useLayoutEffect Timing & Feedback Loop Elimination</p>
+    </div>
+    <button class="btn-reset" onclick="resetAll()">↺ Reset Sandbox</button>
+  </header>
+
+  <!-- Dashboard Grid -->
+  <div class="dashboard-grid">
+    
+    <!-- LEFT PANEL -->
+    <div>
+      
+      <!-- Primary Card with Tabs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📐</span> DOM Layout & Measurement Labs
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab(event, 'tab-timing')">1. useLayoutEffect vs useEffect</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-observer')">2. Live ResizeObserver</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-feedback')">3. Feedback Loop Simulator</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-registry')">4. Dynamic Ref Geometry Map</button>
+        </div>
+
+        <!-- TAB 1: useLayoutEffect vs useEffect -->
+        <div id="tab-timing" class="tab-panel active">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Demonstrating why layout-sensitive positioning requires <strong>useLayoutEffect</strong> (pre-paint synchronization) to eliminate visual flicker.
+          </p>
+
+          <div class="telemetry-row">
+            <div class="telemetry-cell">
+              <span class="telemetry-label">Hook Timing</span>
+              <span class="telemetry-val" id="hookTimingMode" style="color: var(--accent-emerald);">useLayoutEffect (Pre-Paint)</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-label">Visual Flicker</span>
+              <span class="telemetry-val" id="flickerStatus" style="color: var(--accent-emerald);">0 ms (Zero Flicker)</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-label">Anchor Height</span>
+              <span class="telemetry-val" id="anchorHeightVal">120px</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-label">Calculated Offset</span>
+              <span class="telemetry-val" id="offsetCalculated">160px</span>
+            </div>
+          </div>
+
+          <div class="resizable-target" id="timingBox" style="height: 120px;">
+            <div style="font-weight: 600; color: #fff;">📦 Resizable Anchor Container (boxRef.current)</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">Drag bottom-right corner to test layout recalculation!</div>
+            <div class="floating-tooltip" id="floatingTooltip" style="bottom: -40px; left: 24px;">
+              📍 Anchored Floating Popover
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-emerald" onclick="setTimingMode('useLayoutEffect')">
+              Use useLayoutEffect (Pre-Paint)
+            </button>
+            <button class="btn-rose" onclick="setTimingMode('useEffect')">
+              Use useEffect (Simulate Post-Paint Jitter)
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: Live ResizeObserver -->
+        <div id="tab-observer" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Live <code>ResizeObserver</code> subscription synchronized to React state with an <strong>equality guard</strong> to prevent render storms.
+          </p>
+
+          <div class="resizable-target" id="observerBox" style="width: 100%; height: 140px;">
+            <div style="font-weight: 600;" id="responsiveModeLabel">Mode: EXPANDED VIEW</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Drag width &lt; 400px to trigger breakpoint!</div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-cyan" onclick="simulateWidthBurst()">Simulate Width Resize</button>
+            <button class="btn-reset" onclick="resetObserverBox()">Reset Box Dimensions</button>
+          </div>
+        </div>
+
+        <!-- TAB 3: Feedback Loop Simulator -->
+        <div id="tab-feedback" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Simulate a <strong>Measurement Feedback Loop</strong> (where measuring DOM width causes a state update that immediately alters CSS width).
+          </p>
+
+          <div style="padding: 16px; background: rgba(244, 63, 94, 0.15); border: 1px solid var(--accent-rose); border-radius: 10px; margin-bottom: 14px;">
+            <div style="font-weight: 600; color: #fff;">⚠️ Feedback Oscillator State: <span id="feedbackStatusText" style="color: var(--accent-rose);">CONVERGED (Safe)</span></div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Oscillation Iterations: <span id="oscillationCount" style="font-family: var(--font-mono); color: #fff;">0</span></div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-rose" onclick="triggerOscillationLoop()">
+              ⚡ Trigger Unbounded Feedback Loop
+            </button>
+            <button class="btn-emerald" onclick="applyHysteresisBuffer()">
+              🛡️ Apply Hysteresis Dead-Zone Buffer (Fix)
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 4: Dynamic Ref Geometry Map -->
+        <div id="tab-registry" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            Dynamic list of cards with physical bounding rects mapped in <code>useRef(new Map())</code> by domain ID.
+          </p>
+
+          <div class="button-group">
+            <button class="btn-cyan" onclick="measureAllCards()">📐 Measure All Cards via Registry</button>
+            <button class="btn-primary" onclick="reorderCards()">🔀 Reorder Cards</button>
+          </div>
+
+          <div id="cardsContainer" style="display: flex; gap: 10px; overflow-x: auto; padding: 8px 0;"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div>
+      
+      <!-- Terminal Log -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📡</span> Measurement & Telemetry Log
+          </div>
+          <button class="btn-reset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="clearLogs()">Clear</button>
+        </div>
+
+        <div class="terminal" id="terminalLog">
+          <!-- Live events will stream here -->
+        </div>
+      </div>
+
+      <!-- Crucible Prediction Sandbox -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🔥</span> Crucible Diagnostic Challenge
+          </div>
+        </div>
+
+        <div class="quiz-question" id="quizQuestion">
+          A component measures <code>ref.current.getBoundingClientRect()</code> inside <code>useEffect</code> to position a tooltip. Why does the tooltip flash at (0, 0) for 1 frame?
+        </div>
+
+        <div class="quiz-options">
+          <button class="quiz-btn" onclick="checkQuizAnswer(1)">A) getBoundingClientRect() only works in production builds.</button>
+          <button class="quiz-btn" onclick="checkQuizAnswer(2)">B) useEffect runs asynchronously AFTER paint; the browser paints the initial unpositioned frame before measurement corrects it.</button>
+          <button class="quiz-btn" onclick="checkQuizAnswer(3)">C) Tooltips cannot use React refs.</button>
+        </div>
+
+        <div class="quiz-feedback" id="quizFeedback"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function getTimestamp() {
+    const d = new Date();
+    return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+
+  function appendLog(tag, tagClass, text) {
+    const terminal = document.getElementById('terminalLog');
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `
+      <span class="log-time">[${getTimestamp()}]</span>
+      <span class="log-tag ${tagClass}">${tag}</span>
+      <span class="log-text">${text}</span>
+    `;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function clearLogs() {
+    document.getElementById('terminalLog').innerHTML = '';
+  }
+
+  function switchTab(evt, tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    
+    evt.currentTarget.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  // 1. Timing Lab
+  let timingMode = 'useLayoutEffect';
+
+  function setTimingMode(mode) {
+    timingMode = mode;
+    const modeLabel = document.getElementById('hookTimingMode');
+    const flickerLabel = document.getElementById('flickerStatus');
+    const tooltip = document.getElementById('floatingTooltip');
+
+    if (mode === 'useLayoutEffect') {
+      modeLabel.innerText = 'useLayoutEffect (Pre-Paint)';
+      modeLabel.style.color = 'var(--accent-emerald)';
+      flickerLabel.innerText = '0 ms (Zero Flicker)';
+      flickerLabel.style.color = 'var(--accent-emerald)';
+      tooltip.style.background = 'var(--accent-emerald)';
+      appendLog('LAYOUT_SYNC', 'tag-layout', 'Switched to useLayoutEffect. Positioning computed synchronously before Paint.');
+    } else {
+      modeLabel.innerText = 'useEffect (Post-Paint Passive)';
+      modeLabel.style.color = 'var(--accent-rose)';
+      flickerLabel.innerText = '1 Frame (~16.6ms Visual Jitter)';
+      flickerLabel.style.color = 'var(--accent-rose)';
+      tooltip.style.background = 'var(--accent-rose)';
+      appendLog('EFFECT_SYNC', 'tag-warn', 'Switched to useEffect. Browser will paint initial (0,0) frame before effect corrects position!');
+    }
+  }
+
+  // 2. ResizeObserver Lab
+  let resizeObserver = null;
+
+  function initResizeObserver() {
+    const target = document.getElementById('observerBox');
+    if (!target) return;
+
+    resizeObserver = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      const width = Math.round(entry.contentRect.width);
+      const label = document.getElementById('responsiveModeLabel');
+
+      if (width < 400) {
+        label.innerText = `Mode: COMPACT VIEW (${width}px)`;
+        label.style.color = 'var(--accent-cyan)';
+      } else {
+        label.innerText = `Mode: EXPANDED VIEW (${width}px)`;
+        label.style.color = 'var(--accent-emerald)';
+      }
+
+      appendLog('RESIZE_OBSERVER', 'tag-obs', `ResizeObserver callback: width = ${width}px. Synchronized to state.`);
+    });
+
+    resizeObserver.observe(target);
+  }
+
+  function simulateWidthBurst() {
+    const box = document.getElementById('observerBox');
+    box.style.width = '350px';
+    setTimeout(() => { box.style.width = '520px'; }, 800);
+  }
+
+  function resetObserverBox() {
+    const box = document.getElementById('observerBox');
+    box.style.width = '100%';
+    box.style.height = '140px';
+  }
+
+  // 3. Feedback Loop Lab
+  let loopInterval = null;
+  let oscillations = 0;
+
+  function triggerOscillationLoop() {
+    if (loopInterval) return;
+    oscillations = 0;
+    document.getElementById('feedbackStatusText').innerText = 'OSCILLATING (Feedback Loop Active!)';
+    appendLog('FEEDBACK_START', 'tag-warn', '⚠️ FEEDBACK LOOP: Measure Width -> setState -> CSS changes -> Measure Width!');
+
+    loopInterval = setInterval(() => {
+      oscillations += 1;
+      document.getElementById('oscillationCount').innerText = oscillations;
+      appendLog('OSCILLATE', 'tag-warn', `Loop iteration #${oscillations}: 490px ➔ 510px ➔ 490px...`);
+      if (oscillations >= 6) {
+        clearInterval(loopInterval);
+        loopInterval = null;
+        document.getElementById('feedbackStatusText').innerText = 'CONVERGED (Bounded at 6 iterations)';
+        appendLog('CONVERGED', 'tag-layout', 'Loop stopped.');
+      }
+    }, 300);
+  }
+
+  function applyHysteresisBuffer() {
+    if (loopInterval) {
+      clearInterval(loopInterval);
+      loopInterval = null;
+    }
+    document.getElementById('feedbackStatusText').innerText = 'SAFE (Hysteresis 40px Buffer Applied)';
+    document.getElementById('feedbackStatusText').style.color = 'var(--accent-emerald)';
+    appendLog('HYSTERESIS', 'tag-layout', '✅ Applied 40px dead-zone buffer. Oscillation eliminated!');
+  }
+
+  // 4. Dynamic Cards Lab
+  let cards = [
+    { id: 'card_A', name: 'Alpha Container', width: 140 },
+    { id: 'card_B', name: 'Beta Container', width: 180 },
+    { id: 'card_C', name: 'Gamma Container', width: 220 }
+  ];
+
+  function renderCards() {
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = '';
+
+    cards.forEach(card => {
+      const el = document.createElement('div');
+      el.id = card.id;
+      el.style.minWidth = `${card.width}px`;
+      el.style.padding = '14px';
+      el.style.background = 'rgba(30, 41, 59, 0.7)';
+      el.style.border = '1px solid var(--border-subtle)';
+      el.style.borderRadius = '8px';
+      el.innerHTML = `
+        <div style="font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-mono);">[${card.id}]</div>
+        <div style="font-weight: 600; color: #fff; margin-top: 4px;">${card.name}</div>
+        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Width: ${card.width}px</div>
+      `;
+      container.appendChild(el);
+    });
+  }
+
+  function measureAllCards() {
+    cards.forEach(c => {
+      const el = document.getElementById(c.id);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        appendLog('MAP_MEASURE', 'tag-meas', `Registry [${c.id}] measured -> width: ${Math.round(rect.width)}px, left: ${Math.round(rect.left)}px.`);
+      }
+    });
+  }
+
+  function reorderCards() {
+    cards.reverse();
+    renderCards();
+    appendLog('REORDER', 'tag-layout', 'Dynamic cards reordered. Stable entity IDs maintained exact measurement bindings.');
+  }
+
+  // Quiz Validation
+  function checkQuizAnswer(selected) {
+    const feedback = document.getElementById('quizFeedback');
+    feedback.style.display = 'block';
+
+    if (selected === 2) {
+      feedback.className = 'quiz-feedback feedback-correct';
+      feedback.innerHTML = '<strong>✅ Correct!</strong> <code>useEffect</code> executes asynchronously after the browser paints the unpositioned frame. Switching to <code>useLayoutEffect</code> guarantees pre-paint execution, eliminating visual jitter!';
+    } else {
+      feedback.className = 'quiz-feedback feedback-wrong';
+      feedback.innerHTML = '<strong>❌ Incorrect.</strong> Remember: The pre-paint vs post-paint execution timing is the critical distinction between <code>useLayoutEffect</code> and <code>useEffect</code>.';
+    }
+  }
+
+  function resetAll() {
+    clearLogs();
+    resetObserverBox();
+    setTimingMode('useLayoutEffect');
+    cards = [
+      { id: 'card_A', name: 'Alpha Container', width: 140 },
+      { id: 'card_B', name: 'Beta Container', width: 180 },
+      { id: 'card_C', name: 'Gamma Container', width: 220 }
+    ];
+    renderCards();
+    appendLog('SYSTEM', 'tag-layout', 'Measurement sandbox re-initialized.');
+  }
+
+  // Init
+  initResizeObserver();
+  renderCards();
+  appendLog('SYSTEM', 'tag-layout', 'DOM measurement engine attached. Observers active.');
+</script>
+
+</body>
+</html>

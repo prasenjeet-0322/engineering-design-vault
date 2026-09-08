@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 / Part 04 — Context Value Identity & Unintentional Re-render Traps Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 30%, #9ca3af 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .header-title p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-must-know {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .badge-kpi {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .lab-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 14px;
+    }
+
+    .card-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-header h2 span {
+      color: var(--accent-cyan);
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .btn {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: var(--accent-rose);
+    }
+
+    .btn-danger:hover {
+      background: var(--accent-rose);
+      color: #fff;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .interactive-box {
+      border: 1px dashed var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .tree-node {
+      border-left: 2px solid var(--accent-primary);
+      padding-left: 14px;
+      margin: 8px 0;
+      position: relative;
+    }
+
+    .tree-node.provider-active {
+      border-left-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.05);
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.85rem;
+    }
+
+    .telemetry-label {
+      color: var(--text-muted);
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    .code-block {
+      background: #080c14;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #d1d5db;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .tag-provider {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .pulse-render {
+      animation: pulseGlow 0.4s ease-out;
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.8); background: rgba(99, 102, 241, 0.3); }
+      100% { box-shadow: 0 0 0 10px transparent; background: transparent; }
+    }
+
+    .alert-box {
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 0.85rem;
+      margin-top: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .alert-error {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fecdd3;
+    }
+
+    .alert-info {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: #cffafe;
+    }
+  </style>
+
+  <!-- React 18 and Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useCallback, useRef, useReducer } = React;
+
+    // =========================================================================
+    // STATIC CONTEXT TOKENS
+    // =========================================================================
+    const ChurnTestContext = createContext({ theme: 'dark', count: 0 });
+    const SplitStateContext = createContext(0);
+    const SplitDispatchContext = createContext(() => {});
+    const MonolithicContext = createContext({ user: 'Alice', theme: 'dark', notifications: 0 });
+    const StaleTrapContext = createContext({ text: '', save: () => {} });
+
+    // =========================================================================
+    // MAIN INTERACTIVE LAB APPLICATION
+    // =========================================================================
+    function ValueIdentityLab() {
+      const [activeTab, setActiveTab] = useState("diffing");
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-title">
+              <h1>Context Value Identity & Unintentional Re-render Traps</h1>
+              <p>KPI 11 / PART 04 — Interactive Laboratory & Object.is Diffing Simulator</p>
+            </div>
+            <div className="badge-bar">
+              <span className="badge badge-kpi">KPI 11</span>
+              <span className="badge badge-must-know">Must Know</span>
+            </div>
+          </header>
+
+          <div className="tabs">
+            <button className={`tab-btn ${activeTab === 'diffing' ? 'active' : ''}`} onClick={() => setActiveTab('diffing')}>
+              ⚡ B/C: Inline vs useMemo
+            </button>
+            <button className={`tab-btn ${activeTab === 'split' ? 'active' : ''}`} onClick={() => setActiveTab('split')}>
+              ✂️ F: State vs Dispatch Split
+            </button>
+            <button className={`tab-btn ${activeTab === 'god' ? 'active' : ''}`} onClick={() => setActiveTab('god')}>
+              🏛️ K: Monolithic God Context
+            </button>
+            <button className={`tab-btn ${activeTab === 'stale' ? 'active' : ''}`} onClick={() => setActiveTab('stale')}>
+              ⚠️ L: Stale Closure Trap
+            </button>
+            <button className={`tab-btn ${activeTab === 'timeline' ? 'active' : ''}`} onClick={() => setActiveTab('timeline')}>
+              📊 I: Heap Pointer Timeline
+            </button>
+          </div>
+
+          <main>
+            {activeTab === 'diffing' && <ModuleDiffingComparison />}
+            {activeTab === 'split' && <ModuleSplitArchitecture />}
+            {activeTab === 'god' && <ModuleGodContext />}
+            {activeTab === 'stale' && <ModuleStaleTrap />}
+            {activeTab === 'timeline' && <ModuleHeapTimeline />}
+          </main>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE B/C: INLINE OBJECT VS USEMEMO
+    // =========================================================================
+    function ModuleDiffingComparison() {
+      const [parentTicker, setParentTicker] = useState(0);
+      const [mode, setMode] = useState("unstable"); // 'unstable' | 'memoized' | 'primitive'
+      const [theme, setTheme] = useState("dark-emerald");
+
+      // Pointer Simulator
+      const heapPointer = useRef(0x00A1);
+      if (mode === 'unstable') {
+        heapPointer.current = (heapPointer.current + 0x10) % 0xFFFF;
+      }
+
+      // 1. Unstable inline object
+      const unstableValue = { theme, count: 42 };
+
+      // 2. Memoized object
+      const memoizedValue = useMemo(() => ({ theme, count: 42 }), [theme]);
+
+      const activeValue = mode === 'unstable' ? unstableValue : mode === 'memoized' ? memoizedValue : theme;
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module B/C</span> Object.is Diffing & Value Churn</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Trigger unrelated parent renders and observe whether the leaf consumer re-renders under different value strategies.
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${mode === 'unstable' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setMode('unstable')}>
+                  1. Unstable Inline Literal
+                </button>
+                <button className={`btn ${mode === 'memoized' ? 'active' : 'btn-secondary'}`} onClick={() => setMode('memoized')}>
+                  2. useMemo Stabilized
+                </button>
+                <button className={`btn ${mode === 'primitive' ? 'active' : 'btn-secondary'}`} onClick={() => setMode('primitive')}>
+                  3. Primitive String
+                </button>
+              </div>
+
+              <div className="btn-group">
+                <button className="btn btn-danger" onClick={() => setParentTicker(t => t + 1)}>
+                  🔥 Trigger Unrelated Parent Render (Ticker: {parentTicker})
+                </button>
+                <button className="btn btn-secondary" onClick={() => setTheme(t => t === 'dark-emerald' ? 'sunset-purple' : 'dark-emerald')}>
+                  Toggle Theme ({theme})
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <ChurnTestContext.Provider value={activeValue}>
+                  <div className="tree-node provider-active">
+                    <span className="tag-provider">&lt;Provider value=&#123;{mode === 'primitive' ? `"${theme}"` : JSON.stringify(activeValue)}&#125;&gt;</span>
+                    <div className="tree-node">
+                      <MemoizedWrapper>
+                        <LeafConsumer mode={mode} />
+                      </MemoizedWrapper>
+                    </div>
+                  </div>
+                </ChurnTestContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Object.is(prev, next) Inspection</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Active Strategy:</span>
+              <span className="telemetry-val">{mode.toUpperCase()}</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Simulated Heap Pointer:</span>
+              <span className="telemetry-val" style={{ color: mode === 'unstable' ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                Ref@0x{heapPointer.current.toString(16).toUpperCase().padStart(4, '0')}
+              </span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Object.is(prev, next):</span>
+              <span className="telemetry-val" style={{ color: mode === 'unstable' ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                {mode === 'unstable' ? 'FALSE (Reference Mismatch!)' : 'TRUE (Bailed Out)'}
+              </span>
+            </div>
+            <div className="alert-box alert-info">
+              <span>💡</span>
+              <div>
+                <strong>Reconciliation Insight:</strong> Even though `MemoizedWrapper` bails out via `React.memo`, `propagateContextChange()` bypasses it and forces `LeafConsumer` to re-render when `mode === 'unstable'`.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const MemoizedWrapper = React.memo(function Wrapper({ children }) {
+      const renders = useRef(0);
+      renders.current++;
+      return (
+        <div style={{ padding: "8px", background: "rgba(255,255,255,0.02)", borderRadius: 6, border: "1px dashed var(--border-subtle)" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+            &lt;React.memo Wrapper&gt; (Renders: {renders.current})
+          </div>
+          {children}
+        </div>
+      );
+    });
+
+    function LeafConsumer({ mode }) {
+      const ctx = useContext(ChurnTestContext);
+      const renders = useRef(0);
+      renders.current++;
+
+      return (
+        <div className="pulse-render" key={renders.current} style={{ padding: "10px", background: "rgba(255,255,255,0.04)", borderRadius: 8, marginTop: 6 }}>
+          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fff" }}>
+            Leaf Consumer Component
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>
+            Observed Value: <strong style={{ color: "var(--accent-cyan)" }}>{typeof ctx === 'object' ? JSON.stringify(ctx) : String(ctx)}</strong>
+          </div>
+          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: mode === 'unstable' ? 'var(--accent-rose)' : 'var(--accent-emerald)', marginTop: 6 }}>
+            Consumer Re-Renders: {renders.current}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE F: STATE VS DISPATCH SPLIT
+    // =========================================================================
+    function ModuleSplitArchitecture() {
+      const [count, setCount] = useState(0);
+
+      // Increment dispatcher is 100% referentially stable:
+      const increment = useCallback(() => {
+        setCount(c => c + 1);
+      }, []);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module F</span> State vs Dispatch Context Split</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                By separating `StateContext` and `DispatchContext`, button components that only dispatch actions never re-render when state changes!
+              </p>
+              <div className="interactive-box">
+                <SplitStateContext.Provider value={count}>
+                  <SplitDispatchContext.Provider value={increment}>
+                    <div className="tree-node provider-active">
+                      <span className="tag-provider">&lt;SplitStateContext.Provider value={count}&gt;</span>
+                      <div className="tree-node">
+                        <span className="tag-provider">&lt;SplitDispatchContext.Provider value=&#123;increment&#125;&gt;</span>
+                        <div className="tree-node">
+                          <StateReaderConsumer />
+                          <CommandButtonConsumer />
+                        </div>
+                      </div>
+                    </div>
+                  </SplitDispatchContext.Provider>
+                </SplitStateContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Split Channel Re-Render Isolation</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">State Channel Subscribers:</span>
+              <span className="telemetry-val">&lt;StateReaderConsumer /&gt;</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Dispatch Channel Subscribers:</span>
+              <span className="telemetry-val">&lt;CommandButtonConsumer /&gt;</span>
+            </div>
+            <div className="code-block" style={{ marginTop: 16 }}>
+{`// Dispatch is stable:
+const increment = useCallback(() => setCount(c => c + 1), []);
+// CommandButtonConsumer NEVER re-renders when count changes!`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function StateReaderConsumer() {
+      const count = useContext(SplitStateContext);
+      const renders = useRef(0);
+      renders.current++;
+
+      return (
+        <div className="pulse-render" key={renders.current} style={{ padding: "8px", background: "rgba(16, 185, 129, 0.1)", borderRadius: 6, marginBottom: 8 }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--accent-emerald)" }}>
+            📊 State Reader (useContext(SplitStateContext))
+          </div>
+          <div>Current Count: <strong>{count}</strong> | Renders: <strong>{renders.current}</strong></div>
+        </div>
+      );
+    }
+
+    function CommandButtonConsumer() {
+      const increment = useContext(SplitDispatchContext);
+      const renders = useRef(0);
+      renders.current++;
+
+      return (
+        <div style={{ padding: "8px", background: "rgba(99, 102, 241, 0.1)", borderRadius: 6 }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--accent-primary)" }}>
+            ⚡ Command Dispatcher (useContext(SplitDispatchContext))
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <button className="btn" style={{ padding: "4px 10px", fontSize: "0.75rem" }} onClick={increment}>
+              Dispatch Increment (Renders: {renders.current})
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE K: MONOLITHIC GOD CONTEXT
+    // =========================================================================
+    function ModuleGodContext() {
+      const [user, setUser] = useState("Alice");
+      const [theme, setTheme] = useState("dark");
+      const [notifications, setNotifications] = useState(0);
+
+      const godValue = { user, theme, notifications };
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module K</span> Monolithic God Context Bottleneck</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                In a God Context, updating `notifications` forces the `UserProfileBadge` and `ThemeToggle` to re-render even though they don't use notifications!
+              </p>
+              <div className="btn-group">
+                <button className="btn btn-secondary" onClick={() => setNotifications(n => n + 1)}>
+                  +1 Notification ({notifications})
+                </button>
+                <button className="btn btn-secondary" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+                  Toggle Theme ({theme})
+                </button>
+                <button className="btn btn-secondary" onClick={() => setUser(u => u === 'Alice' ? 'Bob' : 'Alice')}>
+                  Switch User ({user})
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <MonolithicContext.Provider value={godValue}>
+                  <div className="tree-node provider-active">
+                    <span className="tag-provider">&lt;GlobalAppContext.Provider value=&#123;...&#125;&gt;</span>
+                    <div className="tree-node" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <GodUserConsumer />
+                      <GodThemeConsumer />
+                      <GodNotificationConsumer />
+                    </div>
+                  </div>
+                </MonolithicContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Cross-Domain Blast Radius</h2>
+            </div>
+            <div className="alert-box alert-error">
+              <span>🚨</span>
+              <div>
+                <strong>Architectural Anti-Pattern:</strong> Placing high-frequency notification streams inside the same Context container as user profile and theme settings pollutes the entire tree with unneeded re-renders.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function GodUserConsumer() {
+      const { user } = useContext(MonolithicContext);
+      const renders = useRef(0);
+      renders.current++;
+      return (
+        <div className="pulse-render" key={renders.current} style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6, fontSize: "0.8rem" }}>
+          User Badge: <strong>{user}</strong> (Re-renders: <span style={{ color: "var(--accent-rose)" }}>{renders.current}</span>)
+        </div>
+      );
+    }
+
+    function GodThemeConsumer() {
+      const { theme } = useContext(MonolithicContext);
+      const renders = useRef(0);
+      renders.current++;
+      return (
+        <div className="pulse-render" key={renders.current} style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6, fontSize: "0.8rem" }}>
+          Theme Badge: <strong>{theme}</strong> (Re-renders: <span style={{ color: "var(--accent-rose)" }}>{renders.current}</span>)
+        </div>
+      );
+    }
+
+    function GodNotificationConsumer() {
+      const { notifications } = useContext(MonolithicContext);
+      const renders = useRef(0);
+      renders.current++;
+      return (
+        <div className="pulse-render" key={renders.current} style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6, fontSize: "0.8rem" }}>
+          Notification Bell: <strong>{notifications}</strong> (Re-renders: <span style={{ color: "var(--accent-rose)" }}>{renders.current}</span>)
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE L: STALE CLOSURE TRAP
+    // =========================================================================
+    function ModuleStaleTrap() {
+      const [text, setText] = useState("Initial Text");
+      const [savedText, setSavedText] = useState("");
+
+      // ❌ FATAL STALE CLOSURE: text omitted from dependency array!
+      const staleSave = useCallback(() => {
+        setSavedText(text); // Closes over initial `text`!
+      }, []);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module L</span> Stale Closure Optimization Trap</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Type into the input and click "Save Document". Because `text` was omitted from `useCallback([],)`, it permanently saves the initial stale state!
+              </p>
+              <input 
+                type="text" 
+                value={text} 
+                onChange={(e) => setText(e.target.value)}
+                style={{ padding: "8px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border-subtle)", color: "#fff", borderRadius: 6, fontSize: "0.85rem" }}
+              />
+
+              <div className="btn-group">
+                <button className="btn btn-danger" onClick={staleSave}>
+                  Save Document (Stale Callback)
+                </button>
+              </div>
+
+              <div className="telemetry-row" style={{ marginTop: 12 }}>
+                <span className="telemetry-label">Input Text:</span>
+                <span className="telemetry-val">"{text}"</span>
+              </div>
+              <div className="telemetry-row">
+                <span className="telemetry-label">Saved Document Payload:</span>
+                <span className="telemetry-val" style={{ color: "var(--accent-rose)" }}>"{savedText}"</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Stale Closure Anatomy</h2>
+            </div>
+            <div className="code-block">
+{`// ❌ BANNED ANTI-PATTERN:
+const save = useCallback(() => {
+  api.save(text); // Closed over "Initial Text" at mount!
+}, []); // text omitted to make save() stable!`}
+            </div>
+            <div className="alert-box alert-error">
+              <span>⚠️</span>
+              <div>
+                <strong>Golden Rule:</strong> Never sacrifice semantic correctness to force referential stability! Use `useRef` synchronization for stable event handlers.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE I: HEAP POINTER TIMELINE
+    // =========================================================================
+    function ModuleHeapTimeline() {
+      const [history, setHistory] = useState([]);
+      const ptr = useRef(0x1000);
+
+      const addPass = (type) => {
+        if (type === 'unstable') {
+          ptr.current += 0x20;
+          setHistory(prev => [{
+            render: prev.length + 1,
+            type: 'Inline Object Literal',
+            ptr: `0x${ptr.current.toString(16).toUpperCase()}`,
+            isMatch: false
+          }, ...prev]);
+        } else {
+          setHistory(prev => [{
+            render: prev.length + 1,
+            type: 'useMemo Cached Object',
+            ptr: `0x${ptr.current.toString(16).toUpperCase()}`,
+            isMatch: true
+          }, ...prev]);
+        }
+      };
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module I</span> Heap Allocation Pointer Timeline</h2>
+            </div>
+            <div className="controls-panel">
+              <div className="btn-group">
+                <button className="btn btn-danger" onClick={() => addPass('unstable')}>
+                  Simulate Inline Render Pass (New Reference)
+                </button>
+                <button className="btn" onClick={() => addPass('memoized')}>
+                  Simulate useMemo Render Pass (Cached Reference)
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+                {history.map((h, i) => (
+                  <div key={i} style={{ padding: "8px 12px", background: "rgba(0,0,0,0.3)", borderRadius: 6, fontSize: "0.8rem", display: "flex", justifyContent: "space-between", borderLeft: `3px solid ${h.isMatch ? 'var(--accent-emerald)' : 'var(--accent-rose)'}` }}>
+                    <span>Render #{h.render}: {h.type}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", color: h.isMatch ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>{h.ptr} ({h.isMatch ? 'MATCH' : 'MISMATCH'})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Fiber Diffing Rule</h2>
+            </div>
+            <div className="code-block">
+{`if (!Object.is(oldValue, newValue)) {
+  // Reference Mismatch:
+  propagateContextChange(workInProgress, context, renderLanes);
+}`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount App
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<ValueIdentityLab />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 08: Component Lifecycle, Mount, Update & Effects</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 08: Component Lifecycle, Mount, Update & Effects</h1>
+  <p class="subtitle">Interactive laboratory demonstrating Render vs Commit vs Effect, Setup/Cleanup pairs, Async Race Handling, and Derived State vs Synchronization.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('renderCommitEffect')">1. Render ≠ Commit ≠ Effect</button>
+    <button onclick="selectLab('setupCleanup')">2. Setup / Cleanup Pair Lifecycle</button>
+    <button onclick="selectLab('asyncRace')">3. Async Race Condition & Cleanup</button>
+    <button onclick="selectLab('derivedVsEffect')">4. Derived State vs Synchronization</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Lifecycle Architecture Pattern</h2>
+      <pre id="code-panel">// Pattern</pre>
+
+      <h2>Execution Sequence & Lifecycle Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Lifecycle Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Lifecycle: Resource Synchronized</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Engineering Rule</h2>
+      <pre id="rule-panel">// Rule</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      renderCommitEffect: {
+        code: `// Render is Pure Calculation:\nfunction UserProfile({ userId }) {\n  // ❌ NO fetch() during render!\n  useEffect(() => {\n    // ✅ Effect synchronizes external system post-commit\n    const sub = subscribeUser(userId);\n    return () => sub.unsubscribe();\n  }, [userId]);\n  return <div>Profile</div>;\n}`,
+        trace: `1. Render #1 (userId=10): React executes function, calculates JSX virtual tree.\n2. Commit #1: React applies real DOM updates.\n3. Effect Setup #1: subscribeUser(10) runs.\n4. Prop Change (userId=20): Render #2 -> Commit #2 -> Cleanup #1 (unsub 10) -> Setup #2 (sub 20).`,
+        verdict: `Complete Lifecycle Separation: Render calculates snapshot, Commit makes it real, Effect synchronizes external world.`,
+        rule: `Keep rendering pure. Use effects to synchronize with external systems after commit.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Pure Render / Clean Synchronization'
+      },
+      setupCleanup: {
+        code: `// Symmetric Setup / Cleanup Pair:\nuseEffect(() => {\n  const timer = setInterval(() => tick(), 1000);\n  return () => clearInterval(timer);\n}, []);`,
+        trace: `Mount: Component enters tree ➔ Commit ➔ setInterval started.\nUpdates: Ticks trigger setState ➔ re-render ➔ [] dependency unchanged, timer persists.\nUnmount: Component removed ➔ clearInterval called immediately.`,
+        verdict: `Zero Resource Leaks: Timer lifetime exactly mirrors component occurrence lifetime.`,
+        rule: `Cleanup must be the exact inverse of the synchronization established by setup.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Symmetrical Teardown'
+      },
+      asyncRace: {
+        code: `// Async Race Condition Defense:\nuseEffect(() => {\n  let cancelled = false;\n  async function loadData() {\n    const data = await fetchDetails(id);\n    if (!cancelled) setDetails(data);\n  }\n  loadData();\n  return () => { cancelled = true; };\n}, [id]);`,
+        trace: `Request 1 (id="A") starts ➔ User switches id="B" ➔ Effect cleans up (cancelled=true for A) ➔ Request 2 (id="B") starts ➔ If Request 1 finishes late, cancelled flag drops stale data!`,
+        verdict: `Safe Async Lifecycle: Prevents out-of-order response overwrites and memory leaks.`,
+        rule: `Asynchronous operations have lifetimes that outlive render; always handle cancellation or stale responses.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Race-Condition Immune'
+      },
+      derivedVsEffect: {
+        code: `// ❌ Flawed (Effect for derived state - 2 renders!):\nconst [fullName, setFullName] = useState("");\nuseEffect(() => setFullName(first + " " + last), [first, last]);\n\n// ✅ Correct (Render-time derivation - 1 render):\nconst fullName = first + " " + last;`,
+        trace: `Flawed: props change ➔ Render 1 ➔ Commit ➔ Effect runs ➔ setState ➔ Render 2 ➔ Commit (Double render penalty!).\nCorrect: props change ➔ Render 1 calculates fullName directly ➔ Commit (Instant, 0 extra renders).`,
+        verdict: `Zero Redundant Synchronization: Pure in-memory transformation belongs in render.`,
+        rule: `Do not use an effect to calculate data that can already be derived from current render inputs.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Pure Render Derivation'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('renderCommitEffect');
+  </script>
+</body>
+</html>

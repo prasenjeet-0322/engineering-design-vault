@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 07 / Part 08 Lab — Ref-Driven Focus, Selection, Scrolling & Browser Interaction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+    }
+
+    /* Layout Grid */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card Panels */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Controls & Buttons */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      border-color: #6366f1;
+      color: #fff;
+      box-shadow: 0 2px 10px var(--accent-primary-glow);
+    }
+
+    button.primary:hover {
+      background: linear-gradient(135deg, #4338ca, #4f46e5);
+      box-shadow: 0 4px 16px var(--accent-primary-glow);
+    }
+
+    button.emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+    button.emerald:hover {
+      background: rgba(16, 185, 129, 0.25);
+    }
+
+    button.cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.35);
+      color: #22d3ee;
+    }
+    button.cyan:hover {
+      background: rgba(6, 182, 212, 0.25);
+    }
+
+    button.amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+    button.amber:hover {
+      background: rgba(245, 158, 11, 0.25);
+    }
+
+    button.rose {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: #fb7185;
+    }
+    button.rose:hover {
+      background: rgba(244, 63, 94, 0.25);
+    }
+
+    /* Inputs */
+    input[type="text"], input[type="number"], select {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #f8fafc;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-glow);
+    }
+
+    /* Metrics Grid & Telemetry */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-box {
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-top: 4px;
+    }
+
+    /* Live Terminal Console */
+    .terminal-window {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      max-height: 190px;
+      overflow-y: auto;
+      margin-top: 14px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: #64748b;
+      min-width: 65px;
+    }
+    .log-cmd {
+      color: #818cf8;
+      font-weight: 600;
+    }
+    .log-info {
+      color: #22d3ee;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .log-err {
+      color: #f43f5e;
+    }
+
+    /* Chat Simulation UI */
+    .chat-container {
+      height: 280px;
+      background: #0b0f19;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      scroll-behavior: smooth;
+    }
+
+    .chat-msg {
+      padding: 10px 14px;
+      border-radius: 10px;
+      max-width: 80%;
+      font-size: 0.875rem;
+      line-height: 1.4;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: #fff;
+    }
+
+    .chat-msg.system {
+      align-self: flex-start;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+    }
+
+    .new-msg-pill {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #6366f1;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);
+      display: none;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    /* Modal Backdrop & Focus Trap */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal-content {
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 460px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .badge-status {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-titles">
+        <h1>
+          <span>🎯 Ref-Driven Focus, Selection & Scrolling</span>
+        </h1>
+        <div class="subtitle">KPI 07 · Part 08 Companion Lab — Architectural Exploration of Imperative Browser Capabilities</div>
+      </div>
+      <div>
+        <span class="badge badge-primary">Level 06 Core Competency</span>
+      </div>
+    </header>
+
+    <!-- Top Grid: Interactive Focus & Selection Sandbox vs Caret Range -->
+    <div class="grid-2col">
+      <!-- Panel 1: Focus, Selection & Caret -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. Focus & Selection Control Deck</span>
+          <span class="badge-status" id="focusStatusBadge" style="background: rgba(100,116,139,0.2); color:#94a3b8;">Unfocused</span>
+        </div>
+        <p class="card-desc">
+          Commands like <code>focus()</code>, <code>select()</code>, and <code>setSelectionRange()</code> are native browser operations. They execute immediately through ref handles without triggering React reconciliation cycles.
+        </p>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 0.8rem; color: var(--text-dim); display:block; margin-bottom: 6px;">REF-ATTACHED INPUT ELEMENT</label>
+          <input type="text" id="sandboxInput" value="React Fiber Architecture & Refs" style="width: 100%; font-size: 1rem; font-family: var(--font-mono);">
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnFocus">⚡ inputRef.current.focus()</button>
+          <button class="cyan" id="btnSelect">✂️ inputRef.current.select()</button>
+          <button class="emerald" id="btnCaretStart">⏮️ Caret [0, 0]</button>
+          <button class="emerald" id="btnCaretEnd">⏭️ Caret End</button>
+          <button class="amber" id="btnSelectWord">🔍 Select 'Fiber' [6, 11]</button>
+          <button class="rose" id="btnBlur">❌ Blur</button>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">activeElement</span>
+            <span class="metric-value" id="activeElementVal" style="font-size:0.85rem; color:#818cf8;">BODY</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">selectionStart</span>
+            <span class="metric-value" id="selStartVal">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">selectionEnd</span>
+            <span class="metric-value" id="selEndVal">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">React Renders</span>
+            <span class="metric-value" id="renderCountVal" style="color:#10b981;">0</span>
+          </div>
+        </div>
+
+        <div class="terminal-window" id="focusTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[System] Ready. Ref handle bound to &lt;input /&gt;.</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Controlled Input Authority Conflict Warning -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Controlled Input vs Imperative Mutation</span>
+          <span class="badge" style="background: rgba(244,63,94,0.15); color:#fb7185;">Anti-Pattern Warning</span>
+        </div>
+        <p class="card-desc">
+          React's declarative engine maintains authority over controlled input values. Imperatively writing to <code>ref.current.value</code> produces desynchronized state and cursor jump anomalies.
+        </p>
+
+        <div style="background: #0f172a; padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 14px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+            <span style="font-size:0.8rem; color:#94a3b8;">React State: <code id="reactStateDisplay" style="color:#38bdf8;">"Hello"</code></span>
+            <span style="font-size:0.8rem; color:#94a3b8;">DOM Node .value: <code id="domValueDisplay" style="color:#a855f7;">"Hello"</code></span>
+          </div>
+          <input type="text" id="controlledInput" value="Hello" style="width: 100%; font-family: var(--font-mono);">
+        </div>
+
+        <div class="btn-group">
+          <button class="rose" id="btnMutateDom">❌ Imperative: ref.current.value = "Hacked"</button>
+          <button class="emerald" id="btnUpdateState">✅ Declarative: setState("Hacked")</button>
+          <button id="btnTriggerRerender">🔄 Trigger Dummy Parent Re-render</button>
+        </div>
+
+        <div class="terminal-window" id="controlledTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[StateSync] React state and DOM node are currently in sync.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid: Smart Chat Auto-Scroll Policy & Accessible Modal Focus Trap -->
+    <div class="grid-2col">
+      <!-- Panel 3: Smart Chat Auto-Scroll Policy -->
+      <div class="card">
+        <div class="card-title">
+          <span>3. Smart Chat Auto-Scroll & Distance Policy</span>
+          <span class="badge-status" id="scrollStatusBadge" style="background: rgba(16,185,129,0.15); color:#34d399;">At Bottom</span>
+        </div>
+        <p class="card-desc">
+          Auto-scrolling on every render hijacks user reading position. A senior interaction policy calculates <code>distanceFromBottom &lt; 60px</code> before issuing imperative <code>scrollTo()</code> commands.
+        </p>
+
+        <div class="chat-container" id="chatFeed">
+          <div class="chat-msg system">👋 Welcome to the High-Performance Architectural Chat Feed!</div>
+          <div class="chat-msg user">Is automatic scrolling always desirable on incoming messages?</div>
+          <div class="chat-msg system">No! If the user scrolled up to read past logs, auto-scrolling steals user control.</div>
+          <div class="chat-msg user">Let's test the distance threshold policy.</div>
+          <div class="new-msg-pill" id="newMsgPill">↓ New Messages Below</div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">scrollTop</span>
+            <span class="metric-value" id="scrollTopVal">0px</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">scrollHeight</span>
+            <span class="metric-value" id="scrollHeightVal">280px</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Dist from Bottom</span>
+            <span class="metric-value" id="distFromBottomVal" style="color:#10b981;">0px</span>
+          </div>
+        </div>
+
+        <div class="btn-group" style="margin-top: 10px;">
+          <button class="primary" id="btnSendMsg">💬 Push New Message (Smart Policy)</button>
+          <button class="rose" id="btnNaiveMsg">⚠️ Push (Naive Hijack Policy)</button>
+          <button class="cyan" id="btnScrollToTop">⬆️ Scroll to Top (Inspect History)</button>
+        </div>
+      </div>
+
+      <!-- Panel 4: Accessible Modal Focus Trap & Sync Boundary -->
+      <div class="card">
+        <div class="card-title">
+          <span>4. Focus Trap & Layout Synchronization</span>
+          <span class="badge badge-primary">A11y Authority</span>
+        </div>
+        <p class="card-desc">
+          Synchronize initial focus to the first interactive element when a dialog mounts (via <code>useLayoutEffect</code>), trap keyboard Tab/Shift+Tab cycles, and restore focus to the invoker element on unmount.
+        </p>
+
+        <div style="background: #0f172a; padding: 20px; border-radius: 12px; border: 1px dashed rgba(255,255,255,0.12); text-align: center; margin-bottom: 16px;">
+          <p style="font-size:0.875rem; color:#94a3b8; margin-bottom: 14px;">Trigger dialog lifecycle to test focus synchronization & keyboard trapping:</p>
+          <button class="primary" id="btnOpenModal" style="padding: 10px 20px; font-size:0.95rem;">🚀 Open Accessible Dialog</button>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Invoker Ref</span>
+            <span class="metric-value" id="invokerRefVal" style="font-size:0.8rem; color:#818cf8;">#btnOpenModal</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Focus Owner</span>
+            <span class="metric-value" id="modalFocusOwnerVal" style="font-size:0.8rem; color:#38bdf8;">Main Document</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Trap Active</span>
+            <span class="metric-value" id="trapStatusVal" style="color:#94a3b8;">False</span>
+          </div>
+        </div>
+
+        <div class="terminal-window" id="modalTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[A11y] Modal idle. Invoker reference cached.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accessible Modal Simulation Element -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content" id="modalDialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 10px; color:#fff;">Confirm Deployment</h2>
+      <p style="font-size: 0.875rem; color: #9ca3af; margin-bottom: 16px;">
+        Focus has been automatically synchronized to the first interactive field via Layout Effect. Try pressing <strong>Tab</strong> or <strong>Shift+Tab</strong>—focus is trapped within this dialog.
+      </p>
+
+      <div style="margin-bottom: 14px;">
+        <label style="font-size: 0.78rem; color: var(--text-dim); display:block; margin-bottom: 4px;">TARGET ENVIRONMENT</label>
+        <select id="modalSelect" style="width: 100%;">
+          <option>production-us-east-1</option>
+          <option>staging-eu-central-1</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label style="font-size: 0.78rem; color: var(--text-dim); display:block; margin-bottom: 4px;">DEPLOYMENT REASON</label>
+        <input type="text" id="modalInput" placeholder="Enter release summary..." style="width: 100%;">
+      </div>
+
+      <div style="display:flex; justify-content: flex-end; gap: 10px;">
+        <button id="modalBtnCancel" class="rose">Cancel (Esc)</button>
+        <button id="modalBtnConfirm" class="primary">Confirm Deploy</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getTime() {
+      const d = new Date();
+      return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0').slice(0,2);
+    }
+
+    function log(terminalId, cmd, info, type = 'info') {
+      const term = document.getElementById(terminalId);
+      if (!term) return;
+      const row = document.createElement('div');
+      row.className = 'log-line';
+      row.innerHTML = `<span class="log-time">${getTime()}</span><span class="log-cmd">${cmd}</span><span class="log-${type}">${info}</span>`;
+      term.appendChild(row);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // --- PANEL 1: FOCUS, SELECTION & CARET ---
+    const sandboxInput = document.getElementById('sandboxInput');
+    const activeElementVal = document.getElementById('activeElementVal');
+    const selStartVal = document.getElementById('selStartVal');
+    const selEndVal = document.getElementById('selEndVal');
+    const renderCountVal = document.getElementById('renderCountVal');
+    const focusStatusBadge = document.getElementById('focusStatusBadge');
+
+    function updateFocusMetrics() {
+      const isFocused = document.activeElement === sandboxInput;
+      activeElementVal.textContent = document.activeElement ? document.activeElement.tagName : 'NONE';
+      selStartVal.textContent = sandboxInput.selectionStart ?? 0;
+      selEndVal.textContent = sandboxInput.selectionEnd ?? 0;
+
+      if (isFocused) {
+        focusStatusBadge.textContent = 'Focused';
+        focusStatusBadge.style.background = 'rgba(99,102,241,0.2)';
+        focusStatusBadge.style.color = '#818cf8';
+      } else {
+        focusStatusBadge.textContent = 'Unfocused';
+        focusStatusBadge.style.background = 'rgba(100,116,139,0.2)';
+        focusStatusBadge.style.color = '#94a3b8';
+      }
+    }
+
+    document.getElementById('btnFocus').addEventListener('click', () => {
+      sandboxInput.focus();
+      updateFocusMetrics();
+      log('focusTerminal', 'inputRef.current.focus()', 'Focus acquired. (0 React renders triggered)', 'info');
+    });
+
+    document.getElementById('btnSelect').addEventListener('click', () => {
+      sandboxInput.focus();
+      sandboxInput.select();
+      updateFocusMetrics();
+      log('focusTerminal', 'inputRef.current.select()', `Selected all ${sandboxInput.value.length} characters.`, 'info');
+    });
+
+    document.getElementById('btnCaretStart').addEventListener('click', () => {
+      sandboxInput.focus();
+      sandboxInput.setSelectionRange(0, 0);
+      updateFocusMetrics();
+      log('focusTerminal', 'setSelectionRange(0, 0)', 'Caret moved to start position.', 'cmd');
+    });
+
+    document.getElementById('btnCaretEnd').addEventListener('click', () => {
+      sandboxInput.focus();
+      const len = sandboxInput.value.length;
+      sandboxInput.setSelectionRange(len, len);
+      updateFocusMetrics();
+      log('focusTerminal', `setSelectionRange(${len}, ${len})`, 'Caret moved to end position.', 'cmd');
+    });
+
+    document.getElementById('btnSelectWord').addEventListener('click', () => {
+      sandboxInput.focus();
+      sandboxInput.setSelectionRange(6, 11);
+      updateFocusMetrics();
+      log('focusTerminal', 'setSelectionRange(6, 11)', 'Selected substring "Fiber" [6, 11].', 'info');
+    });
+
+    document.getElementById('btnBlur').addEventListener('click', () => {
+      sandboxInput.blur();
+      updateFocusMetrics();
+      log('focusTerminal', 'inputRef.current.blur()', 'Element blurred.', 'warn');
+    });
+
+    sandboxInput.addEventListener('keyup', updateFocusMetrics);
+    sandboxInput.addEventListener('mouseup', updateFocusMetrics);
+    sandboxInput.addEventListener('focus', updateFocusMetrics);
+    sandboxInput.addEventListener('blur', updateFocusMetrics);
+
+    // --- PANEL 2: CONTROLLED INPUT VS MUTATION ---
+    let reactState = "Hello";
+    const controlledInput = document.getElementById('controlledInput');
+    const reactStateDisplay = document.getElementById('reactStateDisplay');
+    const domValueDisplay = document.getElementById('domValueDisplay');
+
+    function syncDisplay() {
+      reactStateDisplay.textContent = `"${reactState}"`;
+      domValueDisplay.textContent = `"${controlledInput.value}"`;
+    }
+
+    controlledInput.addEventListener('input', (e) => {
+      reactState = e.target.value;
+      syncDisplay();
+      log('controlledTerminal', 'onChange', `React state updated naturally to "${reactState}".`, 'info');
+    });
+
+    document.getElementById('btnMutateDom').addEventListener('click', () => {
+      controlledInput.value = "Hacked_Imperatively";
+      syncDisplay();
+      log('controlledTerminal', 'ref.current.value = "Hacked"', '⚠️ WARNING: Mutated DOM directly! React state is still "' + reactState + '"', 'err');
+    });
+
+    document.getElementById('btnUpdateState').addEventListener('click', () => {
+      reactState = "Hacked_Declaratively";
+      controlledInput.value = reactState;
+      syncDisplay();
+      log('controlledTerminal', 'setState("Hacked_Declaratively")', '✅ React rendered new value and synchronized DOM correctly.', 'info');
+    });
+
+    document.getElementById('btnTriggerRerender').addEventListener('click', () => {
+      // Re-render simulates React reconciling with its known state
+      controlledInput.value = reactState;
+      syncDisplay();
+      log('controlledTerminal', 'React Re-render', `Reconciliation overwrote DOM back to React state "${reactState}".`, 'warn');
+    });
+
+    // --- PANEL 3: SMART CHAT AUTO-SCROLL ---
+    const chatFeed = document.getElementById('chatFeed');
+    const scrollTopVal = document.getElementById('scrollTopVal');
+    const scrollHeightVal = document.getElementById('scrollHeightVal');
+    const distFromBottomVal = document.getElementById('distFromBottomVal');
+    const scrollStatusBadge = document.getElementById('scrollStatusBadge');
+    const newMsgPill = document.getElementById('newMsgPill');
+
+    let msgCount = 0;
+    const sampleMsgs = [
+      "Refs provide stable pointers to host instances across Fiber renders.",
+      "useLayoutEffect fires synchronously after mutations before browser paint.",
+      "Never call focus() in the render phase—the DOM node is not yet committed!",
+      "Distance threshold policy: distanceFromBottom < 60px.",
+      "Controlled inputs own their value; use refs only for imperative commands."
+    ];
+
+    function updateChatMetrics() {
+      const st = Math.round(chatFeed.scrollTop);
+      const sh = chatFeed.scrollHeight;
+      const ch = chatFeed.clientHeight;
+      const dist = sh - st - ch;
+
+      scrollTopVal.textContent = `${st}px`;
+      scrollHeightVal.textContent = `${sh}px`;
+      distFromBottomVal.textContent = `${dist}px`;
+
+      if (dist <= 60) {
+        scrollStatusBadge.textContent = 'At Bottom';
+        scrollStatusBadge.style.background = 'rgba(16,185,129,0.15)';
+        scrollStatusBadge.style.color = '#34d399';
+        newMsgPill.style.display = 'none';
+      } else {
+        scrollStatusBadge.textContent = `Reading History (${dist}px up)`;
+        scrollStatusBadge.style.background = 'rgba(245,158,11,0.15)';
+        scrollStatusBadge.style.color = '#fbbf24';
+      }
+    }
+
+    chatFeed.addEventListener('scroll', updateChatMetrics);
+
+    function addMessage(isSmartPolicy) {
+      const msgText = sampleMsgs[msgCount % sampleMsgs.length];
+      msgCount++;
+
+      const isUser = msgCount % 2 === 1;
+      const msgEl = document.createElement('div');
+      msgEl.className = `chat-msg ${isUser ? 'user' : 'system'}`;
+      msgEl.textContent = `[#${msgCount}] ${msgText}`;
+
+      // Measure distance BEFORE appending
+      const dist = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight;
+      const isNearBottom = dist <= 60;
+
+      chatFeed.appendChild(msgEl);
+
+      if (isSmartPolicy) {
+        if (isNearBottom) {
+          chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior: 'smooth' });
+        } else {
+          newMsgPill.style.display = 'flex';
+        }
+      } else {
+        // Naive hijack policy: always scroll
+        chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior: 'smooth' });
+      }
+
+      setTimeout(updateChatMetrics, 50);
+    }
+
+    document.getElementById('btnSendMsg').addEventListener('click', () => addMessage(true));
+    document.getElementById('btnNaiveMsg').addEventListener('click', () => addMessage(false));
+    document.getElementById('btnScrollToTop').addEventListener('click', () => {
+      chatFeed.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(updateChatMetrics, 200);
+    });
+    newMsgPill.addEventListener('click', () => {
+      chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior: 'smooth' });
+      newMsgPill.style.display = 'none';
+    });
+
+    // --- PANEL 4: ACCESSIBLE MODAL FOCUS TRAP ---
+    const btnOpenModal = document.getElementById('btnOpenModal');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalDialog = document.getElementById('modalDialog');
+    const modalSelect = document.getElementById('modalSelect');
+    const modalInput = document.getElementById('modalInput');
+    const modalBtnCancel = document.getElementById('modalBtnCancel');
+    const modalBtnConfirm = document.getElementById('modalBtnConfirm');
+
+    const invokerRefVal = document.getElementById('invokerRefVal');
+    const modalFocusOwnerVal = document.getElementById('modalFocusOwnerVal');
+    const trapStatusVal = document.getElementById('trapStatusVal');
+
+    let previousActiveElement = null;
+
+    function openModal() {
+      previousActiveElement = document.activeElement;
+      invokerRefVal.textContent = previousActiveElement ? '#' + previousActiveElement.id : 'Unknown';
+      modalOverlay.style.display = 'flex';
+      trapStatusVal.textContent = 'Active (Trapped)';
+      trapStatusVal.style.color = '#10b981';
+
+      // Synchronize initial focus via layout timing simulation
+      setTimeout(() => {
+        modalSelect.focus();
+        modalFocusOwnerVal.textContent = '#modalSelect';
+        log('modalTerminal', 'useLayoutEffect Focus Sync', 'Modal committed -> Initial focus synchronized to #modalSelect', 'info');
+      }, 10);
+    }
+
+    function closeModal() {
+      modalOverlay.style.display = 'none';
+      trapStatusVal.textContent = 'False';
+      trapStatusVal.style.color = '#94a3b8';
+      modalFocusOwnerVal.textContent = 'Main Document';
+
+      // Restore focus to invoker
+      if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
+        previousActiveElement.focus();
+        log('modalTerminal', 'Cleanup / Focus Restore', `Modal unmounted -> Restored focus to ${previousActiveElement.id}`, 'emerald');
+      }
+    }
+
+    btnOpenModal.addEventListener('click', openModal);
+    modalBtnCancel.addEventListener('click', closeModal);
+    modalBtnConfirm.addEventListener('click', () => {
+      alert('Deployment Initiated!');
+      closeModal();
+    });
+
+    // Focus Trap Keydown Listener
+    modalDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const focusableElements = modalDialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+            modalFocusOwnerVal.textContent = '#' + lastElement.id;
+            log('modalTerminal', 'Shift+Tab Loop', 'Wrapped focus from first element to last (#modalBtnConfirm)', 'cmd');
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+            modalFocusOwnerVal.textContent = '#' + firstElement.id;
+            log('modalTerminal', 'Tab Loop', 'Wrapped focus from last element to first (#modalSelect)', 'cmd');
+          }
+        }
+      }
+    });
+
+    // Initial metrics update
+    updateFocusMetrics();
+    updateChatMetrics();
+  </script>
+</body>
+</html>

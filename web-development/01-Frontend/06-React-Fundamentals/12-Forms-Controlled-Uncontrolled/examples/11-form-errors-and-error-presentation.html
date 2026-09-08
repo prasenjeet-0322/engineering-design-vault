@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 08 Part 11 — Form Errors & Error Presentation Simulator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.7);
+      --card-border: rgba(99, 102, 241, 0.2);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1250px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 950px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+
+    input.input-invalid {
+      border-color: var(--danger) !important;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25) !important;
+    }
+
+    .error-msg {
+      color: #f87171;
+      font-size: 0.8rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(51, 65, 85, 0.8);
+      color: #cbd5e1;
+      border: 1px solid #475569;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.35);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .summary-box {
+      background: rgba(239, 68, 68, 0.12);
+      border: 2px solid rgba(239, 68, 68, 0.4);
+      padding: 16px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .summary-box h3 {
+      font-size: 0.95rem;
+      color: #fca5a5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .summary-box ul {
+      margin-left: 20px;
+      font-size: 0.85rem;
+      color: #fecaca;
+    }
+
+    .summary-box a {
+      color: #fca5a5;
+      text-decoration: underline;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .summary-box a:hover {
+      color: #ffffff;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .code-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .pill-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-red { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .pill-yellow { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+
+    .dynamic-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid #334155;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useMemo } = React;
+
+    function App() {
+      // 1. Form Draft State
+      const [draft, setDraft] = useState({
+        fullName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        plan: "standard"
+      });
+
+      // 2. Interaction Metadata State
+      const [touched, setTouched] = useState({});
+      const [isSubmitted, setIsSubmitted] = useState(false);
+      const [visibilityPolicy, setVisibilityPolicy] = useState("touched_or_submitted");
+
+      // 3. Server Errors State
+      const [serverFieldErrors, setServerFieldErrors] = useState({});
+      const [serverFormError, setServerFormError] = useState(null);
+
+      // 4. Dynamic Rows with Stable IDs
+      const [contacts, setContacts] = useState([
+        { id: "c1", name: "Alice", email: "alice@test.com" },
+        { id: "c2", name: "Bob", email: "invalid-bob-email" }
+      ]);
+      const [dynamicErrors, setDynamicErrors] = useState({ c2_email: "Invalid email syntax" });
+
+      const summaryRef = useRef(null);
+
+      // --- Pure Validation Engine (Error Existence) ---
+      const validationErrors = useMemo(() => {
+        const errors = {};
+
+        if (!draft.fullName.trim()) {
+          errors.fullName = "Full name is required.";
+        } else if (draft.fullName.length < 3) {
+          errors.fullName = "Name must be at least 3 characters.";
+        }
+
+        if (!draft.email.trim()) {
+          errors.email = "Email address is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
+          errors.email = "Please provide a valid email format.";
+        }
+
+        if (!draft.password) {
+          errors.password = "Password is required.";
+        } else if (draft.password.length < 6) {
+          errors.password = "Password must be at least 6 characters.";
+        }
+
+        if (draft.password && draft.confirmPassword !== draft.password) {
+          errors.confirmPassword = "Passwords do not match.";
+        }
+
+        return errors;
+      }, [draft]);
+
+      // Merge client & server errors
+      const combinedErrors = useMemo(() => {
+        return {
+          ...validationErrors,
+          ...serverFieldErrors
+        };
+      }, [validationErrors, serverFieldErrors]);
+
+      // Check if error is currently visible based on policy
+      const isVisible = (field) => {
+        if (!combinedErrors[field]) return false;
+        if (visibilityPolicy === "always") return true;
+        if (visibilityPolicy === "submitted_only") return isSubmitted;
+        return Boolean(touched[field] || isSubmitted);
+      };
+
+      const handleFieldChange = (field, val) => {
+        setDraft(prev => ({ ...prev, [field]: val }));
+
+        // Invalidate stale server error on keystroke
+        if (serverFieldErrors[field]) {
+          setServerFieldErrors(prev => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+          });
+        }
+      };
+
+      const handleBlur = (field) => {
+        setTouched(prev => ({ ...prev, [field]: true }));
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setIsSubmitted(true);
+
+        const hasErrors = Object.keys(combinedErrors).length > 0;
+        if (hasErrors) {
+          requestAnimationFrame(() => {
+            summaryRef.current?.focus();
+            summaryRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        } else {
+          alert("✓ Validation Passed! Form submitted successfully.");
+        }
+      };
+
+      const triggerMockServerError = (status) => {
+        if (status === 422) {
+          setServerFieldErrors({
+            email: "HTTP 422: Email address is already registered."
+          });
+          setServerFormError(null);
+        } else if (status === 403) {
+          setServerFormError("HTTP 403 Forbidden: You lack permission to perform registration.");
+        } else {
+          setServerFormError("HTTP 500 Internal Server Error: Database transaction timed out.");
+        }
+        setIsSubmitted(true);
+      };
+
+      // Summary list compilation
+      const errorList = useMemo(() => {
+        const list = [];
+        for (const [key, msg] of Object.entries(combinedErrors)) {
+          if (isVisible(key)) {
+            list.push({ field: key, msg, targetId: `input-${key}` });
+          }
+        }
+        return list;
+      }, [combinedErrors, touched, isSubmitted, visibilityPolicy]);
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>KPI 08 Part 11 — Form Errors & Error Presentation</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "4px" }}>
+                Decoupled Existence vs Visibility, Accessible Error Summaries & Semantic Graphs
+              </p>
+            </div>
+            <div className="badge">Level 06 — React Fundamentals</div>
+          </header>
+
+          <div className="grid">
+            {/* Left Column: Interactive Form & Presentation */}
+            <div className="card">
+              <div className="card-title">
+                <span>Enterprise User Registration Form</span>
+                <span className={`pill ${Object.keys(validationErrors).length === 0 ? "pill-green" : "pill-red"}`}>
+                  {Object.keys(validationErrors).length === 0 ? "VALID DOMAIN" : "INVALID DOMAIN"}
+                </span>
+              </div>
+
+              {/* Accessible Error Summary Banner */}
+              {errorList.length > 0 && (
+                <div
+                  ref={summaryRef}
+                  tabIndex={-1}
+                  role="alert"
+                  className="summary-box"
+                  style={{ outline: "none" }}
+                >
+                  <h3>⚠️ Please correct {errorList.length} error{errorList.length > 1 ? "s" : ""}:</h3>
+                  <ul>
+                    {errorList.map(item => (
+                      <li key={item.field}>
+                        <a
+                          onClick={() => {
+                            const el = document.getElementById(item.targetId);
+                            el?.focus();
+                            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }}
+                        >
+                          {item.field}: {item.msg}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {serverFormError && (
+                <div style={{ background: "rgba(239,68,68,0.2)", border: "1px solid #ef4444", padding: "10px", borderRadius: "8px", color: "#fca5a5", fontSize: "0.85rem" }}>
+                  {serverFormError}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} noValidate>
+                {/* Full Name */}
+                <div className="form-group" style={{ marginBottom: "12px" }}>
+                  <label htmlFor="input-fullName">Full Name *</label>
+                  <input
+                    id="input-fullName"
+                    type="text"
+                    value={draft.fullName}
+                    onChange={(e) => handleFieldChange("fullName", e.target.value)}
+                    onBlur={() => handleBlur("fullName")}
+                    aria-invalid={Boolean(combinedErrors.fullName)}
+                    aria-describedby={isVisible("fullName") ? "err-fullName" : undefined}
+                    className={isVisible("fullName") ? "input-invalid" : ""}
+                  />
+                  {isVisible("fullName") && (
+                    <span id="err-fullName" role="alert" className="error-msg">
+                      ⚠️ {combinedErrors.fullName}
+                    </span>
+                  )}
+                </div>
+
+                {/* Email Address */}
+                <div className="form-group" style={{ marginBottom: "12px" }}>
+                  <label htmlFor="input-email">Email Address *</label>
+                  <input
+                    id="input-email"
+                    type="email"
+                    value={draft.email}
+                    onChange={(e) => handleFieldChange("email", e.target.value)}
+                    onBlur={() => handleBlur("email")}
+                    aria-invalid={Boolean(combinedErrors.email)}
+                    aria-describedby={isVisible("email") ? "err-email" : undefined}
+                    className={isVisible("email") ? "input-invalid" : ""}
+                  />
+                  {isVisible("email") && (
+                    <span id="err-email" role="alert" className="error-msg">
+                      ⚠️ {combinedErrors.email}
+                    </span>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div className="form-group" style={{ marginBottom: "12px" }}>
+                  <label htmlFor="input-password">Password (Min 6 chars) *</label>
+                  <input
+                    id="input-password"
+                    type="password"
+                    value={draft.password}
+                    onChange={(e) => handleFieldChange("password", e.target.value)}
+                    onBlur={() => handleBlur("password")}
+                    aria-invalid={Boolean(combinedErrors.password)}
+                    aria-describedby={isVisible("password") ? "err-password" : undefined}
+                    className={isVisible("password") ? "input-invalid" : ""}
+                  />
+                  {isVisible("password") && (
+                    <span id="err-password" role="alert" className="error-msg">
+                      ⚠️ {combinedErrors.password}
+                    </span>
+                  )}
+                </div>
+
+                {/* Confirm Password (Cross-Field Invariant) */}
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label htmlFor="input-confirmPassword">Confirm Password *</label>
+                  <input
+                    id="input-confirmPassword"
+                    type="password"
+                    value={draft.confirmPassword}
+                    onChange={(e) => handleFieldChange("confirmPassword", e.target.value)}
+                    onBlur={() => handleBlur("confirmPassword")}
+                    aria-invalid={Boolean(combinedErrors.confirmPassword)}
+                    aria-describedby={isVisible("confirmPassword") ? "err-confirmPassword" : undefined}
+                    className={isVisible("confirmPassword") ? "input-invalid" : ""}
+                  />
+                  {isVisible("confirmPassword") && (
+                    <span id="err-confirmPassword" role="alert" className="error-msg">
+                      ⚠️ {combinedErrors.confirmPassword}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                    Submit Registration
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setDraft({ fullName: "", email: "", password: "", confirmPassword: "", plan: "standard" });
+                      setTouched({});
+                      setIsSubmitted(false);
+                      setServerFieldErrors({});
+                      setServerFormError(null);
+                    }}
+                  >
+                    Reset Form
+                  </button>
+                </div>
+              </form>
+
+              <hr style={{ borderColor: "#1e293b", margin: "8px 0" }} />
+
+              {/* Server Mock Controls */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "#cbd5e1" }}>
+                  🧪 Mock Server Response Injectors:
+                </span>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary" onClick={() => triggerMockServerError(422)}>
+                    Inject 422 Email Taken
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => triggerMockServerError(403)}>
+                    Inject 403 Forbidden
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => triggerMockServerError(500)}>
+                    Inject 500 DB Crash
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Deep Diagnostic Inspector */}
+            <div className="card">
+              <div className="card-title">
+                <span>Error State & Visibility Engine</span>
+                <span className="badge">Auditor</span>
+              </div>
+
+              {/* Policy Selector */}
+              <div className="form-group">
+                <label>Active Visibility Policy:</label>
+                <select
+                  value={visibilityPolicy}
+                  onChange={(e) => setVisibilityPolicy(e.target.value)}
+                >
+                  <option value="touched_or_submitted">Standard: Visited onBlur OR isSubmitted (Recommended)</option>
+                  <option value="submitted_only">Strict: Show ONLY after Submit Attempt</option>
+                  <option value="always">Aggressive: Show Immediately (Anti-Pattern Demo)</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>isSubmitted:</span>
+                  <span style={{ fontWeight: 600, color: isSubmitted ? "#38bdf8" : "#94a3b8" }}>
+                    {String(isSubmitted)}
+                  </span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Touched Fields:</span>
+                  <span style={{ fontWeight: 600, color: "#a5b4fc" }}>
+                    {Object.keys(touched).filter(k => touched[k]).join(", ") || "None"}
+                  </span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Domain Error Count (Existence):</span>
+                  <span style={{ fontWeight: 600, color: "#f87171" }}>
+                    {Object.keys(combinedErrors).length}
+                  </span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Rendered Error Count (Visibility):</span>
+                  <span style={{ fontWeight: 600, color: "#fcd34d" }}>
+                    {errorList.length}
+                  </span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Underlying Domain Errors (Mathematical Existence):</label>
+                <div className="code-box">
+                  {JSON.stringify(combinedErrors, null, 2)}
+                </div>
+              </div>
+
+              {/* Dynamic Row Entity ID Demo */}
+              <div className="form-group">
+                <label>Dynamic Contact List (Stable ID Error Binding Demo):</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {contacts.map((c, idx) => (
+                    <div key={c.id} className="dynamic-row">
+                      <span style={{ fontSize: "0.8rem", color: "#a5b4fc", minWidth: "24px" }}>#{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={c.email}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setContacts(prev => prev.map(item => item.id === c.id ? { ...item, email: val } : item));
+                          if (dynamicErrors[`${c.id}_email`]) {
+                            setDynamicErrors(prev => {
+                              const next = { ...prev };
+                              delete next[`${c.id}_email`];
+                              return next;
+                            });
+                          }
+                        }}
+                        className={dynamicErrors[`${c.id}_email`] ? "input-invalid" : ""}
+                        style={{ flex: 1 }}
+                      />
+                      {dynamicErrors[`${c.id}_email`] && (
+                        <span style={{ color: "#f87171", fontSize: "0.75rem" }}>⚠️ Invalid</span>
+                      )}
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: "6px 10px", fontSize: "0.75rem" }}
+                        onClick={() => {
+                          setContacts(prev => prev.filter(item => item.id !== c.id));
+                          setDynamicErrors(prev => {
+                            const next = { ...prev };
+                            delete next[`${c.id}_email`];
+                            return next;
+                          });
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.8rem" }}
+                    onClick={() => {
+                      const newId = "c" + (contacts.length + 1) + "_" + Math.random().toString(36).substring(2, 5);
+                      setContacts(prev => [...prev, { id: newId, name: "", email: "" }]);
+                    }}
+                  >
+                    + Add Dynamic Contact Row
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

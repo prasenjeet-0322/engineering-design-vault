@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 / Part 03 — useContext Hook & Dynamic Consumption Lifecycles Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 30%, #9ca3af 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .header-title p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-must-know {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .badge-kpi {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .lab-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 14px;
+    }
+
+    .card-header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-header h2 span {
+      color: var(--accent-cyan);
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .btn {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: var(--accent-rose);
+    }
+
+    .btn-danger:hover {
+      background: var(--accent-rose);
+      color: #fff;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .interactive-box {
+      border: 1px dashed var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .tree-node {
+      border-left: 2px solid var(--accent-primary);
+      padding-left: 14px;
+      margin: 8px 0;
+      position: relative;
+    }
+
+    .tree-node.provider-active {
+      border-left-color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.05);
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .tree-node.provider-shadowed {
+      border-left-color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.05);
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 0.85rem;
+    }
+
+    .telemetry-label {
+      color: var(--text-muted);
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    .code-block {
+      background: #080c14;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #d1d5db;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .tag-fiber {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--accent-purple);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .tag-provider {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .tag-default {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .pulse-render {
+      animation: pulseGlow 0.4s ease-out;
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.8); background: rgba(99, 102, 241, 0.3); }
+      100% { box-shadow: 0 0 0 10px transparent; background: transparent; }
+    }
+
+    .alert-box {
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 0.85rem;
+      margin-top: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .alert-error {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fecdd3;
+    }
+
+    .alert-info {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: #cffafe;
+    }
+  </style>
+
+  <!-- React 18 and Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useCallback, useRef } = React;
+
+    // =========================================================================
+    // STATIC CONTEXT TOKENS (Allocated at Module Scope)
+    // =========================================================================
+    const ThemeContext = createContext("light-default");
+    const AuthSessionContext = createContext({ userId: "guest_user", role: "public", token: "tok_guest" });
+    const LocaleContext = createContext({ lang: "en", currency: "USD", greeting: "Hello" });
+    const RequiredBillingContext = createContext(null);
+
+    // Guarded Custom Hook Gateway
+    function useGuardedBilling() {
+      const billing = useContext(RequiredBillingContext);
+      if (!billing) {
+        throw new Error("[INVARIANT ERROR] useGuardedBilling() was called outside <RequiredBillingContext.Provider>!");
+      }
+      return billing;
+    }
+
+    // Error Boundary
+    class GuardErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, errorMsg: "" };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, errorMsg: error.message };
+      }
+      componentDidCatch(error, info) {
+        console.error("Guarded Hook Exception:", error);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="alert-box alert-error">
+              <span style={{ fontSize: "1.2rem" }}>🚨</span>
+              <div>
+                <strong>Guarded Hook Exception Caught:</strong>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", marginTop: 4 }}>
+                  {this.state.errorMsg}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // =========================================================================
+    // MAIN INTERACTIVE LAB APPLICATION
+    // =========================================================================
+    function UseContextLab() {
+      const [activeTab, setActiveTab] = useState("consumption");
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-title">
+              <h1>useContext Hook & Dynamic Consumption Lifecycles</h1>
+              <p>KPI 11 / PART 03 — Interactive Laboratory & Fiber Subscription Simulator</p>
+            </div>
+            <div className="badge-bar">
+              <span className="badge badge-kpi">KPI 11</span>
+              <span className="badge badge-must-know">Must Know</span>
+            </div>
+          </header>
+
+          <div className="tabs">
+            <button className={`tab-btn ${activeTab === 'consumption' ? 'active' : ''}`} onClick={() => setActiveTab('consumption')}>
+              🔍 A/B: Default vs Provider
+            </button>
+            <button className={`tab-btn ${activeTab === 'multi' ? 'active' : ''}`} onClick={() => setActiveTab('multi')}>
+              🌐 E: Multi-Context Consumer
+            </button>
+            <button className={`tab-btn ${activeTab === 'dynamic' ? 'active' : ''}`} onClick={() => setActiveTab('dynamic')}>
+              🔄 D: Dynamic Provider Insertion
+            </button>
+            <button className={`tab-btn ${activeTab === 'closures' ? 'active' : ''}`} onClick={() => setActiveTab('closures')}>
+              ⏱️ H: Event Closure Snapshots
+            </button>
+            <button className={`tab-btn ${activeTab === 'migration' ? 'active' : ''}`} onClick={() => setActiveTab('migration')}>
+              🔀 J: Subtree Scope Migration
+            </button>
+            <button className={`tab-btn ${activeTab === 'guard' ? 'active' : ''}`} onClick={() => setActiveTab('guard')}>
+              🛡️ K: Guarded Gateway (Strategy B)
+            </button>
+            <button className={`tab-btn ${activeTab === 'fiber' ? 'active' : ''}`} onClick={() => setActiveTab('fiber')}>
+              🧬 I: Fiber Dependencies Graph
+            </button>
+          </div>
+
+          <main>
+            {activeTab === 'consumption' && <ModuleConsumption />}
+            {activeTab === 'multi' && <ModuleMultiContext />}
+            {activeTab === 'dynamic' && <ModuleDynamicProvider />}
+            {activeTab === 'closures' && <ModuleClosures />}
+            {activeTab === 'migration' && <ModuleMigration />}
+            {activeTab === 'guard' && <ModuleGuard />}
+            {activeTab === 'fiber' && <ModuleFiberDependencies />}
+          </main>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE A/B: DEFAULT VS PROVIDER CONSUMPTION
+    // =========================================================================
+    function ModuleConsumption() {
+      const [providedTheme, setProvidedTheme] = useState("dark-emerald");
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module A/B</span> useContext Resolution Mechanics</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Compare leaf consumer resolution inside vs outside `<ThemeContext.Provider>`.
+              </p>
+              <div className="btn-group">
+                <button className="btn" onClick={() => setProvidedTheme(p => p === 'dark-emerald' ? 'sunset-violet' : 'dark-emerald')}>
+                  Toggle Provider Value
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <div style={{ marginBottom: 12 }}>
+                  <span className="tag-default">&lt;No Provider Container&gt;</span>
+                  <div className="tree-node">
+                    <ThemeConsumer label="Consumer Outside Any Provider" />
+                  </div>
+                </div>
+
+                <ThemeContext.Provider value={providedTheme}>
+                  <div className="tree-node provider-active">
+                    <span className="tag-provider">&lt;ThemeContext.Provider value="{providedTheme}"&gt;</span>
+                    <div className="tree-node">
+                      <ThemeConsumer label="Consumer Inside Provider Subtree" />
+                    </div>
+                  </div>
+                </ThemeContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Resolution Inspection</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Static Context Default:</span>
+              <span className="telemetry-val">"light-default"</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Active Provider Value:</span>
+              <span className="telemetry-val" style={{ color: "var(--accent-emerald)" }}>"{providedTheme}"</span>
+            </div>
+            <div className="code-block" style={{ marginTop: 16 }}>
+{`// Upward Walk Resolution:
+Consumer Inside  -> Hit Provider (tag: 10) -> Returns "${providedTheme}"
+Consumer Outside -> 0 Providers in Ancestry -> Returns "light-default"`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ThemeConsumer({ label }) {
+      const theme = useContext(ThemeContext);
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      return (
+        <div className="pulse-render" key={renderCount.current} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 8, marginTop: 4 }}>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{label}</div>
+          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginTop: 2 }}>
+            Observed Value: <span style={{ color: "var(--accent-cyan)" }}>"{theme}"</span>
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 2 }}>
+            Render Count: {renderCount.current}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE E: MULTI-CONTEXT CONSUMER
+    // =========================================================================
+    function ModuleMultiContext() {
+      const [theme, setTheme] = useState("dark");
+      const [role, setRole] = useState("admin");
+      const [lang, setLang] = useState("ja");
+
+      const authValue = useMemo(() => ({
+        userId: "usr_enterprise_99",
+        role,
+        token: `tok_${role}_xyz`
+      }), [role]);
+
+      const localeValue = useMemo(() => ({
+        lang,
+        currency: lang === 'ja' ? 'JPY' : lang === 'de' ? 'EUR' : 'USD',
+        greeting: lang === 'ja' ? 'こんにちは' : lang === 'de' ? 'Guten Tag' : 'Welcome'
+      }), [lang]);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module E</span> Multi-Context Subscription Surface</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                A single component consuming 3 distinct Contexts (`ThemeContext`, `AuthSessionContext`, `LocaleContext`).
+              </p>
+              <div className="btn-group">
+                <button className="btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+                  Toggle Theme ({theme})
+                </button>
+                <button className="btn btn-secondary" onClick={() => setRole(r => r === 'admin' ? 'editor' : 'admin')}>
+                  Toggle Role ({role})
+                </button>
+                <button className="btn btn-secondary" onClick={() => setLang(l => l === 'ja' ? 'de' : l === 'de' ? 'en' : 'ja')}>
+                  Cycle Locale ({lang})
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <ThemeContext.Provider value={theme}>
+                  <AuthSessionContext.Provider value={authValue}>
+                    <LocaleContext.Provider value={localeValue}>
+                      <MultiConsumerComponent />
+                    </LocaleContext.Provider>
+                  </AuthSessionContext.Provider>
+                </ThemeContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Dependencies Linked List</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">1. firstContext:</span>
+              <span className="telemetry-val">ThemeContext (value: "{theme}")</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">2. next:</span>
+              <span className="telemetry-val">AuthSessionContext (role: "{role}")</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">3. next.next:</span>
+              <span className="telemetry-val">LocaleContext (lang: "{lang}")</span>
+            </div>
+            <div className="alert-box alert-info">
+              <span>💡</span>
+              <div>
+                <strong>Re-render Cascade Rule:</strong> When ANY of the 3 Provider values change reference, React tags this consumer Fiber with update lanes!
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MultiConsumerComponent() {
+      const theme = useContext(ThemeContext);
+      const auth = useContext(AuthSessionContext);
+      const locale = useContext(LocaleContext);
+      const renders = useRef(0);
+      renders.current++;
+
+      return (
+        <div className="pulse-render" key={renders.current} style={{ padding: "12px", background: theme === 'dark' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.1)', borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--accent-cyan)" }}>
+            {locale.greeting}, {auth.userId} ({auth.role})
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 4 }}>
+            Active Theme: <strong>{theme}</strong> | Currency: <strong>{locale.currency}</strong>
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--accent-emerald)", marginTop: 6 }}>
+            Total Re-renders: {renders.current}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE D: DYNAMIC PROVIDER INSERTION & REMOVAL
+    // =========================================================================
+    function ModuleDynamicProvider() {
+      const [isWrapped, setIsWrapped] = useState(true);
+      const [counter, setCounter] = useState(1);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module D</span> Dynamic Provider Insertion & Removal</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Dynamically mount/unmount the Provider around the consumer. Notice that the consumer's local internal state is preserved across environment shifts!
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${isWrapped ? 'btn-danger' : 'btn'}`} onClick={() => setIsWrapped(!isWrapped)}>
+                  {isWrapped ? "Remove <ThemeContext.Provider>" : "Insert <ThemeContext.Provider>"}
+                </button>
+                <button className="btn btn-secondary" onClick={() => setCounter(c => c + 1)}>
+                  Update Provider Value (v{counter})
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                {isWrapped ? (
+                  <ThemeContext.Provider value={`Dynamic_Scope_v${counter}`}>
+                    <div className="tree-node provider-active">
+                      <span className="tag-provider">&lt;ThemeContext.Provider value="Dynamic_Scope_v{counter}"&gt;</span>
+                      <div className="tree-node">
+                        <StatefulConsumer />
+                      </div>
+                    </div>
+                  </ThemeContext.Provider>
+                ) : (
+                  <div className="tree-node">
+                    <span className="tag-default">&lt;No Provider in Tree&gt;</span>
+                    <div className="tree-node">
+                      <StatefulConsumer />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Environment Transition Telemetry</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Provider Presence:</span>
+              <span className="telemetry-val" style={{ color: isWrapped ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
+                {isWrapped ? 'MOUNTED IN ANCESTRY' : 'UNMOUNTED (Fallback)'}
+              </span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Consumer Fiber Identity:</span>
+              <span className="telemetry-val" style={{ color: 'var(--accent-cyan)' }}>PRESERVED (Re-render, Not Remount)</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function StatefulConsumer() {
+      const theme = useContext(ThemeContext);
+      const [localClickCount, setLocalClickCount] = useState(0);
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      return (
+        <div style={{ padding: "10px", background: "rgba(255,255,255,0.04)", borderRadius: 8 }}>
+          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fff" }}>
+            Stateful Consumer Node
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>
+            Observed Context: <strong style={{ color: "var(--accent-cyan)" }}>"{theme}"</strong>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: "0.75rem" }} onClick={() => setLocalClickCount(c => c + 1)}>
+              Click Local State ({localClickCount})
+            </button>
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 4 }}>
+            Render Count: {renderCount.current}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE H: CLOSURES & ASYNC CAPTURE
+    // =========================================================================
+    function ModuleClosures() {
+      const [token, setToken] = useState("token_v1");
+      const [logHistory, setLogHistory] = useState([]);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module H</span> Context Snapshots & Async Closures</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Click "Trigger 3-Second Delayed Log" and immediately change the token. Compare the Stale Closure (captured at click) vs Latest Mutable Ref!
+              </p>
+              <div className="btn-group">
+                <button className="btn" onClick={() => setToken(`token_v${Math.floor(Math.random()*1000)}`)}>
+                  Change Token ({token})
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <AuthSessionContext.Provider value={{ token }}>
+                  <AsyncClosureConsumer onLog={(entry) => setLogHistory(prev => [entry, ...prev.slice(0, 4)])} />
+                </AuthSessionContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Async Closure Log Stream</h2>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+              {logHistory.length === 0 && (
+                <div style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>No logs recorded yet.</div>
+              )}
+              {logHistory.map((item, idx) => (
+                <div key={idx} style={{ padding: "8px", background: "rgba(0,0,0,0.3)", borderRadius: 6, fontSize: "0.8rem", borderLeft: "2px solid var(--accent-cyan)" }}>
+                  <div>Captured Snapshot: <span style={{ color: "var(--accent-rose)" }}>"{item.stale}"</span></div>
+                  <div>Mutable Ref: <span style={{ color: "var(--accent-emerald)" }}>"{item.latest}"</span></div>
+                  <div style={{ color: "var(--text-dim)", fontSize: "0.7rem", marginTop: 2 }}>{item.time}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AsyncClosureConsumer({ onLog }) {
+      const { token } = useContext(AuthSessionContext);
+      const tokenRef = useRef(token);
+      const [isPending, setIsPending] = useState(false);
+
+      useEffect(() => {
+        tokenRef.current = token;
+      }, [token]);
+
+      const handleDelayedCapture = () => {
+        setIsPending(true);
+        const capturedSnapshot = token;
+        setTimeout(() => {
+          onLog({
+            stale: capturedSnapshot,
+            latest: tokenRef.current,
+            time: new Date().toLocaleTimeString()
+          });
+          setIsPending(false);
+        }, 3000);
+      };
+
+      return (
+        <div style={{ padding: "10px", background: "rgba(255,255,255,0.04)", borderRadius: 8 }}>
+          <div>Current Context Token: <strong style={{ color: "var(--accent-cyan)" }}>"{token}"</strong></div>
+          <button className={`btn ${isPending ? 'btn-secondary' : 'btn'}`} style={{ marginTop: 10 }} disabled={isPending} onClick={handleDelayedCapture}>
+            {isPending ? "⏳ Waiting 3s (Change Token Now!)..." : "⏱️ Trigger 3-Second Delayed Log"}
+          </button>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE J: SUBTREE SCOPE MIGRATION
+    // =========================================================================
+    function ModuleMigration() {
+      const [activeColumn, setActiveColumn] = useState("columnA");
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module J</span> Subtree Scope Migration Across Providers</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                Move the draggable consumer card between Column A (Emerald Scope) and Column B (Purple Scope). The card re-subscribes dynamically!
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${activeColumn === 'columnA' ? 'active' : 'btn-secondary'}`} onClick={() => setActiveColumn('columnA')}>
+                  Move Card to Column A (Emerald)
+                </button>
+                <button className={`btn ${activeColumn === 'columnB' ? 'active' : 'btn-secondary'}`} onClick={() => setActiveColumn('columnB')}>
+                  Move Card to Column B (Purple)
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 12 }}>
+                <ThemeContext.Provider value="emerald-theme">
+                  <div className="interactive-box" style={{ borderColor: activeColumn === 'columnA' ? 'var(--accent-emerald)' : 'var(--border-subtle)' }}>
+                    <div style={{ color: "var(--accent-emerald)", fontWeight: 700, fontSize: "0.85rem", marginBottom: 8 }}>
+                      Column A (&lt;Theme: emerald&gt;)
+                    </div>
+                    {activeColumn === 'columnA' && <MigratingCard columnId="Column A" />}
+                  </div>
+                </ThemeContext.Provider>
+
+                <ThemeContext.Provider value="purple-theme">
+                  <div className="interactive-box" style={{ borderColor: activeColumn === 'columnB' ? 'var(--accent-purple)' : 'var(--border-subtle)' }}>
+                    <div style={{ color: "var(--accent-purple)", fontWeight: 700, fontSize: "0.85rem", marginBottom: 8 }}>
+                      Column B (&lt;Theme: purple&gt;)
+                    </div>
+                    {activeColumn === 'columnB' && <MigratingCard columnId="Column B" />}
+                  </div>
+                </ThemeContext.Provider>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Migration Reconciliation Trace</h2>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Active Host Container:</span>
+              <span className="telemetry-val">{activeColumn === 'columnA' ? 'Column A Provider' : 'Column B Provider'}</span>
+            </div>
+            <div className="telemetry-row">
+              <span className="telemetry-label">Dynamic Re-Subscription:</span>
+              <span className="telemetry-val" style={{ color: "var(--accent-emerald)" }}>SUCCESS (Zero State Reset)</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MigratingCard({ columnId }) {
+      const theme = useContext(ThemeContext);
+      const [cardNotes, setCardNotes] = useState("Enterprise Task #42");
+
+      return (
+        <div style={{ padding: "12px", background: theme === 'emerald-theme' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(168, 85, 247, 0.15)', borderRadius: 8, border: `1px solid ${theme === 'emerald-theme' ? 'var(--accent-emerald)' : 'var(--accent-purple)'}` }}>
+          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fff" }}>
+            📦 Draggable Task Card
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>
+            Current Ambient Scope: <strong style={{ color: "var(--accent-cyan)" }}>"{theme}"</strong>
+          </div>
+          <input 
+            type="text" 
+            value={cardNotes} 
+            onChange={(e) => setCardNotes(e.target.value)}
+            style={{ width: "100%", marginTop: 8, padding: "6px 8px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border-subtle)", color: "#fff", borderRadius: 6, fontSize: "0.8rem" }}
+          />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE K: GUARDED HOOK GATEWAY (Strategy B)
+    // =========================================================================
+    function ModuleGuard() {
+      const [hasProvider, setHasProvider] = useState(false);
+
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module K</span> Guarded Custom Hook (Strategy B Fail-Fast)</h2>
+            </div>
+            <div className="controls-panel">
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                `useGuardedBilling()` checks if Context is `null` and throws an invariant exception immediately.
+              </p>
+              <div className="btn-group">
+                <button className={`btn ${hasProvider ? 'btn-danger' : 'btn'}`} onClick={() => setHasProvider(!hasProvider)}>
+                  {hasProvider ? "Remove <RequiredBillingContext.Provider>" : "Mount <RequiredBillingContext.Provider>"}
+                </button>
+              </div>
+
+              <div className="interactive-box">
+                <GuardErrorBoundary key={String(hasProvider)}>
+                  {hasProvider ? (
+                    <RequiredBillingContext.Provider value={{ plan: "Enterprise Tier", balance: 4500 }}>
+                      <div className="tree-node provider-active">
+                        <span className="tag-provider">&lt;RequiredBillingContext.Provider value=&#123;...&#125;&gt;</span>
+                        <div className="tree-node">
+                          <GuardedBillingConsumer />
+                        </div>
+                      </div>
+                    </RequiredBillingContext.Provider>
+                  ) : (
+                    <div className="tree-node">
+                      <span className="tag-default">&lt;No Billing Provider&gt;</span>
+                      <div className="tree-node">
+                        <GuardedBillingConsumer />
+                      </div>
+                    </div>
+                  )}
+                </GuardErrorBoundary>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Invariant Assertion Gateway</h2>
+            </div>
+            <div className="code-block">
+{`export function useGuardedBilling() {
+  const billing = useContext(RequiredBillingContext);
+  if (!billing) {
+    throw new Error("[INVARIANT ERROR] Missing <BillingProvider>!");
+  }
+  return billing;
+}`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function GuardedBillingConsumer() {
+      const billing = useGuardedBilling(); // Will throw if context is null!
+
+      return (
+        <div style={{ padding: "8px 12px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: 8 }}>
+          <div style={{ fontSize: "0.85rem", color: "var(--accent-emerald)", fontWeight: 700 }}>
+            ✅ Billing Context Successfully Resolved
+          </div>
+          <div style={{ fontSize: "0.8rem", marginTop: 4 }}>
+            Plan: <strong>{billing.plan}</strong> | Balance: <strong>${billing.balance}</strong>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE I: FIBER DEPENDENCY GRAPH
+    // =========================================================================
+    function ModuleFiberDependencies() {
+      return (
+        <div className="lab-grid">
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Module I</span> Fiber Reconciliation Dependency Graph</h2>
+            </div>
+            <div className="controls-panel">
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "#e5e7eb" }}>
+                <div style={{ color: "var(--accent-purple)", fontWeight: 700 }}>
+                  Fiber (tag: 10 ContextProvider)
+                </div>
+                <div style={{ paddingLeft: 16, borderLeft: "2px solid var(--accent-purple)", margin: "6px 0" }}>
+                  <div>type: ThemeContext.Provider</div>
+                  <div>pendingProps: &#123; value: "dark" &#125;</div>
+                  <div>child: Fiber(ConsumerNode)</div>
+                </div>
+
+                <div style={{ color: "var(--accent-cyan)", fontWeight: 700, marginTop: 12 }}>
+                  Fiber (tag: 0 FunctionComponent - ConsumerNode)
+                </div>
+                <div style={{ paddingLeft: 16, borderLeft: "2px solid var(--accent-cyan)", margin: "6px 0" }}>
+                  <div>dependencies: &#123;</div>
+                  <div style={{ paddingLeft: 16 }}>
+                    <div>lanes: 0,</div>
+                    <div>firstContext: &#123;</div>
+                    <div style={{ paddingLeft: 16 }}>
+                      <div>context: ThemeContext@0x00A1,</div>
+                      <div>memoizedValue: "dark",</div>
+                      <div>next: null</div>
+                    </div>
+                    <div>&#125;</div>
+                  </div>
+                  <div>&#125;</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2><span>Diagnostics</span> Reconciler Propagation Pipeline</h2>
+            </div>
+            <div className="code-block">
+{`1. Provider Value Changes (!Object.is(prev, next))
+2. React runs propagateContextChange()
+3. Scans descendant Fiber.dependencies linked list
+4. Tags Consumer Fiber with update lanes
+5. Consumer schedules render work (Bypasses React.memo!)`}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount App
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<UseContextLab />);
+  </script>
+</body>
+</html>

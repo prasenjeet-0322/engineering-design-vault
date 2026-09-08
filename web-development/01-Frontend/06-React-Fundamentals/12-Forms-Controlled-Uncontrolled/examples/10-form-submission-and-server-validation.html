@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 08 Part 10 — Form Submission & Server Validation Simulator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.7);
+      --card-border: rgba(99, 102, 241, 0.2);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #334155;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+
+    input.input-error {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+
+    .error-text {
+      color: var(--danger);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(51, 65, 85, 0.8);
+      color: #cbd5e1;
+      border: 1px solid #475569;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .alert-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fcd34d;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .telemetry-label {
+      color: var(--text-muted);
+    }
+
+    .telemetry-val {
+      font-weight: 600;
+    }
+
+    .code-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .pill-idle { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+    .pill-submitting { background: rgba(56, 189, 248, 0.2); color: #38bdf8; animation: pulse 1.5s infinite; }
+    .pill-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .range-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useMemo, useCallback } = React;
+
+    const INITIAL_VALUES = {
+      username: "alice_dev",
+      email: "alice@example.com",
+      role: "developer"
+    };
+
+    function App() {
+      // Form State
+      const [draft, setDraft] = useState(INITIAL_VALUES);
+      const [baseline, setBaseline] = useState(INITIAL_VALUES);
+      const [status, setStatus] = useState("idle");
+      const [clientErrors, setClientErrors] = useState({});
+      const [serverFieldErrors, setServerFieldErrors] = useState({});
+      const [formServerError, setFormServerError] = useState(null);
+      const [inFlightSnapshot, setInFlightSnapshot] = useState(null);
+
+      // Simulation Controls
+      const [latencyMs, setLatencyMs] = useState(1500);
+      const [mockServerOutcome, setMockServerOutcome] = useState("200");
+      const [idempotencyKey, setIdempotencyKey] = useState("idem-" + Math.random().toString(36).substring(2, 9));
+      
+      // Concurrency & Sequence Refs
+      const isSubmittingRef = useRef(false);
+      const requestSequenceRef = useRef(0);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (msg, type = "info") => {
+        setLogs(prev => [{
+          id: Math.random(),
+          timestamp: new Date().toLocaleTimeString(),
+          msg,
+          type
+        }, ...prev.slice(0, 7)]);
+      };
+
+      const isDirty = useMemo(() => {
+        return (
+          draft.username !== baseline.username ||
+          draft.email !== baseline.email ||
+          draft.role !== baseline.role
+        );
+      }, [draft, baseline]);
+
+      // Client-Side Validation (Fast Feedback)
+      const validateClient = (values) => {
+        const errors = {};
+        if (!values.username.trim()) {
+          errors.username = "Username is required.";
+        } else if (values.username.length < 3) {
+          errors.username = "Username must be at least 3 characters.";
+        }
+
+        if (!values.email.trim()) {
+          errors.email = "Email is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+          errors.email = "Invalid email format.";
+        }
+        return errors;
+      };
+
+      const handleFieldChange = (field, value) => {
+        setDraft(prev => ({ ...prev, [field]: value }));
+
+        // Keystroke Invalidation: Clear local & server errors for this field
+        if (clientErrors[field]) {
+          setClientErrors(prev => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+          });
+        }
+        if (serverFieldErrors[field]) {
+          setServerFieldErrors(prev => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+          });
+          addLog(`Invalidated server error for "${field}" on keystroke`, "warn");
+        }
+        setFormServerError(null);
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // 1. Concurrency Guard
+        if (isSubmittingRef.current) {
+          addLog("Blocked duplicate submission attempt (in-handler guard)", "warn");
+          return;
+        }
+
+        // 2. Client Pre-Flight Validation
+        const localErrors = validateClient(draft);
+        if (Object.keys(localErrors).length > 0) {
+          setClientErrors(localErrors);
+          addLog("Submission halted: Failed local client validation", "warn");
+          return;
+        }
+
+        // 3. Capture Immutable Submission Snapshot
+        const snapshot = { ...draft };
+        setInFlightSnapshot(snapshot);
+
+        // 4. Token & State Lock
+        const requestId = ++requestSequenceRef.current;
+        isSubmittingRef.current = true;
+        setStatus("submitting");
+        setServerFieldErrors({});
+        setFormServerError(null);
+
+        addLog(`Request #${requestId} DISPATCHED with Snapshot: ${JSON.stringify(snapshot)} (Latency: ${latencyMs}ms)`, "info");
+
+        try {
+          // Simulated Network Delay
+          await new Promise(resolve => setTimeout(resolve, latencyMs));
+
+          // 5. Stale Response Check
+          if (requestId !== requestSequenceRef.current) {
+            addLog(`Request #${requestId} FINISHED but DISCARDED (Superseded by #${requestSequenceRef.current})`, "warn");
+            return;
+          }
+
+          // 6. Mock Server Response Resolution
+          if (mockServerOutcome === "200") {
+            setBaseline(snapshot); // Reconcile baseline to what server committed!
+            setStatus("success");
+            addLog(`Request #${requestId} COMMITTED (HTTP 200). Baseline updated to snapshot!`, "success");
+            setIdempotencyKey("idem-" + Math.random().toString(36).substring(2, 9));
+          } else if (mockServerOutcome === "422") {
+            setStatus("error");
+            setServerFieldErrors({
+              email: "This email address is already registered to another account."
+            });
+            addLog(`Request #${requestId} REJECTED (HTTP 422 Field Error). User draft preserved!`, "error");
+          } else if (mockServerOutcome === "409") {
+            setStatus("error");
+            setFormServerError("HTTP 409 Conflict: Record was modified concurrently by another user.");
+            addLog(`Request #${requestId} REJECTED (HTTP 409 Conflict).`, "error");
+          } else if (mockServerOutcome === "403") {
+            setStatus("error");
+            setFormServerError("HTTP 403 Forbidden: You lack permission to update user roles.");
+            addLog(`Request #${requestId} REJECTED (HTTP 403 Forbidden).`, "error");
+          } else {
+            setStatus("error");
+            setFormServerError("HTTP 500 Internal Server Error: Transaction timed out.");
+            addLog(`Request #${requestId} FAILED (HTTP 500 Network/Server Error).`, "error");
+          }
+        } catch (err) {
+          if (requestId === requestSequenceRef.current) {
+            setStatus("error");
+            setFormServerError("Network timeout or unreachable gateway.");
+          }
+        } finally {
+          if (requestId === requestSequenceRef.current) {
+            isSubmittingRef.current = false;
+            setInFlightSnapshot(null);
+          }
+        }
+      };
+
+      const handleReset = () => {
+        setDraft(baseline);
+        setClientErrors({});
+        setServerFieldErrors({});
+        setFormServerError(null);
+        setStatus("idle");
+        addLog("Reset draft to active baseline values", "info");
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>KPI 08 Part 10 — Form Submission & Server Validation</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "4px" }}>
+                Immutable Submission Snapshots, Dual Error Taxonomies & Baseline Reconciliation
+              </p>
+            </div>
+            <div className="badge">Level 06 — React Fundamentals</div>
+          </header>
+
+          <div className="grid">
+            {/* Left Card: Interactive Form */}
+            <div className="card">
+              <div className="card-title">
+                <span>Interactive Submission Form</span>
+                <span className={`pill pill-${status}`}>{status.toUpperCase()}</span>
+              </div>
+
+              {formServerError && (
+                <div className="alert alert-danger">
+                  <span>⚠️</span>
+                  <div>{formServerError}</div>
+                </div>
+              )}
+
+              {status === "success" && !isDirty && (
+                <div className="alert alert-success">
+                  <span>✓</span>
+                  <div>Changes committed successfully to authoritative database!</div>
+                </div>
+              )}
+
+              {status === "success" && isDirty && (
+                <div className="alert alert-warning">
+                  <span>ℹ️</span>
+                  <div>Previous snapshot saved! You have subsequent unsaved modifications.</div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} noValidate>
+                <div className="form-group" style={{ marginBottom: "14px" }}>
+                  <label>Username (Local & Server Validated):</label>
+                  <input
+                    type="text"
+                    value={draft.username}
+                    onChange={(e) => handleFieldChange("username", e.target.value)}
+                    className={clientErrors.username ? "input-error" : ""}
+                  />
+                  {clientErrors.username && (
+                    <span className="error-text">{clientErrors.username}</span>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "14px" }}>
+                  <label>Email Address (Unique Server Constraint):</label>
+                  <input
+                    type="email"
+                    value={draft.email}
+                    onChange={(e) => handleFieldChange("email", e.target.value)}
+                    className={clientErrors.email || serverFieldErrors.email ? "input-error" : ""}
+                  />
+                  {clientErrors.email && (
+                    <span className="error-text">{clientErrors.email}</span>
+                  )}
+                  {serverFieldErrors.email && (
+                    <span className="error-text">{serverFieldErrors.email}</span>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "18px" }}>
+                  <label>Account Role:</label>
+                  <select
+                    value={draft.role}
+                    onChange={(e) => handleFieldChange("role", e.target.value)}
+                  >
+                    <option value="developer">Developer</option>
+                    <option value="admin">System Administrator (Requires 403 test)</option>
+                    <option value="billing">Billing Manager</option>
+                  </select>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={status === "submitting"}
+                    style={{ flex: 1 }}
+                  >
+                    {status === "submitting" ? "Submitting Snapshot..." : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleReset}
+                    disabled={!isDirty || status === "submitting"}
+                  >
+                    Discard Changes
+                  </button>
+                </div>
+              </form>
+
+              <hr style={{ borderColor: "#1e293b", margin: "12px 0" }} />
+
+              {/* Simulation Sandbox Settings */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#cbd5e1" }}>
+                  ⚙️ Server Simulator Controls
+                </div>
+
+                <div className="range-group">
+                  <span style={{ minWidth: "90px" }}>Latency: {latencyMs}ms</span>
+                  <input
+                    type="range"
+                    min="200"
+                    max="4000"
+                    step="100"
+                    value={latencyMs}
+                    onChange={(e) => setLatencyMs(Number(e.target.value))}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Simulated Server Outcome:</label>
+                  <select
+                    value={mockServerOutcome}
+                    onChange={(e) => setMockServerOutcome(e.target.value)}
+                  >
+                    <option value="200">HTTP 200 OK — Successful Transaction</option>
+                    <option value="422">HTTP 422 Unprocessable Entity — Email Taken</option>
+                    <option value="409">HTTP 409 Conflict — Concurrent Version Race</option>
+                    <option value="403">HTTP 403 Forbidden — Insufficient Permissions</option>
+                    <option value="500">HTTP 500 Internal Error — Database Gateway Timeout</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Card: Telemetry & In-Flight Inspector */}
+            <div className="card">
+              <div className="card-title">
+                <span>Telemetry & Temporal Inspector</span>
+                <span className="badge">Audit Trace</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div className="telemetry-row">
+                  <span className="telemetry-label">Lifecycle Status:</span>
+                  <span className="telemetry-val" style={{ color: "#38bdf8" }}>{status.toUpperCase()}</span>
+                </div>
+                <div className="telemetry-row">
+                  <span className="telemetry-label">Form isDirty:</span>
+                  <span className="telemetry-val" style={{ color: isDirty ? "#f59e0b" : "#10b981" }}>
+                    {String(isDirty)}
+                  </span>
+                </div>
+                <div className="telemetry-row">
+                  <span className="telemetry-label">Idempotency Key:</span>
+                  <span className="telemetry-val" style={{ color: "#a5b4fc" }}>{idempotencyKey}</span>
+                </div>
+                <div className="telemetry-row">
+                  <span className="telemetry-label">Request Sequence Token:</span>
+                  <span className="telemetry-val">#{requestSequenceRef.current}</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>In-Flight Submission Snapshot (Frozen at submit intent):</label>
+                <div className="code-box">
+                  {inFlightSnapshot ? JSON.stringify(inFlightSnapshot, null, 2) : "// No network request currently in-flight"}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Active Baseline (Committed Server Reference):</label>
+                <div className="code-box">
+                  {JSON.stringify(baseline, null, 2)}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Execution Event Log:</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "160px", overflowY: "auto" }}>
+                  {logs.length === 0 ? (
+                    <span style={{ fontSize: "0.8rem", color: "#64748b" }}>No submission events dispatched yet.</span>
+                  ) : (
+                    logs.map(log => (
+                      <div
+                        key={log.id}
+                        style={{
+                          fontSize: "0.75rem",
+                          fontFamily: "monospace",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          background: log.type === "error" ? "rgba(239, 68, 68, 0.2)" : log.type === "warn" ? "rgba(245, 158, 11, 0.2)" : log.type === "success" ? "rgba(16, 185, 129, 0.2)" : "rgba(15, 23, 42, 0.8)",
+                          color: log.type === "error" ? "#fca5a5" : log.type === "warn" ? "#fde68a" : log.type === "success" ? "#6ee7b7" : "#94a3b8"
+                        }}
+                      >
+                        [{log.timestamp}] {log.msg}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

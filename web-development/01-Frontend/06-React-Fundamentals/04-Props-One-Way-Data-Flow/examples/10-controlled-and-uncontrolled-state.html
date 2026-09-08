@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 10: Controlled & Uncontrolled State</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --cyan: #39c5bb;
+      --yellow: #d29922;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 6px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .badge.controlled {
+      background: #1c1938;
+      color: var(--purple);
+      border-color: #8957e5;
+    }
+    .badge.uncontrolled {
+      background: #0d281e;
+      color: var(--green);
+      border-color: #1a7f37;
+    }
+    .badge.warn {
+      background: #341a04;
+      color: var(--orange);
+      border-color: #9e6a03;
+    }
+    input[type="text"] {
+      background: #090d13;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin: 10px 0;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    button.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    .inspector {
+      background: #090d13;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      padding: 2px 0;
+      border-bottom: 1px dotted #1b2128;
+    }
+    .row:last-child { border-bottom: none; }
+    .val { color: var(--cyan); font-weight: bold; }
+    .log-box {
+      background: #04070b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 140px;
+      overflow-y: auto;
+      color: #8b949e;
+      margin-top: auto;
+    }
+    .log-entry {
+      margin-bottom: 3px;
+    }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+
+  <h1>🧪 Lab 10: Controlled & Uncontrolled State</h1>
+  <p class="subtitle">Interactive Diagnostic Sandbox for State Ownership, Default Values, and Hybrid API Contracts</p>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef } = React;
+
+    // 1. Fully Controlled Section
+    function ControlledSection() {
+      const [text, setText] = useState("React 18");
+      const [uppercaseOnly, setUppercaseOnly] = useState(false);
+
+      const handleChange = (e) => {
+        const next = uppercaseOnly ? e.target.value.toUpperCase() : e.target.value;
+        setText(next);
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            1. Controlled Ownership
+            <span className="badge controlled">Parent Owned</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Parent holds authoritative state in <code>text</code>. All transformations and validation occur on-the-fly.
+          </p>
+          <input
+            type="text"
+            value={text}
+            onChange={handleChange}
+            placeholder="Type here..."
+          />
+          <div className="inspector">
+            <div className="row">
+              <span>Parent State Value:</span>
+              <span className="val">"{text}"</span>
+            </div>
+            <div className="row">
+              <span>Length / Character Count:</span>
+              <span className="val">{text.length}</span>
+            </div>
+            <div className="row">
+              <span>Transform Policy:</span>
+              <span>{uppercaseOnly ? "Uppercase Enforced" : "Raw"}</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button onClick={() => setUppercaseOnly(!uppercaseOnly)}>
+              Toggle Uppercase Force: {uppercaseOnly ? "ON" : "OFF"}
+            </button>
+            <button onClick={() => setText("")}>External Reset (Clear)</button>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Uncontrolled Section with defaultValue & Ref
+    function UncontrolledSection() {
+      const inputRef = useRef(null);
+      const [submittedVal, setSubmittedVal] = useState(null);
+
+      const handleSubmit = () => {
+        if (inputRef.current) {
+          setSubmittedVal(inputRef.current.value);
+        }
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            2. Uncontrolled Component
+            <span className="badge uncontrolled">DOM Owned</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Initialized via <code>defaultValue</code>. React does not re-render on keystrokes; value read imperatively via ref on submit.
+          </p>
+          <input
+            type="text"
+            ref={inputRef}
+            defaultValue="Initial Uncontrolled"
+            placeholder="Type freely..."
+          />
+          <div className="inspector">
+            <div className="row">
+              <span>Last Read via Ref (Submit):</span>
+              <span className="val">{submittedVal !== null ? `"${submittedVal}"` : "(Not read yet)"}</span>
+            </div>
+            <div className="row">
+              <span>Parent State Updates on Key:</span>
+              <span style={{ color: "var(--green)" }}>0 (No Re-renders)</span>
+            </div>
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={handleSubmit}>Read Value via Ref</button>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. The defaultValue vs Key Reset Misconception
+    function DefaultValueMisconceptionSection() {
+      const [userId, setUserId] = useState("u1");
+      const [theme, setTheme] = useState("dark");
+      const users = {
+        u1: { name: "Alice", id: "u1" },
+        u2: { name: "Bob", id: "u2" }
+      };
+
+      const currentUser = users[userId];
+
+      return (
+        <div className="card">
+          <h2>
+            3. defaultValue vs Key Reset
+            <span className="badge warn">Lifecycle Trap</span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Compare input with/without <code>key</code> when switching user or theme.
+          </p>
+          <div style={{ marginBottom: "8px" }}>
+            <span style={{ fontSize: "12px", color: "#8b949e" }}>Without Key (Retains Stale Typed Value):</span>
+            <input type="text" defaultValue={currentUser.name} />
+          </div>
+          <div>
+            <span style={{ fontSize: "12px", color: "var(--cyan)" }}>With <code>key={userId}</code> (Intentionally Resets Occurrence):</span>
+            <input key={userId} type="text" defaultValue={currentUser.name} />
+          </div>
+          <div className="btn-group">
+            <button className="primary" onClick={() => setUserId(userId === "u1" ? "u2" : "u1")}>
+              Switch User (Current: {currentUser.name})
+            </button>
+            <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+              Rerender Parent (Theme: {theme})
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 4. Reusable Hybrid Component
+    function HybridInput({ value, defaultValue, onChange }) {
+      const isControlled = value !== undefined;
+      const [internalVal, setInternalVal] = useState(defaultValue ?? "");
+
+      const currentValue = isControlled ? value : internalVal;
+
+      const handleChange = (e) => {
+        const next = e.target.value;
+        if (!isControlled) {
+          setInternalVal(next);
+        }
+        onChange?.(next);
+      };
+
+      return (
+        <input
+          type="text"
+          value={currentValue}
+          onChange={handleChange}
+          style={{ borderColor: isControlled ? "var(--purple)" : "var(--green)" }}
+        />
+      );
+    }
+
+    function HybridPlayground() {
+      const [mode, setMode] = useState("uncontrolled");
+      const [controlledVal, setControlledVal] = useState("Hello Controlled");
+      const [logs, setLogs] = useState([]);
+
+      const handleNotify = (next) => {
+        setLogs(prev => [...prev.slice(-4), `onChange emitted: "${next}"`]);
+      };
+
+      return (
+        <div className="card">
+          <h2>
+            4. Reusable Hybrid API
+            <span className={`badge ${mode === "controlled" ? "controlled" : "uncontrolled"}`}>
+              Mode: {mode}
+            </span>
+          </h2>
+          <p style={{ fontSize: "13px", color: "#8b949e", margin: "4px 0 8px 0" }}>
+            Passes <code>value</code> in controlled mode; passes <code>defaultValue</code> in uncontrolled mode.
+          </p>
+          {mode === "controlled" ? (
+            <HybridInput
+              value={controlledVal}
+              onChange={(next) => {
+                setControlledVal(next);
+                handleNotify(next);
+              }}
+            />
+          ) : (
+            <HybridInput
+              defaultValue="Initial Uncontrolled"
+              onChange={handleNotify}
+            />
+          )}
+          <div className="btn-group">
+            <button className="primary" onClick={() => setMode(mode === "controlled" ? "uncontrolled" : "controlled")}>
+              Toggle Mode (Controlled / Uncontrolled)
+            </button>
+          </div>
+          <div className="log-box">
+            {logs.length === 0 ? <div style={{ fontStyle: "italic" }}>Type in the input to observe callbacks.</div> : null}
+            {logs.map((log, i) => (
+              <div key={i} className="log-entry" style={{ color: "var(--cyan)" }}>{log}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div className="grid">
+          <ControlledSection />
+          <UncontrolledSection />
+          <DefaultValueMisconceptionSection />
+          <HybridPlayground />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

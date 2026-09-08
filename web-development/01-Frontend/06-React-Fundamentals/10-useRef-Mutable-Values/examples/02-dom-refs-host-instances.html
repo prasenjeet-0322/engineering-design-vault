@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 07 / Part 02 Lab — DOM Refs, Host Instances & Imperative Browser Access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.8);
+      --bg-card-hover: rgba(30, 41, 59, 0.9);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.3);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.3);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.3);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--border-active);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tab Controls */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Form Controls & Inputs */
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 10px var(--accent-primary-glow);
+    }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .btn-primary:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: var(--accent-primary);
+    }
+
+    .btn-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      color: #38bdf8;
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+    .btn-cyan:hover {
+      background: rgba(6, 182, 212, 0.25);
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .btn-emerald:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: var(--accent-emerald);
+    }
+
+    .btn-rose {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+    .btn-rose:hover {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: var(--accent-rose);
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border-color: var(--border-subtle);
+    }
+    .btn-reset:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Scroll Box Demo */
+    .scroll-container {
+      height: 180px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .scroll-item {
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.85rem;
+    }
+
+    .scroll-item.target-highlight {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: var(--accent-primary);
+    }
+
+    /* Geometry Inspector Demo */
+    .geometry-target {
+      padding: 24px;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+      border: 2px dashed rgba(99, 102, 241, 0.5);
+      border-radius: 12px;
+      text-align: center;
+      resize: both;
+      overflow: auto;
+      min-height: 100px;
+      margin-bottom: 14px;
+    }
+
+    .geo-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .geo-cell {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .geo-label {
+      color: var(--text-dim);
+      font-size: 0.7rem;
+    }
+
+    .geo-val {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    /* Canvas Demo */
+    canvas {
+      background: #050811;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      display: block;
+      width: 100%;
+      height: 140px;
+    }
+
+    /* Terminal Console */
+    .terminal {
+      background: #070a11;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 2px 0;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .log-tag {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tag-dom { background: rgba(6, 182, 212, 0.2); color: #38bdf8; }
+    .tag-render { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .tag-meas { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+    .tag-warn { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .tag-err { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+    .log-text {
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    /* Quiz Crucible */
+    .quiz-question {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .quiz-btn {
+      text-align: left;
+      justify-content: flex-start;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .quiz-btn:hover {
+      background: rgba(30, 41, 59, 0.8);
+      color: #fff;
+      border-color: var(--border-active);
+    }
+
+    .quiz-feedback {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .feedback-correct { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--accent-emerald); color: #34d399; }
+    .feedback-wrong { background: rgba(244, 63, 94, 0.2); border: 1px solid var(--accent-rose); color: #fb7185; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="header-titles">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="badge badge-primary">KPI 07 · Part 02</span>
+        <span class="badge badge-live">Live Runtime Host Engine</span>
+      </div>
+      <h1>DOM Refs, Host Instances & Imperative Browser Access</h1>
+      <p class="subtitle">Real-time Host Inspection, Focus/Selection APIs, Layout Geometry & Competing Writers</p>
+    </div>
+    <button class="btn-reset" onclick="resetAllLabs()">↺ Reset Sandbox</button>
+  </header>
+
+  <!-- Dashboard Grid -->
+  <div class="dashboard-grid">
+    
+    <!-- LEFT PANEL: Interactive Host Simulations -->
+    <div>
+      
+      <!-- Primary Card with Tabs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🕹️</span> Imperative Host Controls & Scenarios
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab(event, 'tab-focus')">1. Focus & Selection</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-scroll')">2. Smooth Scroll</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-measure')">3. Layout Measurement</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-canvas')">4. Canvas Context</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-writers')">5. Competing Writers Bug</button>
+        </div>
+
+        <!-- TAB 1: Focus & Selection -->
+        <div id="tab-focus" class="tab-panel active">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Invoke native browser host methods directly through <code>inputRef.current</code> without scheduling a React render.
+          </p>
+
+          <input type="text" id="demoInput" value="React Fiber Imperative Architecture">
+
+          <div class="button-group">
+            <button class="btn-cyan" onclick="handleFocusInput()">
+              <span>🎯</span> inputRef.current.focus()
+            </button>
+            <button class="btn-primary" onclick="handleSelectRange(0, 11)">
+              <span>✂️</span> Select "React Fiber"
+            </button>
+            <button class="btn-primary" onclick="handleSelectAll()">
+              <span>📝</span> Select All
+            </button>
+            <button class="btn-rose" onclick="handleBlurInput()">
+              <span>🚪</span> inputRef.current.blur()
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: Smooth Scroll -->
+        <div id="tab-scroll" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Imperatively command scroll position via <code>sectionRef.current.scrollIntoView({ behavior: 'smooth' })</code>.
+          </p>
+
+          <div class="scroll-container" id="scrollContainer">
+            <div class="scroll-item" id="item-1">Item #1: Initial Element</div>
+            <div class="scroll-item" id="item-2">Item #2: Intermediate Node</div>
+            <div class="scroll-item" id="item-3">Item #3: Fiber Target A</div>
+            <div class="scroll-item" id="item-4">Item #4: Intermediate Node</div>
+            <div class="scroll-item" id="item-5" style="border-left: 4px solid var(--accent-emerald);">Item #5: 🎯 Target Item (Anchor Ref)</div>
+            <div class="scroll-item" id="item-6">Item #6: Intermediate Node</div>
+            <div class="scroll-item" id="item-7">Item #7: Intermediate Node</div>
+            <div class="scroll-item" id="item-8">Item #8: Deep Target Item (Bottom Anchor)</div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-emerald" onclick="handleScrollTo('item-5')">Scroll to Target #5</button>
+            <button class="btn-cyan" onclick="handleScrollTo('item-8')">Scroll to Target #8</button>
+            <button class="btn-reset" onclick="handleScrollTo('item-1')">Scroll to Top</button>
+          </div>
+        </div>
+
+        <!-- TAB 3: Geometry & Measurements -->
+        <div id="tab-measure" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+            Drag bottom-right corner to resize this box, then click measure to read live bounding rect from the browser layout engine.
+          </p>
+
+          <div class="geometry-target" id="geoTarget">
+            <div style="font-weight: 600; color: #fff;">📦 Resizable DOM Host Element (boxRef.current)</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Drag my bottom-right handle!</div>
+          </div>
+
+          <div class="geo-grid">
+            <div class="geo-cell">
+              <span class="geo-label">Width (px)</span>
+              <span class="geo-val" id="geoWidth">--</span>
+            </div>
+            <div class="geo-cell">
+              <span class="geo-label">Height (px)</span>
+              <span class="geo-val" id="geoHeight">--</span>
+            </div>
+            <div class="geo-cell">
+              <span class="geo-label">Client Top</span>
+              <span class="geo-val" id="geoTop">--</span>
+            </div>
+            <div class="geo-cell">
+              <span class="geo-label">Client Left</span>
+              <span class="geo-val" id="geoLeft">--</span>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-primary" onclick="measureGeometry()">
+              <span>📐</span> Read getBoundingClientRect()
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 4: Canvas Context -->
+        <div id="tab-canvas" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+            Directly manipulate HTML5 Canvas 2D context via <code>canvasRef.current.getContext('2d')</code>.
+          </p>
+
+          <canvas id="demoCanvas" width="600" height="140"></canvas>
+
+          <div class="button-group">
+            <button class="btn-cyan" onclick="drawCanvasPulse()">
+              <span>🎨</span> Draw Canvas Burst
+            </button>
+            <button class="btn-reset" onclick="clearCanvas()">Clear Canvas</button>
+          </div>
+        </div>
+
+        <!-- TAB 5: Competing Writers -->
+        <div id="tab-writers" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Observe what happens when imperative code mutates <code>classList</code> directly, and then React re-renders with declarative <code>className</code>.
+          </p>
+
+          <div id="writerDemoBox" style="padding: 16px; border-radius: 8px; background: rgba(30,41,59,0.5); border: 1px solid var(--border-subtle); margin-bottom: 14px; text-align: center;">
+            <div id="writerText" style="font-weight: 600;">Declared React State: <span id="reactStateLabel" style="color: var(--accent-emerald);">"badge-normal"</span></div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">DOM classList: <span id="actualDomClasses" style="font-family: var(--font-mono); color: #fff;">badge-normal</span></div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-rose" onclick="handleImperativeClassMutate()">
+              1. Imperative: classList.add('manual-override')
+            </button>
+            <button class="btn-emerald" onclick="handleReactStateRender()">
+              2. Declarative: Trigger React Re-render
+            </button>
+          </div>
+
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 10px; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px;">
+            ⚠️ Notice how React's declarative re-render wipes out the manually added class!
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL: Live Console & Crucible Quiz -->
+    <div>
+      
+      <!-- Terminal Log -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📡</span> Host Instance Telemetry Log
+          </div>
+          <button class="btn-reset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="clearLogs()">Clear</button>
+        </div>
+
+        <div class="terminal" id="terminalLog">
+          <!-- Live events will be logged here -->
+        </div>
+      </div>
+
+      <!-- Crucible Prediction Sandbox -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🔥</span> Crucible Diagnostic Challenge
+          </div>
+        </div>
+
+        <div class="quiz-question" id="quizQuestion">
+          A component executes: <code>const inputRef = useRef(null); inputRef.current.focus(); return &lt;input ref={inputRef} /&gt;;</code>. Why does this throw an error during initial render?
+        </div>
+
+        <div class="quiz-options">
+          <button class="quiz-btn" onclick="checkQuizAnswer(1)">A) React forbids function components from having more than 1 hook.</button>
+          <button class="quiz-btn" onclick="checkQuizAnswer(2)">B) inputRef.current is null during render; host attachment occurs later in the Commit Phase.</button>
+          <button class="quiz-btn" onclick="checkQuizAnswer(3)">C) The browser disabled focus APIs for virtual elements.</button>
+        </div>
+
+        <div class="quiz-feedback" id="quizFeedback"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function getTimestamp() {
+    const d = new Date();
+    return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+
+  function appendLog(tag, tagClass, text) {
+    const terminal = document.getElementById('terminalLog');
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `
+      <span class="log-time">[${getTimestamp()}]</span>
+      <span class="log-tag ${tagClass}">${tag}</span>
+      <span class="log-text">${text}</span>
+    `;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function clearLogs() {
+    document.getElementById('terminalLog').innerHTML = '';
+  }
+
+  function switchTab(evt, tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    
+    evt.currentTarget.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  // 1. Focus & Selection Demo
+  function handleFocusInput() {
+    const input = document.getElementById('demoInput');
+    input.focus();
+    appendLog('DOM_FOCUS', 'tag-dom', `inputRef.current.focus() executed. document.activeElement is #${input.id}. (React Render: 0ms)`);
+  }
+
+  function handleSelectRange(start, end) {
+    const input = document.getElementById('demoInput');
+    input.focus();
+    input.setSelectionRange(start, end);
+    appendLog('DOM_SELECT', 'tag-dom', `inputRef.current.setSelectionRange(${start}, ${end}) executed. Highlighted "${input.value.substring(start, end)}".`);
+  }
+
+  function handleSelectAll() {
+    const input = document.getElementById('demoInput');
+    input.select();
+    appendLog('DOM_SELECT', 'tag-dom', `inputRef.current.select() executed. Full text selected.`);
+  }
+
+  function handleBlurInput() {
+    const input = document.getElementById('demoInput');
+    input.blur();
+    appendLog('DOM_BLUR', 'tag-dom', `inputRef.current.blur() executed.`);
+  }
+
+  // 2. Scroll Demo
+  function handleScrollTo(itemId) {
+    const target = document.getElementById(itemId);
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    
+    document.querySelectorAll('.scroll-item').forEach(el => el.classList.remove('target-highlight'));
+    target.classList.add('target-highlight');
+
+    appendLog('DOM_SCROLL', 'tag-dom', `scrollIntoView() commanded to #${itemId}.`);
+  }
+
+  // 3. Layout Geometry Demo
+  function measureGeometry() {
+    const el = document.getElementById('geoTarget');
+    const rect = el.getBoundingClientRect();
+    
+    document.getElementById('geoWidth').innerText = Math.round(rect.width) + 'px';
+    document.getElementById('geoHeight').innerText = Math.round(rect.height) + 'px';
+    document.getElementById('geoTop').innerText = Math.round(rect.top) + 'px';
+    document.getElementById('geoLeft').innerText = Math.round(rect.left) + 'px';
+
+    appendLog('DOM_MEASURE', 'tag-meas', `boxRef.current.getBoundingClientRect() -> width: ${Math.round(rect.width)}px, height: ${Math.round(rect.height)}px.`);
+  }
+
+  // 4. Canvas Demo
+  function drawCanvasPulse() {
+    const canvas = document.getElementById('demoCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw animated gradient circles
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      const x = 50 + i * 90;
+      const y = 70;
+      const radius = 15 + Math.random() * 20;
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${210 + i * 25}, 85%, 60%, 0.7)`;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    appendLog('CANVAS_API', 'tag-dom', `canvasRef.current.getContext('2d') invoked directly. Rendered 6 buffer geometry objects.`);
+  }
+
+  function clearCanvas() {
+    const canvas = document.getElementById('demoCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    appendLog('CANVAS_API', 'tag-dom', 'Canvas buffer cleared.');
+  }
+
+  // 5. Competing Writers Demo
+  let mockReactState = 'badge-normal';
+
+  function handleImperativeClassMutate() {
+    const box = document.getElementById('writerDemoBox');
+    box.style.background = 'rgba(244, 63, 94, 0.3)';
+    box.style.borderColor = 'var(--accent-rose)';
+    document.getElementById('actualDomClasses').innerText = `${mockReactState} manual-override`;
+    appendLog('COMPETING_WRITER', 'tag-warn', `Imperative bypass: ref.current.classList.add('manual-override') executed! DOM diverged from React State.`);
+  }
+
+  function handleReactStateRender() {
+    mockReactState = mockReactState === 'badge-normal' ? 'badge-active' : 'badge-normal';
+    const box = document.getElementById('writerDemoBox');
+    
+    // React reconciliation rewrites the class and style based on state:
+    box.style.background = mockReactState === 'badge-active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(30, 41, 59, 0.5)';
+    box.style.borderColor = mockReactState === 'badge-active' ? 'var(--accent-emerald)' : 'var(--border-subtle)';
+    
+    document.getElementById('reactStateLabel').innerText = `"${mockReactState}"`;
+    document.getElementById('actualDomClasses').innerText = mockReactState; // Manual override wiped out!
+
+    appendLog('REACT_COMMIT', 'tag-render', `React Reconciled: Rendered state "${mockReactState}". Manually injected classes were wiped out!`);
+  }
+
+  function resetAllLabs() {
+    clearCanvas();
+    clearLogs();
+    measureGeometry();
+    document.getElementById('demoInput').value = "React Fiber Imperative Architecture";
+    appendLog('SYSTEM', 'tag-render', 'DOM Refs sandbox re-initialized.');
+  }
+
+  // Quiz Validation
+  function checkQuizAnswer(selected) {
+    const feedback = document.getElementById('quizFeedback');
+    feedback.style.display = 'block';
+
+    if (selected === 2) {
+      feedback.className = 'quiz-feedback feedback-correct';
+      feedback.innerHTML = '<strong>✅ Correct!</strong> During the Render Phase, React is only computing the element tree. <code>ref.current</code> is <code>null</code> until the Commit Phase creates and attaches the native DOM node!';
+    } else {
+      feedback.className = 'quiz-feedback feedback-wrong';
+      feedback.innerHTML = '<strong>❌ Incorrect.</strong> Remember: Ref attachment is a Commit Phase operation. Accessing <code>ref.current</code> synchronously in the render body will read <code>null</code> on initial render.';
+    }
+  }
+
+  // Initial measure & logs
+  measureGeometry();
+  appendLog('SYSTEM', 'tag-render', 'Host DOM nodes committed and attached to ref handles.');
+</script>
+
+</body>
+</html>

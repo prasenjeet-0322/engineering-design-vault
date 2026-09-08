@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 10 / Part 16 — Ref Architecture: Final Review & Mastery Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #080c14;
+      --bg-surface: #0f172a;
+      --bg-card: rgba(15, 23, 42, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-top: 4px;
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-tier {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .badge-part {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    /* Tab Navigation */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: var(--border-active);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-header h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-active);
+    }
+
+    .btn-primary {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #4f46e5;
+      box-shadow: 0 0 12px var(--accent-primary-glow);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: var(--accent-rose);
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--accent-emerald);
+    }
+
+    /* Console / Telemetry Ledger */
+    .console-box {
+      background: #060911;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: #38bdf8;
+      height: 420px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-entry {
+      margin-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .log-entry.info { color: #38bdf8; }
+    .log-entry.success { color: #10b981; }
+    .log-entry.warn { color: #f59e0b; }
+    .log-entry.error { color: #f43f5e; }
+
+    /* Stat Cards */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-top: 4px;
+      font-family: var(--font-mono);
+    }
+  </style>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useLayoutEffect, useCallback, useImperativeHandle, forwardRef, memo } = React;
+
+    function useLatest(value) {
+      const ref = useRef(value);
+      useLayoutEffect(() => {
+        ref.current = value;
+      });
+      return ref;
+    }
+
+    // =========================================================================
+    // MODULE 1: THE TRADING TERMINAL BLUEPRINT (Canvas Engine + Keyed Registry)
+    // =========================================================================
+    function ModuleTradingTerminal({ onLog }) {
+      const [orders, setOrders] = useState([
+        { id: 'ORD-101', side: 'BUY', price: 64250.00, amount: 1.4 },
+        { id: 'ORD-102', side: 'SELL', price: 64310.50, amount: 0.85 },
+        { id: 'ORD-103', side: 'BUY', price: 64190.00, amount: 2.1 },
+      ]);
+      const [status, setStatus] = useState('Connected');
+      const orderRegistryRef = useRef(new Map());
+      const canvasRef = useRef(null);
+      const rafRef = useRef(null);
+      const phaseRef = useRef(0);
+      const renderCountRef = useRef(0);
+      renderCountRef.current += 1;
+
+      // 60 FPS Depth Canvas Engine
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let running = true;
+        const tick = () => {
+          if (!running) return;
+          phaseRef.current += 0.05;
+          const { width, height } = canvas;
+          ctx.clearRect(0, 0, width, height);
+
+          // Buy curve (Emerald)
+          ctx.beginPath();
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 2;
+          for (let x = 0; x < width / 2; x += 4) {
+            const y = height - (Math.sin(phaseRef.current + x * 0.05) * 15 + 35);
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+
+          // Sell curve (Rose)
+          ctx.beginPath();
+          ctx.strokeStyle = '#f43f5e';
+          ctx.lineWidth = 2;
+          for (let x = width / 2; x < width; x += 4) {
+            const y = height - (Math.cos(phaseRef.current + x * 0.05) * 15 + 35);
+            if (x === width / 2) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+
+          rafRef.current = requestAnimationFrame(tick);
+        };
+
+        rafRef.current = requestAnimationFrame(tick);
+        onLog('[Canvas] 60 FPS depth chart animation loop initialized', 'success');
+
+        return () => {
+          running = false;
+          if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+      }, []);
+
+      const registerOrderNode = (id) => (node) => {
+        if (node) orderRegistryRef.current.set(id, node);
+        else orderRegistryRef.current.delete(id);
+      };
+
+      const focusOrder = (id) => {
+        const el = orderRegistryRef.current.get(id);
+        if (el) {
+          el.focus();
+          onLog(`[Focus] Restored imperative focus to row: ${id}`, 'info');
+        }
+      };
+
+      const cancelOrder = (id) => {
+        setOrders((prev) => prev.filter((o) => o.id !== id));
+        onLog(`[Order] Cancelled ${id} -> Symmetrically unmounted row DOM`, 'warn');
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status: {status}</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)' }}>Terminal Renders: {renderCountRef.current}</span>
+          </div>
+
+          <canvas ref={canvasRef} width={500} height={90} style={{ width: '100%', background: '#060911', borderRadius: '8px' }} />
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-primary" onClick={() => focusOrder('ORD-101')}>Focus ORD-101</button>
+            <button className="btn btn-primary" onClick={() => focusOrder('ORD-102')}>Focus ORD-102</button>
+          </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '8px' }}>Order ID</th>
+                <th style={{ padding: '8px' }}>Side</th>
+                <th style={{ padding: '8px' }}>Price</th>
+                <th style={{ padding: '8px' }}>Amount</th>
+                <th style={{ padding: '8px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((ord) => (
+                <tr
+                  key={ord.id}
+                  ref={registerOrderNode(ord.id)}
+                  tabIndex={0}
+                  style={{
+                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    color: ord.side === 'BUY' ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                  }}
+                >
+                  <td style={{ padding: '8px', color: 'var(--text-main)' }}>{ord.id}</td>
+                  <td style={{ padding: '8px', fontWeight: 600 }}>{ord.side}</td>
+                  <td style={{ padding: '8px' }}>${ord.price.toFixed(2)}</td>
+                  <td style={{ padding: '8px' }}>{ord.amount}</td>
+                  <td style={{ padding: '8px' }}>
+                    <button className="btn btn-danger" onClick={() => cancelOrder(ord.id)}>Cancel</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE 2: RESOURCE GENERATION & ASYNC CURRENTNESS
+    // =========================================================================
+    function ModuleResourceGeneration({ onLog }) {
+      const [activeDoc, setActiveDoc] = useState('doc-1');
+      const genRef = useRef(1);
+
+      const switchDoc = (nextId) => {
+        const nextGen = ++genRef.current;
+        setActiveDoc(nextId);
+        onLog(`[Resource] Switched to ${nextId} -> Active Gen #${nextGen}`, 'info');
+
+        const taskGen = nextGen;
+        setTimeout(() => {
+          if (taskGen !== genRef.current) {
+            onLog(`❌ [Worker] Discarded stale highlight callback for Gen #${taskGen} (Current: #${genRef.current})`, 'warn');
+          } else {
+            onLog(`✅ [Worker] Applied syntax tree for Gen #${taskGen}`, 'success');
+          }
+        }, 1200);
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Tests <strong>Resource Generation Tokens</strong>: Rapidly switching document tabs rejects syntax highlighting worker results from superseded generations.
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-primary" onClick={() => switchDoc('doc-1')}>Doc 1 (Gen #{genRef.current})</button>
+            <button className="btn btn-primary" onClick={() => switchDoc('doc-2')}>Doc 2</button>
+            <button className="btn btn-primary" onClick={() => switchDoc('doc-3')}>Doc 3</button>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Active Document & Generation</div>
+            <div className="stat-value">{activeDoc} (Generation #{genRef.current})</div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE 3: LATEST-VALUE BRIDGE & SUBSCRIPTION TESTER
+    // =========================================================================
+    function ModuleSubscriptionBridge({ onLog }) {
+      const [currency, setCurrency] = useState('USD');
+      const connCountRef = useRef(0);
+      const currencyRef = useLatest(currency);
+
+      useEffect(() => {
+        connCountRef.current += 1;
+        onLog(`[Socket] Stream established (Total Connections: ${connCountRef.current})`, 'info');
+
+        const interval = setInterval(() => {
+          onLog(`[Tick] Quote received in currency: ${currencyRef.current}`, 'success');
+        }, 2000);
+
+        return () => {
+          clearInterval(interval);
+          onLog('[Socket] Stream closed', 'warn');
+        };
+      }, []);
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Tests <strong>useLatest Callback Bridge</strong>: Changing props/state does not tear down or re-subscribe long-lived connections.
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn" onClick={() => setCurrency('USD')}>Currency: USD</button>
+            <button className="btn" onClick={() => setCurrency('EUR')}>Currency: EUR</button>
+            <button className="btn" onClick={() => setCurrency('JPY')}>Currency: JPY</button>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Active Socket Reconnections</div>
+            <div className="stat-value">{connCountRef.current} (Connection remains stable across prop updates)</div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MASTER APPLICATION ROOT
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('terminal');
+      const [logs, setLogs] = useState([]);
+      const rootRendersRef = useRef(0);
+      rootRendersRef.current += 1;
+
+      const appendLog = (msg, type = 'info') => {
+        const time = new Date().toLocaleTimeString();
+        setLogs((prev) => [{ time, msg, type }, ...prev.slice(0, 40)]);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-titles">
+              <h1>⚡ Ref Architecture: Final Review & Mastery Lab</h1>
+              <p>Level 06 / KPI 10 — Terminal Interactive Synthesis & Production Telemetry Suite</p>
+            </div>
+            <div className="header-badges">
+              <span className="badge badge-tier">🔴 MUST KNOW</span>
+              <span className="badge badge-part">PART 16</span>
+            </div>
+          </header>
+
+          <nav className="tabs-nav">
+            <button className={`tab-btn ${activeTab === 'terminal' ? 'active' : ''}`} onClick={() => setActiveTab('terminal')}>
+              1. Multi-Tier Trading Terminal Blueprint
+            </button>
+            <button className={`tab-btn ${activeTab === 'gen' ? 'active' : ''}`} onClick={() => setActiveTab('gen')}>
+              2. Resource Generation Tokens
+            </button>
+            <button className={`tab-btn ${activeTab === 'sub' ? 'active' : ''}`} onClick={() => setActiveTab('sub')}>
+              3. useLatest Subscription Stability
+            </button>
+          </nav>
+
+          <div className="dashboard-grid">
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Interactive Architecture Sandbox</h2>
+                <button className="btn" onClick={() => setLogs([])}>Clear Console</button>
+              </div>
+
+              {activeTab === 'terminal' && <ModuleTradingTerminal onLog={appendLog} />}
+              {activeTab === 'gen' && <ModuleResourceGeneration onLog={appendLog} />}
+              {activeTab === 'sub' && <ModuleSubscriptionBridge onLog={appendLog} />}
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Telemetry & Memory Audit</h2>
+                <span className="badge badge-part">Render #{rootRendersRef.current}</span>
+              </div>
+              <div className="console-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: 'var(--text-dim)' }}>Ready. Trigger an interaction to inspect live execution telemetry...</div>
+                ) : (
+                  logs.map((l, idx) => (
+                    <div key={idx} className={`log-entry ${l.type}`}>
+                      <span style={{ color: 'var(--text-dim)' }}>[{l.time}]</span> {l.msg}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

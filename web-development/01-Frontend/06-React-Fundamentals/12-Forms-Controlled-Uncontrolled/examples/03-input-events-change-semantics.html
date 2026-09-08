@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Part 03 — Input Events, Change Semantics & Render Snapshots Lab</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-secondary: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #1f2937;
+      --border-focus: #38bdf8;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .badge-primary {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      background: #0d1322;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus,
+    select:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #334155;
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      border-color: #0369a1;
+    }
+
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .telemetry-box {
+      background: #0d1322;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .telemetry-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .val-snapshot { color: var(--accent-rose); }
+    .val-event { color: var(--accent-emerald); }
+    .val-state { color: var(--accent-cyan); }
+
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+    }
+
+    .log-table th {
+      text-align: left;
+      padding: 8px 10px;
+      color: var(--text-muted);
+      border-bottom: 1px solid #1f2937;
+      font-weight: 600;
+    }
+
+    .log-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .tag {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tag-stale { background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); }
+    .tag-valid { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); }
+    .tag-info { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); }
+
+    .switch-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+    }
+
+    .checkbox-custom {
+      accent-color: var(--accent-cyan);
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .status-banner {
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 14px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+
+    .status-validating { border-color: var(--accent-amber); color: var(--accent-amber); }
+    .status-success { border-color: var(--accent-emerald); color: var(--accent-emerald); }
+    .status-error { border-color: var(--accent-rose); color: var(--accent-rose); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge badge-primary">Level 06 — React Fundamentals • KPI 08 Lab</span>
+      <h1>Part 03 Diagnostic Laboratory</h1>
+      <p class="subtitle">Input Events, Change Semantics & Render Snapshot Discrepancy Probe</p>
+    </header>
+
+    <div class="grid">
+      <!-- PROBE 1: Event Payload vs Closure Snapshot -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🔬 Probe 1: Event vs Closure Telemetry</div>
+          <button class="btn" onclick="clearProbe1Logs()">Clear Logs</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Type rapidly into the input. Notice how the <strong>Closure Snapshot</strong> lags behind the <strong>Event Payload</strong> by exactly one render cycle.
+        </p>
+
+        <div class="input-group">
+          <label>Type Here (Simulating Controlled Input):</label>
+          <input type="text" id="probe1Input" placeholder="Start typing letters..." oninput="handleProbe1Input(event)" />
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="telemetry-box">
+            <div class="telemetry-label">Closure Snapshot</div>
+            <div class="telemetry-val val-snapshot" id="p1Snapshot">""</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">DOM Event Payload</div>
+            <div class="telemetry-val val-event" id="p1EventVal">""</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Next Render State</div>
+            <div class="telemetry-val val-state" id="p1NextState">""</div>
+          </div>
+        </div>
+
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Closure Snapshot</th>
+              <th>Event Payload</th>
+              <th>Discrepancy Status</th>
+            </tr>
+          </thead>
+          <tbody id="probe1LogBody">
+            <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No input events recorded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PROBE 2: Async Validation Race Condition Simulator -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚡ Probe 2: Async Validation Race Simulator</div>
+          <span class="tag tag-info" id="raceModeBadge">Token Protected</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Simulates asynchronous API calls with non-deterministic network delays. Toggle protection to see how stale responses overwrite newer state.
+        </p>
+
+        <div class="switch-container">
+          <input type="checkbox" id="tokenProtectionCheckbox" class="checkbox-custom" checked onchange="toggleProtectionMode()" />
+          <label for="tokenProtectionCheckbox" style="margin: 0; cursor: pointer; color: var(--text-primary);">
+            Enable Request Token Protection (Prevents Out-Of-Order Overwrites)
+          </label>
+        </div>
+
+        <div class="input-group">
+          <label>Username Check (Try typing "admin", then deleting quickly):</label>
+          <input type="text" id="asyncInput" placeholder="Enter username..." oninput="handleAsyncValidation(event)" />
+        </div>
+
+        <div id="asyncStatusBox" class="status-banner">
+          <span>⚪ Idle (Ready for validation)</span>
+        </div>
+
+        <table class="log-table" style="margin-top: 12px;">
+          <thead>
+            <tr>
+              <th>Req ID</th>
+              <th>Query Payload</th>
+              <th>Latency</th>
+              <th>Outcome</th>
+            </tr>
+          </thead>
+          <tbody id="asyncLogBody">
+            <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No requests dispatched yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- PROBE 3: Heterogeneous Control Extractor -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🧩 Probe 3: Heterogeneous Control Extraction</div>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Demonstrates how different HTML controls require distinct semantic property extraction rather than a naive <code>e.target.value</code>.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div>
+            <div class="input-group">
+              <label>Text Field (reads .value):</label>
+              <input type="text" id="hText" value="Senior Engineer" oninput="updateHeteroTelemetry()" />
+            </div>
+
+            <div class="input-group">
+              <label>Checkbox (reads .checked):</label>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                <input type="checkbox" id="hCheck" class="checkbox-custom" checked onchange="updateHeteroTelemetry()" />
+                <span style="font-size: 0.85rem;">Agree to Terms</span>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label>Multi-Select (reads selectedOptions):</label>
+              <select id="hSelect" multiple style="height: 75px;" onchange="updateHeteroTelemetry()">
+                <option value="react" selected>React</option>
+                <option value="typescript" selected>TypeScript</option>
+                <option value="rust">Rust</option>
+                <option value="graphql">GraphQL</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="background: #0d1322; border: 1px solid #1f2937; border-radius: 8px; padding: 14px; font-family: var(--font-mono); font-size: 0.8rem;">
+            <div style="color: var(--accent-cyan); font-weight: 700; margin-bottom: 8px;">// Extracted Application State</div>
+            <pre id="heteroStatePreview" style="color: #e2e8f0; white-space: pre-wrap;"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROBE 4: Delegated Event Target vs CurrentTarget -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🎯 Probe 4: target vs currentTarget Inspector</div>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Click different areas inside the delegated boundary to observe event origin (<code>target</code>) vs listener container (<code>currentTarget</code>).
+        </p>
+
+        <div id="delegatedContainer" style="background: #0d1322; border: 2px dashed #334155; border-radius: 8px; padding: 20px; text-align: center;" onclick="handleDelegatedClick(event)">
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 12px;">Delegated Container Boundary (&lt;div id="delegatedContainer"&gt;)</p>
+          <button type="button" class="btn btn-primary" style="pointer-events: auto;">
+            <span style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px; font-weight: bold;">Nested &lt;span&gt;</span> Inside Button
+          </button>
+        </div>
+
+        <div class="telemetry-grid" style="grid-template-columns: 1fr 1fr; margin-top: 14px;">
+          <div class="telemetry-box">
+            <div class="telemetry-label">event.target (Origin)</div>
+            <div class="telemetry-val val-snapshot" id="dtTarget" style="font-size: 0.9rem;">None</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">event.currentTarget (Owner)</div>
+            <div class="telemetry-val val-event" id="dtCurrentTarget" style="font-size: 0.9rem;">None</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- PROBE 1: Event vs Closure State Simulation ---
+    let simulatedState = "";
+    let p1LogCount = 0;
+
+    function handleProbe1Input(e) {
+      const eventValue = e.target.value;
+      const closureSnapshot = simulatedState; // captures previous render state
+      const nextState = eventValue; // state scheduled for next render
+
+      p1LogCount++;
+      document.getElementById("p1Snapshot").textContent = `"${closureSnapshot}"`;
+      document.getElementById("p1EventVal").textContent = `"${eventValue}"`;
+      document.getElementById("p1NextState").textContent = `"${nextState}"`;
+
+      const tbody = document.getElementById("probe1LogBody");
+      if (p1LogCount === 1) tbody.innerHTML = "";
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${p1LogCount}</td>
+        <td style="color: var(--accent-rose);">"${closureSnapshot}"</td>
+        <td style="color: var(--accent-emerald);">"${eventValue}"</td>
+        <td><span class="tag ${closureSnapshot === eventValue ? 'tag-valid' : 'tag-stale'}">${closureSnapshot === eventValue ? 'Synchronized' : '1-Keystroke Lag'}</span></td>
+      `;
+      tbody.prepend(row);
+
+      // Advance simulated React render cycle
+      simulatedState = nextState;
+    }
+
+    function clearProbe1Logs() {
+      simulatedState = "";
+      p1LogCount = 0;
+      document.getElementById("probe1Input").value = "";
+      document.getElementById("p1Snapshot").textContent = '""';
+      document.getElementById("p1EventVal").textContent = '""';
+      document.getElementById("p1NextState").textContent = '""';
+      document.getElementById("probe1LogBody").innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No input events recorded yet.</td></tr>';
+    }
+
+    // --- PROBE 2: Async Validation Race Simulator ---
+    let latestRequestId = 0;
+    let tokenProtectionEnabled = true;
+
+    function toggleProtectionMode() {
+      tokenProtectionEnabled = document.getElementById("tokenProtectionCheckbox").checked;
+      const badge = document.getElementById("raceModeBadge");
+      badge.textContent = tokenProtectionEnabled ? "Token Protected" : "Unprotected (Race Prone)";
+      badge.className = `tag ${tokenProtectionEnabled ? 'tag-info' : 'tag-stale'}`;
+    }
+
+    function handleAsyncValidation(e) {
+      const query = e.target.value.trim();
+      const statusBox = document.getElementById("asyncStatusBox");
+      const logBody = document.getElementById("asyncLogBody");
+
+      if (query.length === 0) {
+        statusBox.className = "status-banner";
+        statusBox.innerHTML = "<span>⚪ Idle (Ready for validation)</span>";
+        return;
+      }
+
+      const reqId = ++latestRequestId;
+      // Artificial non-deterministic network delay (short strings take longer to simulate race)
+      const simulatedDelay = Math.max(300, 1400 - (query.length * 200));
+
+      statusBox.className = "status-banner status-validating";
+      statusBox.innerHTML = `<span>⏳ Checking availability for "${query}" (Req #${reqId})...</span>`;
+
+      if (logBody.children.length === 1 && logBody.children[0].innerText.includes("No requests")) {
+        logBody.innerHTML = "";
+      }
+
+      const row = document.createElement("tr");
+      row.id = `req-row-${reqId}`;
+      row.innerHTML = `
+        <td>#${reqId}</td>
+        <td>"${query}"</td>
+        <td>${simulatedDelay}ms</td>
+        <td><span class="tag tag-info">In Flight...</span></td>
+      `;
+      logBody.prepend(row);
+
+      setTimeout(() => {
+        const targetRow = document.getElementById(`req-row-${reqId}`);
+        const isStale = reqId !== latestRequestId;
+
+        if (tokenProtectionEnabled && isStale) {
+          if (targetRow) {
+            targetRow.innerHTML = `
+              <td>#${reqId}</td>
+              <td>"${query}"</td>
+              <td>${simulatedDelay}ms</td>
+              <td><span class="tag tag-stale">Discarded (Stale)</span></td>
+            `;
+          }
+          return; // Ignore stale completion
+        }
+
+        // Apply result to UI
+        const isAvailable = query.toLowerCase() !== "admin" && query.toLowerCase() !== "root";
+        if (targetRow) {
+          targetRow.innerHTML = `
+            <td>#${reqId}</td>
+            <td>"${query}"</td>
+            <td>${simulatedDelay}ms</td>
+            <td><span class="tag ${isAvailable ? 'tag-valid' : 'tag-stale'}">${isAvailable ? 'Available' : 'Taken'}</span></td>
+          `;
+        }
+
+        statusBox.className = `status-banner ${isAvailable ? 'status-success' : 'status-error'}`;
+        statusBox.innerHTML = isAvailable
+          ? `<span>✅ "${query}" is available!</span>`
+          : `<span>❌ "${query}" is already taken!</span>`;
+      }, simulatedDelay);
+    }
+
+    // --- PROBE 3: Heterogeneous Normalization ---
+    function updateHeteroTelemetry() {
+      const textVal = document.getElementById("hText").value;
+      const checkVal = document.getElementById("hCheck").checked;
+      const selectOpts = Array.from(document.getElementById("hSelect").selectedOptions).map(o => o.value);
+
+      const stateObj = {
+        title: textVal,
+        agreedToTerms: checkVal,
+        technologies: selectOpts,
+        _domCheckValueIgnored: document.getElementById("hCheck").value // "on"
+      };
+
+      document.getElementById("heteroStatePreview").textContent = JSON.stringify(stateObj, null, 2);
+    }
+
+    // --- PROBE 4: Delegated Target vs CurrentTarget ---
+    function handleDelegatedClick(e) {
+      document.getElementById("dtTarget").textContent = `<${e.target.tagName.toLowerCase()}> (Class: ${e.target.className || 'none'})`;
+      document.getElementById("dtCurrentTarget").textContent = `<${e.currentTarget.tagName.toLowerCase()} id="${e.currentTarget.id}">`;
+    }
+
+    // Initialize telemetry
+    updateHeteroTelemetry();
+  </script>
+</body>
+</html>

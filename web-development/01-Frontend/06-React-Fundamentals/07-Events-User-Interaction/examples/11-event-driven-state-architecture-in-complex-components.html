@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 11 — Event-Driven State Architecture in Complex Components</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-group label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    input[type="text"], textarea {
+      background-color: #0b111c;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary:hover:not(:disabled) {
+      background-color: #0369a1;
+    }
+
+    button.btn-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
+    }
+
+    button.btn-danger:hover:not(:disabled) {
+      background-color: rgba(239, 68, 68, 0.35);
+    }
+
+    button.btn-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-amber);
+      color: #fcd34d;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .status-idle { background: rgba(156, 163, 175, 0.15); color: #d1d5db; }
+    .status-saving, .status-publishing { background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); }
+    .status-saved, .status-published { background: rgba(34, 197, 94, 0.18); color: var(--accent-green); }
+    .status-error { background: rgba(239, 68, 68, 0.18); color: var(--accent-red); }
+
+    .state-tree {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    .log-container {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    .log-diff {
+      color: var(--text-muted);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .item-card {
+      background: #0b111c;
+      border: 1px solid var(--border-color);
+      padding: 10px 14px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .item-card.optimistic {
+      opacity: 0.6;
+      border-style: dashed;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .metric-num {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useEffect, useRef } = React;
+
+    // --- DOMAIN PARTITIONED REDUCER ---
+    const initialAppState = {
+      draft: {
+        title: "Event-Driven State Architecture",
+        body: "Complex components are coordinated systems governed by domain invariants.",
+        tags: ["React", "Architecture", "State"]
+      },
+      save: {
+        status: "idle", // idle | saving | saved | error
+        requestId: 0,
+        error: null,
+        lastSavedAt: null
+      },
+      publish: {
+        status: "unpublished", // unpublished | publishing | published | error
+        error: null
+      },
+      optimisticItems: [
+        { id: 1, title: "Section 01 — Executive Mental Models", deleting: false },
+        { id: 2, title: "Section 10 — State Partitioning Principle", deleting: false },
+        { id: 3, title: "Section 28 — Request Identity Invariant", deleting: false }
+      ]
+    };
+
+    function complexEditorReducer(state, action) {
+      switch (action.type) {
+        // DRAFT DOMAIN
+        case "TITLE_CHANGED":
+          return {
+            ...state,
+            draft: { ...state.draft, title: action.title },
+            save: state.save.status === "saved" ? { ...state.save, status: "idle" } : state.save
+          };
+
+        case "BODY_CHANGED":
+          return {
+            ...state,
+            draft: { ...state.draft, body: action.body },
+            save: state.save.status === "saved" ? { ...state.save, status: "idle" } : state.save
+          };
+
+        case "TAG_ADDED":
+          if (!action.tag || state.draft.tags.includes(action.tag)) return state;
+          return {
+            ...state,
+            draft: { ...state.draft, tags: [...state.draft.tags, action.tag] }
+          };
+
+        case "TAG_REMOVED":
+          return {
+            ...state,
+            draft: { ...state.draft, tags: state.draft.tags.filter(t => t !== action.tag) }
+          };
+
+        // SAVE LIFECYCLE DOMAIN
+        case "SAVE_REQUESTED":
+          return {
+            ...state,
+            save: {
+              status: "saving",
+              requestId: action.requestId,
+              error: null,
+              lastSavedAt: state.save.lastSavedAt
+            }
+          };
+
+        case "SAVE_SUCCEEDED":
+          // INVARIANT CHECK: Only authoritative active request ID commits
+          if (action.requestId !== state.save.requestId) {
+            console.warn(`[STALE RESPONSE REJECTED] Action requestId: ${action.requestId}, Active: ${state.save.requestId}`);
+            return state; // Safe no-op
+          }
+          return {
+            ...state,
+            save: {
+              status: "saved",
+              requestId: action.requestId,
+              error: null,
+              lastSavedAt: new Date().toLocaleTimeString()
+            }
+          };
+
+        case "SAVE_FAILED":
+          if (action.requestId !== state.save.requestId) return state;
+          return {
+            ...state,
+            save: {
+              status: "error",
+              requestId: action.requestId,
+              error: action.error,
+              lastSavedAt: state.save.lastSavedAt
+            }
+          };
+
+        case "SAVE_RESET":
+          return {
+            ...state,
+            save: { ...state.save, status: "idle", error: null }
+          };
+
+        // PUBLISH LIFECYCLE DOMAIN
+        case "PUBLISH_REQUESTED":
+          return {
+            ...state,
+            publish: { status: "publishing", error: null }
+          };
+
+        case "PUBLISH_SUCCEEDED":
+          return {
+            ...state,
+            publish: { status: "published", error: null }
+          };
+
+        case "PUBLISH_FAILED":
+          return {
+            ...state,
+            publish: { status: "error", error: action.error }
+          };
+
+        // OPTIMISTIC ITEM DELETION DOMAIN
+        case "ITEM_DELETE_REQUESTED":
+          return {
+            ...state,
+            optimisticItems: state.optimisticItems.map(item =>
+              item.id === action.id ? { ...item, deleting: true } : item
+            )
+          };
+
+        case "ITEM_DELETE_CONFIRMED":
+          return {
+            ...state,
+            optimisticItems: state.optimisticItems.filter(item => item.id !== action.id)
+          };
+
+        case "ITEM_DELETE_ROLLBACK":
+          return {
+            ...state,
+            optimisticItems: state.optimisticItems.map(item =>
+              item.id === action.id ? { ...item, deleting: false } : item
+            )
+          };
+
+        default:
+          return state;
+      }
+    }
+
+    // Invariant validation hook
+    function assertStateInvariants(state) {
+      const violations = [];
+      if (state.save.status === "saving" && state.save.error !== null) {
+        violations.push("Invariant Violation: State 'saving' cannot contain an active error object.");
+      }
+      if (state.publish.status === "publishing" && state.publish.error !== null) {
+        violations.push("Invariant Violation: State 'publishing' cannot contain an error.");
+      }
+      return violations;
+    }
+
+    function ComplexArchitectureLab() {
+      const [state, dispatch] = useReducer(complexEditorReducer, initialAppState);
+      const [telemetry, setTelemetry] = useState([]);
+      const [tagInput, setTagInput] = useState("");
+      const requestCounterRef = useRef(0);
+      const prevStateRef = useRef(state);
+
+      // Telemetry recorder
+      const dispatchWithTrace = (action) => {
+        const prev = prevStateRef.current;
+        const now = performance.now();
+        dispatch(action);
+        
+        // Log telemetry
+        setTelemetry(prevLogs => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString() + ` (+${(now % 1000).toFixed(0)}ms)`,
+            action: action.type,
+            payload: JSON.stringify(action),
+            prevSaveStatus: prev.save.status,
+            activeRequestId: prev.save.requestId,
+            actionRequestId: action.requestId || "-"
+          },
+          ...prevLogs.slice(0, 19)
+        ]);
+      };
+
+      useEffect(() => {
+        prevStateRef.current = state;
+      }, [state]);
+
+      // Operations
+      const handleFastSave = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SAVE_REQUESTED", requestId: reqId });
+        setTimeout(() => {
+          dispatchWithTrace({ type: "SAVE_SUCCEEDED", requestId: reqId });
+        }, 600);
+      };
+
+      const handleStaleRaceCondition = () => {
+        // Dispatches Request #1 (slow, 2000ms)
+        const req1 = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SAVE_REQUESTED", requestId: req1 });
+
+        // User quickly edits and triggers Request #2 (fast, 700ms)
+        setTimeout(() => {
+          const req2 = ++requestCounterRef.current;
+          dispatchWithTrace({ type: "SAVE_REQUESTED", requestId: req2 });
+          
+          setTimeout(() => {
+            dispatchWithTrace({ type: "SAVE_SUCCEEDED", requestId: req2 });
+          }, 700);
+        }, 300);
+
+        // Stale Request #1 finally resolves after 2000ms
+        setTimeout(() => {
+          dispatchWithTrace({ type: "SAVE_SUCCEEDED", requestId: req1 });
+        }, 2000);
+      };
+
+      const handleFailedSave = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SAVE_REQUESTED", requestId: reqId });
+        setTimeout(() => {
+          dispatchWithTrace({
+            type: "SAVE_FAILED",
+            requestId: reqId,
+            error: "503 Service Unavailable: Remote database lock timeout"
+          });
+        }, 800);
+      };
+
+      const handlePublish = () => {
+        dispatchWithTrace({ type: "PUBLISH_REQUESTED" });
+        setTimeout(() => {
+          dispatchWithTrace({ type: "PUBLISH_SUCCEEDED" });
+        }, 1200);
+      };
+
+      const handleOptimisticDelete = (id, simulateFailure = false) => {
+        dispatchWithTrace({ type: "ITEM_DELETE_REQUESTED", id });
+        setTimeout(() => {
+          if (simulateFailure) {
+            alert(`Server 403 Forbidden: Cannot delete item ${id}. Rolling back optimistic state!`);
+            dispatchWithTrace({ type: "ITEM_DELETE_ROLLBACK", id });
+          } else {
+            dispatchWithTrace({ type: "ITEM_DELETE_CONFIRMED", id });
+          }
+        }, 900);
+      };
+
+      const invariants = assertStateInvariants(state);
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🧪 Companion Lab 11 — Complex Component Architecture</span>
+                <span className="badge">KPI-05 Senior Level</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                Multi-domain partitioned reducer, request identity invariants, optimistic rollback & interaction telemetry.
+              </p>
+            </div>
+            <div className="metric-grid" style={{ minWidth: 320 }}>
+              <div className="metric-box">
+                <div className="metric-num">{state.save.requestId}</div>
+                <div className="metric-label">Active Req ID</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{state.draft.tags.length}</div>
+                <div className="metric-label">Draft Tags</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{telemetry.length}</div>
+                <div className="metric-label">Traced Actions</div>
+              </div>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            {/* LEFT COLUMN: INTERACTIVE COMPONENT TREE */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card">
+                <div className="card-title">
+                  <span>📄 Complex Document Editor</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span className={`status-pill status-${state.save.status}`}>
+                      save: {state.save.status}
+                    </span>
+                    <span className={`status-pill status-${state.publish.status}`}>
+                      publish: {state.publish.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* DRAFT DOMAIN CONTROLS */}
+                <div className="input-group">
+                  <label>Document Title (Domain: draft.title)</label>
+                  <input
+                    type="text"
+                    value={state.draft.title}
+                    onChange={e => dispatchWithTrace({ type: "TITLE_CHANGED", title: e.target.value })}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label>Body Content (Domain: draft.body)</label>
+                  <textarea
+                    value={state.draft.body}
+                    onChange={e => dispatchWithTrace({ type: "BODY_CHANGED", body: e.target.value })}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label>Taxonomy Tags (Semantic Event Adapter)</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="Add tag and press enter..."
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") {
+                          dispatchWithTrace({ type: "TAG_ADDED", tag: tagInput.trim() });
+                          setTagInput("");
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        dispatchWithTrace({ type: "TAG_ADDED", tag: tagInput.trim() });
+                        setTagInput("");
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                    {state.draft.tags.map(t => (
+                      <span key={t} className="badge" style={{ cursor: "pointer" }} onClick={() => dispatchWithTrace({ type: "TAG_REMOVED", tag: t })}>
+                        {t} ✕
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SAVE WORKFLOW CONTROLS */}
+                <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 14 }}>
+                  <label style={{ fontSize: "0.82rem", color: "var(--text-muted)", display: "block", marginBottom: 8 }}>
+                    Async Save & Publish Workflows
+                  </label>
+                  <div className="btn-row">
+                    <button
+                      className="btn-primary"
+                      disabled={state.save.status === "saving"}
+                      onClick={handleFastSave}
+                    >
+                      ⚡ Save Normal
+                    </button>
+                    <button
+                      className="btn-warning"
+                      disabled={state.save.status === "saving"}
+                      onClick={handleStaleRaceCondition}
+                    >
+                      🏎️ Race: Stale vs New Req
+                    </button>
+                    <button
+                      className="btn-danger"
+                      disabled={state.save.status === "saving"}
+                      onClick={handleFailedSave}
+                    >
+                      ⚠️ Trigger Save Error
+                    </button>
+                    <button
+                      disabled={state.publish.status === "publishing"}
+                      onClick={handlePublish}
+                    >
+                      🚀 Publish
+                    </button>
+                  </div>
+                </div>
+
+                {state.save.error && (
+                  <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid var(--accent-red)", padding: 12, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-red)", fontWeight: 600, fontSize: "0.85rem" }}>
+                      Error Encountered (Draft Preserved intact!)
+                    </div>
+                    <div style={{ color: "#fca5a5", fontSize: "0.8rem", marginTop: 4 }}>
+                      {state.save.error}
+                    </div>
+                    <button
+                      className="btn-primary"
+                      style={{ marginTop: 8, padding: "4px 10px", fontSize: "0.78rem" }}
+                      onClick={handleFastSave}
+                    >
+                      🔄 Retry Save Without Losing Data
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* OPTIMISTIC ITEMS WITH ROLLBACK RECOVERY */}
+              <div className="card">
+                <div className="card-title">
+                  <span>📦 Optimistic Item Sub-domain (With Failure Rollback)</span>
+                  <span className="badge">{state.optimisticItems.length} Items</span>
+                </div>
+                <div className="item-list">
+                  {state.optimisticItems.map(item => (
+                    <div key={item.id} className={`item-card ${item.deleting ? "optimistic" : ""}`}>
+                      <div>
+                        <div style={{ fontSize: "0.88rem", fontWeight: 500 }}>{item.title}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                          {item.deleting ? "⏳ Pending server acknowledgment..." : "Authoritative on server"}
+                        </div>
+                      </div>
+                      <div className="btn-row">
+                        <button
+                          className="btn-danger"
+                          disabled={item.deleting}
+                          onClick={() => handleOptimisticDelete(item.id, false)}
+                        >
+                          Delete (Success)
+                        </button>
+                        <button
+                          className="btn-warning"
+                          disabled={item.deleting}
+                          onClick={() => handleOptimisticDelete(item.id, true)}
+                        >
+                          Delete (Server 403 Rollback)
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: STATE SNAPSHOT & TELEMETRY */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* CURRENT PARTITIONED STATE SNAPSHOT */}
+              <div className="card">
+                <div className="card-title">
+                  <span>🔍 Authoritative Partitioned State</span>
+                  <span className="badge">Domain Invariants: {invariants.length === 0 ? "✅ VALID" : "❌ VIOLATED"}</span>
+                </div>
+                <pre className="state-tree">
+{JSON.stringify(state, null, 2)}
+                </pre>
+              </div>
+
+              {/* ACTION TRANSITION TELEMETRY LEDGER */}
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 Event & Transition Telemetry Ledger</span>
+                  <button onClick={() => setTelemetry([])} style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                    Clear
+                  </button>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>
+                      Perform any action above to trace semantic event flow...
+                    </div>
+                  ) : (
+                    telemetry.map(log => (
+                      <div key={log.id} className="log-item">
+                        <div className="log-header">
+                          <span>⚡ {log.action}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{log.time}</span>
+                        </div>
+                        <div className="log-diff">
+                          <span>Save Status: <strong>{log.prevSaveStatus}</strong></span>
+                          <span>Active Req: <strong>{log.activeRequestId}</strong></span>
+                          <span>Action Req: <strong>{log.actionRequestId}</strong></span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<ComplexArchitectureLab />);
+  </script>
+</body>
+</html>

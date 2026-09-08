@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 15 — Event & Interaction Crucible</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(168, 85, 247, 0.15));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid var(--accent-red);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
+    }
+
+    button.btn-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-amber);
+      color: #fcd34d;
+    }
+
+    .log-container {
+      max-height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    .interactive-card {
+      background: #0b111c;
+      border: 2px dashed var(--accent-cyan);
+      padding: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .interactive-card:hover {
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    input[type="text"] {
+      background-color: #0b111c;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      width: 100%;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-cyan);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef } = React;
+
+    function EventCrucibleLab() {
+      // 1. PROPAGATION LAB
+      const [stopProp, setStopProp] = useState(true);
+
+      // 2. STATE QUEUE LAB
+      const [countSimple, setCountSimple] = useState(0);
+      const [countFunc, setCountFunc] = useState(0);
+
+      // 3. FORM SUBMIT LAB
+      const [formQuery, setFormQuery] = useState("");
+      const [submitSource, setSubmitSource] = useState("None");
+
+      // 4. ASYNC RACE LAB
+      const [activeToken, setActiveToken] = useState(0);
+      const [authoritativeData, setAuthoritativeData] = useState("None");
+      const requestCounterRef = useRef(0);
+
+      // TELEMETRY LOG
+      const [telemetry, setTelemetry] = useState([]);
+
+      const log = (source, message, extra = {}) => {
+        setTelemetry(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString(),
+            source,
+            message,
+            extra: JSON.stringify(extra)
+          },
+          ...prev.slice(0, 19)
+        ]);
+      };
+
+      // 1. PROPAGATION HANDLERS
+      const handleCardClick = (e) => {
+        log("CARD_CLICK", "Ancestor Card Container received click", {
+          target: e.target.tagName,
+          currentTarget: e.currentTarget.tagName
+        });
+      };
+
+      const handleButtonClick = (e) => {
+        if (stopProp) {
+          e.stopPropagation();
+          log("BUTTON_CLICK", "Button handled click [stopPropagation = TRUE]", {
+            target: e.target.tagName,
+            currentTarget: e.currentTarget.tagName
+          });
+        } else {
+          log("BUTTON_CLICK", "Button handled click [stopPropagation = FALSE - bubbling to Card]", {
+            target: e.target.tagName,
+            currentTarget: e.currentTarget.tagName
+          });
+        }
+      };
+
+      // 2. STATE QUEUE SIMULATOR
+      const handleSimpleQueue = () => {
+        // Sequential direct state replacement (captures current count)
+        setCountSimple(countSimple + 1);
+        setCountSimple(countSimple + 1);
+        log("QUEUE", `Direct set: queued [${countSimple + 1}, ${countSimple + 1}] -> result is ${countSimple + 1}`);
+      };
+
+      const handleFunctionalQueue = () => {
+        // Functional updates
+        setCountFunc(c => c + 1);
+        setCountFunc(c => c + 1);
+        log("QUEUE", `Functional set: queued [c => c + 1, c => c + 1] -> increments by 2`);
+      };
+
+      // 3. FORM SUBMIT
+      const handleFormSubmit = (e) => {
+        e.preventDefault();
+        setSubmitSource("Native Form <form onSubmit>");
+        log("FORM", `Form Submitted with query: "${formQuery}" via <form onSubmit>`);
+      };
+
+      // 4. OUT OF ORDER RACE
+      const triggerRace = (label, delay) => {
+        const reqId = ++requestCounterRef.current;
+        setActiveToken(reqId);
+        log("RACE", `Started ${label} (Req #${reqId}, delay ${delay}ms)`);
+
+        setTimeout(() => {
+          if (reqId === requestCounterRef.current) {
+            setAuthoritativeData(`${label} (#${reqId})`);
+            log("RACE", `✅ ACCEPTED ${label} (Req #${reqId} is authoritative)`);
+          } else {
+            log("RACE", `❌ REJECTED STALE ${label} (Req #${reqId} != active #${requestCounterRef.current})`);
+          }
+        }, delay);
+      };
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🔥 Companion Lab 15 — Event & Interaction Crucible</span>
+                <span className="badge">Stress Test Engine</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                Interactive stress-testing of Propagation, target vs currentTarget, Update Queues, and Out-of-Order Races.
+              </p>
+            </div>
+            <button className="btn-danger" onClick={() => setTelemetry([])}>
+              Clear Telemetry
+            </button>
+          </header>
+
+          <div className="grid-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* 1. PROPAGATION & TARGET LAB */}
+              <div className="card">
+                <div className="card-title">
+                  <span>1️⃣ Propagation & target vs currentTarget</span>
+                  <label style={{ fontSize: "0.78rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={stopProp}
+                      onChange={e => setStopProp(e.target.checked)}
+                    />
+                    <span>stopPropagation() enabled</span>
+                  </label>
+                </div>
+                <div className="interactive-card" onClick={handleCardClick}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>Parent Card Container (&lt;div&gt;)</div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Clicking card background triggers card handler</div>
+                  </div>
+                  <button className="btn-danger" onClick={handleButtonClick}>
+                    <span>Nested Button (&lt;button&gt;)</span>
+                    <span style={{ background: "rgba(255,255,255,0.2)", padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem" }}>
+                      &lt;span&gt;icon&lt;/span&gt;
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. STATE QUEUE COMPARATOR */}
+              <div className="card">
+                <div className="card-title">
+                  <span>2️⃣ State Update Queue: Snapshot vs Functional</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div style={{ background: "#090d16", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--accent-amber)" }}>Direct Replacements</div>
+                    <div style={{ fontSize: "1.2rem", fontWeight: "bold", margin: "8px 0" }}>Count: {countSimple}</div>
+                    <button className="btn-warning" onClick={handleSimpleQueue} style={{ fontSize: "0.78rem" }}>
+                      setCount(count + 1) × 2
+                    </button>
+                  </div>
+                  <div style={{ background: "#090d16", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--accent-green)" }}>Functional Updates</div>
+                    <div style={{ fontSize: "1.2rem", fontWeight: "bold", margin: "8px 0" }}>Count: {countFunc}</div>
+                    <button className="btn-primary" onClick={handleFunctionalQueue} style={{ fontSize: "0.78rem" }}>
+                      setCount(c =&gt; c + 1) × 2
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. FORM SUBMISSION SEMANTICS */}
+              <div className="card">
+                <div className="card-title">
+                  <span>3️⃣ Form Submission Semantics (Enter Key vs Click)</span>
+                  <span className="badge">Source: {submitSource}</span>
+                </div>
+                <form onSubmit={handleFormSubmit} style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="Type and press Enter to test submit boundary..."
+                    value={formQuery}
+                    onChange={e => setFormQuery(e.target.value)}
+                  />
+                  <button type="submit" className="btn-primary" style={{ whiteSpace: "nowrap" }}>
+                    Submit
+                  </button>
+                </form>
+              </div>
+
+              {/* 4. ASYNC RACE RESOLVER */}
+              <div className="card">
+                <div className="card-title">
+                  <span>4️⃣ Out-of-Order Race Token Invariant</span>
+                  <span className="badge">Active Req: #{activeToken}</span>
+                </div>
+                <div className="btn-row">
+                  <button className="btn-primary" onClick={() => triggerRace("Query 'react'", 2500)}>
+                    Slow Req A (2500ms)
+                  </button>
+                  <button className="btn-warning" onClick={() => triggerRace("Query 'react hooks'", 600)}>
+                    Fast Req B (600ms)
+                  </button>
+                </div>
+                <div style={{ background: "#090d16", padding: 10, borderRadius: 8, fontSize: "0.82rem" }}>
+                  Authoritative Rendered Result: <strong style={{ color: "var(--accent-cyan)" }}>{authoritativeData}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: REAL-TIME TELEMETRY LEDGER */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 Crucible Telemetry Ledger</span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{telemetry.length} events logged</span>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 30 }}>
+                      Interact with any module on the left to observe live event execution...
+                    </div>
+                  ) : (
+                    telemetry.map(entry => (
+                      <div key={entry.id} className="log-item">
+                        <div className="log-header">
+                          <span>[{entry.source}]</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{entry.time}</span>
+                        </div>
+                        <div style={{ color: "#fff", fontSize: "0.8rem" }}>{entry.message}</div>
+                        {entry.extra !== "{}" && (
+                          <div style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{entry.extra}</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<EventCrucibleLab />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Part 06 — Form Metadata: Touched, Dirty & Error State Architecture Lab</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-secondary: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #1f2937;
+      --border-focus: #38bdf8;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .badge-primary {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle { color: var(--text-secondary); font-size: 1rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-group { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0d1322;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .input-error {
+      border-color: var(--accent-rose) !important;
+      box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2) !important;
+    }
+
+    .error-msg {
+      font-size: 0.78rem;
+      color: var(--accent-rose);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+    .btn {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover { background: #334155; border-color: var(--accent-cyan); }
+    .btn-primary { background: #0284c7; border-color: #0369a1; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-success { background: #059669; border-color: #047857; }
+    .btn-danger { background: #dc2626; border-color: #b91c1c; }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .telemetry-box {
+      background: #0d1322;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .telemetry-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .tag {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tag-clean { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); }
+    .tag-dirty { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); }
+    .tag-touched { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }
+    .tag-error { background: rgba(244, 63, 94, 0.2); color: var(--accent-rose); }
+
+    .log-list {
+      list-style: none;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+
+    .log-item {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge badge-primary">Level 06 — React Fundamentals • KPI 08 Lab</span>
+      <h1>Part 06 Diagnostic Laboratory</h1>
+      <p class="subtitle">Form Metadata Architecture: Touched History, Relational Dirty & Error Visibility</p>
+    </header>
+
+    <div class="grid">
+      <!-- PROBE 1: The Three Core Metadata Dimensions Sandbox -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🔬 Probe 1: Touched vs Dirty vs Error Sandbox</div>
+          <button class="btn" onclick="resetProbe1()">Reset All</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Try: Focus then blur without editing (<code>touched=true, dirty=false</code>). Edit to "Alicia" then back to "Alice" (<code>dirty</code> resets to false automatically!).
+        </p>
+
+        <div class="input-group">
+          <label>Profile Username (Baseline: <span id="p1BaselineText" style="color: var(--accent-cyan);">"Alice"</span>):</label>
+          <input 
+            type="text" 
+            id="p1Input" 
+            value="Alice" 
+            oninput="handleP1Change(event)"
+            onfocus="handleP1Focus()"
+            onblur="handleP1Blur()"
+          />
+          <div id="p1ErrorMsg" class="error-msg" style="display: none;">⚠️ Username must be 3+ characters!</div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-success" onclick="commitP1Baseline()">💾 Commit as New Baseline</button>
+          <button class="btn" onclick="revertP1ToBaseline()">🔄 Revert to Baseline</button>
+          <button class="btn btn-primary" onclick="simulateSubmitP1()">🚀 Submit Form</button>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="telemetry-box">
+            <div class="telemetry-label">Historical: touched</div>
+            <div class="telemetry-val" id="p1TouchedVal">false</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Relational: dirty</div>
+            <div class="telemetry-val" id="p1DirtyVal">false (Clean)</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Constraint: rawError</div>
+            <div class="telemetry-val" id="p1RawErrorVal">null (Valid)</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Visibility: showError</div>
+            <div class="telemetry-val" id="p1ShowErrorVal">false</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROBE 2: Dynamic List Stable Identity vs Array Index Hazard -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🧩 Probe 2: Dynamic List Identity vs Index Hazard</div>
+          <button class="btn" onclick="addDynamicItem()">+ Add Address</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Delete Address #1 below. Notice how Address #2 preserves its exact metadata without corrupting or inheriting Address #1's error state.
+        </p>
+
+        <div id="dynamicListContainer"></div>
+
+        <div class="telemetry-box" style="margin-top: 14px;">
+          <div class="telemetry-label">Stable Keyed Metadata Store</div>
+          <pre id="dynamicMetadataPreview" style="font-family: var(--font-mono); font-size: 0.8rem; color: #cbd5e1;"></pre>
+        </div>
+      </div>
+
+      <!-- PROBE 3: Transition Timeline & Telemetry Trace -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <div class="card-title">📜 Probe 3: Real-Time Event & Metadata Transition Trace</div>
+          <button class="btn" onclick="clearTelemetryLogs()">Clear Timeline</button>
+        </div>
+        <ul class="log-list" id="timelineList">
+          <li class="log-item" style="color: var(--text-muted);"><span>System initialized. Awaiting user interaction...</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- PROBE 1: Three Metadata Dimensions ---
+    let p1Baseline = "Alice";
+    let p1Current = "Alice";
+    let p1Touched = false;
+    let p1Focused = false;
+    let p1SubmitCount = 0;
+
+    function evaluateP1() {
+      const isDirty = p1Current !== p1Baseline;
+      const rawError = p1Current.trim().length < 3 ? "Username must be 3+ characters" : null;
+      const showError = (p1Touched || p1SubmitCount > 0) && rawError !== null;
+
+      document.getElementById("p1BaselineText").textContent = `"${p1Baseline}"`;
+      document.getElementById("p1TouchedVal").innerHTML = `<span class="tag ${p1Touched ? 'tag-touched' : ''}">${p1Touched}</span>`;
+      document.getElementById("p1DirtyVal").innerHTML = `<span class="tag ${isDirty ? 'tag-dirty' : 'tag-clean'}">${isDirty ? 'true (Modified)' : 'false (Clean)'}</span>`;
+      document.getElementById("p1RawErrorVal").innerHTML = `<span class="tag ${rawError ? 'tag-error' : 'tag-clean'}">${rawError || 'null (Valid)'}</span>`;
+      document.getElementById("p1ShowErrorVal").innerHTML = `<span class="tag ${showError ? 'tag-error' : ''}">${showError}</span>`;
+
+      const input = document.getElementById("p1Input");
+      const errEl = document.getElementById("p1ErrorMsg");
+      if (showError) {
+        input.classList.add("input-error");
+        errEl.style.display = "flex";
+        errEl.textContent = `⚠️ ${rawError}`;
+      } else {
+        input.classList.remove("input-error");
+        errEl.style.display = "none";
+      }
+    }
+
+    function handleP1Change(e) {
+      p1Current = e.target.value;
+      logEvent("CHANGE", `Value mutated to "${p1Current}"`);
+      evaluateP1();
+    }
+
+    function handleP1Focus() {
+      p1Focused = true;
+      logEvent("FOCUS", "User entered field (focused=true)");
+      evaluateP1();
+    }
+
+    function handleP1Blur() {
+      p1Focused = false;
+      p1Touched = true;
+      logEvent("BLUR", "User abandoned field (touched := true)");
+      evaluateP1();
+    }
+
+    function commitP1Baseline() {
+      p1Baseline = p1Current;
+      p1Touched = false;
+      logEvent("COMMIT_SAVE", `New baseline established: "${p1Baseline}" (dirty resets to false)`);
+      evaluateP1();
+    }
+
+    function revertP1ToBaseline() {
+      p1Current = p1Baseline;
+      document.getElementById("p1Input").value = p1Baseline;
+      p1Touched = false;
+      logEvent("REVERT", `Draft reverted to baseline "${p1Baseline}"`);
+      evaluateP1();
+    }
+
+    function simulateSubmitP1() {
+      p1SubmitCount++;
+      logEvent("SUBMIT_ATTEMPT", `Submit triggered (submitCount=${p1SubmitCount}). Errors unlocked!`);
+      evaluateP1();
+    }
+
+    function resetProbe1() {
+      p1Baseline = "Alice";
+      p1Current = "Alice";
+      p1Touched = false;
+      p1Focused = false;
+      p1SubmitCount = 0;
+      document.getElementById("p1Input").value = "Alice";
+      logEvent("RESET", "Factory reset applied");
+      evaluateP1();
+    }
+
+    // --- PROBE 2: Dynamic List Identity ---
+    let dynamicAddresses = [
+      { id: "addr_1", street: "100 Pine St", zip: "" },
+      { id: "addr_2", street: "200 Market St", zip: "94105" }
+    ];
+    let dynamicTouched = { "addr_1.zip": true }; // Address 1 touched & invalid
+
+    function renderDynamicList() {
+      const container = document.getElementById("dynamicListContainer");
+      container.innerHTML = "";
+
+      dynamicAddresses.forEach((item, index) => {
+        const zipKey = `${item.id}.zip`;
+        const isZipTouched = Boolean(dynamicTouched[zipKey]);
+        const zipErr = !item.zip ? "Zip is required" : null;
+        const showZipErr = isZipTouched && zipErr !== null;
+
+        const row = document.createElement("div");
+        row.style.background = "#0d1322";
+        row.style.border = "1px solid #1f2937";
+        row.style.borderRadius = "8px";
+        row.style.padding = "12px";
+        row.style.marginBottom = "10px";
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.gap = "10px";
+
+        row.innerHTML = `
+          <div style="font-size: 0.75rem; color: var(--accent-purple); width: 70px;">[${item.id}]</div>
+          <input type="text" placeholder="Street" value="${item.street}" style="flex: 2;" oninput="updateDynamicStreet('${item.id}', this.value)" />
+          <div style="flex: 1;">
+            <input type="text" placeholder="Zip" class="${showZipErr ? 'input-error' : ''}" value="${item.zip}" onblur="markDynamicTouched('${zipKey}')" oninput="updateDynamicZip('${item.id}', this.value)" />
+            ${showZipErr ? `<div class="error-msg" style="font-size: 0.7rem;">${zipErr}</div>` : ''}
+          </div>
+          <button class="btn btn-danger" style="padding: 6px 10px;" onclick="deleteDynamicItem('${item.id}')">✕</button>
+        `;
+        container.appendChild(row);
+      });
+
+      document.getElementById("dynamicMetadataPreview").textContent = JSON.stringify({
+        items: dynamicAddresses.map(a => a.id),
+        touchedStore: dynamicTouched
+      }, null, 2);
+    }
+
+    function updateDynamicStreet(id, val) {
+      dynamicAddresses = dynamicAddresses.map(a => a.id === id ? { ...a, street: val } : a);
+      renderDynamicList();
+    }
+
+    function updateDynamicZip(id, val) {
+      dynamicAddresses = dynamicAddresses.map(a => a.id === id ? { ...a, zip: val } : a);
+      renderDynamicList();
+    }
+
+    function markDynamicTouched(key) {
+      dynamicTouched[key] = true;
+      logEvent("DYNAMIC_BLUR", `Marked touched on stable key: ${key}`);
+      renderDynamicList();
+    }
+
+    function deleteDynamicItem(id) {
+      dynamicAddresses = dynamicAddresses.filter(a => a.id !== id);
+      delete dynamicTouched[`${id}.zip`];
+      delete dynamicTouched[`${id}.street`];
+      logEvent("DYNAMIC_DELETE", `Removed item [${id}]. Stable metadata mapping preserved!`);
+      renderDynamicList();
+    }
+
+    function addDynamicItem() {
+      const newId = "addr_" + Math.random().toString(36).substring(2, 6);
+      dynamicAddresses.push({ id: newId, street: "", zip: "" });
+      logEvent("DYNAMIC_ADD", `Added new item with stable ID [${newId}]`);
+      renderDynamicList();
+    }
+
+    // --- TIMELINE LOGGING ---
+    function logEvent(type, desc) {
+      const list = document.getElementById("timelineList");
+      const item = document.createElement("li");
+      item.className = "log-item";
+      item.innerHTML = `
+        <span><strong style="color: var(--accent-cyan);">${type}:</strong> ${desc}</span>
+        <span style="color: var(--text-muted);">${new Date().toLocaleTimeString()}</span>
+      `;
+      list.prepend(item);
+    }
+
+    function clearTelemetryLogs() {
+      document.getElementById("timelineList").innerHTML = "";
+    }
+
+    // Initial setup
+    evaluateP1();
+    renderDynamicList();
+  </script>
+</body>
+</html>

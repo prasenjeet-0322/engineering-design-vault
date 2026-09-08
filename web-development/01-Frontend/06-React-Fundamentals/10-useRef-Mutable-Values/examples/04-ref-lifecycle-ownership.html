@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 07 / Part 04 Lab — Ref Lifecycle, Ownership & Resource Lifetime</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.8);
+      --bg-card-hover: rgba(30, 41, 59, 0.9);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.3);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.3);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.3);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--border-active);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Lifetime Tier Visualizer */
+    .tier-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .tier-bar {
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .tier-component { background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.3); }
+    .tier-host { background: rgba(6, 182, 212, 0.15); border-color: rgba(6, 182, 212, 0.3); }
+    .tier-resource { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); }
+
+    .tier-label { font-weight: 600; }
+    .tier-status { font-family: var(--font-mono); font-size: 0.75rem; }
+
+    /* Buttons */
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    button {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .btn-primary:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: var(--accent-primary);
+    }
+
+    .btn-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      color: #38bdf8;
+      border-color: rgba(6, 182, 212, 0.3);
+    }
+    .btn-cyan:hover {
+      background: rgba(6, 182, 212, 0.25);
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .btn-emerald:hover {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: var(--accent-emerald);
+    }
+
+    .btn-rose {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+    .btn-rose:hover {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: var(--accent-rose);
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      border-color: var(--border-subtle);
+    }
+    .btn-reset:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Terminal Console */
+    .terminal {
+      background: #070a11;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 2px 0;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .log-tag {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tag-comp { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+    .tag-host { background: rgba(6, 182, 212, 0.2); color: #38bdf8; }
+    .tag-res { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .tag-warn { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .tag-err { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+    .log-text {
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    /* Quiz */
+    .quiz-question {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .quiz-btn {
+      text-align: left;
+      justify-content: flex-start;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .quiz-btn:hover {
+      background: rgba(30, 41, 59, 0.8);
+      color: #fff;
+      border-color: var(--border-active);
+    }
+
+    .quiz-feedback {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .feedback-correct { background: rgba(16, 185, 129, 0.2); border: 1px solid var(--accent-emerald); color: #34d399; }
+    .feedback-wrong { background: rgba(244, 63, 94, 0.2); border: 1px solid var(--accent-rose); color: #fb7185; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="header-titles">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="badge badge-primary">KPI 07 · Part 04</span>
+        <span class="badge badge-live">Resource Ledger Engine</span>
+      </div>
+      <h1>Ref Lifecycle, Ownership & Resource Lifetime</h1>
+      <p class="subtitle">Component Lifetime vs Host Lifetime vs Resource Lifetime & Idempotent Teardowns</p>
+    </div>
+    <button class="btn-reset" onclick="resetAll()">↺ Reset Sandbox</button>
+  </header>
+
+  <!-- Dashboard Grid -->
+  <div class="dashboard-grid">
+    
+    <!-- LEFT PANEL -->
+    <div>
+      
+      <!-- Primary Card with Tabs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🏛️</span> Resource Ownership & Lifetime Simulator
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab(event, 'tab-lifetimes')">1. Three-Tier Lifetimes</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-multiplied')">2. Multiplied Widget Bug</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-shared')">3. Shared Singleton Safety</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-strict')">4. StrictMode Stress Test</button>
+        </div>
+
+        <!-- TAB 1: Three-Tier Lifetimes -->
+        <div id="tab-lifetimes" class="tab-panel active">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Observe how the <strong>Component</strong> can stay mounted while the <strong>Host DOM Node</strong> is swapped, requiring the <strong>Imperative Resource</strong> to be cleanly destroyed and recreated.
+          </p>
+
+          <div class="tier-container">
+            <div class="tier-bar tier-component">
+              <span class="tier-label">1. Component Lifetime</span>
+              <span class="tier-status" id="statusComponent" style="color: var(--accent-primary);">MOUNTED (Render #1)</span>
+            </div>
+            <div class="tier-bar tier-host">
+              <span class="tier-label">2. Host DOM Instance</span>
+              <span class="tier-status" id="statusHost" style="color: var(--accent-cyan);">&lt;canvas #chartCanvas_0x01&gt;</span>
+            </div>
+            <div class="tier-bar tier-resource">
+              <span class="tier-label">3. Imperative Widget Resource</span>
+              <span class="tier-status" id="statusResource" style="color: var(--accent-emerald);">ChartEngine_01 (Active)</span>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button class="btn-cyan" onclick="swapHostElement()">
+              <span>🔄</span> Swap Host Element (Canvas ➔ SVG)
+            </button>
+            <button class="btn-primary" onclick="reRenderComponent()">
+              <span>⚡</span> Re-render Component (Props Update)
+            </button>
+            <button class="btn-rose" onclick="toggleComponentMount()">
+              <span>🚪</span> Unmount Component
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: Multiplied Widget Bug -->
+        <div id="tab-multiplied" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            Simulate a component that calls <code>new ThirdPartyChart()</code> on every prop change without calling <code>.destroy()</code> on the previous instance.
+          </p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; margin-bottom: 14px;">
+            <div>
+              <span style="font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase;">Active Leaked Instances:</span>
+              <div style="font-size: 1.5rem; font-family: var(--font-mono); color: var(--accent-rose);" id="leakedWidgetCount">1</div>
+            </div>
+            <div>
+              <span style="font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase;">Simulated Heap Footprint:</span>
+              <div style="font-size: 1.5rem; font-family: var(--font-mono); color: var(--accent-amber);" id="heapFootprint">14.2 MB</div>
+            </div>
+          </div>
+
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-bottom: 12px; cursor: pointer;">
+            <input type="checkbox" id="enableCleanupToggle">
+            Enable <strong>Symmetric Cleanup Protocol</strong> (Destroy previous before creating new)
+          </label>
+
+          <div class="button-group">
+            <button class="btn-rose" onclick="triggerPropUpdateWithoutCleanup()">
+              Trigger Prop Change (Simulate Re-render)
+            </button>
+            <button class="btn-emerald" onclick="cleanAllLeakedWidgets()">
+              Clean All Leaked Instances
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 3: Shared Singleton Safety -->
+        <div id="tab-shared" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Two independent components consume a shared WebSocket connection. Watch what happens if Component A unmounts and improperly calls <code>socket.close()</code> vs <code>unsubscribe()</code>.
+          </p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div style="padding: 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-subtle); border-radius: 8px;" id="widgetBoxA">
+              <div style="font-weight: 600;">Component A (Chat Room)</div>
+              <div style="font-size: 0.75rem; color: var(--accent-emerald);" id="statusCompA">Connected (Subscribed)</div>
+              <button class="btn-rose" style="margin-top: 8px; font-size: 0.75rem; padding: 6px 10px;" onclick="unmountCompA(false)">Unmount A (Buggy socket.close())</button>
+              <button class="btn-emerald" style="margin-top: 8px; font-size: 0.75rem; padding: 6px 10px;" onclick="unmountCompA(true)">Unmount A (Safe unsubscribe())</button>
+            </div>
+
+            <div style="padding: 12px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-subtle); border-radius: 8px;">
+              <div style="font-weight: 600;">Component B (Live Feed)</div>
+              <div style="font-size: 0.75rem; color: var(--accent-emerald);" id="statusCompB">Connected (Subscribed)</div>
+              <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 8px;">Listening for live ticker data...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: StrictMode Stress Test -->
+        <div id="tab-strict" class="tab-panel">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            React 18 StrictMode double-invokes effects: <code>Mount ➔ Teardown ➔ Mount</code>. Test if your imperative resource handles survive double-invocation without memory leaks.
+          </p>
+
+          <div class="button-group">
+            <button class="btn-primary" onclick="simulateStrictModeTest()">
+              ▶ Run StrictMode Lifecycle Stress Test
+            </button>
+          </div>
+
+          <div id="strictModeResult" style="padding: 12px; border-radius: 8px; font-size: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); display: none;"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div>
+      
+      <!-- Terminal Log -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📡</span> Resource Lifecycle Ledger Stream
+          </div>
+          <button class="btn-reset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="clearLogs()">Clear</button>
+        </div>
+
+        <div class="terminal" id="terminalLog">
+          <!-- Live events will stream here -->
+        </div>
+      </div>
+
+      <!-- Crucible Prediction Sandbox -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🔥</span> Crucible Diagnostic Challenge
+          </div>
+        </div>
+
+        <div class="quiz-question" id="quizQuestion">
+          A component does <code>resourceRef.current = null</code> on unmount. The third-party chart widget it created still runs internal timers. Why did a memory leak occur?
+        </div>
+
+        <div class="quiz-options">
+          <button class="quiz-btn" onclick="checkQuizAnswer(1)">A) JavaScript garbage collection is disabled inside React hooks.</button>
+          <button class="quiz-btn" onclick="checkQuizAnswer(2)">B) Setting ref.current = null only clears the JS handle; it does not invoke widget.destroy() to release native event listeners.</button>
+          <button class="quiz-btn" onclick="checkQuizAnswer(3)">C) Only Class Components can destroy imperative widgets.</button>
+        </div>
+
+        <div class="quiz-feedback" id="quizFeedback"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function getTimestamp() {
+    const d = new Date();
+    return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+
+  function appendLog(tag, tagClass, text) {
+    const terminal = document.getElementById('terminalLog');
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `
+      <span class="log-time">[${getTimestamp()}]</span>
+      <span class="log-tag ${tagClass}">${tag}</span>
+      <span class="log-text">${text}</span>
+    `;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function clearLogs() {
+    document.getElementById('terminalLog').innerHTML = '';
+  }
+
+  function switchTab(evt, tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    
+    evt.currentTarget.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  // 1. Three-Tier Lifetimes Simulation
+  let compRenderCount = 1;
+  let isCanvasMode = true;
+  let isMounted = true;
+
+  function swapHostElement() {
+    if (!isMounted) return;
+    isCanvasMode = !isCanvasMode;
+    const hostTag = isCanvasMode ? '&lt;canvas #chartCanvas_0x01&gt;' : '&lt;svg #chartSvg_0x02&gt;';
+    const resourceName = isCanvasMode ? 'CanvasChartEngine_01' : 'SvgVectorEngine_02';
+
+    document.getElementById('statusHost').innerHTML = hostTag;
+    document.getElementById('statusResource').innerText = `${resourceName} (Active)`;
+
+    appendLog('HOST_TEARDOWN', 'tag-host', 'Host element destroyed by React commit phase.');
+    appendLog('RES_DESTROY', 'tag-err', 'Old imperative engine destroyed: widgetRef.current.destroy()');
+    appendLog('HOST_ATTACH', 'tag-host', `New host instance created: ${hostTag}`);
+    appendLog('RES_CREATE', 'tag-res', `New imperative engine initialized: ${resourceName}`);
+  }
+
+  function reRenderComponent() {
+    if (!isMounted) return;
+    compRenderCount += 1;
+    document.getElementById('statusComponent').innerText = `MOUNTED (Render #${compRenderCount})`;
+    appendLog('COMP_RENDER', 'tag-comp', `Component Render #${compRenderCount} committed. Host & Resource identity preserved.`);
+  }
+
+  function toggleComponentMount() {
+    isMounted = !isMounted;
+    if (isMounted) {
+      document.getElementById('statusComponent').innerText = 'MOUNTED (Render #1)';
+      document.getElementById('statusHost').innerText = '&lt;canvas #chartCanvas_0x01&gt;';
+      document.getElementById('statusResource').innerText = 'ChartEngine_01 (Active)';
+      appendLog('COMP_MOUNT', 'tag-comp', 'Component mounted to Fiber tree.');
+    } else {
+      document.getElementById('statusComponent').innerText = 'UNMOUNTED';
+      document.getElementById('statusHost').innerText = 'null (Detached)';
+      document.getElementById('statusResource').innerText = 'null (Destroyed & Cleared)';
+      appendLog('COMP_UNMOUNT', 'tag-err', 'Component unmounted -> Host detached -> Resource destroyed.');
+    }
+  }
+
+  // 2. Multiplied Widget Bug
+  let leakedInstances = 1;
+
+  function triggerPropUpdateWithoutCleanup() {
+    const isClean = document.getElementById('enableCleanupToggle').checked;
+    if (isClean) {
+      appendLog('CLEANUP', 'tag-res', '🟢 Symmetric Teardown: chartRef.current.destroy() called before re-creation.');
+      appendLog('RECREATE', 'tag-res', 'Fresh Chart instance created. Active count remains 1.');
+      leakedInstances = 1;
+    } else {
+      leakedInstances += 1;
+      appendLog('LEAK_WARN', 'tag-warn', `⚠️ MULTIPLIED INSTANCE: New Chart created on same DOM node! (Total Active: ${leakedInstances})`);
+    }
+
+    document.getElementById('leakedWidgetCount').innerText = leakedInstances;
+    document.getElementById('heapFootprint').innerText = `${(leakedInstances * 14.2).toFixed(1)} MB`;
+  }
+
+  function cleanAllLeakedWidgets() {
+    leakedInstances = 1;
+    document.getElementById('leakedWidgetCount').innerText = 1;
+    document.getElementById('heapFootprint').innerText = '14.2 MB';
+    appendLog('CLEANUP', 'tag-res', 'All orphaned chart instances destroyed.');
+  }
+
+  // 3. Shared Singleton Safety
+  function unmountCompA(isSafe) {
+    const statusA = document.getElementById('statusCompA');
+    const statusB = document.getElementById('statusCompB');
+
+    statusA.innerText = 'Unmounted';
+    statusA.style.color = 'var(--text-dim)';
+
+    if (!isSafe) {
+      statusB.innerText = 'DISCONNECTED (Socket closed by Component A!)';
+      statusB.style.color = 'var(--accent-rose)';
+      appendLog('SPLIT_BRAIN_BUG', 'tag-err', '❌ DISASTER: Component A called socket.close()! Component B lost live data stream!');
+    } else {
+      statusB.innerText = 'Connected (Subscribed)';
+      statusB.style.color = 'var(--accent-emerald)';
+      appendLog('SAFE_UNSUB', 'tag-res', '✅ SAFE: Component A unsubscribed its listener. Global socket remains open for Component B.');
+    }
+  }
+
+  // 4. StrictMode Tester
+  async function simulateStrictModeTest() {
+    const resBox = document.getElementById('strictModeResult');
+    resBox.style.display = 'block';
+    resBox.innerHTML = '<span style="color: var(--accent-cyan);">Running StrictMode Mount ➔ Teardown ➔ Mount sequence...</span>';
+
+    appendLog('STRICT_START', 'tag-comp', 'StrictMode Test: Simulating initial Mount (Cycle 1)...');
+    await new Promise(r => setTimeout(r, 400));
+    appendLog('STRICT_CLEAN', 'tag-err', 'StrictMode Test: Simulating intentional immediate Teardown...');
+    await new Promise(r => setTimeout(r, 400));
+    appendLog('STRICT_REMOUNT', 'tag-res', 'StrictMode Test: Simulating second Mount (Cycle 2)...');
+    await new Promise(r => setTimeout(r, 400));
+
+    resBox.innerHTML = '<span style="color: var(--accent-emerald); font-weight: 600;">✅ PASSED: Resource setup & teardown are perfectly symmetric. No memory leaks detected.</span>';
+  }
+
+  // Quiz Validation
+  function checkQuizAnswer(selected) {
+    const feedback = document.getElementById('quizFeedback');
+    feedback.style.display = 'block';
+
+    if (selected === 2) {
+      feedback.className = 'quiz-feedback feedback-correct';
+      feedback.innerHTML = '<strong>✅ Correct!</strong> Setting <code>ref.current = null</code> only modifies a JavaScript variable pointer. If the underlying resource has active timers or native DOM listeners, it must be explicitly destroyed via its API (e.g., <code>widget.destroy()</code>)!';
+    } else {
+      feedback.className = 'quiz-feedback feedback-wrong';
+      feedback.innerHTML = '<strong>❌ Incorrect.</strong> Remember: Clearing a ref handle is NOT equivalent to destroying an imperative resource.';
+    }
+  }
+
+  function resetAll() {
+    clearLogs();
+    compRenderCount = 1;
+    isCanvasMode = true;
+    isMounted = true;
+    leakedInstances = 1;
+
+    document.getElementById('statusComponent').innerText = 'MOUNTED (Render #1)';
+    document.getElementById('statusHost').innerText = '&lt;canvas #chartCanvas_0x01&gt;';
+    document.getElementById('statusResource').innerText = 'ChartEngine_01 (Active)';
+    document.getElementById('leakedWidgetCount').innerText = 1;
+    document.getElementById('heapFootprint').innerText = '14.2 MB';
+    document.getElementById('statusCompA').innerText = 'Connected (Subscribed)';
+    document.getElementById('statusCompA').style.color = 'var(--accent-emerald)';
+    document.getElementById('statusCompB').innerText = 'Connected (Subscribed)';
+    document.getElementById('statusCompB').style.color = 'var(--accent-emerald)';
+    document.getElementById('strictModeResult').style.display = 'none';
+
+    appendLog('SYSTEM', 'tag-comp', 'Resource Lifecycle sandbox re-initialized.');
+  }
+
+  // Init
+  appendLog('SYSTEM', 'tag-comp', 'Resource Lifecycle engine initialized. All three lifetime tiers synchronized.');
+</script>
+
+</body>
+</html>

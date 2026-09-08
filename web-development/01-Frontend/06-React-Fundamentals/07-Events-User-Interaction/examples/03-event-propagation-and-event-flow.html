@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 05 — Part 03: Event Propagation & Event Flow</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f293d;
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --accent: #06b6d4;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --code-bg: #030712;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      font-size: 0.75rem;
+      background: rgba(99, 102, 241, 0.2);
+      color: var(--primary-light);
+      padding: 4px 8px;
+      border-radius: 9999px;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+    .header p {
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 10px;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: var(--border);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    button.btn-accent {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: var(--accent);
+      color: #67e8f9;
+    }
+    button.btn-accent:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+    button.btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--error);
+      color: #fca5a5;
+    }
+    button.btn-danger:hover {
+      background: var(--error);
+      color: #fff;
+    }
+    .code-view {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .nested-layer {
+      padding: 14px;
+      border-radius: 8px;
+      margin-top: 8px;
+      transition: background 0.3s ease;
+    }
+    .layer-outer {
+      background: #1e1b4b;
+      border: 1px solid #4338ca;
+    }
+    .layer-middle {
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+    }
+    .layer-inner {
+      background: #0f172a;
+      border: 1px solid #06b6d4;
+    }
+    .log-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 160px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+    .log-row {
+      padding: 3px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.05);
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // 1. Capture & Bubble Propagation Visualizer
+    function PropagationVisualizer() {
+      const [logs, setLogs] = useState([]);
+      const [stopAtChild, setStopAtChild] = useState(false);
+      const [stopAtMiddleCapture, setStopAtMiddleCapture] = useState(false);
+
+      const addLog = (msg) => {
+        setLogs(prev => [`[${prev.length + 1}] ${msg}`, ...prev.slice(0, 7)]);
+      };
+
+      const handleOuterCapture = () => addLog('🔵 1. Outer CAPTURE (onClickCapture)');
+      const handleMiddleCapture = (e) => {
+        addLog('🔵 2. Middle CAPTURE (onClickCapture)');
+        if (stopAtMiddleCapture) {
+          e.stopPropagation();
+          addLog('🛑 Middle CAPTURE called e.stopPropagation() — Event halted!');
+        }
+      };
+
+      const handleInnerClick = (e) => {
+        addLog('🎯 3. Inner Button TARGET / BUBBLE (onClick)');
+        if (stopAtChild) {
+          e.stopPropagation();
+          addLog('🛑 Child called e.stopPropagation() — Bubbling halted!');
+        }
+      };
+
+      const handleMiddleBubble = () => addLog('🟢 4. Middle BUBBLE (onClick)');
+      const handleOuterBubble = () => addLog('🟢 5. Outer BUBBLE (onClick)');
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. Capture & Bubble Flow Inspector</span>
+            <span className="badge">5-Phase Traversal</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <input
+                type="checkbox"
+                checked={stopAtChild}
+                onChange={e => setStopAtChild(e.target.checked)}
+              />
+              Stop at Button (Bubble)
+            </label>
+            <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <input
+                type="checkbox"
+                checked={stopAtMiddleCapture}
+                onChange={e => setStopAtMiddleCapture(e.target.checked)}
+              />
+              Stop at Middle (Capture)
+            </label>
+            <button onClick={() => setLogs([])}>Clear Log</button>
+          </div>
+
+          {/* Nested Hierarchy */}
+          <div
+            className="nested-layer layer-outer"
+            onClickCapture={handleOuterCapture}
+            onClick={handleOuterBubble}
+          >
+            <div style={{ fontSize: '0.8rem', color: '#818cf8', fontWeight: 600 }}>
+              Outer Container (&lt;div&gt;)
+            </div>
+
+            <div
+              className="nested-layer layer-middle"
+              onClickCapture={handleMiddleCapture}
+              onClick={handleMiddleBubble}
+            >
+              <div style={{ fontSize: '0.8rem', color: '#60a5fa', fontWeight: 600 }}>
+                Middle Section (&lt;section&gt;)
+              </div>
+
+              <div className="nested-layer layer-inner" style={{ textAlign: 'center' }}>
+                <button
+                  className="btn-accent"
+                  onClick={handleInnerClick}
+                >
+                  🎯 Click Inner Button
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="log-box">
+            <div style={{ color: 'var(--text-muted)', marginBottom: '4px' }}>Propagation Event Trace:</div>
+            {logs.map((log, i) => (
+              <div key={i} className="log-row">{log}</div>
+            ))}
+            {logs.length === 0 && <div style={{ color: '#64748b' }}>Click the inner button to trigger propagation...</div>}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Clickable Card Conflict Simulator
+    function ClickableCardLab() {
+      const [cardClicks, setCardClicks] = useState(0);
+      const [deleteActions, setDeleteActions] = useState(0);
+      const [useStopProp, setUseStopProp] = useState(false);
+
+      const handleCardClick = () => {
+        setCardClicks(c => c + 1);
+      };
+
+      const handleDelete = (e) => {
+        if (useStopProp) {
+          e.stopPropagation();
+        }
+        setDeleteActions(d => d + 1);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. Clickable Card Conflict Simulator</span>
+            <span className="badge">Production Incident Demo</span>
+          </div>
+
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            When the entire card has an <code>onClick</code> handler, clicking nested buttons bubbles up unless handled.
+          </div>
+
+          <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              type="checkbox"
+              checked={useStopProp}
+              onChange={e => setUseStopProp(e.target.checked)}
+            />
+            Enable <code>e.stopPropagation()</code> on Delete Button
+          </label>
+
+          {/* Clickable Card */}
+          <div
+            onClick={handleCardClick}
+            style={{
+              background: '#1e293b',
+              border: '1px solid var(--primary)',
+              borderRadius: '8px',
+              padding: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h4 style={{ color: '#fff' }}>Pro Plan Subscription ($49/mo)</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Clicking anywhere on this card opens 'Card Details'.
+                </p>
+              </div>
+              <button
+                className="btn-danger"
+                onClick={handleDelete}
+              >
+                🗑️ Delete Item
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div className="stat-badge">
+              <span>Card Details Opened:</span>
+              <strong style={{ color: 'var(--accent)' }}>{cardClicks} times</strong>
+            </div>
+            <div className="stat-badge">
+              <span>Delete Executions:</span>
+              <strong style={{ color: 'var(--error)' }}>{deleteActions} times</strong>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Main App
+    function App() {
+      return (
+        <div>
+          <div className="header">
+            <h1>
+              <span>KPI 05 Part 03: Event Propagation & Event Flow</span>
+              <span className="badge">Interactive Lab</span>
+            </h1>
+            <p>
+              Interactive runtime validation of capture/bubble traversal order, propagation interruption via stopPropagation, and nested clickable card conflicts.
+            </p>
+          </div>
+
+          <div className="grid">
+            <PropagationVisualizer />
+            <ClickableCardLab />
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

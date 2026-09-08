@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 09: Component State Ownership & State Placement</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 09: Component State Ownership & State Placement</h1>
+  <p class="subtitle">Interactive laboratory exploring Narrowest Common Owner, State Colocation, Single Source of Truth, and State vs Derived Data.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('narrowestOwner')">1. Narrowest Common Owner</button>
+    <button onclick="selectLab('singleSource')">2. Single Source vs Duplicate Drift</button>
+    <button onclick="selectLab('derivedVsState')">3. Derived Data vs Redundant State</button>
+    <button onclick="selectLab('colocation')">4. State Colocation vs Over-Lifting</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>State Architecture & Data Flow</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Ownership & Coordination Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Ownership Boundary Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Ownership: Narrowest Common Ancestor</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architectural Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      narrowestOwner: {
+        code: `// ✅ Dashboard owns category state:\nfunction Dashboard() {\n  const [category, setCategory] = useState("all");\n  return (\n    <>\n      <Filter category={category} onChange={setCategory} />\n      <Results category={category} />\n    </>\n  );\n}`,
+        trace: `1. User selects "Books" in Filter ➔ Filter emits onChange("Books") ➔ Dashboard updates state ➔ Re-renders with category="Books" ➔ Both Filter & Results receive updated prop.`,
+        verdict: `High Cohesion: State lives at lowest boundary coordinating both consumers without polluting App or root global state.`,
+        rule: `Put state at the lowest common component that needs to own and coordinate it.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Narrowest Common Owner'
+      },
+      singleSource: {
+        code: `// ❌ Flawed (Duplicated State with Drift Risk):\nfunction Child({ value }) {\n  const [localValue, setLocalValue] = useState(value);\n  // If parent updates value, localValue drifts!\n}\n\n// ✅ Controlled Component (Single Source of Truth):\nfunction Child({ value, onChange }) {\n  return <input value={value} onChange={e => onChange(e.target.value)} />;\n}`,
+        trace: `Flawed: Parent.value !== Child.localValue (divergence!).\nRefactored: Single authoritative state owned by Parent. Child is pure presenter + event emitter.`,
+        verdict: `Zero Synchronization Bugs: Eliminates useEffect synchronization smells and state drift.`,
+        rule: `Do not maintain multiple authoritative representations of the same conceptual state.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Single Source of Truth'
+      },
+      derivedVsState: {
+        code: `// ❌ Storing redundant state:\nconst [items, setItems] = useState([]);\nconst [selectedId, setSelectedId] = useState(null);\nconst [selectedItem, setSelectedItem] = useState(null); // Redundant!\n\n// ✅ Pure Calculation during render:\nconst selectedItem = items.find(i => i.id === selectedId) ?? null;`,
+        trace: `Modifying items or selectedId automatically computes selectedItem on next render with ZERO extra synchronization code or state inconsistency.`,
+        verdict: `Zero Redundancy: 2 state variables instead of 3; impossible for selectedItem to be out of sync.`,
+        rule: `If a value can be computed from existing props or state, derive it during render.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Render-Time Derivation'
+      },
+      colocation: {
+        code: `// ❌ Over-Lifting: App owns expandedCardIds for entire store\n// ✅ Colocation: Each ProductCard owns its own local open/close state\nfunction ProductCard({ product }) {\n  const [isExpanded, setIsExpanded] = useState(false);\n  return ...;\n}`,
+        trace: `Toggling card expansion re-renders ONLY that specific ProductCard occurrence. App, Header, and sibling cards remain completely untouched.`,
+        verdict: `Minimized Blast Radius: Keeps API surface small and avoids prop plumbing across intermediate components.`,
+        rule: `Keep state and behavior colocated with the component that actually uses and owns them.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ State Colocation'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('narrowestOwner');
+  </script>
+</body>
+</html>

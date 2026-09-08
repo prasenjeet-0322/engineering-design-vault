@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 09 — Async Effects, Cancellation & Race Conditions</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .badge-amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    button.purple { background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; }
+
+    input {
+      background: #0d1527;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #fff;
+      font-size: 0.85rem;
+      flex: 1;
+    }
+    input:focus { outline: none; border-color: var(--accent-cyan); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: #0d1527;
+      color: var(--accent-cyan);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+    }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line { display: flex; gap: 8px; align-items: center; }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-start { color: var(--accent-cyan); font-weight: 600; }
+    .log-current { color: var(--accent-green); font-weight: 600; }
+    .log-stale { color: var(--accent-red); font-weight: 600; }
+    .log-abort { color: var(--accent-amber); font-weight: 600; }
+
+    .result-display {
+      background: #0c1524;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    let globalReqCounter = 100;
+
+    // Simulated network call with intentional latency jitter
+    function mockNetworkFetch(query, delayMs, signal) {
+      return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          resolve({
+            query,
+            timestamp: new Date().toLocaleTimeString(),
+            data: `Verified Payload for "${query}" (latency: ${delayMs}ms)`
+          });
+        }, delayMs);
+
+        if (signal) {
+          signal.addEventListener("abort", () => {
+            clearTimeout(timeoutId);
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        }
+      });
+    }
+
+    function App() {
+      const [query, setQuery] = useState("react");
+      const [protectionMode, setProtectionMode] = useState("protected"); // 'protected' or 'unprotected'
+      const [displayedResult, setDisplayedResult] = useState(null);
+      const [operations, setOperations] = useState([]);
+      const [logs, setLogs] = useState([]);
+
+      const requestIdRef = useRef(0);
+      const currentControllerRef = useRef(null);
+
+      const logMessage = (text, type) => {
+        const time = new Date().toLocaleTimeString();
+        setLogs(prev => [{ id: Math.random(), time, text, type }, ...prev.slice(0, 39)]);
+      };
+
+      // Main Async Effect
+      useEffect(() => {
+        const reqId = ++globalReqCounter;
+        requestIdRef.current = reqId;
+
+        // Custom latency: "react" is slow (1200ms), "react hooks" is fast (300ms)
+        const latency = query === "react" ? 1200 : query === "react hooks" ? 300 : 700;
+
+        const controller = new AbortController();
+        currentControllerRef.current = controller;
+
+        setOperations(prev => [
+          { id: reqId, query, latency, status: "PENDING", startedAt: new Date().toLocaleTimeString() },
+          ...prev.slice(0, 7)
+        ]);
+
+        logMessage(`[START #${reqId}] Initiating fetch for "${query}" (${latency}ms delay)`, "start");
+
+        if (protectionMode === "protected") {
+          // Senior Pattern: AbortController + RequestId currentness check
+          mockNetworkFetch(query, latency, controller.signal)
+            .then(res => {
+              if (reqId !== requestIdRef.current) {
+                logMessage(`[STALE DISCARD #${reqId}] Result arrived but discarded! (Current is #${requestIdRef.current})`, "stale");
+                setOperations(prev => prev.map(op => op.id === reqId ? { ...op, status: "DISCARDED (STALE)" } : op));
+                return;
+              }
+              logMessage(`[CURRENT APPLY #${reqId}] State committed for "${query}"!`, "current");
+              setDisplayedResult(res);
+              setOperations(prev => prev.map(op => op.id === reqId ? { ...op, status: "APPLIED (CURRENT)" } : op));
+            })
+            .catch(err => {
+              if (err.name === "AbortError") {
+                logMessage(`[ABORTED #${reqId}] Request aborted cleanly via AbortController!`, "abort");
+                setOperations(prev => prev.map(op => op.id === reqId ? { ...op, status: "ABORTED" } : op));
+              }
+            });
+
+          return () => {
+            logMessage(`[CLEANUP #${reqId}] Aborting prior in-flight request`, "abort");
+            controller.abort();
+          };
+        } else {
+          // Unprotected Anti-Pattern: Unconditional setState ignores race conditions!
+          mockNetworkFetch(query, latency, null)
+            .then(res => {
+              logMessage(`[UNPROTECTED #${reqId}] Unconditionally applied result for "${query}"!`, "stale");
+              setDisplayedResult(res);
+              setOperations(prev => prev.map(op => op.id === reqId ? { ...op, status: "APPLIED (UNPROTECTED)" } : op));
+            });
+        }
+      }, [query, protectionMode]);
+
+      const triggerDeliberateRace = () => {
+        // Triggers query "react" (slow 1200ms), then immediately query "react hooks" (fast 300ms)
+        setQuery("react");
+        setTimeout(() => {
+          setQuery("react hooks");
+        }, 150);
+      };
+
+      const abortCurrent = () => {
+        if (currentControllerRef.current) {
+          currentControllerRef.current.abort();
+        }
+      };
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 09: Async Effects & Race Conditions Lab
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Interactive Verification of Out-of-Order Responses, AbortController Signals, and Request Identity Guards
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2>
+              <span>Query & Race Simulation Controls</span>
+              <span className="badge badge-cyan">Async Simulator</span>
+            </h2>
+
+            <div className="control-panel">
+              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Search Presets:</span>
+              <button className={query === "react" ? "active" : ""} onClick={() => setQuery("react")}>
+                "react" (Slow: 1200ms)
+              </button>
+              <button className={query === "react hooks" ? "active" : ""} onClick={() => setQuery("react hooks")}>
+                "react hooks" (Fast: 300ms)
+              </button>
+              <button className={query === "react native" ? "active" : ""} onClick={() => setQuery("react native")}>
+                "react native" (700ms)
+              </button>
+            </div>
+
+            <div className="control-panel">
+              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Protection Mode:</span>
+              <button
+                className={protectionMode === "protected" ? "active" : ""}
+                onClick={() => setProtectionMode("protected")}
+              >
+                ✅ Protected (RequestId + AbortController)
+              </button>
+              <button
+                className={protectionMode === "unprotected" ? "danger active" : "danger"}
+                onClick={() => setProtectionMode("unprotected")}
+              >
+                ❌ Unprotected (Race Condition Vulnerable)
+              </button>
+            </div>
+
+            <div className="control-panel">
+              <button className="purple" onClick={triggerDeliberateRace}>
+                🔥 Trigger Deliberate Race Condition ("react" → "react hooks")
+              </button>
+              <button className="danger" onClick={abortCurrent}>
+                Abort Current In-Flight Request
+              </button>
+            </div>
+
+            <div className="result-display">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Current UI State:</span>
+                <span className="badge badge-green">Target Query: "{query}"</span>
+              </div>
+              <div style={{ fontSize: "1.1rem", fontWeight: "700", color: "#fff" }}>
+                {displayedResult ? displayedResult.data : "Fetching data..."}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                Delivered payload timestamp: {displayedResult?.timestamp || "—"}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            {/* Panel 1: Operations Ledger */}
+            <div className="card">
+              <h2>
+                <span>1. Active Operations Ledger</span>
+                <span className="badge badge-cyan">In-Flight Tracker</span>
+              </h2>
+
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Req ID</th>
+                      <th>Query</th>
+                      <th>Latency</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operations.map(op => (
+                      <tr key={op.id}>
+                        <td>#{op.id}</td>
+                        <td><strong>"{op.query}"</strong></td>
+                        <td>{op.latency}ms</td>
+                        <td>
+                          <span className={`badge ${
+                            op.status.includes("APPLIED") ? "badge-green" :
+                            op.status.includes("DISCARDED") ? "badge-tier" :
+                            op.status === "ABORTED" ? "badge-amber" : "badge-cyan"
+                          }`}>
+                            {op.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Panel 2: Telemetry Audit */}
+            <div className="card">
+              <h2>
+                <span>2. Temporal Ordering Telemetry</span>
+                <span className="badge badge-green">Audit Trail</span>
+              </h2>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Lifecycle Event Stream:</span>
+                <button onClick={() => setLogs([])} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No async events recorded yet.</div>
+                ) : (
+                  logs.map(l => (
+                    <div key={l.id} className="log-line">
+                      <span className="log-time">[{l.time}]</span>
+                      <span className={`log-${l.type}`}>{l.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ background: "#0d1527", border: "1px dashed var(--accent-cyan)", borderRadius: "8px", padding: "14px", fontSize: "0.85rem" }}>
+                <strong style={{ color: "var(--accent-cyan)" }}>Race Condition Breakdown:</strong>
+                <p style={{ marginTop: "4px" }}>
+                  In <strong>Unprotected Mode</strong>, the slow response for `"react"` (1200ms) resolves after `"react hooks"` (300ms) finishes, permanently overwriting the UI with stale data. In <strong>Protected Mode</strong>, `requestIdRef` discards the older response and `AbortController` aborts the transport stream!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 03: Children, Composition & Slot-Like APIs</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 03: Children, Composition & Slot-Like APIs</h1>
+  <p class="subtitle">Interactive sandbox comparing Configuration-heavy vs Composition-oriented APIs, Render Props, Named Slots, and Compound Components.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('configVsComp')">1. Configuration vs Composition</button>
+    <button onclick="selectLab('renderProps')">2. Render Props (Function-as-Children)</button>
+    <button onclick="selectLab('namedSlots')">3. Named Slots Simulation</button>
+    <button onclick="selectLab('compound')">4. Compound Component Architecture</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>JSX Architecture Pattern</h2>
+      <pre id="code-panel">// Pattern</pre>
+
+      <h2>Responsibility Breakdown</h2>
+      <pre id="resp-panel">// Responsibility</pre>
+    </div>
+
+    <div class="card">
+      <h2>Structural Boundary & Reconciler Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Architecture: High Cohesion</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Decision Rule</h2>
+      <pre id="rule-panel">// Rule</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      configVsComp: {
+        code: `// ❌ Configuration-Heavy (64 state permutations):\n<Card title="Account" showAvatar showActions showBadge actionLabel="Edit" />\n\n// ✅ Composition-Oriented:\n<Card>\n  <Card.Header><Avatar user={user} /><Badge status={user.status} /></Card.Header>\n  <Card.Body><AccountDetails user={user} /></Card.Body>\n  <Card.Actions><EditButton userId={user.id} /></Card.Actions>\n</Card>`,
+        resp: `Card: owns container structure, border styling, layout grid.\nConsumer: owns Avatar, Badge, AccountDetails, and EditButton content.`,
+        verdict: `High Extensibility: New actions/elements can be added without modifying the Card component definition.`,
+        rule: `Prefer composition when consumers need to control structure/content; prefer configuration when behavior represents a stable intrinsic property.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Dependency Inversion for UI'
+      },
+      renderProps: {
+        code: `// Provider:\nfunction DataProvider({ children }) {\n  const data = { name: "Srikar", role: "Founding Engineer" };\n  return children(data);\n}\n\n// Consumer:\n<DataProvider>\n  {data => <h2>{data.name} ({data.role})</h2>}\n</DataProvider>`,
+        resp: `Provider: produces data, controls WHEN to execute render function.\nConsumer: controls WHAT UI element tree is produced from that data.`,
+        verdict: `Direction: Provider data ➔ Consumer function ➔ React Element Tree returned.`,
+        rule: `Function-as-children is a specialized callable contract. Use it when the receiving component genuinely supplies render-time data/control.`,
+        badgeClass: 'badge-ok',
+        badgeText: 'ℹ️ Callable Render Prop Contract'
+      },
+      namedSlots: {
+        code: `function Dialog({ header, footer, children }) {\n  return (\n    <section className="dialog-modal">\n      <header>{header}</header>\n      <main>{children}</main>\n      <footer>{footer}</footer>\n    </section>\n  );\n}\n\n// Usage:\n<Dialog\n  header={<h2>Delete Account</h2>}\n  footer={<Button variant="danger">Delete</Button>}\n>\n  <p>Are you sure?</p>\n</Dialog>`,
+        resp: `Dialog: owns modal overlay, focus trap, accessibility containers.\nConsumer: passes React Element descriptors into named header/footer props.`,
+        verdict: `Clean named slots without introducing pseudo-HTML custom parser tags.`,
+        rule: `Model named slots using props containing React element values when distinct structural regions exist.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Named Slots via Element Props'
+      },
+      compound: {
+        code: `// Compound Tabs:\n<Tabs defaultValue="profile">\n  <Tabs.List>\n    <Tabs.Trigger value="profile">Profile</Tabs.Trigger>\n    <Tabs.Trigger value="settings">Settings</Tabs.Trigger>\n  </Tabs.List>\n  <Tabs.Panel value="profile"><ProfileView /></Tabs.Panel>\n  <Tabs.Panel value="settings"><SettingsView /></Tabs.Panel>\n</Tabs>`,
+        resp: `Tabs: coordinates active tab state, ARIA roles, key navigation.\nSubcomponents: participate in coordinated state while consumer controls markup structure.`,
+        verdict: `Flexible, declarative system with shared behavioral contract.`,
+        rule: `Use compound components when multiple participants must share coordinated behavior while allowing consumer layout freedom.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Compound Component System'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('resp-panel').textContent = data.resp;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('configVsComp');
+  </script>
+</body>
+</html>

@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 Part 07 — List Rendering Performance & Architecture Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.85);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+      --cyan: #06b6d4;
+      --purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-primary { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); }
+    .badge-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); }
+
+    .nav-tabs {
+      display: flex;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active { color: var(--accent); background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); color: var(--text); border-color: rgba(255, 255, 255, 0.15); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { opacity: 0.9; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { opacity: 0.9; }
+    .btn-cyan { background: var(--cyan); color: #090d16; font-weight: 700; }
+    .btn-cyan:hover { opacity: 0.9; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    .console-box {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      max-height: 260px;
+      overflow-y: auto;
+      color: #94a3b8;
+    }
+    .log-line { margin-bottom: 4px; line-height: 1.4; }
+    .log-render { color: #38bdf8; }
+    .log-opt { color: #34d399; }
+    .log-warn { color: #fbbf24; }
+    .log-err { color: #f87171; }
+
+    .virtual-viewport {
+      height: 380px;
+      overflow-y: auto;
+      position: relative;
+      background: #050811;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      contain: strict;
+    }
+
+    .virtual-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(15, 23, 42, 0.9);
+      transition: background 0.15s;
+    }
+    .virtual-row:hover { background: rgba(30, 41, 59, 0.9); }
+    .virtual-row.selected { background: rgba(99, 102, 241, 0.25); border-left: 3px solid #6366f1; }
+
+    .slider-control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .slider-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo, useCallback, memo } = React;
+
+    function logEvent(logs, setLogs, type, text) {
+      const time = new Date().toLocaleTimeString().split(" ")[0];
+      setLogs(prev => [{ id: Math.random().toString(), time, type, text }, ...prev.slice(0, 49)]);
+    }
+
+    // =========================================================================
+    // TAB 1: INTERACTIVE 100,000-ROW VIRTUALIZATION ENGINE
+    // =========================================================================
+    function VirtualizationEngineTab({ logs, setLogs }) {
+      const [totalCount, setTotalCount] = useState(10000);
+      const [itemHeight, setItemHeight] = useState(44);
+      const [viewportHeight, setViewportHeight] = useState(380);
+      const [overscan, setOverscan] = useState(5);
+      const [scrollTop, setScrollTop] = useState(0);
+      const [selectedId, setSelectedId] = useState(null);
+
+      // Generate items dataset
+      const dataset = useMemo(() => {
+        return Array.from({ length: totalCount }, (_, i) => ({
+          id: `rec_${i}`,
+          index: i,
+          title: `Telemetry Record #${i.toString().padStart(6, "0")}`,
+          value: (Math.sin(i / 10) * 100).toFixed(2),
+          status: i % 7 === 0 ? "Critical" : i % 3 === 0 ? "Warning" : "Optimal"
+        }));
+      }, [totalCount]);
+
+      // Virtualizer calculations
+      const totalHeight = totalCount * itemHeight;
+      const rawStart = Math.floor(scrollTop / itemHeight);
+      const visibleCount = Math.ceil(viewportHeight / itemHeight);
+      const startIndex = Math.max(0, rawStart - overscan);
+      const endIndex = Math.min(totalCount - 1, rawStart + visibleCount + overscan);
+      const offsetY = startIndex * itemHeight;
+
+      const visibleRows = useMemo(() => {
+        return dataset.slice(startIndex, endIndex + 1);
+      }, [dataset, startIndex, endIndex]);
+
+      const handleScroll = (e) => {
+        setScrollTop(e.currentTarget.scrollTop);
+      };
+
+      const handleJumpTo = (index) => {
+        const targetScroll = index * itemHeight;
+        setScrollTop(targetScroll);
+        const el = document.getElementById("virtual-viewport-container");
+        if (el) el.scrollTop = targetScroll;
+        logEvent(logs, setLogs, "opt", `Jumped to index #${index} (Offset: ${targetScroll}px)`);
+      };
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "6px" }}>
+              DOM Virtualization (Windowing) Geometry Simulator
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Observe how a 100,000-item dataset renders at steady 60 FPS with only <strong>{visibleRows.length}</strong> real DOM nodes mounted.
+            </p>
+
+            {/* PARAMETER CONTROLS */}
+            <div className="grid-4" style={{ marginBottom: "20px" }}>
+              <div className="slider-control">
+                <div className="slider-label">
+                  <span>Total Items:</span>
+                  <strong style={{ color: "var(--cyan)" }}>{totalCount.toLocaleString()}</strong>
+                </div>
+                <input
+                  type="range"
+                  min="100"
+                  max="100000"
+                  step="500"
+                  value={totalCount}
+                  onChange={e => setTotalCount(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="slider-control">
+                <div className="slider-label">
+                  <span>Row Height:</span>
+                  <strong style={{ color: "var(--accent)" }}>{itemHeight}px</strong>
+                </div>
+                <input
+                  type="range"
+                  min="30"
+                  max="80"
+                  step="2"
+                  value={itemHeight}
+                  onChange={e => setItemHeight(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="slider-control">
+                <div className="slider-label">
+                  <span>Overscan Buffer:</span>
+                  <strong style={{ color: "#fbbf24" }}>{overscan} rows</strong>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={overscan}
+                  onChange={e => setOverscan(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="slider-control">
+                <div className="slider-label">
+                  <span>Viewport Height:</span>
+                  <strong style={{ color: "#34d399" }}>{viewportHeight}px</strong>
+                </div>
+                <input
+                  type="range"
+                  min="250"
+                  max="600"
+                  step="10"
+                  value={viewportHeight}
+                  onChange={e => setViewportHeight(Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            {/* REAL-TIME GEOMETRY METRICS */}
+            <div className="grid-4" style={{ marginBottom: "16px" }}>
+              <div style={{ background: "#050811", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Scroll Offset (`scrollTop`)</div>
+                <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--accent)" }}>{Math.round(scrollTop)}px</div>
+              </div>
+              <div style={{ background: "#050811", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Visible Index Range</div>
+                <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#34d399" }}>[{startIndex} .. {endIndex}]</div>
+              </div>
+              <div style={{ background: "#050811", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Mounted DOM Nodes</div>
+                <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#fbbf24" }}>{visibleRows.length} nodes</div>
+              </div>
+              <div style={{ background: "#050811", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Virtual Total Height</div>
+                <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#a855f7" }}>{(totalHeight / 1000).toFixed(1)}k px</div>
+              </div>
+            </div>
+
+            {/* QUICK JUMP SHORTCUTS */}
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Quick Jump:</span>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => handleJumpTo(0)}>Top (Index 0)</button>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => handleJumpTo(Math.floor(totalCount * 0.25))}>25% ({Math.floor(totalCount * 0.25)})</button>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => handleJumpTo(Math.floor(totalCount * 0.5))}>50% ({Math.floor(totalCount * 0.5)})</button>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => handleJumpTo(Math.floor(totalCount * 0.75))}>75% ({Math.floor(totalCount * 0.75)})</button>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => handleJumpTo(totalCount - 20)}>Bottom ({totalCount - 1})</button>
+            </div>
+
+            {/* VIRTUAL VIEWPORT CONTAINER */}
+            <div
+              id="virtual-viewport-container"
+              className="virtual-viewport"
+              style={{ height: `${viewportHeight}px` }}
+              onScroll={handleScroll}
+            >
+              {/* Phantom Spacer */}
+              <div style={{ height: `${totalHeight}px`, width: "100%", position: "relative" }}>
+                {/* Translated Container */}
+                <div
+                  style={{
+                    transform: `translate3d(0, ${offsetY}px, 0)`,
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top: 0
+                  }}
+                >
+                  {visibleRows.map((row) => (
+                    <div
+                      key={row.id}
+                      className={`virtual-row ${selectedId === row.id ? "selected" : ""}`}
+                      style={{ height: `${itemHeight}px` }}
+                      onClick={() => {
+                        setSelectedId(row.id);
+                        logEvent(logs, setLogs, "render", `Selected Row ${row.title}`);
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span className="badge badge-primary" style={{ fontFamily: "monospace" }}>#{row.index}</span>
+                        <span style={{ fontWeight: 600, color: "#f8fafc", fontSize: "0.85rem" }}>{row.title}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <span style={{ fontFamily: "monospace", color: "#38bdf8", fontSize: "0.8rem" }}>{row.value} MHz</span>
+                        <span className={`badge ${row.status === "Critical" ? "badge-danger" : row.status === "Warning" ? "badge-warning" : "badge-success"}`}>
+                          {row.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: UPDATE SURFACE & PROPS BENCHMARK
+    // =========================================================================
+    function UpdateSurfaceBenchmarkTab({ logs, setLogs }) {
+      const [strategy, setStrategy] = useState("memo"); // unmemo | memo | inline_trap | split_context
+      const [rowCount, setRowCount] = useState(200);
+      const [selectedId, setSelectedId] = useState("row_10");
+      const [lastRenderTime, setLastRenderTime] = useState(0);
+
+      const items = useMemo(() => {
+        return Array.from({ length: rowCount }, (_, i) => ({
+          id: `row_${i}`,
+          name: `Employee Profile #${i}`,
+          role: i % 4 === 0 ? "Principal" : i % 2 === 0 ? "Senior" : "Associate",
+          score: 85 + (i % 15)
+        }));
+      }, [rowCount]);
+
+      const handleSelect = useCallback((id) => {
+        const t0 = performance.now();
+        setSelectedId(id);
+        setTimeout(() => {
+          setLastRenderTime(performance.now() - t0);
+        }, 0);
+        logEvent(logs, setLogs, "render", `[BENCHMARK] Selected row ${id} under strategy "${strategy}"`);
+      }, [strategy]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "6px" }}>
+              Update Surface & Prop Identity Invalidation Benchmark
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Compare how different prop passing architectures affect the total number of child component executions.
+            </p>
+
+            {/* STRATEGY TOGGLE */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+              <button
+                className={`btn ${strategy === "memo" ? "btn-cyan" : "btn-secondary"}`}
+                onClick={() => setStrategy("memo")}
+              >
+                ✅ Optimal (React.memo + Stable Props)
+              </button>
+              <button
+                className={`btn ${strategy === "unmemo" ? "btn-cyan" : "btn-secondary"}`}
+                onClick={() => setStrategy("unmemo")}
+              >
+                ❌ Un-memoized (Standard Components)
+              </button>
+              <button
+                className={`btn ${strategy === "inline_trap" ? "btn-cyan" : "btn-secondary"}`}
+                onClick={() => setStrategy("inline_trap")}
+              >
+                ⚠️ Inline Prop Trap (`style={&#123;&#125;}` + `() =>`)
+              </button>
+            </div>
+
+            {/* BENCHMARK STATS */}
+            <div className="grid-3" style={{ marginBottom: "16px" }}>
+              <div style={{ background: "#050811", padding: "14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Total Collection Size</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--cyan)" }}>{rowCount} Rows</div>
+              </div>
+              <div style={{ background: "#050811", padding: "14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Expected Render Surface</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: strategy === "memo" ? "#34d399" : "#f87171" }}>
+                  {strategy === "memo" ? "Exactly 2 Rows" : `${rowCount} Rows (100%)`}
+                </div>
+              </div>
+              <div style={{ background: "#050811", padding: "14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>JS Interaction Duration</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#38bdf8" }}>{lastRenderTime.toFixed(2)} ms</div>
+              </div>
+            </div>
+
+            {/* ROW LIST */}
+            <div style={{ maxHeight: "360px", overflowY: "auto", background: "#050811", padding: "12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {items.map(item => {
+                const isSelected = item.id === selectedId;
+
+                if (strategy === "unmemo") {
+                  return (
+                    <UnmemoizedRow
+                      key={item.id}
+                      item={item}
+                      isSelected={isSelected}
+                      onSelect={handleSelect}
+                    />
+                  );
+                }
+
+                if (strategy === "inline_trap") {
+                  // Pass inline object and inline callback:
+                  return (
+                    <MemoizedRow
+                      key={item.id}
+                      item={item}
+                      isSelected={isSelected}
+                      onSelect={() => handleSelect(item.id)} // INLINE CLOSURE TRAP!
+                      inlineStyle={{ padding: "10px" }}       // INLINE OBJECT TRAP!
+                    />
+                  );
+                }
+
+                // Optimal Memoized
+                return (
+                  <MemoizedRow
+                    key={item.id}
+                    item={item}
+                    isSelected={isSelected}
+                    onSelect={handleSelect}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Un-memoized Row
+    function UnmemoizedRow({ item, isSelected, onSelect }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div
+          onClick={() => onSelect(item.id)}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "8px 12px",
+            margin: "3px 0",
+            borderRadius: "6px",
+            background: isSelected ? "rgba(99, 102, 241, 0.25)" : "rgba(255,255,255,0.03)",
+            border: isSelected ? "1px solid #6366f1" : "1px solid transparent",
+            cursor: "pointer"
+          }}
+        >
+          <div>
+            <strong style={{ color: "#f8fafc", fontSize: "0.85rem" }}>{item.name}</strong>
+            <span style={{ fontSize: "0.75rem", color: "#94a3b8", marginLeft: "8px" }}>• {item.role}</span>
+          </div>
+          <span className="badge badge-danger">Renders: {renderCount.current}</span>
+        </div>
+      );
+    }
+
+    // Memoized Row
+    const MemoizedRow = memo(function MemoizedRow({ item, isSelected, onSelect, inlineStyle }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div
+          onClick={() => onSelect(item.id)}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "8px 12px",
+            margin: "3px 0",
+            borderRadius: "6px",
+            background: isSelected ? "rgba(99, 102, 241, 0.25)" : "rgba(255,255,255,0.03)",
+            border: isSelected ? "1px solid #6366f1" : "1px solid transparent",
+            cursor: "pointer",
+            ...inlineStyle
+          }}
+        >
+          <div>
+            <strong style={{ color: "#f8fafc", fontSize: "0.85rem" }}>{item.name}</strong>
+            <span style={{ fontSize: "0.75rem", color: "#94a3b8", marginLeft: "8px" }}>• {item.role}</span>
+          </div>
+          <span className={`badge ${renderCount.current > 1 ? "badge-warning" : "badge-success"}`}>
+            Renders: {renderCount.current}
+          </span>
+        </div>
+      );
+    });
+
+    // =========================================================================
+    // TAB 3: LIFTED STATE & VIRTUAL FORM RESILIENCE
+    // =========================================================================
+    function VirtualFormGuardianTab({ logs, setLogs }) {
+      const [stateModel, setStateModel] = useState("lifted"); // local_trap | lifted
+      const [liftedDrafts, setLiftedDrafts] = useState({});
+      const [scrollTop, setScrollTop] = useState(0);
+
+      const items = useMemo(() => {
+        return Array.from({ length: 50 }, (_, i) => ({
+          id: `task_${i}`,
+          index: i,
+          title: `Audit Task #${i}`,
+          assignee: `Engineer_${(i % 5) + 1}`
+        }));
+      }, []);
+
+      const itemHeight = 60;
+      const viewportHeight = 360;
+      const totalHeight = items.length * itemHeight;
+      const rawStart = Math.floor(scrollTop / itemHeight);
+      const visibleCount = Math.ceil(viewportHeight / itemHeight);
+      const startIndex = Math.max(0, rawStart - 2);
+      const endIndex = Math.min(items.length - 1, rawStart + visibleCount + 2);
+      const offsetY = startIndex * itemHeight;
+      const visibleRows = items.slice(startIndex, endIndex + 1);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="card">
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)", marginBottom: "6px" }}>
+              Lifted State & Virtualized Form Input Guardian
+            </h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+              Type text in Task #0, scroll down to Task #40 (which unmounts Task #0), then scroll back up. Witness how local state wipes out vs lifted state survives!
+            </p>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", background: "rgba(0,0,0,0.3)", padding: "12px", borderRadius: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>Form State Architecture:</span>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="formStateModel"
+                  checked={stateModel === "lifted"}
+                  onChange={() => setStateModel("lifted")}
+                />
+                <span style={{ color: "#34d399", fontWeight: 600 }}>✅ Lifted Parent Store (`draftsById`) - Safe</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem" }}>
+                <input
+                  type="radio"
+                  name="formStateModel"
+                  checked={stateModel === "local_trap"}
+                  onChange={() => setStateModel("local_trap")}
+                />
+                <span style={{ color: "#f87171", fontWeight: 600 }}>❌ Row-Local `useState` - Wiped on Unmount!</span>
+              </label>
+            </div>
+
+            <div
+              className="virtual-viewport"
+              style={{ height: `${viewportHeight}px` }}
+              onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
+            >
+              <div style={{ height: `${totalHeight}px`, position: "relative" }}>
+                <div
+                  style={{
+                    transform: `translate3d(0, ${offsetY}px, 0)`,
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top: 0
+                  }}
+                >
+                  {visibleRows.map(task => (
+                    <VirtualFormRow
+                      key={task.id}
+                      task={task}
+                      itemHeight={itemHeight}
+                      stateModel={stateModel}
+                      liftedValue={liftedDrafts[task.id] || ""}
+                      onLiftedChange={(val) => {
+                        setLiftedDrafts(prev => ({ ...prev, [task.id]: val }));
+                        logEvent(logs, setLogs, "opt", `Updated draft for ${task.id} in Parent Store`);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function VirtualFormRow({ task, itemHeight, stateModel, liftedValue, onLiftedChange }) {
+      const [localDraft, setLocalDraft] = useState("");
+      const instanceId = useRef(crypto.randomUUID().slice(0, 4)).current;
+
+      return (
+        <div
+          style={{
+            height: `${itemHeight}px`,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "0 16px",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: "rgba(15, 23, 42, 0.85)"
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className="badge badge-primary">#{task.index}</span>
+              <strong style={{ color: "#f8fafc", fontSize: "0.85rem" }}>{task.title}</strong>
+            </div>
+            <div style={{ fontSize: "0.7rem", color: "#64748b", fontFamily: "monospace" }}>
+              Fiber UUID: #{instanceId}
+            </div>
+          </div>
+
+          <div>
+            {stateModel === "local_trap" ? (
+              <input
+                type="text"
+                value={localDraft}
+                onChange={e => setLocalDraft(e.target.value)}
+                placeholder="Local draft (will wipe!)..."
+                style={{ background: "#1e293b", border: "1px solid #ef4444", color: "#f8fafc", padding: "6px 10px", borderRadius: "6px", fontSize: "0.8rem", width: "220px" }}
+              />
+            ) : (
+              <input
+                type="text"
+                value={liftedValue}
+                onChange={e => onLiftedChange(e.target.value)}
+                placeholder="Lifted draft (survives!)..."
+                style={{ background: "#1e293b", border: "1px solid #10b981", color: "#f8fafc", padding: "6px 10px", borderRadius: "6px", fontSize: "0.8rem", width: "220px" }}
+              />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APP
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("virtualizer");
+      const [logs, setLogs] = useState([
+        { id: "init", time: new Date().toLocaleTimeString().split(" ")[0], type: "render", text: "Performance Lab Ready. Select a tab to inspect list architectures." }
+      ]);
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+                <span className="badge badge-primary">KPI 09 — PART 07</span>
+                <span className="badge badge-cyan">Performance Engine</span>
+              </div>
+              <h1 style={{ fontSize: "1.5rem", fontWeight: 800 }}>List Rendering Performance & Architecture Lab</h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Master DOM Virtualization, Update Surfaces, and 60 FPS Collection Architectures
+              </p>
+            </div>
+            <div>
+              <a href="../07-list-rendering-performance-and-architecture.md" className="btn btn-secondary" style={{ textDecoration: "none" }}>
+                📖 Read Guide
+              </a>
+            </div>
+          </header>
+
+          <nav className="nav-tabs">
+            <button
+              className={`tab-btn ${activeTab === "virtualizer" ? "active" : ""}`}
+              onClick={() => setActiveTab("virtualizer")}
+            >
+              🚀 100,000-Row Virtualization Engine
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "benchmark" ? "active" : ""}`}
+              onClick={() => setActiveTab("benchmark")}
+            >
+              📊 Update Surface & Prop Benchmark
+            </button>
+            <button
+              className={`tab-btn ${activeTab === "forms" ? "active" : ""}`}
+              onClick={() => setActiveTab("forms")}
+            >
+              🛡️ Lifted State & Virtual Form Guardian
+            </button>
+          </nav>
+
+          <main>
+            {activeTab === "virtualizer" && <VirtualizationEngineTab logs={logs} setLogs={setLogs} />}
+            {activeTab === "benchmark" && <UpdateSurfaceBenchmarkTab logs={logs} setLogs={setLogs} />}
+            {activeTab === "forms" && <VirtualFormGuardianTab logs={logs} setLogs={setLogs} />}
+          </main>
+
+          {/* AUDIT LOG CONSOLE */}
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent)" }}>
+                📜 Real-Time Performance & Interaction Telemetry Log
+              </span>
+              <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setLogs([])}>
+                Clear Log
+              </button>
+            </div>
+            <div className="console-box">
+              {logs.length === 0 ? (
+                <div style={{ color: "#64748b" }}>Console clear. Trigger an action above to inspect performance events.</div>
+              ) : (
+                logs.map(log => (
+                  <div key={log.id} className={`log-line log-${log.type}`}>
+                    [{log.time}] {log.text}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

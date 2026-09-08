@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 08 Part 15 — Forms & Controlled Inputs Crucible Simulator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(26, 34, 52, 0.75);
+      --card-border: rgba(99, 102, 241, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --accent: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1250px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 950px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(51, 65, 85, 0.8);
+      color: #cbd5e1;
+      border: 1px solid #475569;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn-warning {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .code-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .pill-idle { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+    .pill-submitting { background: rgba(56, 189, 248, 0.2); color: #38bdf8; animation: pulse 1.5s infinite; }
+    .pill-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-conflict { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .pill-error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .dynamic-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #334155;
+      padding: 8px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useRef, useMemo } = React;
+
+    const INITIAL_STATE = {
+      username: "alice_crucible",
+      email: "alice@test.com",
+      seats: 10,
+      contacts: [
+        { id: "c_1", name: "Alice", email: "alice@test.com" },
+        { id: "c_2", name: "Bob", email: "invalid-bob" }
+      ]
+    };
+
+    function crucibleReducer(state, action) {
+      switch (action.type) {
+        case "FIELD_CHANGED":
+          return {
+            ...state,
+            draft: { ...state.draft, [action.field]: action.value },
+            serverErrors: { ...state.serverErrors, [action.field]: null }
+          };
+        case "CONTACT_REMOVED":
+          return {
+            ...state,
+            draft: {
+              ...state.draft,
+              contacts: state.draft.contacts.filter(c => c.id !== action.id)
+            }
+          };
+        case "SUBMIT_STARTED":
+          return {
+            ...state,
+            status: "submitting",
+            inFlightSnapshot: structuredClone(state.draft)
+          };
+        case "SUBMIT_SUCCEEDED":
+          return {
+            ...state,
+            baseline: action.committed,
+            status: "success",
+            inFlightSnapshot: null
+          };
+        case "SUBMIT_CONFLICT_409":
+          return {
+            ...state,
+            status: "conflict",
+            serverLatest: action.serverRecord,
+            inFlightSnapshot: null
+          };
+        case "SUBMIT_FAILED":
+          return {
+            ...state,
+            status: "error",
+            inFlightSnapshot: null
+          };
+        case "RESET_TO_BASELINE":
+          return {
+            ...state,
+            draft: state.baseline,
+            status: "idle",
+            inFlightSnapshot: null
+          };
+        default:
+          return state;
+      }
+    }
+
+    function App() {
+      const [state, dispatch] = useReducer(crucibleReducer, {
+        draft: INITIAL_STATE,
+        baseline: INITIAL_STATE,
+        inFlightSnapshot: null,
+        status: "idle",
+        serverLatest: null,
+        serverErrors: {}
+      });
+
+      const [logs, setLogs] = useState([]);
+      const requestSeqRef = useRef(0);
+
+      const addLog = (msg, type = "info") => {
+        setLogs(prev => [{
+          id: Math.random(),
+          timestamp: new Date().toLocaleTimeString(),
+          msg,
+          type
+        }, ...prev.slice(0, 7)]);
+      };
+
+      const isDirty = useMemo(() => {
+        return (
+          state.draft.username !== state.baseline.username ||
+          state.draft.email !== state.baseline.email ||
+          state.draft.seats !== state.baseline.seats
+        );
+      }, [state.draft, state.baseline]);
+
+      // Dynamic Validation
+      const contactErrors = useMemo(() => {
+        const errs = {};
+        state.draft.contacts.forEach(c => {
+          if (!c.email.includes("@")) {
+            errs[c.id] = "Invalid email format";
+          }
+        });
+        return errs;
+      }, [state.draft.contacts]);
+
+      // Gauntlet Action 1: In-Flight Edit Test (Submit A -> Type B -> HTTP 200)
+      const handleInFlightEditSimulation = async () => {
+        dispatch({ type: "SUBMIT_STARTED" });
+        const reqId = ++requestSeqRef.current;
+        const snapshot = structuredClone(state.draft);
+        addLog(`Request #${reqId} dispatched snapshot: "${snapshot.username}" (takes 2500ms)`, "info");
+
+        setTimeout(() => {
+          if (reqId !== requestSeqRef.current) return;
+          dispatch({ type: "SUBMIT_SUCCEEDED", committed: snapshot });
+          addLog(`Request #${reqId} succeeded! Baseline updated to "${snapshot.username}". Live edits remain dirty.`, "success");
+        }, 2500);
+      };
+
+      // Gauntlet Action 2: Out-of-Order Race Condition (Req 1 slow, Req 2 fast)
+      const triggerOutOfOrderRace = () => {
+        // Request 1: Slow
+        const req1 = ++requestSeqRef.current;
+        addLog(`Dispatched Request #${req1} (Slow: 3000ms, Query: "Alice")`, "warn");
+
+        setTimeout(() => {
+          if (req1 !== requestSeqRef.current) {
+            addLog(`Request #${req1} FINISHED at 3000ms but was DISCARDED as STALE! (Token #${requestSeqRef.current} is current)`, "error");
+          } else {
+            addLog(`Request #${req1} committed.`, "success");
+          }
+        }, 3000);
+
+        // Request 2: Fast (supersedes Req 1)
+        setTimeout(() => {
+          const req2 = ++requestSeqRef.current;
+          addLog(`Dispatched Request #${req2} (Fast: 500ms, Query: "Alice Smith")`, "info");
+
+          setTimeout(() => {
+            if (req2 === requestSeqRef.current) {
+              addLog(`Request #${req2} COMMITTED at 500ms (HTTP 200). Active state updated!`, "success");
+            }
+          }, 500);
+        }, 300);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>KPI 08 Part 15 — Forms & Controlled Inputs Crucible</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "4px" }}>
+                Multi-Timeline State Machines, Out-of-Order Races & Stable Entity ID Gauntlet
+              </p>
+            </div>
+            <div className="badge">Level 06 — React Fundamentals</div>
+          </header>
+
+          <div className="grid">
+            {/* Left Column: Interactive Gauntlet Surface */}
+            <div className="card">
+              <div className="card-title">
+                <span>Crucible Interactive Surface</span>
+                <span className={`pill pill-${state.status}`}>{state.status.toUpperCase()}</span>
+              </div>
+
+              {state.status === "success" && (
+                <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", padding: "10px", borderRadius: "8px", color: "#6ee7b7", fontSize: "0.85rem" }}>
+                  ✓ Committed to baseline! {isDirty ? "Unsaved in-flight edits preserved." : "Form is completely clean."}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Username (Type while in-flight):</label>
+                <input
+                  type="text"
+                  value={state.draft.username}
+                  onChange={e => dispatch({ type: "FIELD_CHANGED", field: "username", value: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Seats Allocation:</label>
+                <input
+                  type="number"
+                  value={state.draft.seats}
+                  onChange={e => dispatch({ type: "FIELD_CHANGED", field: "seats", value: Number(e.target.value) })}
+                />
+              </div>
+
+              {/* Dynamic Rows with Stable UUID Binding */}
+              <div className="form-group">
+                <label>Dynamic Entity Binding (Notice deleting Row 0 keeps Bob's error):</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {state.draft.contacts.map((c) => (
+                    <div key={c.id} className="dynamic-item">
+                      <span style={{ fontSize: "0.75rem", color: "#38bdf8", fontFamily: "monospace" }}>{c.id}</span>
+                      <span style={{ fontSize: "0.85rem", flex: 1 }}>{c.name} ({c.email})</span>
+                      {contactErrors[c.id] && (
+                        <span style={{ color: "#f87171", fontSize: "0.75rem" }}>⚠️ Invalid</span>
+                      )}
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                        onClick={() => dispatch({ type: "CONTACT_REMOVED", id: c.id })}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gauntlet Simulation Triggers */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "#cbd5e1" }}>
+                  🔥 Crucible Scenario Triggers:
+                </span>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <button className="btn btn-primary" onClick={handleInFlightEditSimulation} disabled={state.status === "submitting"}>
+                    {state.status === "submitting" ? "In Flight..." : "Test In-Flight Divergence"}
+                  </button>
+                  <button className="btn btn-warning" onClick={triggerOutOfOrderRace}>
+                    Trigger Out-of-Order Race
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => dispatch({ type: "RESET_TO_BASELINE" })}>
+                    Reset to Baseline
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Multi-Timeline Inspector & Telemetry */}
+            <div className="card">
+              <div className="card-title">
+                <span>Multi-Timeline Inspector</span>
+                <span className="badge">Sequence Token #{requestSeqRef.current}</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>isDirty (draft !== baseline):</span>
+                  <span style={{ fontWeight: 600, color: isDirty ? "#f59e0b" : "#10b981" }}>{String(isDirty)}</span>
+                </div>
+                <div className="telemetry-row">
+                  <span style={{ color: "#94a3b8" }}>Lifecycle Status:</span>
+                  <span style={{ fontWeight: 600, color: "#38bdf8" }}>{state.status.toUpperCase()}</span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Live Draft (Mutable in Memory):</label>
+                <div className="code-box">
+                  {JSON.stringify(state.draft, null, 2)}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>In-Flight Submission Snapshot (Frozen):</label>
+                <div className="code-box">
+                  {state.inFlightSnapshot ? JSON.stringify(state.inFlightSnapshot, null, 2) : "// No request currently in-flight"}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Active Baseline (Server Truth):</label>
+                <div className="code-box">
+                  {JSON.stringify(state.baseline, null, 2)}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Temporal Event Logger:</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "140px", overflowY: "auto" }}>
+                  {logs.length === 0 ? (
+                    <span style={{ fontSize: "0.8rem", color: "#64748b" }}>No execution actions dispatched yet.</span>
+                  ) : (
+                    logs.map(log => (
+                      <div
+                        key={log.id}
+                        style={{
+                          fontSize: "0.75rem",
+                          fontFamily: "monospace",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          background: log.type === "error" ? "rgba(239, 68, 68, 0.2)" : log.type === "warn" ? "rgba(245, 158, 11, 0.2)" : log.type === "success" ? "rgba(16, 185, 129, 0.2)" : "rgba(15, 23, 42, 0.8)",
+                          color: log.type === "error" ? "#fca5a5" : log.type === "warn" ? "#fcd34d" : log.type === "success" ? "#6ee7b7" : "#94a3b8"
+                        }}
+                      >
+                        [{log.timestamp}] {log.msg}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

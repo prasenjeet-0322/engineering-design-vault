@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 02: useState API, Initialization & State Update Semantics</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 02: useState API, Initialization & State Update Semantics</h1>
+  <p class="subtitle">Interactive sandbox demonstrating useState lazy initializers, direct vs functional updates, snapshot closures, and top-level hook call order.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('snapshotClosure')">1. Snapshot Closure in Handlers</button>
+    <button onclick="selectLab('directVsFunctional')">2. Direct vs Functional Updaters</button>
+    <button onclick="selectLab('lazyInitializer')">3. Lazy Initializer Function</button>
+    <button onclick="selectLab('functionAsState')">4. Storing a Function as State</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Code Representation</h2>
+      <pre id="code-panel">// Code</pre>
+
+      <h2>Execution Pipeline & Snapshot Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Diagnosis</h2>
+      <span id="badge" class="status-badge badge-ok">Snapshot Model: Deterministic</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Principle</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      snapshotClosure: {
+        code: `function Counter() {\n  const [count, setCount] = useState(0);\n  function handleClick() {\n    console.log('before:', count); // 0\n    setCount(count + 1);          // Requests next render with 1\n    console.log('after:', count);  // Still 0! (Snapshot for this render)\n  }\n  return <button onClick={handleClick}>{count}</button>;\n}`,
+        trace: `Render #1 Snapshot: count = 0.\nhandleClick closes over count = 0.\nsetCount(0 + 1) requests a new render.\ncurrent handler execution continues with count = 0.\nNext Render #2 produces fresh snapshot count = 1.`,
+        verdict: `Setters do not mutate the running render's JavaScript variable binding.`,
+        rule: `Read state as a snapshot. Request state changes through the setter. Current Render ≠ Future State.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Snapshot Closure'
+      },
+      directVsFunctional: {
+        code: `// ❌ Direct Updates (Reads same snapshot):\nsetCount(count + 1); // setCount(0 + 1) => 1\nsetCount(count + 1); // setCount(0 + 1) => 1\nsetCount(count + 1); // setCount(0 + 1) => 1\n// Final result: 1\n\n// ✅ Functional Updates (Chained computation):\nsetCount(c => c + 1); // 0 => 1\nsetCount(c => c + 1); // 1 => 2\nsetCount(c => c + 1); // 2 => 3\n// Final result: 3`,
+        trace: `Direct updates compute the value using the constant count snapshot from the current render.\nFunctional updaters queue transformations: next = fn(previousState).`,
+        verdict: `Always use functional updaters when the next state depends on the previous state across multiple updates.`,
+        rule: `useState(initializer) produces initial state; setState(updater) calculates next state from previous.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Functional Updater'
+      },
+      lazyInitializer: {
+        code: `// ❌ Expensive evaluation every single render:\nconst [items, setItems] = useState(buildLargeDataset());\n\n// ✅ Lazy Initializer (Evaluated once on mount):\nconst [items, setItems] = useState(() => buildLargeDataset());`,
+        trace: `Direct function calls evaluate as JS arguments before useState receives them.\nLazy function references allow React to execute the initializer ONLY during initial occurrence mount.`,
+        verdict: `Zero Performance Waste: Subsequent renders skip re-running expensive initialization logic.`,
+        rule: `Use lazy initialization when establishing initial state requires meaningful computation. Keep initializers pure!`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Lazy Initialization'
+      },
+      functionAsState: {
+        code: `// Storing a Function in State:\nconst handler = () => console.log('Action');\n\n// ❌ Misinterpreted as an initializer function:\nconst [fn, setFn] = useState(handler);\n\n// ✅ Correct: Initializer returns the function:\nconst [fn, setFn] = useState(() => handler);`,
+        trace: `useState interprets a bare function argument as an initializer to be executed.\nWrapping in () => handler ensures the returned function itself becomes the stored state value.`,
+        verdict: `Correct Contract: Distinguishes between state computation instructions and function values.`,
+        rule: `To store a function as state, pass an initializer that returns the function: useState(() => fn).`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Function as State Value'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('snapshotClosure');
+  </script>
+</body>
+</html>

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 10 / Part 15 — Ref Architecture Advanced Patterns Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-top: 4px;
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-tier {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .badge-part {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--accent-primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    /* Tab Navigation */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: var(--border-active);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-header h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-active);
+    }
+
+    .btn-primary {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #4f46e5;
+      box-shadow: 0 0 12px var(--accent-primary-glow);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: var(--accent-rose);
+    }
+
+    .btn-danger:hover {
+      background: rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-emerald {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--accent-emerald);
+    }
+
+    /* Console / Telemetry Ledger */
+    .console-box {
+      background: #060911;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: #38bdf8;
+      height: 380px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-entry {
+      margin-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .log-entry.info { color: #38bdf8; }
+    .log-entry.success { color: #10b981; }
+    .log-entry.warn { color: #f59e0b; }
+    .log-entry.error { color: #f43f5e; }
+
+    /* Stat Badges */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-top: 4px;
+      font-family: var(--font-mono);
+    }
+  </style>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useLayoutEffect, useCallback, useImperativeHandle, forwardRef, memo } = React;
+
+    function useLatest(value) {
+      const ref = useRef(value);
+      useLayoutEffect(() => {
+        ref.current = value;
+      });
+      return ref;
+    }
+
+    // =========================================================================
+    // MODULE 1: RESOURCE GENERATION TOKENS (Async Syntax Worker Simulation)
+    // =========================================================================
+    function ModuleResourceGeneration({ onLog }) {
+      const [docId, setDocId] = useState('doc-alpha');
+      const genRef = useRef(1);
+      const [status, setStatus] = useState('Idle');
+
+      const switchDoc = (newDocId) => {
+        const nextGen = ++genRef.current;
+        setDocId(newDocId);
+        setStatus(`Switched to ${newDocId} (Gen #${nextGen})`);
+        onLog(`[Resource] Mounted ${newDocId} -> Activated Generation #${nextGen}`, 'info');
+
+        // Simulate 1500ms async worker task
+        const taskGen = nextGen;
+        setTimeout(() => {
+          if (taskGen !== genRef.current) {
+            onLog(`❌ [Worker] DROPPED syntax callback for dead Gen #${taskGen} (Current: #${genRef.current})`, 'warn');
+          } else {
+            onLog(`✅ [Worker] APPLIED syntax tree for Gen #${taskGen}`, 'success');
+            setStatus(`Syntax Synced for Gen #${taskGen}`);
+          }
+        }, 1500);
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Demonstrates <strong>Resource Generation Tokens</strong>: Stale background worker callbacks from destroyed document incarnations are rejected.
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-primary" onClick={() => switchDoc('doc-alpha')}>Switch to Doc Alpha</button>
+            <button className="btn btn-primary" onClick={() => switchDoc('doc-beta')}>Switch to Doc Beta</button>
+            <button className="btn btn-primary" onClick={() => switchDoc('doc-gamma')}>Switch to Doc Gamma</button>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Current Active Document</div>
+            <div className="stat-value">{docId} (Gen #{genRef.current})</div>
+            <div style={{ marginTop: '8px', fontSize: '0.85rem', color: 'var(--accent-cyan)' }}>Status: {status}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE 2: SUBSCRIPTION STABILITY (useLatest Callback Bridge)
+    // =========================================================================
+    function ModuleSubscriptionStability({ onLog }) {
+      const [theme, setTheme] = useState('Dark');
+      const [messages, setMessages] = useState([]);
+      const subCountRef = useRef(0);
+      const themeRef = useLatest(theme);
+
+      useEffect(() => {
+        subCountRef.current += 1;
+        onLog(`[WebSocket] Connected stream (Total Connection Count: ${subCountRef.current})`, 'info');
+
+        const interval = setInterval(() => {
+          const msg = `Packet @ ${new Date().toLocaleTimeString()} (Theme: ${themeRef.current})`;
+          setMessages((prev) => [msg, ...prev.slice(0, 4)]);
+          onLog(`[Stream] Handled: ${msg}`, 'success');
+        }, 2000);
+
+        return () => {
+          clearInterval(interval);
+          onLog(`[WebSocket] Disconnected stream`, 'warn');
+        };
+      }, []); // Stable [] mount
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Demonstrates <strong>useLatest Callback Bridge</strong>: Long-lived WebSocket streams access fresh React state without tearing down or reconnecting.
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn" onClick={() => { setTheme('Dark'); onLog('[Theme] State updated to Dark', 'info'); }}>Theme: Dark</button>
+            <button className="btn" onClick={() => { setTheme('Neon Cyber'); onLog('[Theme] State updated to Neon Cyber', 'info'); }}>Theme: Neon Cyber</button>
+            <button className="btn" onClick={() => { setTheme('Monochrome'); onLog('[Theme] State updated to Monochrome', 'info'); }}>Theme: Monochrome</button>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Active Stream Connection Count</div>
+            <div className="stat-value">{subCountRef.current} (Zero Reconnections on Prop Update)</div>
+          </div>
+          <ul style={{ listStyle: 'none', background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+            {messages.map((m, i) => <li key={i} style={{ marginBottom: '4px', color: '#a5f3fc' }}>{m}</li>)}
+          </ul>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE 3: THE IMPERATIVE ISLAND & ECHO MUTEX
+    // =========================================================================
+    function ModuleImperativeIsland({ onLog }) {
+      const [text, setText] = useState('const x = 42;');
+      const containerRef = useRef(null);
+      const isApplyingExternalStateRef = useRef(false);
+      const onTextChangeRef = useLatest((val) => {
+        setText(val);
+        onLog(`[EchoMutex] User typed: "${val}" -> Updated React state`, 'info');
+      });
+
+      useEffect(() => {
+        if (!containerRef.current) return;
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.width = '100%';
+        textarea.style.height = '120px';
+        textarea.style.background = '#060911';
+        textarea.style.color = '#38bdf8';
+        textarea.style.fontFamily = 'monospace';
+        textarea.style.padding = '12px';
+        textarea.style.borderRadius = '8px';
+        textarea.style.border = '1px solid rgba(255,255,255,0.1)';
+
+        textarea.addEventListener('input', (e) => {
+          if (isApplyingExternalStateRef.current) return; // Mutex blocks echo!
+          onTextChangeRef.current(e.target.value);
+        });
+
+        containerRef.current.appendChild(textarea);
+        onLog('[Island] Imperative editor mounted in isolated DOM leaf', 'success');
+
+        return () => {
+          if (containerRef.current) containerRef.current.innerHTML = '';
+        };
+      }, []);
+
+      const triggerExternalUpdate = () => {
+        const nextVal = `const timestamp = ${Date.now()};`;
+        setText(nextVal);
+        onLog(`[External] React pushed programmatic update: "${nextVal}"`, 'warn');
+
+        // Apply with Mutex Guard
+        const textarea = containerRef.current?.querySelector('textarea');
+        if (textarea) {
+          isApplyingExternalStateRef.current = true;
+          try {
+            textarea.value = nextVal;
+          } finally {
+            isApplyingExternalStateRef.current = false;
+          }
+        }
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Demonstrates <strong>Imperative DOM Island & Echo Mutex</strong>: Bidirectional synchronization without circular oscillation or cursor jump.
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-emerald" onClick={triggerExternalUpdate}>Push React State to Editor</button>
+          </div>
+          <div ref={containerRef} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE 4: DYNAMIC KEYED REGISTRY & FOCUS RESTORATION
+    // =========================================================================
+    function ModuleDynamicRegistry({ onLog }) {
+      const [items, setItems] = useState([
+        { id: 'usr-1', name: 'Alice Walker' },
+        { id: 'usr-2', name: 'Bob Vance' },
+        { id: 'usr-3', name: 'Carol Danvers' },
+      ]);
+      const registryRef = useRef(new Map());
+
+      const registerNode = (id) => (node) => {
+        if (node) {
+          registryRef.current.set(id, node);
+          onLog(`[Registry] Attached node for ID: ${id}`, 'info');
+        } else {
+          registryRef.current.delete(id);
+          onLog(`[Registry] Symmetrically detached node for ID: ${id}`, 'warn');
+        }
+      };
+
+      const focusItem = (id) => {
+        const node = registryRef.current.get(id);
+        if (node) {
+          node.focus();
+          onLog(`[Focus] Restored imperative focus to node: ${id}`, 'success');
+        }
+      };
+
+      const deleteItem = (id) => {
+        setItems((prev) => prev.filter((item) => item.id !== id));
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Demonstrates <strong>Dynamic Keyed Ref Registries</strong>: Symmetric attach/detach cleanup prevents memory leaks on list reordering/deletion.
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-primary" onClick={() => focusItem('usr-2')}>Focus Bob Vance (usr-2)</button>
+            <button className="btn btn-danger" onClick={() => deleteItem('usr-2')}>Delete Bob Vance</button>
+            <button className="btn" onClick={() => onLog(`[Audit] Active Registered Nodes: ${registryRef.current.size}`, 'info')}>Audit Map Count</button>
+          </div>
+          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {items.map((item) => (
+              <li
+                key={item.id}
+                ref={registerNode(item.id)}
+                tabIndex={0}
+                style={{
+                  padding: '10px 14px',
+                  background: '#1e293b',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span>{item.name} ({item.id})</span>
+                <button className="btn btn-danger" onClick={() => deleteItem(item.id)}>Delete</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MODULE 5: LATEST-ONLY POINTER SAMPLING VS LOSSLESS QUEUE
+    // =========================================================================
+    function ModulePointerSampling({ onLog }) {
+      const [sampleCount, setSampleCount] = useState(0);
+      const [rawCount, setRawCount] = useState(0);
+      const coordsRef = useRef({ x: 0, y: 0 });
+      const rafRef = useRef(null);
+
+      const handlePointer = (e) => {
+        setRawCount((c) => c + 1);
+        coordsRef.current = { x: e.clientX, y: e.clientY };
+
+        if (rafRef.current === null) {
+          rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = null;
+            setSampleCount((c) => c + 1);
+          });
+        }
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Demonstrates <strong>Latest-Only Event Sampling</strong>: High-frequency pointer move streams sampled once per frame, dropping intermediate redundant events.
+          </p>
+          <div
+            onPointerMove={handlePointer}
+            style={{
+              height: '140px',
+              background: '#111827',
+              border: '1px dashed var(--accent-cyan)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'crosshair',
+            }}
+          >
+            Hover and Move Mouse Rapidly Inside This Box
+          </div>
+          <div className="stat-row">
+            <div className="stat-card">
+              <div className="stat-label">Raw Dispatched Events</div>
+              <div className="stat-value">{rawCount}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">rAF Sampled Ticks</div>
+              <div className="stat-value">{sampleCount}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // MASTER APP ROOT
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('gen');
+      const [logs, setLogs] = useState([]);
+      const renderCountRef = useRef(0);
+      renderCountRef.current += 1;
+
+      const appendLog = (msg, type = 'info') => {
+        const time = new Date().toLocaleTimeString();
+        setLogs((prev) => [{ time, msg, type }, ...prev.slice(0, 40)]);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-titles">
+              <h1>⚡ Ref Architecture Advanced Patterns Lab</h1>
+              <p>KPI 10 / Part 15 — Senior Interactive Telemetry & Crucible Diagnostic Visualizer</p>
+            </div>
+            <div className="header-badges">
+              <span className="badge badge-tier">🔴 MUST KNOW</span>
+              <span className="badge badge-part">PART 15</span>
+            </div>
+          </header>
+
+          <nav className="tabs-nav">
+            <button className={`tab-btn ${activeTab === 'gen' ? 'active' : ''}`} onClick={() => setActiveTab('gen')}>
+              1. Resource Generation Tokens
+            </button>
+            <button className={`tab-btn ${activeTab === 'sub' ? 'active' : ''}`} onClick={() => setActiveTab('sub')}>
+              2. Subscription Stability (useLatest)
+            </button>
+            <button className={`tab-btn ${activeTab === 'island' ? 'active' : ''}`} onClick={() => setActiveTab('island')}>
+              3. Imperative Island & Echo Mutex
+            </button>
+            <button className={`tab-btn ${activeTab === 'registry' ? 'active' : ''}`} onClick={() => setActiveTab('registry')}>
+              4. Dynamic Keyed Registry
+            </button>
+            <button className={`tab-btn ${activeTab === 'sampling' ? 'active' : ''}`} onClick={() => setActiveTab('sampling')}>
+              5. Latest-Only Event Sampling
+            </button>
+          </nav>
+
+          <div className="dashboard-grid">
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Interactive Pattern Sandbox</h2>
+                <button className="btn" onClick={() => setLogs([])}>Clear Logs</button>
+              </div>
+
+              {activeTab === 'gen' && <ModuleResourceGeneration onLog={appendLog} />}
+              {activeTab === 'sub' && <ModuleSubscriptionStability onLog={appendLog} />}
+              {activeTab === 'island' && <ModuleImperativeIsland onLog={appendLog} />}
+              {activeTab === 'registry' && <ModuleDynamicRegistry onLog={appendLog} />}
+              {activeTab === 'sampling' && <ModulePointerSampling onLog={appendLog} />}
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <h2>Telemetry & Memory Audit</h2>
+                <span className="badge badge-part">Render #{renderCountRef.current}</span>
+              </div>
+              <div className="console-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: 'var(--text-dim)' }}>Ready. Trigger an interactive action to inspect live execution telemetry...</div>
+                ) : (
+                  logs.map((l, idx) => (
+                    <div key={idx} className={`log-entry ${l.type}`}>
+                      <span style={{ color: 'var(--text-dim)' }}>[{l.time}]</span> {l.msg}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

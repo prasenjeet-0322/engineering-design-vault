@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 14 — Advanced Effect Architecture</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    .terminal {
+      background: #050811;
+      border: 1px solid #1a2333;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+    }
+    .log-time { color: #64748b; }
+    .log-event { font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+    .log-warn { color: var(--accent-amber); }
+    .log-error { color: var(--accent-red); }
+    .log-success { color: var(--accent-green); }
+    .log-purple { color: var(--accent-purple); }
+
+    .state-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useSyncExternalStore } = React;
+
+    // --- LOG TERMINAL COMPONENT ---
+    function LogTerminal({ logs, onClear }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [logs]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Architecture Trace</span>
+            <button style={{ padding: "2px 8px", fontSize: "0.72rem" }} onClick={onClear}>Clear</button>
+          </div>
+          <div className="terminal">
+            {logs.length === 0 ? (
+              <div style={{ color: "#475569", fontStyle: "italic" }}>No architectural events recorded yet.</div>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className="log-line">
+                  <span className="log-time">[{log.time}]</span>
+                  <span className={`log-${log.type} log-event`}>{log.event}</span>
+                  <span>{log.message}</span>
+                </div>
+              ))
+            )}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 1: RESOURCE LEDGER & INSTANCE IDENTITY TRACKER
+    // =========================================================================
+    let resourceSeq = 0;
+
+    function ResourceLedgerDemo() {
+      const [channel, setChannel] = useState("ops");
+      const [isMounted, setIsMounted] = useState(true);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. Resource Ledger & Identity Pairing</span>
+            <span className="badge badge-purple">Setup/Cleanup Invariant</span>
+          </div>
+          <p className="card-desc">
+            Every Effect setup instance must pair deterministically with its own cleanup handle. Switch channel or unmount to observe instance identity tracking.
+          </p>
+
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={() => setChannel(c => c === "ops" ? "billing" : "ops")}>
+              🔄 Switch Channel ({channel})
+            </button>
+            <button onClick={() => setIsMounted(m => !m)} style={{ borderColor: isMounted ? "var(--accent-red)" : "var(--accent-green)" }}>
+              {isMounted ? "Unmount Consumer" : "Mount Consumer"}
+            </button>
+          </div>
+
+          <div style={{ background: "#0d131f", padding: 14, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+            {isMounted ? (
+              <TrackedChannelConsumer channel={channel} onLog={addLog} />
+            ) : (
+              <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Consumer is currently unmounted.</div>
+            )}
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    function TrackedChannelConsumer({ channel, onLog }) {
+      useEffect(() => {
+        const instanceId = ++resourceSeq;
+        onLog("SETUP", `Allocated Socket Instance #${instanceId} for [${channel}]`, "green");
+
+        return () => {
+          onLog("CLEANUP", `Released Socket Instance #${instanceId} for [${channel}]`, "warn");
+        };
+      }, [channel]);
+
+      return (
+        <div>
+          <div>Active Channel: <strong style={{ color: "var(--accent-cyan)" }}>{channel}</strong></div>
+          <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Strict Mode development double-invocation verification verified.</div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 2: ADAPTER BOUNDARY & NORMALIZATION CONVERGENCE
+    // =========================================================================
+    function AdapterNormalizationDemo() {
+      const [reactVal, setReactVal] = useState(10); // Number
+      const [normalized, setNormalized] = useState(true);
+      const [logs, setLogs] = useState([]);
+      const loopCount = useRef(0);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      // Simulated external widget with string representation
+      const widgetRef = useRef({
+        value: "10",
+        setValue(val) {
+          this.value = String(val);
+        },
+        getValue() {
+          return this.value;
+        }
+      });
+
+      const handleUserChange = (newNumber) => {
+        loopCount.current = 0;
+        setReactVal(newNumber);
+      };
+
+      useEffect(() => {
+        const widget = widgetRef.current;
+
+        if (normalized) {
+          // NORMALIZED ADAPTER: Strict type conversion & equality check
+          const currentAsNumber = Number(widget.getValue());
+          if (currentAsNumber !== reactVal) {
+            addLog("ADAPTER SYNC", `Pushing normalized ${reactVal} to widget ("${reactVal}")`, "success");
+            widget.setValue(reactVal);
+          } else {
+            addLog("CONVERGED", `Values match (${reactVal} === "${widget.getValue()}"). Bailing out.`, "info");
+          }
+        } else {
+          // UNNORMALIZED: Blind conversion causing ping-pong loop risk
+          loopCount.current++;
+          if (loopCount.current > 5) {
+            addLog("TRIPWIRE", "Oscillation detected! Halting runaway loop.", "error");
+            return;
+          }
+          addLog("UNNORMALIZED SYNC", `Setting raw ${reactVal} on widget (loop step ${loopCount.current})`, "warn");
+          widget.setValue(reactVal);
+        }
+      }, [reactVal, normalized]);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. Adapter Boundary & Normalization</span>
+            <span className={`badge ${normalized ? "badge-green" : "badge-red"}`}>
+              {normalized ? "Normalized Adapter" : "Unnormalized Oscillation"}
+            </span>
+          </div>
+          <p className="card-desc">
+            When external widgets represent data differently (e.g. String vs Number), the Adapter layer normalizes types to prevent feedback oscillations.
+          </p>
+
+          <div className="btn-group">
+            <button className={normalized ? "active" : ""} onClick={() => { setNormalized(true); loopCount.current = 0; }}>
+              🛡️ Enable Adapter Normalization
+            </button>
+            <button className={!normalized ? "active" : ""} onClick={() => { setNormalized(false); loopCount.current = 0; }}>
+              ⚠️ Disable Normalization
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>React Number State:</span>
+            <input 
+              type="number" 
+              value={reactVal} 
+              onChange={e => handleUserChange(Number(e.target.value))} 
+              style={{ width: "120px" }}
+            />
+            <span style={{ fontSize: "0.85rem", color: "var(--accent-purple)", fontFamily: "var(--font-mono)" }}>
+              Widget Internal: "{widgetRef.current.getValue()}" (String)
+            </span>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 3: SHARED RESOURCE OWNERSHIP POOL
+    // =========================================================================
+    class ConnectionPool {
+      constructor() {
+        this.refCount = 0;
+        this.status = "idle";
+        this.listeners = new Set();
+      }
+
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      }
+
+      notify() {
+        this.listeners.forEach(l => l());
+      }
+
+      acquire(clientName) {
+        this.refCount++;
+        if (this.refCount === 1) {
+          this.status = "connected";
+        }
+        this.notify();
+      }
+
+      release(clientName) {
+        this.refCount = Math.max(0, this.refCount - 1);
+        if (this.refCount === 0) {
+          this.status = "idle";
+        }
+        this.notify();
+      }
+    }
+
+    const appConnectionPool = new ConnectionPool();
+
+    function SharedPoolDemo() {
+      const [subA, setSubA] = useState(true);
+      const [subB, setSubB] = useState(true);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      const poolStatus = useSyncExternalStore(
+        appConnectionPool.subscribe.bind(appConnectionPool),
+        () => appConnectionPool.status
+      );
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>3. Shared Resource Ownership Pool</span>
+            <span className={`badge ${poolStatus === "connected" ? "badge-green" : "badge-amber"}`}>
+              Pool Status: {poolStatus.toUpperCase()}
+            </span>
+          </div>
+          <p className="card-desc">
+            Components hold lightweight consumer references. The shared resource is kept alive as long as at least 1 consumer remains mounted.
+          </p>
+
+          <div className="btn-group">
+            <button className={subA ? "active" : ""} onClick={() => setSubA(a => !a)}>
+              {subA ? "Unmount Consumer A" : "Mount Consumer A"}
+            </button>
+            <button className={subB ? "active" : ""} onClick={() => setSubB(b => !b)}>
+              {subB ? "Unmount Consumer B" : "Mount Consumer B"}
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ background: "#0d131f", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+              {subA ? <PoolConsumer name="Consumer A" onLog={addLog} /> : <span style={{ color: "var(--text-muted)" }}>Consumer A Unmounted</span>}
+            </div>
+            <div style={{ background: "#0d131f", padding: 12, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+              {subB ? <PoolConsumer name="Consumer B" onLog={addLog} /> : <span style={{ color: "var(--text-muted)" }}>Consumer B Unmounted</span>}
+            </div>
+          </div>
+
+          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+            Total Active Reference Count: <strong style={{ color: "var(--accent-cyan)" }}>{appConnectionPool.refCount} consumers</strong>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    function PoolConsumer({ name, onLog }) {
+      useEffect(() => {
+        onLog("ACQUIRE", `${name} acquired shared pool handle`, "cyan");
+        appConnectionPool.acquire(name);
+
+        return () => {
+          onLog("RELEASE", `${name} released shared pool handle`, "warn");
+          appConnectionPool.release(name);
+        };
+      }, [name]);
+
+      return <div style={{ color: "var(--accent-green)", fontWeight: 600 }}>🟢 {name} Active</div>;
+    }
+
+    // =========================================================================
+    // DEMO 4: STATE MACHINE PROTOCOL DECOUPLING
+    // =========================================================================
+    class ConnectionStateMachine {
+      constructor() {
+        this.state = "disconnected";
+        this.listeners = new Set();
+        this.timer = null;
+      }
+
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      }
+
+      transition(next) {
+        this.state = next;
+        this.listeners.forEach(l => l());
+      }
+
+      connect() {
+        if (this.state === "connected" || this.state === "connecting") return;
+        this.transition("connecting");
+        
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => {
+          this.transition("connected");
+        }, 1200);
+      }
+
+      simulateFailure() {
+        clearTimeout(this.timer);
+        this.transition("reconnecting");
+
+        this.timer = setTimeout(() => {
+          this.transition("connected");
+        }, 1500);
+      }
+
+      disconnect() {
+        clearTimeout(this.timer);
+        this.transition("disconnected");
+      }
+    }
+
+    const connectionSM = new ConnectionStateMachine();
+
+    function StateMachineDemo() {
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      const status = useSyncExternalStore(
+        connectionSM.subscribe.bind(connectionSM),
+        () => connectionSM.state
+      );
+
+      const getStatusColor = () => {
+        switch (status) {
+          case "connected": return "var(--accent-green)";
+          case "connecting": return "var(--accent-cyan)";
+          case "reconnecting": return "var(--accent-amber)";
+          default: return "var(--accent-red)";
+        }
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>4. State Machine Protocol Decoupling</span>
+            <div className="state-indicator" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${getStatusColor()}`, color: getStatusColor() }}>
+              ● {status.toUpperCase()}
+            </div>
+          </div>
+          <p className="card-desc">
+            Complex network protocols, exponential backoff, and retry timers belong in a decoupled domain state machine, keeping React components declarative and pure.
+          </p>
+
+          <div className="btn-group">
+            <button onClick={() => { connectionSM.connect(); addLog("COMMAND", "Initiated connect() protocol", "cyan"); }}>
+              ⚡ Connect
+            </button>
+            <button onClick={() => { connectionSM.simulateFailure(); addLog("NETWORK ERROR", "Simulated packet drop -> auto-reconnecting", "warn"); }}>
+              💥 Simulate Network Failure
+            </button>
+            <button onClick={() => { connectionSM.disconnect(); addLog("COMMAND", "Closed connection", "error"); }}>
+              🛑 Disconnect
+            </button>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APPLICATION
+    // =========================================================================
+    function App() {
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🏛️</span>
+                Lab 14 — Advanced Effect Architecture
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 4 }}>
+                Diagnostic laboratory exploring resource ledger tracking, adapter normalization, shared pool reference counting, and decoupled state machines.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <span className="badge badge-primary">React 18</span>
+              <span className="badge badge-purple">Architecture</span>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            <ResourceLedgerDemo />
+            <AdapterNormalizationDemo />
+            <SharedPoolDemo />
+            <StateMachineDemo />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

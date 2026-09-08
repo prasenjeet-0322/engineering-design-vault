@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 08 — Effect Cleanup, Resource Ownership & Synchronization Teardown</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-tier { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .badge-cyan { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .control-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.82rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; border-color: var(--accent-cyan); color: #fff; }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    button.danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+    button.purple { background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      font-family: var(--font-mono);
+    }
+
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: #0d1527;
+      color: var(--accent-cyan);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+    }
+
+    .telemetry-box {
+      background: #06090e;
+      border: 1px solid #1f293d;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line { display: flex; gap: 8px; align-items: center; }
+    .log-time { color: var(--text-muted); font-size: 0.75rem; }
+    .log-setup { color: var(--accent-green); font-weight: 600; }
+    .log-cleanup { color: var(--accent-amber); font-weight: 600; }
+    .log-leak { color: var(--accent-red); font-weight: 600; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #0c121e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 4px;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    let globalResId = 1;
+
+    // Component: Managed Resource with Explicit Ownership
+    function ManagedResourceTarget({ roomId, isLeaky, onAcquire, onRelease }) {
+      useEffect(() => {
+        const id = globalResId++;
+        const resourceName = `SocketConnection#${id} (${roomId})`;
+        onAcquire(id, resourceName);
+
+        return () => {
+          if (!isLeaky) {
+            onRelease(id);
+          } else {
+            // Leaky mode: Omit release!
+          }
+        };
+      }, [roomId, isLeaky]);
+
+      return (
+        <div style={{ padding: "14px", background: "#0c1524", borderRadius: "8px", border: "1px solid #1e293b" }}>
+          <div><strong>Active Channel:</strong> <span style={{ color: "var(--accent-cyan)" }}>#{roomId}</span></div>
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "4px" }}>
+            Mode: {isLeaky ? "❌ Leaky Teardown (Simulating Missing Cleanup)" : "✅ Symmetrical Teardown"}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [roomId, setRoomId] = useState("general");
+      const [isMounted, setIsMounted] = useState(true);
+      const [isLeaky, setIsLeaky] = useState(false);
+      const [resources, setResources] = useState([]);
+      const [logs, setLogs] = useState([]);
+
+      const logMessage = (text, type) => {
+        const time = new Date().toLocaleTimeString();
+        setLogs(prev => [{ id: Math.random(), time, text, type }, ...prev.slice(0, 39)]);
+      };
+
+      const handleAcquire = (id, name) => {
+        logMessage(`[SETUP] Acquired ${name}`, "setup");
+        setResources(prev => [...prev, { id, name, created: new Date().toLocaleTimeString(), released: null, status: "ACTIVE" }]);
+      };
+
+      const handleRelease = (id) => {
+        logMessage(`[CLEANUP] Released Resource #${id}`, "cleanup");
+        setResources(prev => prev.map(r => r.id === id ? { ...r, released: new Date().toLocaleTimeString(), status: "RELEASED" } : r));
+      };
+
+      const activeCount = resources.filter(r => r.status === "ACTIVE").length;
+      const totalCreated = resources.length;
+      const totalReleased = resources.filter(r => r.status === "RELEASED").length;
+      const isLeaking = !isMounted && activeCount > 0;
+
+      const resetAll = () => {
+        setResources([]);
+        setLogs([]);
+      };
+
+      return (
+        <div className="container">
+          <div className="header-banner">
+            <div>
+              <h1>
+                <span>⚡</span> KPI 06 — PART 08: Effect Cleanup & Resource Ownership Lab
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                Interactive Resource Ownership Ledger, Symmetrical Teardown, and Real-time Leak Detector
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-tier">Must Know</span>
+              <span className="badge badge-cyan">React 18</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2>
+              <span>Lifecycle & Ownership Controls</span>
+              <span className="badge badge-cyan">Interactive Panel</span>
+            </h2>
+
+            <div className="control-panel">
+              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Switch Room Prop:</span>
+              {["general", "engineering", "ops"].map(r => (
+                <button key={r} className={roomId === r ? "active" : ""} onClick={() => setRoomId(r)}>
+                  #{r}
+                </button>
+              ))}
+            </div>
+
+            <div className="control-panel">
+              <button
+                className={isMounted ? "danger" : "active"}
+                onClick={() => setIsMounted(!isMounted)}
+              >
+                {isMounted ? "Unmount Component" : "Mount Component"}
+              </button>
+              <button
+                className={isLeaky ? "danger active" : ""}
+                onClick={() => setIsLeaky(!isLeaky)}
+              >
+                {isLeaky ? "⚠️ Leaky Cleanup: ON" : "✅ Symmetrical Cleanup: ON"}
+              </button>
+              <button onClick={resetAll}>Reset Ledger</button>
+            </div>
+
+            {isMounted ? (
+              <ManagedResourceTarget
+                roomId={roomId}
+                isLeaky={isLeaky}
+                onAcquire={handleAcquire}
+                onRelease={handleRelease}
+              />
+            ) : (
+              <div style={{ padding: "14px", background: "#0c1524", borderRadius: "8px", color: "var(--text-muted)", textAlign: "center", fontStyle: "italic" }}>
+                Component unmounted. All owned resources should be in RELEASED state!
+              </div>
+            )}
+          </div>
+
+          <div className="grid-2">
+            {/* Panel B: Resource Ownership Ledger */}
+            <div className="card">
+              <h2>
+                <span>1. Resource Ownership Ledger</span>
+                <span className={`badge ${isLeaking ? "badge-tier" : "badge-green"}`}>
+                  {isLeaking ? "⚠️ LEAK DETECTED" : "HEALTHY"}
+                </span>
+              </h2>
+
+              <div className="stats-row">
+                <div className="stat-card">
+                  <div className="stat-label">Created</div>
+                  <div className="stat-val" style={{ color: "var(--accent-cyan)" }}>{totalCreated}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Released</div>
+                  <div className="stat-val" style={{ color: "var(--accent-green)" }}>{totalReleased}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Active Handles</div>
+                  <div className="stat-val" style={{ color: activeCount > 1 || isLeaking ? "var(--accent-red)" : "var(--accent-purple)" }}>
+                    {activeCount}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Resource Name</th>
+                      <th>Acquired</th>
+                      <th>Released</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resources.length === 0 ? (
+                      <tr><td colSpan="5" style={{ textAlign: "center", color: "var(--text-muted)", fontStyle: "italic" }}>No resources recorded.</td></tr>
+                    ) : (
+                      resources.map(r => (
+                        <tr key={r.id}>
+                          <td>#{r.id}</td>
+                          <td><strong>{r.name}</strong></td>
+                          <td>{r.created}</td>
+                          <td>{r.released || "—"}</td>
+                          <td>
+                            <span className={`badge ${r.status === "ACTIVE" ? "badge-cyan" : "badge-green"}`}>
+                              {r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Panel C: Telemetry & Invariant Audit */}
+            <div className="card">
+              <h2>
+                <span>2. Teardown Telemetry Log</span>
+                <span className="badge badge-cyan">Audit Log</span>
+              </h2>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Live Telemetry:</span>
+                <button onClick={() => setLogs([])} style={{ padding: "4px 8px", fontSize: "0.75rem" }}>Clear</button>
+              </div>
+
+              <div className="telemetry-box">
+                {logs.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>No telemetry events recorded.</div>
+                ) : (
+                  logs.map(l => (
+                    <div key={l.id} className="log-line">
+                      <span className="log-time">[{l.time}]</span>
+                      <span className={`log-${l.type}`}>{l.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ background: "#0d1527", border: "1px dashed var(--accent-cyan)", borderRadius: "8px", padding: "14px", fontSize: "0.85rem" }}>
+                <strong style={{ color: "var(--accent-cyan)" }}>Teardown Invariant:</strong>
+                <p style={{ marginTop: "4px" }}>
+                  Whenever <code>roomId</code> changes, the previous synchronization instance is cleanly terminated before the new one is acquired. On unmount, all owned resources are released: <code>Created IDs === Released IDs</code>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

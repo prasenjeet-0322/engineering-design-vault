@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 08 / Part 01 Lab — Forms as State Ownership & Controlled Input Mental Model</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+    }
+
+    /* Grid */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Buttons */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      border-color: #6366f1;
+      color: #fff;
+      box-shadow: 0 2px 10px var(--accent-primary-glow);
+    }
+
+    button.emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    button.cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.35);
+      color: #22d3ee;
+    }
+
+    button.amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    button.rose {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: #fb7185;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Inputs */
+    input[type="text"], input[type="password"] {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]:focus, input[type="password"]:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-glow);
+    }
+
+    /* Metrics Grid */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-box {
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-top: 4px;
+    }
+
+    /* Terminal Console */
+    .terminal-window {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-top: 14px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: #64748b;
+      min-width: 65px;
+    }
+    .log-cmd {
+      color: #818cf8;
+      font-weight: 600;
+    }
+    .log-info {
+      color: #22d3ee;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .log-err {
+      color: #f43f5e;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-titles">
+        <h1>
+          <span>📝 Forms as State Ownership & Controlled Inputs</span>
+        </h1>
+        <div class="subtitle">KPI 08 · Part 01 Companion Lab — Controlled vs Uncontrolled Mechanics, Feedback Loops & Validation</div>
+      </div>
+      <div>
+        <span class="badge badge-primary">Level 06 Core Competency</span>
+      </div>
+    </header>
+
+    <!-- Top Grid: Keystroke Feedback Loop vs Controlled vs Uncontrolled Comparison -->
+    <div class="grid-2col">
+      <!-- Panel 1: Keystroke Feedback Loop Visualizer -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. The Controlled Input Feedback Loop</span>
+          <span class="status-pill" id="loopStatusBadge" style="background: rgba(99,102,241,0.15); color:#818cf8;">Loop Active</span>
+        </div>
+        <p class="card-desc">
+          Type below. The browser fires <code>onChange</code> ➔ React queues state update ➔ Reconciles virtual DOM ➔ Recommits new <code>value</code> property to DOM.
+        </p>
+
+        <div style="margin-bottom: 12px;">
+          <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">CONTROLLED INPUT: <code>&lt;input value={name} onChange={...} /&gt;</code></label>
+          <input type="text" id="loopInput" value="React" style="width:100%; font-size:1rem;">
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">React State</span>
+            <span class="metric-value" id="reactStateVal" style="color:#38bdf8;">"React"</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Event e.target.value</span>
+            <span class="metric-value" id="eventTargetVal" style="color:#f59e0b;">"React"</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">State Renders</span>
+            <span class="metric-value" id="renderCountVal" style="color:#10b981;">1</span>
+          </div>
+        </div>
+
+        <div class="terminal-window" id="loopTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[StateSync] Initial state = "React". Feedback loop listening.</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Controlled vs Uncontrolled Comparison Deck -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Controlled vs Uncontrolled Comparison</span>
+          <span class="status-pill" style="background: rgba(6,182,212,0.15); color:#22d3ee;">Dual Engine</span>
+        </div>
+        <p class="card-desc">
+          Compare state-owned controlled inputs (live renders) vs DOM-owned uncontrolled inputs (zero re-renders until read via ref/form submit).
+        </p>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="font-size:0.75rem; color:#818cf8; display:block; margin-bottom:4px;">CONTROLLED (State)</label>
+            <input type="text" id="compControlled" placeholder="Type here..." style="width:100%;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:#34d399; display:block; margin-bottom:4px;">UNCONTROLLED (DOM)</label>
+            <input type="text" id="compUncontrolled" defaultValue="DOM Owned" style="width:100%;">
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Controlled Renders</span>
+            <span class="metric-value" id="controlledRendersVal" style="color:#818cf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Uncontrolled Renders</span>
+            <span class="metric-value" id="uncontrolledRendersVal" style="color:#34d399;">0</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="emerald" id="btnReadUncontrolled">🔍 Read Uncontrolled via Ref</button>
+        </div>
+
+        <div class="terminal-window" id="compTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Comparison] Ready. Type in both inputs to observe render counts.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid: Frozen Input Hazards vs Synchronous Derived Validation -->
+    <div class="grid-2col">
+      <!-- Panel 3: Frozen Input & "Fighting the User" Hazards -->
+      <div class="card">
+        <div class="card-title">
+          <span>3. Frozen Input & Anti-Pattern Traps</span>
+          <span class="badge" style="background: rgba(244,63,94,0.15); color:#fb7185;">Anti-Pattern Sandbox</span>
+        </div>
+        <p class="card-desc">
+          When <code>value</code> is passed without an <code>onChange</code> handler, React forces the value back to state, creating a frozen read-only field.
+        </p>
+
+        <div style="margin-bottom: 12px;">
+          <label style="font-size:0.75rem; color:#f43f5e; display:block; margin-bottom:4px;">FROZEN FIELD: <code>&lt;input value="LOCKED_VAL" /&gt; (No onChange)</code></label>
+          <input type="text" id="frozenInput" value="LOCKED_VAL" style="width:100%;">
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Enforced State</span>
+            <span class="metric-value" style="color:#f43f5e; font-size:0.9rem;">"LOCKED_VAL"</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Rejected Keystrokes</span>
+            <span class="metric-value" id="rejectedKeystrokesVal" style="color:#f43f5e;">0</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="rose" id="btnAttemptEdit">❌ Attempt Typing in Frozen Field</button>
+        </div>
+
+        <div class="terminal-window" id="frozenTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-warn">[Warning] You provided a 'value' prop to a form field without an 'onChange' handler.</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 4: Synchronous Derived Validation Deck -->
+      <div class="card">
+        <div class="card-title">
+          <span>4. Synchronous Derived Validation</span>
+          <span class="status-pill" id="valStatusBadge" style="background: rgba(245,158,11,0.15); color:#fbbf24;">Invalid Form</span>
+        </div>
+        <p class="card-desc">
+          Validation is derived synchronously during render (<code>passwordsMatch = p1 === p2</code>) without creating redundant state variables or laggy <code>useEffect</code> synchronizations.
+        </p>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">PASSWORD (Min 8 chars)</label>
+            <input type="password" id="valPassword" placeholder="••••••••" style="width:100%;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">CONFIRM PASSWORD</label>
+            <input type="password" id="valConfirm" placeholder="••••••••" style="width:100%;">
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Passwords Match</span>
+            <span class="metric-value" id="matchStatusVal" style="color:#f43f5e;">false</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Submit Button</span>
+            <span class="metric-value" id="submitBtnStatus" style="color:#94a3b8; font-size:0.9rem;">Disabled</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnSubmitForm" disabled>🚀 Register Account</button>
+        </div>
+
+        <div class="terminal-window" id="valTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Validation] Synchronous render calculation active.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getTime() {
+      const d = new Date();
+      return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0').slice(0,2);
+    }
+
+    function log(terminalId, cmd, info, type = 'info') {
+      const term = document.getElementById(terminalId);
+      if (!term) return;
+      const row = document.createElement('div');
+      row.className = 'log-line';
+      row.innerHTML = `<span class="log-time">${getTime()}</span><span class="log-cmd">${cmd}</span><span class="log-${type}">${info}</span>`;
+      term.appendChild(row);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // --- PANEL 1: CONTROLLED FEEDBACK LOOP ---
+    let loopState = "React";
+    let loopRenders = 1;
+    const loopInput = document.getElementById('loopInput');
+    const reactStateVal = document.getElementById('reactStateVal');
+    const eventTargetVal = document.getElementById('eventTargetVal');
+    const renderCountVal = document.getElementById('renderCountVal');
+
+    loopInput.addEventListener('input', (e) => {
+      const physicalVal = e.target.value;
+      eventTargetVal.textContent = `"${physicalVal}"`;
+      
+      // State transition
+      loopState = physicalVal;
+      loopRenders++;
+      reactStateVal.textContent = `"${loopState}"`;
+      renderCountVal.textContent = loopRenders;
+
+      log('loopTerminal', 'onChange(e.target.value)', `Keystroke -> State updated to "${loopState}" -> Render #${loopRenders}`, 'info');
+    });
+
+    // --- PANEL 2: CONTROLLED VS UNCONTROLLED ---
+    let compControlledRenders = 0;
+    const compControlled = document.getElementById('compControlled');
+    const compUncontrolled = document.getElementById('compUncontrolled');
+    const controlledRendersVal = document.getElementById('controlledRendersVal');
+    const uncontrolledRendersVal = document.getElementById('uncontrolledRendersVal');
+
+    compControlled.addEventListener('input', (e) => {
+      compControlledRenders++;
+      controlledRendersVal.textContent = compControlledRenders;
+      log('compTerminal', 'Controlled Keystroke', `State update triggered Render #${compControlledRenders}`, 'info');
+    });
+
+    compUncontrolled.addEventListener('input', () => {
+      // DOM handles it without React state
+      uncontrolledRendersVal.textContent = '0 (Zero Render)';
+    });
+
+    document.getElementById('btnReadUncontrolled').addEventListener('click', () => {
+      const val = compUncontrolled.value;
+      log('compTerminal', 'ref.current.value', `Read on demand: "${val}" (Zero prior renders triggered during typing).`, 'emerald');
+    });
+
+    // --- PANEL 3: FROZEN INPUT ---
+    const frozenInput = document.getElementById('frozenInput');
+    const rejectedKeystrokesVal = document.getElementById('rejectedKeystrokesVal');
+    let rejectedCount = 0;
+
+    frozenInput.addEventListener('keydown', (e) => {
+      if (['Shift', 'Control', 'Alt', 'Meta', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault(); // Simulates React overriding back to value
+      rejectedCount++;
+      rejectedKeystrokesVal.textContent = rejectedCount;
+      log('frozenTerminal', `Blocked '${e.key}'`, `React resets DOM property to "LOCKED_VAL" because no onChange handler exists.`, 'err');
+    });
+
+    document.getElementById('btnAttemptEdit').addEventListener('click', () => {
+      frozenInput.focus();
+      log('frozenTerminal', 'Focused Field', 'Try typing into the locked field above.', 'warn');
+    });
+
+    // --- PANEL 4: SYNCHRONOUS DERIVED VALIDATION ---
+    const valPassword = document.getElementById('valPassword');
+    const valConfirm = document.getElementById('valConfirm');
+    const matchStatusVal = document.getElementById('matchStatusVal');
+    const submitBtnStatus = document.getElementById('submitBtnStatus');
+    const valStatusBadge = document.getElementById('valStatusBadge');
+    const btnSubmitForm = document.getElementById('btnSubmitForm');
+
+    function deriveValidation() {
+      const p1 = valPassword.value;
+      const p2 = valConfirm.value;
+
+      const hasMinLength = p1.length >= 8;
+      const passwordsMatch = p1.length > 0 && p1 === p2;
+      const isValid = hasMinLength && passwordsMatch;
+
+      matchStatusVal.textContent = passwordsMatch ? 'true' : 'false';
+      matchStatusVal.style.color = passwordsMatch ? '#10b981' : '#f43f5e';
+
+      if (isValid) {
+        btnSubmitForm.disabled = false;
+        submitBtnStatus.textContent = 'Enabled ✅';
+        submitBtnStatus.style.color = '#10b981';
+        valStatusBadge.textContent = 'Valid Form';
+        valStatusBadge.style.background = 'rgba(16,185,129,0.15)';
+        valStatusBadge.style.color = '#34d399';
+        log('valTerminal', 'Derived Valid', 'Synchronously derived validity: Form ready for submission.', 'emerald');
+      } else {
+        btnSubmitForm.disabled = true;
+        submitBtnStatus.textContent = 'Disabled';
+        submitBtnStatus.style.color = '#94a3b8';
+        valStatusBadge.textContent = 'Invalid Form';
+        valStatusBadge.style.background = 'rgba(245,158,11,0.15)';
+        valStatusBadge.style.color = '#fbbf24';
+      }
+    }
+
+    valPassword.addEventListener('input', deriveValidation);
+    valConfirm.addEventListener('input', deriveValidation);
+
+    btnSubmitForm.addEventListener('click', () => {
+      alert('Registration Successful! Payload submitted.');
+      log('valTerminal', 'POST /register', 'Submitted valid credentials snapshot.', 'emerald');
+    });
+  </script>
+</body>
+</html>

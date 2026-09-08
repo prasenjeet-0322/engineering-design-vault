@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 12 — External Store Synchronization</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-amber { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .terminal {
+      background: #050811;
+      border: 1px solid #1a2333;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+    }
+    .log-time { color: #64748b; }
+    .log-event { font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+    .log-warn { color: var(--accent-amber); }
+    .log-error { color: var(--accent-red); }
+    .log-success { color: var(--accent-green); }
+    .log-purple { color: var(--accent-purple); }
+
+    .slice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .slice-box {
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .slice-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+    .slice-val { font-size: 1.2rem; font-weight: 700; font-family: var(--font-mono); color: #fff; }
+    .slice-renders { font-size: 0.72rem; color: var(--accent-amber); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useSyncExternalStore, useRef, useCallback } = React;
+
+    // --- LOG TERMINAL COMPONENT ---
+    function LogTerminal({ logs, onClear }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [logs]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Store Event Audit</span>
+            <button style={{ padding: "2px 8px", fontSize: "0.72rem" }} onClick={onClear}>Clear</button>
+          </div>
+          <div className="terminal">
+            {logs.length === 0 ? (
+              <div style={{ color: "#475569", fontStyle: "italic" }}>No store updates recorded yet.</div>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className="log-line">
+                  <span className="log-time">[{log.time}]</span>
+                  <span className={`log-${log.type} log-event`}>{log.event}</span>
+                  <span>{log.message}</span>
+                </div>
+              ))
+            )}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // STORE 1: GLOBAL IMMUTABLE STATE CONTAINER (External Store Primitive)
+    // =========================================================================
+    function createExternalStore(initialState) {
+      let state = initialState;
+      const listeners = new Set();
+
+      return {
+        getState() {
+          return state;
+        },
+        setState(updater) {
+          state = typeof updater === "function" ? updater(state) : updater;
+          listeners.forEach(listener => listener());
+        },
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        }
+      };
+    }
+
+    const appStore = createExternalStore({
+      count: 0,
+      user: "Srikar",
+      theme: "dark",
+      status: "idle"
+    });
+
+    // =========================================================================
+    // DEMO 1: useSyncExternalStore VS AD-HOC useEffect SUBSCRIPTION
+    // =========================================================================
+    function AdHocVsSyncStoreDemo() {
+      const [method, setMethod] = useState("uSES"); // "uSES" vs "useEffect"
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      // Consumers
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. Canonical useSyncExternalStore vs Ad-Hoc useEffect</span>
+            <span className={`badge ${method === "uSES" ? "badge-green" : "badge-amber"}`}>
+              {method === "uSES" ? "useSyncExternalStore (Concurrent Safe)" : "useEffect (Ad-Hoc Subscription)"}
+            </span>
+          </div>
+          <p className="card-desc">
+            <code>useSyncExternalStore</code> guarantees atomic synchronous snapshot evaluation during render without tearing, passive delay, or hydration drift.
+          </p>
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div className="btn-group">
+              <button className={method === "uSES" ? "active" : ""} onClick={() => setMethod("uSES")}>
+                ✅ useSyncExternalStore
+              </button>
+              <button className={method === "useEffect" ? "active" : ""} onClick={() => setMethod("useEffect")}>
+                ⚠️ useEffect + useState
+              </button>
+            </div>
+
+            <button 
+              onClick={() => {
+                appStore.setState(s => ({ ...s, count: s.count + 1 }));
+                addLog("STORE DISPATCH", `Incremented count to ${appStore.getState().count}`, "purple");
+              }}
+              style={{ borderColor: "var(--accent-cyan)" }}
+            >
+              ➕ Mutate Store Count ({appStore.getState().count})
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ background: "#0d131f", padding: 14, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Subscriber Component A</span>
+              {method === "uSES" ? (
+                <SyncConsumer title="Sub A" onLog={addLog} />
+              ) : (
+                <AdHocConsumer title="Sub A" onLog={addLog} />
+              )}
+            </div>
+            <div style={{ background: "#0d131f", padding: 14, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Subscriber Component B</span>
+              {method === "uSES" ? (
+                <SyncConsumer title="Sub B" onLog={addLog} />
+              ) : (
+                <AdHocConsumer title="Sub B" onLog={addLog} />
+              )}
+            </div>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    function SyncConsumer({ title, onLog }) {
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      const count = useSyncExternalStore(
+        appStore.subscribe,
+        () => appStore.getState().count
+      );
+
+      return (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>
+            Count: {count}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+            Render Count: <strong style={{ color: "#fff" }}>{renderCount.current}</strong>
+          </div>
+        </div>
+      );
+    }
+
+    function AdHocConsumer({ title, onLog }) {
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      const [count, setCount] = useState(appStore.getState().count);
+
+      useEffect(() => {
+        const unsubscribe = appStore.subscribe(() => {
+          setCount(appStore.getState().count);
+        });
+        return unsubscribe;
+      }, []);
+
+      return (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--accent-amber)", fontFamily: "var(--font-mono)" }}>
+            Count: {count}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+            Render Count: <strong style={{ color: "#fff" }}>{renderCount.current}</strong> (1 frame passive delay)
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 2: SNAPSHOT IDENTITY & LOOP CIRCUIT BREAKER
+    // =========================================================================
+    let unstableRawStore = { value: 42 };
+
+    function SnapshotIdentityDemo() {
+      const [mode, setMode] = useState("stable"); // "stable" vs "unstable"
+      const [renderAttempts, setRenderAttempts] = useState(0);
+      const [tripped, setTripped] = useState(false);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. Snapshot Identity & Infinite Render Loop Safety</span>
+            <span className={`badge ${mode === "stable" ? "badge-green" : "badge-red"}`}>
+              {mode === "stable" ? "Stable Snapshot Identity" : "Unstable Object Allocation"}
+            </span>
+          </div>
+          <p className="card-desc">
+            If <code>getSnapshot()</code> allocates and returns a new object on every call, <code>Object.is</code> evaluates to false, causing React to loop infinitely.
+          </p>
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div className="btn-group">
+              <button 
+                className={mode === "stable" ? "active" : ""}
+                onClick={() => { setMode("stable"); setTripped(false); setRenderAttempts(0); }}
+              >
+                ✅ Stable Snapshot
+              </button>
+              <button 
+                className={mode === "unstable" ? "active" : ""}
+                onClick={() => { setMode("unstable"); setTripped(false); setRenderAttempts(0); }}
+              >
+                ❌ Unstable Snapshot (Loop Risk)
+              </button>
+            </div>
+          </div>
+
+          <div style={{ background: "#0d131f", padding: 14, borderRadius: 8, border: "1px solid var(--border-color)" }}>
+            {!tripped ? (
+              <IdentitySubscriber mode={mode} onTrip={() => setTripped(true)} onLog={addLog} />
+            ) : (
+              <div style={{ color: "var(--accent-red)", fontWeight: 700 }}>
+                🚨 CIRCUIT BREAKER TRIPPED: React detected maximum update depth exceeded due to unstable snapshot allocation!
+              </div>
+            )}
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // Stable snapshot cached reference
+    let cachedStableSnapshot = { val: 42 };
+
+    function IdentitySubscriber({ mode, onTrip, onLog }) {
+      const renderPasses = useRef(0);
+      renderPasses.current++;
+
+      if (renderPasses.current > 8 && mode === "unstable") {
+        onTrip();
+        return null;
+      }
+
+      const snapshotValue = useSyncExternalStore(
+        (cb) => () => {}, // empty subscription for demo
+        () => {
+          if (mode === "stable") {
+            return cachedStableSnapshot; // SAME REFERENCE!
+          } else {
+            return { val: 42 }; // NEW OBJECT EVERY CALL!
+          }
+        }
+      );
+
+      return (
+        <div>
+          <div>Snapshot Read Value: <strong style={{ color: "var(--accent-cyan)" }}>{snapshotValue.val}</strong></div>
+          <div>Render Executions: <strong style={{ color: renderPasses.current > 3 ? "var(--accent-red)" : "var(--accent-green)" }}>{renderPasses.current}</strong></div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 3: BROWSER API SUBSCRIPTION (navigator.onLine)
+    // =========================================================================
+    function subscribeOnlineStatus(callback) {
+      window.addEventListener("online", callback);
+      window.addEventListener("offline", callback);
+      return () => {
+        window.removeEventListener("online", callback);
+        window.removeEventListener("offline", callback);
+      };
+    }
+
+    function useOnlineStatus() {
+      return useSyncExternalStore(
+        subscribeOnlineStatus,
+        () => navigator.onLine,
+        () => true // SSR fallback
+      );
+    }
+
+    function BrowserApiStoreDemo() {
+      const isOnline = useOnlineStatus();
+      const [simulatedStatus, setSimulatedStatus] = useState(null);
+
+      const effectiveOnline = simulatedStatus !== null ? simulatedStatus : isOnline;
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>3. Browser API Synchronization (navigator.onLine)</span>
+            <span className={`badge ${effectiveOnline ? "badge-green" : "badge-red"}`}>
+              {effectiveOnline ? "ONLINE" : "OFFLINE"}
+            </span>
+          </div>
+          <p className="card-desc">
+            Browser globals with native events (e.g. <code>window.online</code>, <code>matchMedia</code>) are external stores. <code>useSyncExternalStore</code> wraps them with zero boilerplate.
+          </p>
+
+          <div className="btn-group">
+            <button 
+              className={simulatedStatus === true ? "active" : ""}
+              onClick={() => setSimulatedStatus(true)}
+            >
+              Simulate Online
+            </button>
+            <button 
+              className={simulatedStatus === false ? "active" : ""}
+              onClick={() => setSimulatedStatus(false)}
+            >
+              Simulate Offline
+            </button>
+            <button onClick={() => setSimulatedStatus(null)}>
+              Reset to Native Hardware Status
+            </button>
+          </div>
+
+          <div style={{ background: "#0d131f", padding: 14, borderRadius: 8, border: "1px solid var(--border-color)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>Hardware Connection: <strong style={{ color: isOnline ? "var(--accent-green)" : "var(--accent-red)" }}>{isOnline ? "Connected" : "Disconnected"}</strong></div>
+            <div>Effective Status: <strong style={{ color: effectiveOnline ? "var(--accent-green)" : "var(--accent-red)" }}>{effectiveOnline ? "ONLINE (200 OK)" : "OFFLINE (Network Disconnected)"}</strong></div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 4: SELECTOR GRANULARITY & SLICE ISOLATION
+    // =========================================================================
+    function SelectorGranularityDemo() {
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>4. Selector Granularity & Independent Slices</span>
+            <span className="badge badge-purple">Selective Re-rendering</span>
+          </div>
+          <p className="card-desc">
+            Mutating <code>user</code> or <code>theme</code> in the shared store notifies all subscribers, but components selecting <code>count</code> bail out with <strong>zero re-renders</strong>!
+          </p>
+
+          <div className="btn-group">
+            <button 
+              onClick={() => {
+                appStore.setState(s => ({ ...s, count: s.count + 1 }));
+                addLog("MUTATE COUNT", "Incremented count", "info");
+              }}
+            >
+              ➕ Mutate Count
+            </button>
+            <button 
+              onClick={() => {
+                const names = ["Srikar", "Prasenjeet", "Alex", "Jordan"];
+                const next = names[Math.floor(Math.random() * names.length)];
+                appStore.setState(s => ({ ...s, user: next }));
+                addLog("MUTATE USER", `Set user to "${next}"`, "purple");
+              }}
+            >
+              👤 Randomize User
+            </button>
+            <button 
+              onClick={() => {
+                appStore.setState(s => ({ ...s, theme: s.theme === "dark" ? "light" : "dark" }));
+                addLog("MUTATE THEME", "Toggled theme", "amber");
+              }}
+            >
+              🎨 Toggle Theme
+            </button>
+          </div>
+
+          <div className="slice-grid">
+            <CountSliceSubscriber />
+            <UserSliceSubscriber />
+            <ThemeSliceSubscriber />
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    function CountSliceSubscriber() {
+      const renders = useRef(0);
+      renders.current++;
+
+      const count = useSyncExternalStore(
+        appStore.subscribe,
+        () => appStore.getState().count
+      );
+
+      return (
+        <div className="slice-box">
+          <span className="slice-label">Slice: state.count</span>
+          <span className="slice-val" style={{ color: "var(--accent-cyan)" }}>{count}</span>
+          <span className="slice-renders">Renders: {renders.current}</span>
+        </div>
+      );
+    }
+
+    function UserSliceSubscriber() {
+      const renders = useRef(0);
+      renders.current++;
+
+      const user = useSyncExternalStore(
+        appStore.subscribe,
+        () => appStore.getState().user
+      );
+
+      return (
+        <div className="slice-box">
+          <span className="slice-label">Slice: state.user</span>
+          <span className="slice-val" style={{ color: "var(--accent-purple)" }}>{user}</span>
+          <span className="slice-renders">Renders: {renders.current}</span>
+        </div>
+      );
+    }
+
+    function ThemeSliceSubscriber() {
+      const renders = useRef(0);
+      renders.current++;
+
+      const theme = useSyncExternalStore(
+        appStore.subscribe,
+        () => appStore.getState().theme
+      );
+
+      return (
+        <div className="slice-box">
+          <span className="slice-label">Slice: state.theme</span>
+          <span className="slice-val" style={{ color: "var(--accent-amber)" }}>{theme}</span>
+          <span className="slice-renders">Renders: {renders.current}</span>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APP
+    // =========================================================================
+    function App() {
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>📦</span>
+                Lab 12 — External Store Synchronization
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 4 }}>
+                Diagnostic laboratory exploring <code>useSyncExternalStore</code>, snapshot referential stability, tearing prevention, and granular selector slices.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <span className="badge badge-primary">React 18</span>
+              <span className="badge badge-purple">useSyncExternalStore</span>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            <AdHocVsSyncStoreDemo />
+            <SnapshotIdentityDemo />
+            <BrowserApiStoreDemo />
+            <SelectorGranularityDemo />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

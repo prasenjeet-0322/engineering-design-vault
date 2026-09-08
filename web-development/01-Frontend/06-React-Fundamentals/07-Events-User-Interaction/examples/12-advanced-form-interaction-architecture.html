@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 12 — Advanced Form Interaction Architecture</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .form-group label .meta-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent-purple);
+    }
+
+    input[type="text"], input[type="password"], select {
+      background-color: #0b111c;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, input[type="password"]:focus, select:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    input.input-error, select.input-error {
+      border-color: var(--accent-red) !important;
+    }
+
+    .error-text {
+      color: var(--accent-red);
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background-color: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary {
+      background-color: #0284c7;
+      border-color: var(--accent-cyan);
+    }
+
+    button.btn-primary:hover:not(:disabled) {
+      background-color: #0369a1;
+    }
+
+    button.btn-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      border-color: var(--accent-red);
+      color: #fca5a5;
+    }
+
+    button.btn-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      border-color: var(--accent-amber);
+      color: #fcd34d;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .status-idle { background: rgba(156, 163, 175, 0.15); color: #d1d5db; }
+    .status-submitting { background: rgba(56, 189, 248, 0.18); color: var(--accent-cyan); }
+    .status-success { background: rgba(34, 197, 94, 0.18); color: var(--accent-green); }
+    .status-error { background: rgba(239, 68, 68, 0.18); color: var(--accent-red); }
+
+    .state-tree {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #93c5fd;
+      overflow-x: auto;
+      max-height: 380px;
+    }
+
+    .log-container {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .log-item {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--accent-purple);
+      font-weight: 600;
+    }
+
+    .dynamic-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dynamic-item {
+      background: #0b111c;
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 8px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .metric-num {
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useReducer, useRef } = React;
+
+    const COUNTRY_STATES = {
+      US: ["California", "New York", "Texas", "Washington"],
+      IN: ["Karnataka", "Maharashtra", "Delhi", "Telangana"],
+      DE: ["Bavaria", "Berlin", "Hesse"]
+    };
+
+    const initialFormState = {
+      values: {
+        email: "srikar@example.com",
+        password: "secretpassword123",
+        confirmPassword: "secretpassword123",
+        country: "US",
+        state: "California",
+        termsAccepted: true
+      },
+      metadata: {
+        touched: {
+          email: false,
+          password: false,
+          confirmPassword: false,
+          country: false,
+          state: false,
+          termsAccepted: false
+        }
+      },
+      serverErrors: {
+        fieldErrors: {},
+        formError: null
+      },
+      submission: {
+        status: "idle", // idle | submitting | success | error
+        requestId: 0,
+        lastSubmittedAt: null
+      },
+      addresses: [
+        { id: "addr-1", label: "Primary HQ", street: "100 Tech Blvd", city: "San Francisco" },
+        { id: "addr-2", label: "Branch Lab", street: "45 Innovation Way", city: "Seattle" }
+      ]
+    };
+
+    function formReducer(state, action) {
+      switch (action.type) {
+        // FIELD VALUE TRANSITIONS
+        case "FIELD_CHANGED":
+          return {
+            ...state,
+            values: { ...state.values, [action.field]: action.value },
+            serverErrors: {
+              ...state.serverErrors,
+              fieldErrors: { ...state.serverErrors.fieldErrors, [action.field]: null }
+            },
+            submission: state.submission.status === "success" ? { ...state.submission, status: "idle" } : state.submission
+          };
+
+        case "COUNTRY_CHANGED":
+          // INVARIANT ENFORCEMENT: Changing country clears dependent state selection
+          return {
+            ...state,
+            values: {
+              ...state.values,
+              country: action.country,
+              state: "" // Atomically reset invalid child state
+            },
+            metadata: {
+              ...state.metadata,
+              touched: { ...state.metadata.touched, country: true, state: false }
+            }
+          };
+
+        // METADATA TRANSITIONS
+        case "FIELD_BLURRED":
+          return {
+            ...state,
+            metadata: {
+              ...state.metadata,
+              touched: { ...state.metadata.touched, [action.field]: true }
+            }
+          };
+
+        // SUBMISSION LIFECYCLE
+        case "SUBMIT_REQUESTED":
+          return {
+            ...state,
+            submission: {
+              status: "submitting",
+              requestId: action.requestId,
+              lastSubmittedAt: new Date().toLocaleTimeString()
+            },
+            serverErrors: { fieldErrors: {}, formError: null },
+            metadata: {
+              ...state.metadata,
+              touched: {
+                email: true,
+                password: true,
+                confirmPassword: true,
+                country: true,
+                state: true,
+                termsAccepted: true
+              }
+            }
+          };
+
+        case "SUBMIT_SUCCEEDED":
+          // INVARIANT CHECK: Only authoritative active request ID commits
+          if (action.requestId !== state.submission.requestId) {
+            console.warn(`[STALE SUBMISSION REJECTED] Req ${action.requestId} ignored; active is ${state.submission.requestId}`);
+            return state;
+          }
+          return {
+            ...state,
+            submission: {
+              ...state.submission,
+              status: "success"
+            },
+            serverErrors: { fieldErrors: {}, formError: null }
+          };
+
+        case "SUBMIT_FAILED":
+          if (action.requestId !== state.submission.requestId) return state;
+          return {
+            ...state,
+            submission: {
+              ...state.submission,
+              status: "error"
+            },
+            serverErrors: {
+              fieldErrors: action.fieldErrors || {},
+              formError: action.formError || null
+            }
+          };
+
+        case "FORM_RESET":
+          return {
+            ...initialFormState,
+            submission: { ...initialFormState.submission, requestId: state.submission.requestId + 1 }
+          };
+
+        // DYNAMIC FIELDS (STABLE IDENTITY)
+        case "ADDRESS_ADDED":
+          return {
+            ...state,
+            addresses: [
+              ...state.addresses,
+              { id: "addr-" + Date.now(), label: action.label, street: action.street, city: action.city }
+            ]
+          };
+
+        case "ADDRESS_REMOVED":
+          return {
+            ...state,
+            addresses: state.addresses.filter(a => a.id !== action.id)
+          };
+
+        default:
+          return state;
+      }
+    }
+
+    // DERIVED VALIDATION (PURE COMPUTATION DURING RENDER)
+    function deriveFormValidation(values) {
+      const errors = {};
+      if (!values.email || !values.email.includes("@")) {
+        errors.email = "Valid email with '@' is required.";
+      }
+      if (!values.password || values.password.length < 8) {
+        errors.password = "Password must be at least 8 characters.";
+      }
+      if (values.password !== values.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match.";
+      }
+      if (!values.country) {
+        errors.country = "Please select a country.";
+      }
+      if (!values.state) {
+        errors.state = "Please select a valid state/province.";
+      }
+      if (!values.termsAccepted) {
+        errors.termsAccepted = "You must accept the terms.";
+      }
+
+      const isValid = Object.keys(errors).length === 0;
+      return { errors, isValid };
+    }
+
+    function AdvancedFormLab() {
+      const [state, dispatch] = useReducer(formReducer, initialFormState);
+      const [telemetry, setTelemetry] = useState([]);
+      const requestCounterRef = useRef(0);
+      const [newAddr, setNewAddr] = useState({ label: "Warehouse", street: "88 Logistics Rd", city: "Austin" });
+
+      const { errors: clientErrors, isValid } = deriveFormValidation(state.values);
+
+      const dispatchWithTrace = (action) => {
+        dispatch(action);
+        setTelemetry(prev => [
+          {
+            id: Math.random().toString(36).substr(2, 6),
+            time: new Date().toLocaleTimeString(),
+            action: action.type,
+            status: state.submission.status,
+            activeReq: state.submission.requestId,
+            actionReq: action.requestId || "-"
+          },
+          ...prev.slice(0, 15)
+        ]);
+      };
+
+      // SUBMISSION SCENARIOS
+      const handleNormalSubmit = (e) => {
+        if (e) e.preventDefault();
+        if (!isValid) return;
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT_REQUESTED", requestId: reqId });
+        
+        setTimeout(() => {
+          dispatchWithTrace({ type: "SUBMIT_SUCCEEDED", requestId: reqId });
+        }, 900);
+      };
+
+      const handleConflictServerEmailError = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT_REQUESTED", requestId: reqId });
+        
+        setTimeout(() => {
+          dispatchWithTrace({
+            type: "SUBMIT_FAILED",
+            requestId: reqId,
+            fieldErrors: { email: "409 Conflict: This email address is already registered." },
+            formError: null
+          });
+        }, 800);
+      };
+
+      const handleNetwork503Error = () => {
+        const reqId = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT_REQUESTED", requestId: reqId });
+        
+        setTimeout(() => {
+          dispatchWithTrace({
+            type: "SUBMIT_FAILED",
+            requestId: reqId,
+            fieldErrors: {},
+            formError: "503 Service Unavailable: Remote registration cluster unreachable."
+          });
+        }, 800);
+      };
+
+      const handleStaleRaceCondition = () => {
+        // Dispatches slow Request #1 (2500ms)
+        const req1 = ++requestCounterRef.current;
+        dispatchWithTrace({ type: "SUBMIT_REQUESTED", requestId: req1 });
+
+        // User edits and sends fast Request #2 (700ms)
+        setTimeout(() => {
+          const req2 = ++requestCounterRef.current;
+          dispatchWithTrace({ type: "SUBMIT_REQUESTED", requestId: req2 });
+          
+          setTimeout(() => {
+            dispatchWithTrace({ type: "SUBMIT_SUCCEEDED", requestId: req2 });
+          }, 700);
+        }, 400);
+
+        // Stale Request #1 finally completes after 2500ms
+        setTimeout(() => {
+          dispatchWithTrace({ type: "SUBMIT_SUCCEEDED", requestId: req1 });
+        }, 2500);
+      };
+
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🧪 Companion Lab 12 — Advanced Form Architecture</span>
+                <span className="badge">Senior Interaction System</span>
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 4 }}>
+                5 Form Concerns, Derived Validation vs Touched Metadata, Dependent Invariant Fields & Stale Token Protection.
+              </p>
+            </div>
+            <div className="metric-grid" style={{ minWidth: 340 }}>
+              <div className="metric-box">
+                <div className="metric-num">{isValid ? "VALID" : "INVALID"}</div>
+                <div className="metric-label">Client Validation</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{state.submission.status.toUpperCase()}</div>
+                <div className="metric-label">Submission Lifecycle</div>
+              </div>
+              <div className="metric-box">
+                <div className="metric-num">{state.submission.requestId}</div>
+                <div className="metric-label">Active Request ID</div>
+              </div>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            {/* LEFT COLUMN: INTERACTIVE FORM & SUBMISSION CONTROLS */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div className="card">
+                <div className="card-title">
+                  <span>📝 Enterprise Registration Form</span>
+                  <span className={`status-pill status-${state.submission.status}`}>
+                    {state.submission.status}
+                  </span>
+                </div>
+
+                {state.serverErrors.formError && (
+                  <div style={{ background: "rgba(239, 68, 68, 0.18)", border: "1px solid var(--accent-red)", padding: 12, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-red)", fontWeight: 600, fontSize: "0.85rem" }}>
+                      Form-Level Failure (User inputs preserved intact)
+                    </div>
+                    <div style={{ color: "#fca5a5", fontSize: "0.8rem", marginTop: 4 }}>
+                      {state.serverErrors.formError}
+                    </div>
+                  </div>
+                )}
+
+                {state.submission.status === "success" && (
+                  <div style={{ background: "rgba(34, 197, 94, 0.18)", border: "1px solid var(--accent-green)", padding: 12, borderRadius: 8 }}>
+                    <div style={{ color: "var(--accent-green)", fontWeight: 600, fontSize: "0.85rem" }}>
+                      ✅ Submission Succeeded & Commited
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleNormalSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {/* EMAIL FIELD */}
+                  <div className="form-group">
+                    <label>
+                      <span>Work Email</span>
+                      <span className="meta-tag">touched: {state.metadata.touched.email ? "true" : "false"}</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={state.metadata.touched.email && (clientErrors.email || state.serverErrors.fieldErrors.email) ? "input-error" : ""}
+                      value={state.values.email}
+                      onChange={e => dispatchWithTrace({ type: "FIELD_CHANGED", field: "email", value: e.target.value })}
+                      onBlur={() => dispatchWithTrace({ type: "FIELD_BLURRED", field: "email" })}
+                    />
+                    {state.metadata.touched.email && clientErrors.email && (
+                      <span className="error-text">⚠️ {clientErrors.email}</span>
+                    )}
+                    {state.serverErrors.fieldErrors.email && (
+                      <span className="error-text">🚨 {state.serverErrors.fieldErrors.email}</span>
+                    )}
+                  </div>
+
+                  {/* PASSWORD FIELDS */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="form-group">
+                      <label>
+                        <span>Password</span>
+                        <span className="meta-tag">touched: {state.metadata.touched.password ? "true" : "false"}</span>
+                      </label>
+                      <input
+                        type="password"
+                        className={state.metadata.touched.password && clientErrors.password ? "input-error" : ""}
+                        value={state.values.password}
+                        onChange={e => dispatchWithTrace({ type: "FIELD_CHANGED", field: "password", value: e.target.value })}
+                        onBlur={() => dispatchWithTrace({ type: "FIELD_BLURRED", field: "password" })}
+                      />
+                      {state.metadata.touched.password && clientErrors.password && (
+                        <span className="error-text">⚠️ {clientErrors.password}</span>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        <span>Confirm Password</span>
+                        <span className="meta-tag">touched: {state.metadata.touched.confirmPassword ? "true" : "false"}</span>
+                      </label>
+                      <input
+                        type="password"
+                        className={state.metadata.touched.confirmPassword && clientErrors.confirmPassword ? "input-error" : ""}
+                        value={state.values.confirmPassword}
+                        onChange={e => dispatchWithTrace({ type: "FIELD_CHANGED", field: "confirmPassword", value: e.target.value })}
+                        onBlur={() => dispatchWithTrace({ type: "FIELD_BLURRED", field: "confirmPassword" })}
+                      />
+                      {state.metadata.touched.confirmPassword && clientErrors.confirmPassword && (
+                        <span className="error-text">⚠️ {clientErrors.confirmPassword}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* DEPENDENT COUNTRY / STATE FIELDS */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="form-group">
+                      <label>
+                        <span>Country</span>
+                        <span className="meta-tag">Invariant Source</span>
+                      </label>
+                      <select
+                        value={state.values.country}
+                        onChange={e => dispatchWithTrace({ type: "COUNTRY_CHANGED", country: e.target.value })}
+                      >
+                        <option value="US">United States (US)</option>
+                        <option value="IN">India (IN)</option>
+                        <option value="DE">Germany (DE)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        <span>State / Province</span>
+                        <span className="meta-tag">Dependent Child</span>
+                      </label>
+                      <select
+                        className={state.metadata.touched.state && clientErrors.state ? "input-error" : ""}
+                        value={state.values.state}
+                        onChange={e => dispatchWithTrace({ type: "FIELD_CHANGED", field: "state", value: e.target.value })}
+                        onBlur={() => dispatchWithTrace({ type: "FIELD_BLURRED", field: "state" })}
+                      >
+                        <option value="">-- Select State --</option>
+                        {(COUNTRY_STATES[state.values.country] || []).map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      {state.metadata.touched.state && clientErrors.state && (
+                        <span className="error-text">⚠️ {clientErrors.state}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* TERMS CHECKBOX */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      checked={state.values.termsAccepted}
+                      onChange={e => dispatchWithTrace({ type: "FIELD_CHANGED", field: "termsAccepted", value: e.target.checked })}
+                    />
+                    <label htmlFor="terms" style={{ fontSize: "0.85rem", cursor: "pointer" }}>
+                      I agree to the Enterprise Service Agreements
+                    </label>
+                  </div>
+
+                  {/* SUBMIT BUTTON & SCENARIOS */}
+                  <div className="btn-row" style={{ marginTop: 8 }}>
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      disabled={!isValid || state.submission.status === "submitting"}
+                    >
+                      {state.submission.status === "submitting" ? "⏳ Submitting..." : "Submit Registration"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dispatchWithTrace({ type: "FORM_RESET" })}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </form>
+
+                {/* SCENARIO SIMULATION TOOLBAR */}
+                <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 14 }}>
+                  <label style={{ fontSize: "0.82rem", color: "var(--text-muted)", display: "block", marginBottom: 8 }}>
+                    Crucible Incident Simulators:
+                  </label>
+                  <div className="btn-row">
+                    <button className="btn-danger" onClick={handleConflictServerEmailError}>
+                      🚨 Sim: 409 Server Email Conflict
+                    </button>
+                    <button className="btn-warning" onClick={handleNetwork503Error}>
+                      ⚠️ Sim: 503 Network Timeout
+                    </button>
+                    <button className="btn-warning" onClick={handleStaleRaceCondition}>
+                      🏎️ Sim: Stale Response Race
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* DYNAMIC FIELD LIST (STABLE KEYS) */}
+              <div className="card">
+                <div className="card-title">
+                  <span>🏢 Dynamic Address Entities (Stable ID vs Index)</span>
+                  <span className="badge">{state.addresses.length} Entities</span>
+                </div>
+                <div className="dynamic-list">
+                  {state.addresses.map(addr => (
+                    <div key={addr.id} className="dynamic-item">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "0.88rem", fontWeight: 600 }}>{addr.label} <span className="badge">{addr.id}</span></div>
+                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{addr.street}, {addr.city}</div>
+                      </div>
+                      <button
+                        className="btn-danger"
+                        style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                        onClick={() => dispatchWithTrace({ type: "ADDRESS_REMOVED", id: addr.id })}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                  <input
+                    type="text"
+                    placeholder="Label"
+                    value={newAddr.label}
+                    onChange={e => setNewAddr({ ...newAddr, label: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Street"
+                    value={newAddr.street}
+                    onChange={e => setNewAddr({ ...newAddr, street: e.target.value })}
+                  />
+                  <button
+                    onClick={() => {
+                      dispatchWithTrace({ type: "ADDRESS_ADDED", ...newAddr });
+                    }}
+                  >
+                    + Add Entity
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: STATE SNAPSHOT & TELEMETRY */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* CURRENT SNAPSHOT */}
+              <div className="card">
+                <div className="card-title">
+                  <span>🔍 Authoritative Form State Snapshot</span>
+                  <span className="badge">5 Concerns Partitioned</span>
+                </div>
+                <pre className="state-tree">
+{JSON.stringify(state, null, 2)}
+                </pre>
+              </div>
+
+              {/* ACTION TELEMETRY LEDGER */}
+              <div className="card" style={{ flex: 1 }}>
+                <div className="card-title">
+                  <span>📜 Form Action & Transition Ledger</span>
+                  <button onClick={() => setTelemetry([])} style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                    Clear
+                  </button>
+                </div>
+                <div className="log-container">
+                  {telemetry.length === 0 ? (
+                    <div style={{ color: "var(--text-muted)", textAlign: "center", padding: 20 }}>
+                      Type in fields or submit to trace interaction flow...
+                    </div>
+                  ) : (
+                    telemetry.map(log => (
+                      <div key={log.id} className="log-item">
+                        <div className="log-header">
+                          <span>⚡ {log.action}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>{log.time}</span>
+                        </div>
+                        <div style={{ color: "var(--text-muted)", display: "flex", gap: 12 }}>
+                          <span>Status: <strong>{log.status}</strong></span>
+                          <span>Active Req: <strong>{log.activeReq}</strong></span>
+                          <span>Action Req: <strong>{log.actionReq}</strong></span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<AdvancedFormLab />);
+  </script>
+</body>
+</html>

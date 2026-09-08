@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Part 07 — Form Submission & Lifecycle Architecture Lab</title>
+  <style>
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-secondary: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #1f2937;
+      --border-focus: #38bdf8;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .badge-primary {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle { color: var(--text-secondary); font-size: 1rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .input-group { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0d1322;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+    .btn {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover { background: #334155; border-color: var(--accent-cyan); }
+    .btn-primary { background: #0284c7; border-color: #0369a1; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-success { background: #059669; border-color: #047857; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .telemetry-box {
+      background: #0d1322;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .telemetry-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      word-break: break-all;
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    .status-idle { background: rgba(148, 163, 184, 0.1); color: #94a3b8; }
+    .status-validating { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+    .status-submitting { background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); }
+    .status-success { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); }
+    .status-error { background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); }
+
+    .log-list {
+      list-style: none;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+
+    .log-item {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge badge-primary">Level 06 — React Fundamentals • KPI 08 Lab</span>
+      <h1>Part 07 Diagnostic Laboratory</h1>
+      <p class="subtitle">Form Submission Lifecycles, In-Flight Snapshots & Baseline Reconciliation</p>
+    </header>
+
+    <div class="grid">
+      <!-- PROBE 1: Submission Snapshot vs Live Draft & Baseline Reconciliation -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📦 Probe 1: Live Draft vs In-Flight Snapshot</div>
+          <span id="p1StatusBadge" class="status-badge status-idle">STATUS: IDLE</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Click "Save Profile". While the 3-second simulated request is in-flight, continue typing. Notice that the server commits the <strong>snapshot</strong> while your draft remains <strong>dirty</strong> with newer changes!
+        </p>
+
+        <form id="p1Form" onsubmit="handleProbe1Submit(event)">
+          <div class="input-group">
+            <label>Name (Editable during submit!):</label>
+            <input type="text" id="p1Name" value="Alice" oninput="updateP1Draft(event)" />
+          </div>
+
+          <div class="btn-group">
+            <button type="submit" id="p1SubmitBtn" class="btn btn-primary">
+              💾 Save Profile (3s In-Flight)
+            </button>
+            <button type="button" class="btn" onclick="revertP1()">
+              🔄 Revert to Active Baseline
+            </button>
+          </div>
+        </form>
+
+        <div class="telemetry-grid">
+          <div class="telemetry-box">
+            <div class="telemetry-label">Active Comparison Baseline</div>
+            <div class="telemetry-val" style="color: var(--accent-purple);" id="p1BaselineVal">"Alice"</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">In-Flight Request Snapshot</div>
+            <div class="telemetry-val" style="color: var(--accent-cyan);" id="p1SnapshotVal">None (Idle)</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Live Editable Draft</div>
+            <div class="telemetry-val" style="color: var(--accent-emerald);" id="p1DraftVal">"Alice"</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-label">Relational isDirty State</div>
+            <div class="telemetry-val" style="color: var(--accent-amber);" id="p1DirtyVal">false (Clean)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROBE 2: Async Race & Monotonic Request Identity -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚡ Probe 2: Out-of-Order Submission Race</div>
+          <button class="btn" onclick="resetProbe2()">Clear</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px;">
+          Simulates Submit A (slow 2500ms) followed by Submit B (fast 800ms). Request tokens guarantee that slow Submit A cannot overwrite fast Submit B.
+        </p>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="dispatchRaceSubmit('Draft A (Slow)', 2500)">
+            Submit A (Slow 2.5s)
+          </button>
+          <button class="btn btn-success" onclick="dispatchRaceSubmit('Draft B (Fast)', 800)">
+            Submit B (Fast 0.8s)
+          </button>
+        </div>
+
+        <div class="telemetry-box" style="margin-top: 14px;">
+          <div class="telemetry-label">Authoritative Active Committed Record</div>
+          <div class="telemetry-val" style="color: var(--accent-emerald);" id="p2ActiveRecord">Initial Record v0</div>
+        </div>
+
+        <ul class="log-list" id="p2LogList"></ul>
+      </div>
+
+      <!-- PROBE 3: Chronological Lifecycle Timeline -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <div class="card-title">📜 Probe 3: Chronological Form Lifecycle Stream</div>
+          <button class="btn" onclick="clearTimeline()">Clear Timeline</button>
+        </div>
+        <ul class="log-list" id="timelineStream">
+          <li class="log-item" style="color: var(--text-muted);"><span>System initialized. Awaiting submission intent...</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- PROBE 1: Snapshot & Baseline Reconciliation ---
+    let p1Baseline = "Alice";
+    let p1Draft = "Alice";
+    let p1Status = "idle";
+    let p1Snapshot = null;
+
+    function updateP1Telemetry() {
+      const isDirty = p1Draft !== p1Baseline;
+      document.getElementById("p1BaselineVal").textContent = `"${p1Baseline}"`;
+      document.getElementById("p1DraftVal").textContent = `"${p1Draft}"`;
+      document.getElementById("p1SnapshotVal").textContent = p1Snapshot ? `"${p1Snapshot.name}" (Req #${p1Snapshot.id})` : "None (Idle)";
+      document.getElementById("p1DirtyVal").textContent = isDirty ? "true (Unsaved edits)" : "false (Clean)";
+      document.getElementById("p1DirtyVal").style.color = isDirty ? "var(--accent-amber)" : "var(--accent-emerald)";
+
+      const badge = document.getElementById("p1StatusBadge");
+      badge.textContent = `STATUS: ${p1Status.toUpperCase()}`;
+      badge.className = `status-badge status-${p1Status}`;
+      document.getElementById("p1SubmitBtn").disabled = p1Status === "submitting";
+    }
+
+    function updateP1Draft(e) {
+      p1Draft = e.target.value;
+      logEvent("DRAFT_EDIT", `Draft modified to "${p1Draft}"`);
+      updateP1Telemetry();
+    }
+
+    function revertP1() {
+      p1Draft = p1Baseline;
+      document.getElementById("p1Name").value = p1Baseline;
+      logEvent("REVERT", `Draft restored to active baseline "${p1Baseline}"`);
+      updateP1Telemetry();
+    }
+
+    let p1SubmitCounter = 0;
+    function handleProbe1Submit(e) {
+      e.preventDefault();
+      if (p1Status === "submitting") return;
+
+      const subId = ++p1SubmitCounter;
+      p1Snapshot = { id: subId, name: p1Draft };
+      p1Status = "submitting";
+      logEvent("SUBMIT_INTENT", `Attempt #${subId} captured snapshot: "${p1Snapshot.name}"`);
+      updateP1Telemetry();
+
+      setTimeout(() => {
+        p1Status = "success";
+        const savedName = p1Snapshot.name;
+        p1Snapshot = null;
+        // BASELINE RECONCILIATION
+        p1Baseline = savedName;
+        logEvent("COMMIT_SUCCESS", `Attempt #${subId} resolved. Baseline reconciled to: "${savedName}"`);
+        updateP1Telemetry();
+      }, 3000);
+    }
+
+    // --- PROBE 2: Async Race Simulation ---
+    let latestRaceToken = 0;
+
+    function dispatchRaceSubmit(payload, latency) {
+      const token = ++latestRaceToken;
+      const list = document.getElementById("p2LogList");
+      
+      const item = document.createElement("li");
+      item.id = `race-item-${token}`;
+      item.className = "log-item";
+      item.innerHTML = `<span>🚀 Dispatched #${token} ("${payload}")</span><span>${latency}ms in-flight</span>`;
+      list.prepend(item);
+      logEvent("RACE_DISPATCH", `Dispatched Request #${token} ("${payload}") [${latency}ms]`);
+
+      setTimeout(() => {
+        const row = document.getElementById(`race-item-${token}`);
+        if (token !== latestRaceToken) {
+          if (row) {
+            row.style.color = "var(--accent-rose)";
+            row.innerHTML = `<span>⚠️ Discarded Stale Response #${token} ("${payload}")</span><span>STALE</span>`;
+          }
+          logEvent("RACE_STALE_DISCARD", `Discarded stale response for Request #${token} (Current token is #${latestRaceToken})`);
+          return;
+        }
+
+        document.getElementById("p2ActiveRecord").textContent = payload;
+        if (row) {
+          row.style.color = "var(--accent-emerald)";
+          row.innerHTML = `<span>✅ Committed Authoritative Record #${token} ("${payload}")</span><span>COMMITTED</span>`;
+        }
+        logEvent("RACE_COMMIT", `Committed Request #${token} as Authoritative Record ("${payload}")`);
+      }, latency);
+    }
+
+    function resetProbe2() {
+      document.getElementById("p2LogList").innerHTML = "";
+      document.getElementById("p2ActiveRecord").textContent = "Initial Record v0";
+      latestRaceToken = 0;
+    }
+
+    // --- TIMELINE STREAM ---
+    function logEvent(type, desc) {
+      const stream = document.getElementById("timelineStream");
+      const item = document.createElement("li");
+      item.className = "log-item";
+      item.innerHTML = `
+        <span><strong style="color: var(--accent-cyan);">${type}:</strong> ${desc}</span>
+        <span style="color: var(--text-muted);">${new Date().toLocaleTimeString()}</span>
+      `;
+      stream.prepend(item);
+    }
+
+    function clearTimeline() {
+      document.getElementById("timelineStream").innerHTML = "";
+    }
+
+    // Initial setup
+    updateP1Telemetry();
+  </script>
+</body>
+</html>

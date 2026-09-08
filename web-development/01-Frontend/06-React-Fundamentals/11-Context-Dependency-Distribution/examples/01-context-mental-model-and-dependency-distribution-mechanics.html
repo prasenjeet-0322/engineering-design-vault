@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 / Part 01 — Context Mental Model & Dependency Distribution Mechanics Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid var(--accent-primary);
+      color: #a5b4fc;
+    }
+
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .nav-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .nav-card h3 {
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      margin-bottom: 4px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+    }
+
+    .nav-btn.active {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: var(--border-active);
+      color: #c7d2fe;
+    }
+
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .card-header p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .interactive-zone {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent-primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #4f46e5;
+      box-shadow: 0 0 16px var(--accent-primary-glow);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.2);
+      border: 1px solid var(--accent-rose);
+      color: #fda4af;
+    }
+    .btn-danger:hover {
+      background: rgba(244, 63, 94, 0.3);
+    }
+
+    .tree-box {
+      border: 1px dashed rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.04);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 12px 0;
+    }
+
+    .tree-box.nested {
+      border-color: rgba(6, 182, 212, 0.4);
+      background: rgba(6, 182, 212, 0.04);
+      margin-left: 20px;
+    }
+
+    .tree-box.deep {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.04);
+      margin-left: 20px;
+    }
+
+    .telemetry-log {
+      background: #0d1117;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      max-height: 200px;
+      overflow-y: auto;
+      color: #38bdf8;
+    }
+
+    .log-item {
+      margin-bottom: 4px;
+      display: flex;
+      gap: 10px;
+    }
+    .log-time { color: var(--text-dim); }
+    .log-event { color: #a855f7; font-weight: 600; }
+    .log-val { color: #34d399; }
+
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin-top: 12px;
+    }
+
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--border-subtle);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .matrix-table th {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+  </style>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useCallback } = React;
+
+    // ========================================================================
+    // CONTEXT TOKENS & DOMAIN MODELS
+    // ========================================================================
+    const ThemeContext = createContext("system-default");
+    const AuthContext = createContext(null);
+    const AnalyticsContext = createContext({ track: () => {} });
+
+    // ========================================================================
+    // MAIN APP COMPONENT
+    // ========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("scope");
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, val) => {
+        setLogs(prev => [
+          { time: new Date().toLocaleTimeString(), event, val },
+          ...prev.slice(0, 19)
+        ]);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-titles">
+              <h1>
+                <span>🌐</span> KPI 11 / Part 01 — Context Mental Model & Distribution Lab
+              </h1>
+              <div className="subtitle">
+                Interactive verification of Scoped Environments, Provider Placement, Shadowing & Dependency Injection
+              </div>
+            </div>
+            <div className="badge badge-primary">
+              React 18 / Fiber Context
+            </div>
+          </header>
+
+          <div className="grid-layout">
+            {/* Sidebar Navigation */}
+            <div className="sidebar">
+              <div className="nav-card">
+                <h3>Lab Modules</h3>
+                <button
+                  className={`nav-btn ${activeTab === "scope" ? "active" : ""}`}
+                  onClick={() => setActiveTab("scope")}
+                >
+                  <span>🔭</span> Module A: Scope & Reachability
+                </button>
+                <button
+                  className={`nav-btn ${activeTab === "shadowing" ? "active" : ""}`}
+                  onClick={() => setActiveTab("shadowing")}
+                >
+                  <span>🌗</span> Module B: Scoped Shadowing
+                </button>
+                <button
+                  className={`nav-btn ${activeTab === "multi_instance" ? "active" : ""}`}
+                  onClick={() => setActiveTab("multi_instance")}
+                >
+                  <span>📑</span> Module C: Multi-Instance Isolation
+                </button>
+                <button
+                  className={`nav-btn ${activeTab === "di" ? "active" : ""}`}
+                  onClick={() => setActiveTab("di")}
+                >
+                  <span>💉</span> Module D: Dependency Injection
+                </button>
+                <button
+                  className={`nav-btn ${activeTab === "incidents" ? "active" : ""}`}
+                  onClick={() => setActiveTab("incidents")}
+                >
+                  <span>🚨</span> Module E: Anti-Pattern Simulator
+                </button>
+              </div>
+
+              <div className="nav-card">
+                <h3>Live Event Stream</h3>
+                <div className="telemetry-log">
+                  {logs.length === 0 ? (
+                    <div style={{ color: "var(--text-dim)" }}>No events recorded yet. Interact with the lab.</div>
+                  ) : (
+                    logs.map((log, idx) => (
+                      <div key={idx} className="log-item">
+                        <span className="log-time">{log.time}</span>
+                        <span className="log-event">[{log.event}]</span>
+                        <span className="log-val">{log.val}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ width: "100%", marginTop: "10px", fontSize: "0.75rem" }}
+                  onClick={() => setLogs([])}
+                >
+                  Clear Logs
+                </button>
+              </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="main-panel">
+              {activeTab === "scope" && <ScopeLab addLog={addLog} />}
+              {activeTab === "shadowing" && <ShadowingLab addLog={addLog} />}
+              {activeTab === "multi_instance" && <MultiInstanceLab addLog={addLog} />}
+              {activeTab === "di" && <DependencyInjectionLab addLog={addLog} />}
+              {activeTab === "incidents" && <IncidentSimulator addLog={addLog} />}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================================================================
+    // MODULE A: SCOPE & REACHABILITY LAB
+    // ========================================================================
+    function ScopeLab({ addLog }) {
+      const [providerActive, setProviderActive] = useState(true);
+      const [themeValue, setThemeValue] = useState("dark");
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h2>Module A: Tree Scope & Provider Placement</h2>
+              <p>Observe how provider placement controls dependency reachability across descendants vs siblings.</p>
+            </div>
+          </div>
+
+          <div className="interactive-zone">
+            <div className="btn-group">
+              <button 
+                className={`btn ${providerActive ? "btn-danger" : "btn-primary"}`}
+                onClick={() => {
+                  setProviderActive(!providerActive);
+                  addLog("PROVIDER_TOGGLE", providerActive ? "Unmounted Provider" : "Mounted Provider");
+                }}
+              >
+                {providerActive ? "Unmount Provider" : "Mount <ThemeProvider>"}
+              </button>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  const next = themeValue === "dark" ? "light" : "dark";
+                  setThemeValue(next);
+                  addLog("THEME_CHANGED", next);
+                }}
+              >
+                Switch Theme to: {themeValue === "dark" ? "light" : "dark"}
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--accent-cyan)" }}>
+                  Subtree A: Enclosed in Provider Scope
+                </div>
+                {providerActive ? (
+                  <ThemeContext.Provider value={themeValue}>
+                    <div className="tree-box">
+                      <div style={{ fontSize: "0.8rem", color: "var(--accent-primary)", marginBottom: "8px" }}>
+                        &lt;ThemeContext.Provider value="{themeValue}"&gt;
+                      </div>
+                      <ConsumerComponent name="Enclosed Consumer #1" addLog={addLog} />
+                      <ConsumerComponent name="Enclosed Consumer #2" addLog={addLog} />
+                    </div>
+                  </ThemeContext.Provider>
+                ) : (
+                  <div className="tree-box" style={{ borderColor: "rgba(244, 63, 94, 0.4)" }}>
+                    <div style={{ fontSize: "0.8rem", color: "var(--accent-rose)", marginBottom: "8px" }}>
+                      [Provider Unmounted - Falling back to Default]
+                    </div>
+                    <ConsumerComponent name="Enclosed Consumer #1" addLog={addLog} />
+                    <ConsumerComponent name="Enclosed Consumer #2" addLog={addLog} />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--accent-amber)" }}>
+                  Subtree B: Sibling (Outside Provider Scope)
+                </div>
+                <div className="tree-box" style={{ borderColor: "rgba(245, 158, 11, 0.4)" }}>
+                  <div style={{ fontSize: "0.8rem", color: "var(--accent-amber)", marginBottom: "8px" }}>
+                    [Sibling Hierarchy - Always Reads Default]
+                  </div>
+                  <ConsumerComponent name="Sibling Consumer #3" addLog={addLog} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ConsumerComponent({ name, addLog }) {
+      const theme = useContext(ThemeContext);
+
+      useEffect(() => {
+        addLog("CONSUMER_RESOLVED", `${name} resolved -> "${theme}"`);
+      }, [theme]);
+
+      return (
+        <div style={{
+          background: theme === "dark" ? "#1e293b" : theme === "light" ? "#f8fafc" : "#334155",
+          color: theme === "light" ? "#0f172a" : "#f8fafc",
+          padding: "10px 14px",
+          borderRadius: "8px",
+          margin: "6px 0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          border: "1px solid var(--border-subtle)"
+        }}>
+          <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{name}</span>
+          <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", padding: "2px 6px", borderRadius: "4px", background: "rgba(0,0,0,0.2)" }}>
+            useContext() = "{theme}"
+          </code>
+        </div>
+      );
+    }
+
+    // ========================================================================
+    // MODULE B: SCOPED SHADOWING LAB
+    // ========================================================================
+    function ShadowingLab({ addLog }) {
+      const [outerTheme, setOuterTheme] = useState("dark");
+      const [innerTheme, setInnerTheme] = useState("light");
+      const [deepTheme, setDeepTheme] = useState("high-contrast");
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h2>Module B: Nested Scoped Shadowing</h2>
+              <p>Verify how nested Providers shadow ancestor values for their specific descendants.</p>
+            </div>
+          </div>
+
+          <div className="interactive-zone">
+            <ThemeContext.Provider value={outerTheme}>
+              <div className="tree-box">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ color: "var(--accent-primary)", fontWeight: 600 }}>Outer Provider: "{outerTheme}"</span>
+                  <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setOuterTheme(prev => prev === "dark" ? "dim" : "dark")}>
+                    Toggle Outer
+                  </button>
+                </div>
+                <ConsumerComponent name="Outer Consumer A" addLog={addLog} />
+
+                <ThemeContext.Provider value={innerTheme}>
+                  <div className="tree-box nested">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>Inner Nested Provider: "{innerTheme}"</span>
+                      <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setInnerTheme(prev => prev === "light" ? "sepia" : "light")}>
+                        Toggle Inner
+                      </button>
+                    </div>
+                    <ConsumerComponent name="Inner Consumer B" addLog={addLog} />
+
+                    <ThemeContext.Provider value={deepTheme}>
+                      <div className="tree-box deep">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <span style={{ color: "var(--accent-emerald)", fontWeight: 600 }}>Deep Nested Provider: "{deepTheme}"</span>
+                          <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "0.75rem" }} onClick={() => setDeepTheme(prev => prev === "high-contrast" ? "emerald" : "high-contrast")}>
+                            Toggle Deep
+                          </button>
+                        </div>
+                        <ConsumerComponent name="Deep Consumer C" addLog={addLog} />
+                      </div>
+                    </ThemeContext.Provider>
+                  </div>
+                </ThemeContext.Provider>
+
+                <ConsumerComponent name="Outer Consumer D (Sibling to Inner)" addLog={addLog} />
+              </div>
+            </ThemeContext.Provider>
+          </div>
+        </div>
+      );
+    }
+
+    // ========================================================================
+    // MODULE C: MULTI-INSTANCE FEATURE LAB
+    // ========================================================================
+    const EditorStateContext = createContext(null);
+
+    function MultiInstanceLab({ addLog }) {
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h2>Module C: Multi-Instance Subtree Isolation</h2>
+              <p>Two isolated feature instances operating simultaneously without global singleton conflicts.</p>
+            </div>
+          </div>
+
+          <div className="interactive-zone" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <EditorInstance docId="doc_alpha_101" title="Primary Editor (Alpha)" addLog={addLog} />
+            <EditorInstance docId="doc_beta_202" title="Secondary Editor (Beta)" addLog={addLog} />
+          </div>
+        </div>
+      );
+    }
+
+    function EditorInstance({ docId, title, addLog }) {
+      const [content, setContent] = useState(`Initial content for ${docId}`);
+      const [historyCount, setHistoryCount] = useState(0);
+
+      const updateContent = (text) => {
+        setContent(text);
+        setHistoryCount(c => c + 1);
+        addLog("EDITOR_UPDATE", `${docId}: ${text}`);
+      };
+
+      const value = useMemo(() => ({ docId, content, updateContent, historyCount }), [docId, content, historyCount]);
+
+      return (
+        <EditorStateContext.Provider value={value}>
+          <div className="tree-box">
+            <h4 style={{ color: "var(--accent-cyan)", marginBottom: "10px" }}>{title}</h4>
+            <EditorToolbar />
+            <EditorContent />
+          </div>
+        </EditorStateContext.Provider>
+      );
+    }
+
+    function EditorToolbar() {
+      const { docId, updateContent } = useContext(EditorStateContext);
+      return (
+        <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+          <button className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "4px 8px" }} onClick={() => updateContent(`Heading inserted at ${new Date().toLocaleTimeString()}`)}>
+            + Heading
+          </button>
+          <button className="btn btn-secondary" style={{ fontSize: "0.75rem", padding: "4px 8px" }} onClick={() => updateContent("Content cleared.")}>
+            Clear
+          </button>
+        </div>
+      );
+    }
+
+    function EditorContent() {
+      const { docId, content, historyCount } = useContext(EditorStateContext);
+      return (
+        <div style={{ background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "6px", fontSize: "0.85rem" }}>
+          <div style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginBottom: "4px" }}>Doc ID: {docId} | Edits: {historyCount}</div>
+          <div>{content}</div>
+        </div>
+      );
+    }
+
+    // ========================================================================
+    // MODULE D: DEPENDENCY INJECTION LAB
+    // ========================================================================
+    function DependencyInjectionLab({ addLog }) {
+      const [mode, setMode] = useState("production");
+
+      const analyticsAdapter = useMemo(() => {
+        if (mode === "production") {
+          return {
+            track: (evt) => addLog("PROD_ANALYTICS", `Dispatched to Cloud API: ${evt}`),
+            name: "SegmentCloudAdapter"
+          };
+        } else {
+          return {
+            track: (evt) => addLog("MOCK_ANALYTICS", `In-Memory Test Spy Recorded: ${evt}`),
+            name: "InMemoryMockSpy"
+          };
+        }
+      }, [mode]);
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h2>Module D: In-Tree Dependency Injection (DI)</h2>
+              <p>Switch concrete service adapters without touching or modifying consumer leaf components.</p>
+            </div>
+          </div>
+
+          <div className="interactive-zone">
+            <div className="btn-group">
+              <button 
+                className={`btn ${mode === "production" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setMode("production")}
+              >
+                Production Adapter (Cloud SDK)
+              </button>
+              <button 
+                className={`btn ${mode === "mock" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setMode("mock")}
+              >
+                Test / Mock Adapter (In-Memory)
+              </button>
+            </div>
+
+            <AnalyticsContext.Provider value={analyticsAdapter}>
+              <div className="tree-box">
+                <div style={{ fontSize: "0.8rem", color: "var(--accent-primary)", marginBottom: "10px" }}>
+                  Active Injected Adapter: <strong>{analyticsAdapter.name}</strong>
+                </div>
+                <CheckoutButton />
+              </div>
+            </AnalyticsContext.Provider>
+          </div>
+        </div>
+      );
+    }
+
+    function CheckoutButton() {
+      const analytics = useContext(AnalyticsContext);
+      return (
+        <button 
+          className="btn btn-primary"
+          onClick={() => analytics.track("checkout_submitted_token_99")}
+        >
+          Complete Checkout (Triggers Track)
+        </button>
+      );
+    }
+
+    // ========================================================================
+    // MODULE E: ANTI-PATTERN SIMULATOR
+    // ========================================================================
+    function IncidentSimulator({ addLog }) {
+      const [selectedScenario, setSelectedScenario] = useState("god_context");
+
+      return (
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <h2>Module E: Production Incident Simulator</h2>
+              <p>Diagnose architectural failures and review senior refactoring solutions.</p>
+            </div>
+          </div>
+
+          <div className="interactive-zone">
+            <div className="btn-group">
+              <button 
+                className={`btn ${selectedScenario === "god_context" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setSelectedScenario("god_context")}
+              >
+                1. The God Context
+              </button>
+              <button 
+                className={`btn ${selectedScenario === "missing_provider" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setSelectedScenario("missing_provider")}
+              >
+                2. Silent Default Trap
+              </button>
+              <button 
+                className={`btn ${selectedScenario === "prop_paranoia" ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => setSelectedScenario("prop_paranoia")}
+              >
+                3. Prop Drilling Paranoia
+              </button>
+            </div>
+
+            {selectedScenario === "god_context" && (
+              <div style={{ background: "rgba(0,0,0,0.3)", padding: "16px", borderRadius: "8px" }}>
+                <h4 style={{ color: "var(--accent-rose)", marginBottom: "6px" }}>Symptom: 200ms Typing Lag in Search Field</h4>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "10px" }}>
+                  <strong>Root Cause:</strong> All 140 dashboard components subscribed to a single <code>AppMasterContext</code> containing search query state.
+                </p>
+                <div style={{ background: "#0d1117", padding: "10px", borderRadius: "6px", fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "#34d399" }}>
+                  // Refactored Decomposition:<br/>
+                  export const UserSessionContext = createContext(null);<br/>
+                  export const ThemeContext = createContext('light');<br/>
+                  export const SearchFilterContext = createContext(null); // Isolated!
+                </div>
+              </div>
+            )}
+
+            {selectedScenario === "missing_provider" && (
+              <div style={{ background: "rgba(0,0,0,0.3)", padding: "16px", borderRadius: "8px" }}>
+                <h4 style={{ color: "var(--accent-rose)", marginBottom: "6px" }}>Symptom: Silent Failure on Checkout Submit</h4>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "10px" }}>
+                  <strong>Root Cause:</strong> <code>PaymentContext</code> defaulted to <code>{`{ processPayment: () => {} }`}</code>. Missing provider failed silently.
+                </p>
+                <div style={{ background: "#0d1117", padding: "10px", borderRadius: "6px", fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "#34d399" }}>
+                  // Fail-Fast Guard:<br/>
+                  const context = useContext(PaymentContext);<br/>
+                  if (!context) throw new Error("usePayment must be used within &lt;PaymentProvider /&gt;");
+                </div>
+              </div>
+            )}
+
+            {selectedScenario === "prop_paranoia" && (
+              <div style={{ background: "rgba(0,0,0,0.3)", padding: "16px", borderRadius: "8px" }}>
+                <h4 style={{ color: "var(--accent-rose)", marginBottom: "6px" }}>Symptom: Unnecessary Indirection & Boilerplate</h4>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "10px" }}>
+                  <strong>Root Cause:</strong> A single parent and direct child component communicated via <code>ButtonContext</code> to pass a string label.
+                </p>
+                <div style={{ background: "#0d1117", padding: "10px", borderRadius: "6px", fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "#34d399" }}>
+                  // Senior Refactor:<br/>
+                  &lt;Button label="Save Changes" /&gt; // Direct Props API!
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>

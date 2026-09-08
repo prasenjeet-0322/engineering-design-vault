@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 15: Component Architecture Crucible</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-ok { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-warn { background: rgba(248, 81, 73, 0.15); color: var(--red); border: 1px solid var(--red); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 15: Component Architecture Crucible</h1>
+  <p class="subtitle">Multi-dimensional production scenario lab verifying Narrowest Common Owner, Stable Entity Keys, Inversion of Control, and Senior Refactoring.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectLab('entityKeyDraft')">1. Entity Keys vs Index Reorder</button>
+    <button onclick="selectLab('narrowestOwner')">2. Cross-Sibling Invariant Owner</button>
+    <button onclick="selectLab('inversionControl')">3. Composition Inversion vs God Props</button>
+    <button onclick="selectLab('deleteTest')">4. The Delete Test & Boundary Audit</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Architecture Scenario & Code</h2>
+      <pre id="code-panel">// Scenario</pre>
+
+      <h2>Render Pipeline & State Trace</h2>
+      <pre id="trace-panel">// Trace</pre>
+    </div>
+
+    <div class="card">
+      <h2>Architectural Diagnosis & Verdict</h2>
+      <span id="badge" class="status-badge badge-ok">Architecture: Production Grade</span>
+      <pre id="verdict-panel">// Verdict</pre>
+
+      <h2>Senior Architecture Heuristic</h2>
+      <pre id="rule-panel">// Principle</pre>
+    </div>
+  </div>
+
+  <script>
+    const labs = {
+      entityKeyDraft: {
+        code: `// ❌ Flawed (Index Key Trap):\nproducts.map((p, index) => <ProductEditor key={index} product={p} />)\n\n// ✅ Correct (Entity-Associated Identity):\nproducts.map(p => <ProductEditor key={p.id} product={p} />)`,
+        trace: `1. Row B enters draft 'Widget X'.\n2. List sorted C, A, B.\n3. With key={p.id}, Fiber identity for B follows entity B.\n4. Draft stays attached to B instead of leaking into C!`,
+        verdict: `Zero State Drift: Draft state belongs to entity identity, not array position.`,
+        rule: `Choose keys that represent the entity identity whose state must be preserved across renders.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Stable Entity Identity'
+      },
+      narrowestOwner: {
+        code: `// Cross-Sibling Invariant (start <= end):\nfunction DateRangePicker() {\n  const [range, setRange] = useState({ start: null, end: null });\n  return (\n    <>\n      <DateInput value={range.start} onChange={s => updateRange({ start: s })} />\n      <DateInput value={range.end} onChange={e => updateRange({ end: e })} />\n    </>\n  );\n}`,
+        trace: `DateRangePicker owns the relationship between start and end. DateInput children are pure controlled presenters + event emitters.`,
+        verdict: `Single Source of Truth: Eliminates duplicate validation state and out-of-sync sibling dates.`,
+        rule: `Place state at the narrowest common owner that can validate shared cross-sibling invariants.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Narrowest Common Owner'
+      },
+      inversionControl: {
+        code: `// ❌ 20+ Configuration Booleans (Rigid Mega-Modal):\n<Modal showHeader showFooter danger primaryText="Delete" ... />\n\n// ✅ Composition Inversion of Control:\n<Modal>\n  <Modal.Header><Modal.Title>Delete Item</Modal.Title></Modal.Header>\n  <Modal.Body>Are you sure?</Modal.Body>\n  <Modal.Footer><Button variant="danger">Confirm</Button></Modal.Footer>\n</Modal>`,
+        trace: `Modal owns backdrop and focus trapping. Caller directly structures header, body, and actions with zero boolean prop explosion.`,
+        verdict: `High Cohesion: Structural control inverted to caller while modal encapsulates behavioral contracts.`,
+        rule: `Composition transfers structural control without transferring behavioral ownership.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ Inversion of Control'
+      },
+      deleteTest: {
+        code: `// The Delete Test Audit:\nfunction CardWrapper({ children }) { return <div className="p-4">{children}</div>; }\n// Audit Question:\n// If we delete CardWrapper and inline CSS or use semantic <article>, what breaks?\n// Answer: Nothing! The abstraction was artificial.`,
+        trace: `Removing wrappers with zero state, zero behavioral invariants, and zero semantic contracts simplifies the Fiber tree.`,
+        verdict: `Clean Codebase: Prevents wrapper proliferation and reduces cognitive overhead.`,
+        rule: `If deleting a component boundary loses no invariants or ownership capability, delete it.`,
+        badgeClass: 'badge-ok',
+        badgeText: '✅ The Delete Test'
+      }
+    };
+
+    function selectLab(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = labs[key];
+      document.getElementById('code-panel').textContent = data.code;
+      document.getElementById('trace-panel').textContent = data.trace;
+      document.getElementById('verdict-panel').textContent = data.verdict;
+      document.getElementById('rule-panel').textContent = data.rule;
+
+      const badge = document.getElementById('badge');
+      badge.textContent = data.badgeText;
+      badge.className = 'status-badge ' + data.badgeClass;
+    }
+
+    selectLab('entityKeyDraft');
+  </script>
+</body>
+</html>

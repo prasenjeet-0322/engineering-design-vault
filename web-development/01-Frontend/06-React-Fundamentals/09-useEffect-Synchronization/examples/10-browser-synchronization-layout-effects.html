@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 10 — Browser Synchronization & Layout Effects</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-card: #111827;
+      --bg-card-hover: #1f293d;
+      --border-color: #2e384d;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header-banner {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.12));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-banner h1 {
+      font-size: 1.4rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .badge-primary { background: rgba(56, 189, 248, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+    .badge-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+    button.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .terminal {
+      background: #050811;
+      border: 1px solid #1a2333;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+    }
+    .log-time { color: #64748b; }
+    .log-event { color: var(--accent-purple); font-weight: 600; }
+    .log-info { color: var(--accent-cyan); }
+    .log-warn { color: var(--accent-amber); }
+    .log-error { color: var(--accent-red); }
+    .log-success { color: var(--accent-green); }
+
+    .tooltip-stage {
+      position: relative;
+      height: 200px;
+      background: #0d131f;
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .anchor-target {
+      padding: 10px 20px;
+      background: #1e293b;
+      border: 2px solid var(--accent-cyan);
+      border-radius: 8px;
+      font-weight: 600;
+      color: #fff;
+      user-select: none;
+    }
+
+    .tooltip-popup {
+      position: absolute;
+      background: linear-gradient(135deg, #1e1b4b, #312e81);
+      border: 1px solid var(--accent-purple);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      pointer-events: none;
+      transition: none; /* Intentionally no CSS transition to expose raw React paint */
+      white-space: nowrap;
+    }
+
+    .thrash-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 6px;
+      padding: 12px;
+      background: #0d131f;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+    }
+
+    .thrash-item {
+      height: 30px;
+      background: #1e293b;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .resizable-box {
+      background: rgba(56, 189, 248, 0.08);
+      border: 2px dashed var(--accent-cyan);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      resize: both;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useLayoutEffect, useRef, useReducer } = React;
+
+    // --- HELPER LOGGER COMPONENT ---
+    function LogTerminal({ logs, onClear }) {
+      const bottomRef = useRef(null);
+      useEffect(() => {
+        if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [logs]);
+
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Execution Timeline</span>
+            <button style={{ padding: "2px 8px", fontSize: "0.72rem" }} onClick={onClear}>Clear</button>
+          </div>
+          <div className="terminal">
+            {logs.length === 0 ? (
+              <div style={{ color: "#475569", fontStyle: "italic" }}>No logs recorded yet. Trigger an interaction...</div>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className="log-line">
+                  <span className="log-time">[{log.time}]</span>
+                  <span className={`log-${log.type}`}>{log.event}</span>
+                  <span>{log.message}</span>
+                </div>
+              ))
+            )}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 1: TOOLTIP POSITIONING & THE FLICKER BATTLE
+    // =========================================================================
+    function TooltipFlickerDemo() {
+      const [mode, setMode] = useState("useLayoutEffect"); // "useEffect" vs "useLayoutEffect"
+      const [showTooltip, setShowTooltip] = useState(false);
+      const [slowMainThread, setSlowMainThread] = useState(false);
+      const [logs, setLogs] = useState([]);
+
+      const targetRef = useRef(null);
+      const tooltipRef = useRef(null);
+      const [coords, setCoords] = useState({ top: 0, left: 0 }); // Initial naive default at (0,0)
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      // In useEffect mode
+      useEffect(() => {
+        if (mode !== "useEffect" || !showTooltip) return;
+        addLog("useEffect", "Passive sync running AFTER browser paint!", "warn");
+
+        if (slowMainThread) {
+          // Simulate heavy computation during passive effect to make flicker super visible
+          const start = performance.now();
+          while (performance.now() - start < 80) {}
+        }
+
+        if (targetRef.current && tooltipRef.current) {
+          const targetRect = targetRef.current.getBoundingClientRect();
+          const tooltipRect = tooltipRef.current.getBoundingClientRect();
+          const stageRect = targetRef.current.parentElement.getBoundingClientRect();
+
+          const calculatedTop = (targetRect.top - stageRect.top) - tooltipRect.height - 8;
+          const calculatedLeft = (targetRect.left - stageRect.left) + (targetRect.width / 2) - (tooltipRect.width / 2);
+
+          setCoords({ top: calculatedTop, left: calculatedLeft });
+          addLog("setState", `Repositioned to (${Math.round(calculatedLeft)}px, ${Math.round(calculatedTop)}px)`, "success");
+        }
+      }, [showTooltip, mode, slowMainThread]);
+
+      // In useLayoutEffect mode
+      useLayoutEffect(() => {
+        if (mode !== "useLayoutEffect" || !showTooltip) return;
+        addLog("useLayoutEffect", "Synchronous commit-to-paint sync running BEFORE paint!", "purple");
+
+        if (slowMainThread) {
+          const start = performance.now();
+          while (performance.now() - start < 80) {}
+        }
+
+        if (targetRef.current && tooltipRef.current) {
+          const targetRect = targetRef.current.getBoundingClientRect();
+          const tooltipRect = tooltipRef.current.getBoundingClientRect();
+          const stageRect = targetRef.current.parentElement.getBoundingClientRect();
+
+          const calculatedTop = (targetRect.top - stageRect.top) - tooltipRect.height - 8;
+          const calculatedLeft = (targetRect.left - stageRect.left) + (targetRect.width / 2) - (tooltipRect.width / 2);
+
+          setCoords({ top: calculatedTop, left: calculatedLeft });
+          addLog("setState", `Repositioned synchronously before paint: (${Math.round(calculatedLeft)}px, ${Math.round(calculatedTop)}px)`, "success");
+        }
+      }, [showTooltip, mode, slowMainThread]);
+
+      const handleToggle = () => {
+        if (!showTooltip) {
+          // Reset to origin (0,0) to test whether user sees flicker
+          setCoords({ top: 0, left: 0 });
+          addLog("Render #1", `Initial commit at default top-left (0,0)`, "info");
+        }
+        setShowTooltip(prev => !prev);
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>1. Visual Flicker & Layout Measurement</span>
+            <span className={`badge ${mode === "useLayoutEffect" ? "badge-purple" : "badge-amber"}`}>
+              {mode}
+            </span>
+          </div>
+          <p className="card-desc">
+            When a component renders at default initial coordinates <code>(0,0)</code> and measures itself post-commit:
+            <code>useEffect</code> causes an intermediate frame paint at <code>(0,0)</code> (visible flicker/pop), whereas <code>useLayoutEffect</code> recalculates and commits positioning before the browser paints.
+          </p>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <div className="btn-group">
+              <button 
+                className={mode === "useLayoutEffect" ? "active" : ""}
+                onClick={() => { setMode("useLayoutEffect"); setShowTooltip(false); }}
+              >
+                useLayoutEffect (No Flicker)
+              </button>
+              <button 
+                className={mode === "useEffect" ? "active" : ""}
+                onClick={() => { setMode("useEffect"); setShowTooltip(false); }}
+              >
+                useEffect (Visible Flicker)
+              </button>
+            </div>
+
+            <label style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "var(--accent-amber)" }}>
+              <input 
+                type="checkbox" 
+                checked={slowMainThread} 
+                onChange={e => setSlowMainThread(e.target.checked)} 
+              />
+              Simulate Heavy Frame Work (80ms)
+            </label>
+          </div>
+
+          <div className="tooltip-stage">
+            <button className="anchor-target" onClick={handleToggle}>
+              {showTooltip ? "Hide Popover" : "Click to Spawn Popover"}
+            </button>
+
+            {showTooltip && (
+              <div 
+                ref={tooltipRef}
+                className="tooltip-popup"
+                style={{
+                  top: `${coords.top}px`,
+                  left: `${coords.left}px`,
+                  background: coords.top === 0 && coords.left === 0 ? "var(--accent-red)" : undefined
+                }}
+              >
+                ✨ Popover: [{Math.round(coords.left)}px, {Math.round(coords.top)}px]
+                {coords.top === 0 && coords.left === 0 && " (Initial 0,0 State!)"}
+              </div>
+            )}
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 2: READ-BEFORE-WRITE DISCIPLINE VS LAYOUT THRASHING
+    // =========================================================================
+    function LayoutThrashingDemo() {
+      const [count, setCount] = useState(24);
+      const [lastDuration, setLastDuration] = useState(null);
+      const [strategy, setStrategy] = useState(null);
+      const containerRef = useRef(null);
+
+      const runInterleavedThrash = () => {
+        if (!containerRef.current) return;
+        const boxes = containerRef.current.children;
+        const start = performance.now();
+
+        // BAD: Interleaved Read-Write loop (forces browser to reflow 24 times)
+        for (let i = 0; i < boxes.length; i++) {
+          const currentWidth = boxes[i].offsetWidth; // READ (forces layout)
+          boxes[i].style.width = `${((currentWidth + 5) % 120) + 40}px`; // WRITE (invalidates layout)
+          boxes[i].style.background = `hsl(${(i * 25) % 360}, 70%, 40%)`;
+        }
+
+        const duration = performance.now() - start;
+        setStrategy("Interleaved (Read-Write-Read-Write Thrash)");
+        setLastDuration(duration.toFixed(3));
+      };
+
+      const runBatchedDiscipline = () => {
+        if (!containerRef.current) return;
+        const boxes = containerRef.current.children;
+        const start = performance.now();
+
+        // GOOD: Read all -> Compute -> Write all
+        const widths = [];
+        // Phase 1: READ ALL
+        for (let i = 0; i < boxes.length; i++) {
+          widths.push(boxes[i].offsetWidth);
+        }
+
+        // Phase 2: COMPUTE
+        const newWidths = widths.map(w => ((w + 5) % 120) + 40);
+
+        // Phase 3: WRITE ALL
+        for (let i = 0; i < boxes.length; i++) {
+          boxes[i].style.width = `${newWidths[i]}px`;
+          boxes[i].style.background = `hsl(${(i * 25) % 360}, 70%, 40%)`;
+        }
+
+        const duration = performance.now() - start;
+        setStrategy("Batched Discipline (Read All -> Write All)");
+        setLastDuration(duration.toFixed(3));
+      };
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>2. Layout Thrashing & Read/Write Discipline</span>
+            {lastDuration && (
+              <span className={`badge ${strategy?.includes("Batched") ? "badge-green" : "badge-red"}`}>
+                {lastDuration} ms
+              </span>
+            )}
+          </div>
+          <p className="card-desc">
+            Inside <code>useLayoutEffect</code>, repeatedly alternating between reading layout properties (e.g. <code>offsetWidth</code>) and mutating styles forces synchronous layout recalculation.
+          </p>
+
+          <div className="btn-group">
+            <button onClick={runInterleavedThrash} style={{ borderColor: "var(--accent-red)" }}>
+              ❌ Run Interleaved (Read-Write Thrash)
+            </button>
+            <button onClick={runBatchedDiscipline} style={{ borderColor: "var(--accent-green)" }}>
+              ✅ Run Batched (Read All → Write All)
+            </button>
+          </div>
+
+          <div ref={containerRef} className="thrash-grid">
+            {Array.from({ length: count }).map((_, i) => (
+              <div key={i} className="thrash-item">
+                #{i+1}
+              </div>
+            ))}
+          </div>
+
+          {strategy && (
+            <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              Last executed: <strong style={{ color: "#fff" }}>{strategy}</strong> in <span style={{ color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>{lastDuration}ms</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 3: RESIZEOBSERVER SYNCHRONIZATION
+    // =========================================================================
+    function ResizeObserverDemo() {
+      const boxRef = useRef(null);
+      const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+      const [syncMethod, setSyncMethod] = useState("ResizeObserver"); // "oneTime" vs "ResizeObserver"
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (event, message, type = "info") => {
+        const time = new Date().toISOString().substring(17, 23);
+        setLogs(prev => [...prev.slice(-30), { time, event, message, type }]);
+      };
+
+      useLayoutEffect(() => {
+        const node = boxRef.current;
+        if (!node) return;
+
+        if (syncMethod === "oneTime") {
+          const rect = node.getBoundingClientRect();
+          setDimensions({ width: Math.round(rect.width), height: Math.round(rect.height) });
+          addLog("One-Time Measurement", `Measured initial size: ${Math.round(rect.width)}x${Math.round(rect.height)}`, "warn");
+          return;
+        }
+
+        addLog("ResizeObserver", "Attached ResizeObserver instance", "purple");
+        const observer = new ResizeObserver(entries => {
+          const entry = entries[0];
+          if (!entry) return;
+          const { width, height } = entry.contentRect;
+          setDimensions({ width: Math.round(width), height: Math.round(height) });
+          addLog("Resize Event", `Observed dimension change: ${Math.round(width)}px × ${Math.round(height)}px`, "success");
+        });
+
+        observer.observe(node);
+
+        return () => {
+          addLog("Cleanup", "Disconnected ResizeObserver", "info");
+          observer.disconnect();
+        };
+      }, [syncMethod]);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>3. Dynamic Size Synchronization (ResizeObserver)</span>
+            <span className={`badge ${syncMethod === "ResizeObserver" ? "badge-green" : "badge-amber"}`}>
+              {syncMethod}
+            </span>
+          </div>
+          <p className="card-desc">
+            A one-time <code>useLayoutEffect([])</code> cannot detect CSS container resizes, responsive breakpoints, or user resizing. An external <code>ResizeObserver</code> must synchronize layout changes.
+          </p>
+
+          <div className="btn-group">
+            <button 
+              className={syncMethod === "ResizeObserver" ? "active" : ""}
+              onClick={() => setSyncMethod("ResizeObserver")}
+            >
+              Continuous (ResizeObserver)
+            </button>
+            <button 
+              className={syncMethod === "oneTime" ? "active" : ""}
+              onClick={() => setSyncMethod("oneTime")}
+            >
+              One-Time Snapshot (Stale on Resize)
+            </button>
+          </div>
+
+          <div ref={boxRef} className="resizable-box">
+            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent-cyan)" }}>
+              {dimensions.width}px × {dimensions.height}px
+            </div>
+            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+              ↘️ Drag bottom-right corner to resize this box
+            </div>
+          </div>
+
+          <LogTerminal logs={logs} onClear={() => setLogs([])} />
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // DEMO 4: LAYOUT LOOP CONVERGENCE & TIMING SAFETY
+    // =========================================================================
+    function LayoutLoopGuardDemo() {
+      const [count, setCount] = useState(0);
+      const [renderCount, setRenderCount] = useState(0);
+      const [guardEnabled, setGuardEnabled] = useState(true);
+      const [status, setStatus] = useState("idle");
+
+      const elementRef = useRef(null);
+
+      useLayoutEffect(() => {
+        setRenderCount(c => c + 1);
+
+        if (!guardEnabled) {
+          // Dangerous simulation: triggers without guard (capped at 5 to prevent browser crash)
+          if (renderCount < 5) {
+            setCount(c => c + 1);
+          } else {
+            setStatus("Circuit breaker tripped to prevent freeze!");
+          }
+          return;
+        }
+
+        // Convergent Layout Effect: Compares before updating
+        const measuredWidth = elementRef.current ? elementRef.current.offsetWidth : 100;
+        // Only updates if value changed
+        if (measuredWidth !== count && count === 0) {
+          setCount(measuredWidth);
+          setStatus("Converged safely in 1 extra layout commit.");
+        }
+      }, [count, guardEnabled]);
+
+      return (
+        <div className="card">
+          <div className="card-title">
+            <span>4. Layout Effect Convergence Guard</span>
+            <span className={`badge ${guardEnabled ? "badge-green" : "badge-red"}`}>
+              {guardEnabled ? "Convergent Guard Active" : "Uncontrolled Loop Risk"}
+            </span>
+          </div>
+          <p className="card-desc">
+            Synchronous <code>setState</code> inside <code>useLayoutEffect</code> forces an immediate re-render and re-commit before paint. Without strict convergence conditions, it creates infinite layout loops.
+          </p>
+
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div className="btn-group">
+              <button 
+                className={guardEnabled ? "active" : ""}
+                onClick={() => { setGuardEnabled(true); setCount(0); setRenderCount(0); setStatus("Testing convergent guard..."); }}
+              >
+                Test Convergent Guard
+              </button>
+              <button 
+                className={!guardEnabled ? "active" : ""}
+                onClick={() => { setGuardEnabled(false); setCount(0); setRenderCount(0); setStatus("Testing un-guarded update..."); }}
+              >
+                Test Un-Guarded State Loop
+              </button>
+            </div>
+          </div>
+
+          <div ref={elementRef} style={{ background: "#0d131f", padding: "16px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+            <div>Measured Width State: <strong style={{ color: "var(--accent-cyan)" }}>{count}px</strong></div>
+            <div>Total Commits Triggered: <strong style={{ color: renderCount > 3 ? "var(--accent-red)" : "var(--accent-green)" }}>{renderCount}</strong></div>
+            <div style={{ fontSize: "0.85rem", color: "var(--accent-amber)", marginTop: 4 }}>Status: {status}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // ROOT APP
+    // =========================================================================
+    function App() {
+      return (
+        <div className="container">
+          <header className="header-banner">
+            <div>
+              <h1>
+                <span>🧪</span>
+                Lab 10 — Browser Synchronization & Layout Effects
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: 4 }}>
+                Interactive diagnostic suite for exploring commit-to-paint timing, visual flicker elimination, and DOM measurement discipline.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <span className="badge badge-primary">React 18</span>
+              <span className="badge badge-purple">useLayoutEffect</span>
+            </div>
+          </header>
+
+          <div className="grid-2">
+            <TooltipFlickerDemo />
+            <LayoutThrashingDemo />
+            <ResizeObserverDemo />
+            <LayoutLoopGuardDemo />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>

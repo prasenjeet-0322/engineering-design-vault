@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab 01: JSX Mental Model & AST Runtime Visualizer</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    h1 { color: #fff; margin-bottom: 8px; font-size: 24px; }
+    p.subtitle { color: #8b949e; margin-top: 0; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 16px;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    pre {
+      background: #090d13;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      border: 1px solid #21262d;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #30363d;
+      border-color: #8b949e;
+    }
+    button.active {
+      background: #1f6feb;
+      color: #fff;
+      border-color: #388bfd;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+    .badge-v8 { background: rgba(63, 185, 80, 0.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-dom { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Lab 01: JSX Mental Model & AST Runtime Visualizer</h1>
+  <p class="subtitle">Inspect how JSX transforms from Source Syntax ➔ Factory Invocations ➔ V8 Plain Object Descriptors ➔ Host DOM Operations.</p>
+
+  <div class="btn-group">
+    <button class="active" onclick="selectSnippet('simple')">1. Intrinsic Element</button>
+    <button onclick="selectSnippet('component')">2. Component Reference</button>
+    <button onclick="selectSnippet('expression')">3. Expression Slot ({})</button>
+    <button onclick="selectSnippet('children')">4. Nested Children Tree</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1. Source JSX (What Developer Writes)</h2>
+      <pre id="source-jsx">// Select a snippet above</pre>
+
+      <h2>2. Transpiled Output (Modern `react/jsx-runtime`)</h2>
+      <pre id="transpiled-js">// Generated code</pre>
+    </div>
+
+    <div class="card">
+      <h2>3. V8 Heap Object (React Element Descriptor)</h2>
+      <span class="status-badge badge-v8">Memory Space: JavaScript V8 Heap</span>
+      <pre id="v8-object">// V8 plain object</pre>
+
+      <h2>4. Final Host DOM Node (Browser Engine)</h2>
+      <span class="status-badge badge-dom">Memory Space: C++ Blink/WebKit DOM</span>
+      <pre id="dom-node">// DOM Node</pre>
+    </div>
+  </div>
+
+  <script>
+    const snippets = {
+      simple: {
+        jsx: `<button className="primary">\n  Save\n</button>`,
+        transpiled: `import { jsx as _jsx } from "react/jsx-runtime";\n\nconst element = _jsx("button", {\n  className: "primary",\n  children: "Save"\n});`,
+        v8: JSON.stringify({
+          $$typeof: "Symbol(react.element)",
+          type: "button",
+          key: null,
+          ref: null,
+          props: {
+            className: "primary",
+            children: "Save"
+          },
+          _owner: null
+        }, null, 2),
+        dom: `<button class="primary">Save</button>\n\nType: HTMLButtonElement\nInherits: HTMLElement ➔ Element ➔ Node ➔ EventTarget`
+      },
+      component: {
+        jsx: `function Button({ label }) {\n  return <button>{label}</button>;\n}\n\nconst element = <Button label="Submit" />;`,
+        transpiled: `import { jsx as _jsx } from "react/jsx-runtime";\n\nfunction Button({ label }) {\n  return _jsx("button", { children: label });\n}\n\nconst element = _jsx(Button, {\n  label: "Submit"\n});`,
+        v8: JSON.stringify({
+          $$typeof: "Symbol(react.element)",
+          type: "ƒ Button({ label })",
+          key: null,
+          ref: null,
+          props: {
+            label: "Submit"
+          },
+          _owner: null
+        }, null, 2),
+        dom: `<!-- Button component is evaluated by React during Render Phase -->\n<button>Submit</button>`
+      },
+      expression: {
+        jsx: `const count = 5;\nconst element = <p>Count: {count + 1}</p>;`,
+        transpiled: `import { jsxs as _jsxs } from "react/jsx-runtime";\n\nconst count = 5;\nconst element = _jsxs("p", {\n  children: ["Count: ", count + 1]\n});`,
+        v8: JSON.stringify({
+          $$typeof: "Symbol(react.element)",
+          type: "p",
+          key: null,
+          ref: null,
+          props: {
+            children: ["Count: ", 6]
+          },
+          _owner: null
+        }, null, 2),
+        dom: `<p>Count: 6</p>\n\nType: HTMLParagraphElement`
+      },
+      children: {
+        jsx: `<Card title="Dashboard">\n  <h2>Overview</h2>\n  <p>Metrics active.</p>\n</Card>`,
+        transpiled: `import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";\n\nconst element = _jsx(Card, {\n  title: "Dashboard",\n  children: [\n    _jsx("h2", { children: "Overview" }),\n    _jsx("p", { children: "Metrics active." })\n  ]\n});`,
+        v8: JSON.stringify({
+          $$typeof: "Symbol(react.element)",
+          type: "ƒ Card(props)",
+          props: {
+            title: "Dashboard",
+            children: [
+              { $$typeof: "Symbol(react.element)", type: "h2", props: { children: "Overview" } },
+              { $$typeof: "Symbol(react.element)", type: "p", props: { children: "Metrics active." } }
+            ]
+          }
+        }, null, 2),
+        dom: `<div class="card">\n  <h2>Overview</h2>\n  <p>Metrics active.</p>\n</div>`
+      }
+    };
+
+    function selectSnippet(key) {
+      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const data = snippets[key];
+      document.getElementById('source-jsx').textContent = data.jsx;
+      document.getElementById('transpiled-js').textContent = data.transpiled;
+      document.getElementById('v8-object').textContent = data.v8;
+      document.getElementById('dom-node').textContent = data.dom;
+    }
+
+    // Initialize
+    document.getElementById('source-jsx').textContent = snippets.simple.jsx;
+    document.getElementById('transpiled-js').textContent = snippets.simple.transpiled;
+    document.getElementById('v8-object').textContent = snippets.simple.v8;
+    document.getElementById('dom-node').textContent = snippets.simple.dom;
+  </script>
+</body>
+</html>

@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 09 — Part 16: Final Review & Synthesis Mastery Capstone Lab</title>
+  
+  <!-- React 18 & Babel via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #050811;
+      --card-bg: rgba(15, 23, 42, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #06b6d4;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    
+    .container {
+      max-width: 1540px;
+      margin: 0 auto;
+    }
+    
+    header {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .badge-gold {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    
+    .badge-stable {
+      background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr 380px;
+      gap: 20px;
+    }
+    
+    @media (max-width: 1240px) {
+      .layout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+    }
+    
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #e2e8f0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
+    }
+    
+    .control-group {
+      margin-bottom: 16px;
+    }
+    
+    .control-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    select, input[type="text"] {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    
+    select:focus, input[type="text"]:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+    }
+    
+    .view-switcher {
+      display: flex;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      margin-bottom: 16px;
+    }
+    
+    .view-tab {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    
+    .view-tab.active {
+      background: rgba(59, 130, 246, 0.25);
+      color: #38bdf8;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+    
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    .btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: #38bdf8;
+      color: white;
+    }
+    
+    .btn-emerald {
+      background: linear-gradient(135deg, #059669, #10b981);
+      border-color: #34d399;
+      color: white;
+    }
+
+    .btn-warning {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+    }
+    
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+    }
+    
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      border: 1px solid var(--card-border);
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    .stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent-cyan);
+    }
+    
+    .table-container {
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    
+    .table-header {
+      display: grid;
+      grid-template-columns: 40px 110px 1fr 100px 130px 70px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--card-border);
+      padding: 10px 14px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    .table-row {
+      display: grid;
+      grid-template-columns: 40px 110px 1fr 100px 130px 70px;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background 0.15s;
+    }
+    
+    .table-row:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .table-row.selected {
+      background: rgba(59, 130, 246, 0.12);
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    
+    .grid-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px;
+      transition: all 0.2s;
+    }
+    
+    .grid-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+    
+    .grid-card.selected {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.08);
+    }
+    
+    .cell-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .instance-pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(139, 92, 246, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .render-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fde047;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .log-container {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      background: #040711;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 480px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-entry {
+      line-height: 1.4;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 4px;
+    }
+
+    .log-time { color: #64748b; }
+    .log-tag { font-weight: 700; }
+    .tag-mount { color: #10b981; }
+    .tag-unmount { color: #ef4444; }
+    .tag-race { color: #ec4899; }
+    .tag-render { color: #f59e0b; }
+    .tag-info { color: #38bdf8; }
+
+    .alert-banner {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useRef, useEffect, useCallback } = React;
+
+    const CAPSTONE_CATALOG = [
+      { id: "asset-101", sku: "NVDA-AI", name: "Tensor Supercomputer Node", category: "Compute", price: 12500.00 },
+      { id: "asset-102", sku: "AAPL-M3", name: "High-Density Storage SAN", category: "Storage", price: 4200.00 },
+      { id: "asset-103", sku: "MSFT-AZ", name: "Edge Kubernetes Gateway", category: "Networking", price: 2100.00 },
+      { id: "asset-104", sku: "AMZN-EC", name: "Low-Latency Fiber Switch", category: "Networking", price: 1800.00 },
+      { id: "asset-105", sku: "GOOG-TP", name: "Hardware Cryptographic Enclave", category: "Security", price: 5400.00 }
+    ];
+
+    function FinalReviewAndMasteryHub() {
+      // Key Strategy: 'id' | 'index' | 'random'
+      const [keyStrategy, setKeyStrategy] = useState("id");
+      // View Projection: 'table' | 'grid'
+      const [viewMode, setViewMode] = useState("table");
+      // State Ownership: 'hoisted' (draftsById) | 'row_local' (useState inside Row)
+      const [draftOwnership, setDraftOwnership] = useState("hoisted");
+      
+      const [entities, setEntities] = useState(CAPSTONE_CATALOG);
+      const [draftsById, setDraftsById] = useState({});
+      const [selectedIds, setSelectedIds] = useState(() => new Set());
+      const [searchQuery, setSearchQuery] = useState("");
+      const [categoryFilter, setCategoryFilter] = useState("ALL");
+
+      // In-flight Async Operation Tracking with Pointer Guards
+      const [operations, setOperations] = useState({});
+      const activeRequestPointers = useRef({});
+
+      // Diagnostic Logs
+      const [logs, setLogs] = useState([]);
+      const addLog = useCallback((tag, message, tagClass = "tag-info") => {
+        const time = new Date().toLocaleTimeString().split(" ")[0] + "." + Math.floor(Date.now() % 1000).toString().padStart(3, "0");
+        setLogs(prev => [{ id: crypto.randomUUID(), time, tag, message, tagClass }, ...prev.slice(0, 99)]);
+      }, []);
+
+      // Derived Visible Entities
+      const visibleEntities = useMemo(() => {
+        return entities.filter(item => {
+          const matchText = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            item.sku.toLowerCase().includes(searchQuery.toLowerCase());
+          const matchCat = categoryFilter === "ALL" || item.category === categoryFilter;
+          return matchText && matchCat;
+        });
+      }, [entities, searchQuery, categoryFilter]);
+
+      // Array Actions
+      const handleInsertTop = () => {
+        const nextId = "asset-" + Math.floor(100 + Math.random() * 900);
+        const newItem = {
+          id: nextId,
+          sku: "GEN-" + Math.floor(100 + Math.random() * 899),
+          name: "Provisioned Asset (" + nextId + ")",
+          category: "Compute",
+          price: 3200.00
+        };
+        setEntities(prev => [newItem, ...prev]);
+        addLog("INSERT", `Inserted ${nextId} at Slot 0`, "tag-mount");
+      };
+
+      const handleDeleteFirst = () => {
+        if (entities.length === 0) return;
+        const deleted = entities[0];
+        setEntities(prev => prev.slice(1));
+        addLog("DELETE", `Deleted first item: ${deleted.id}`, "tag-unmount");
+      };
+
+      const handleSortAsc = () => {
+        setEntities(prev => [...prev].sort((a, b) => a.price - b.price));
+        addLog("SORT", "Sorted catalog Ascending by price", "tag-info");
+      };
+
+      const handleSortDesc = () => {
+        setEntities(prev => [...prev].sort((a, b) => b.price - a.price));
+        addLog("SORT", "Sorted catalog Descending by price", "tag-info");
+      };
+
+      const handleShuffle = () => {
+        setEntities(prev => [...prev].sort(() => Math.random() - 0.5));
+        addLog("SHUFFLE", "Shuffled array positions", "tag-info");
+      };
+
+      const handleReset = () => {
+        setEntities(CAPSTONE_CATALOG);
+        setDraftsById({});
+        setSelectedIds(new Set());
+        setOperations({});
+        setSearchQuery("");
+        setCategoryFilter("ALL");
+        activeRequestPointers.current = {};
+        addLog("RESET", "Reset catalog to initial state", "tag-info");
+      };
+
+      const handleToggleSelect = (id) => {
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+      };
+
+      const handleSelectAllVisible = () => {
+        if (selectedIds.size === visibleEntities.length && visibleEntities.length > 0) {
+          setSelectedIds(new Set());
+        } else {
+          setSelectedIds(new Set(visibleEntities.map(i => i.id)));
+        }
+      };
+
+      const handleUpdateDraft = (id, newName) => {
+        setDraftsById(prev => ({
+          ...prev,
+          [id]: { ...(prev[id] ?? {}), name: newName }
+        }));
+      };
+
+      // Simulated Async Race Condition Engine (Slow #1 vs Fast #2)
+      const handleTriggerRaceTest = (id) => {
+        const req1 = "REQ-1(SLOW)";
+        const req2 = "REQ-2(FAST)";
+
+        addLog("RACE_START", `Dispatched Slow Save #1 (1200ms) for ${id}`, "tag-race");
+        activeRequestPointers.current[id] = req1;
+        setOperations(prev => ({ ...prev, [id]: { status: "saving", activeReq: req1 } }));
+
+        setTimeout(() => {
+          if (activeRequestPointers.current[id] === req1) {
+            addLog("RACE_COMMIT", `[AUTHORITATIVE] Save #1 committed for ${id}`, "tag-mount");
+            setOperations(prev => ({ ...prev, [id]: { status: "saved", activeReq: req1 } }));
+          } else {
+            addLog("RACE_DISCARD", `🚨 [STALE DISCARD] Save #1 finished late and was safely dropped for ${id}!`, "tag-race");
+          }
+        }, 1200);
+
+        setTimeout(() => {
+          addLog("RACE_START", `Dispatched Fast Save #2 (400ms) for ${id}`, "tag-race");
+          activeRequestPointers.current[id] = req2;
+          setOperations(prev => ({ ...prev, [id]: { status: "saving", activeReq: req2 } }));
+
+          setTimeout(() => {
+            if (activeRequestPointers.current[id] === req2) {
+              addLog("RACE_COMMIT", `[AUTHORITATIVE] Save #2 committed for ${id}`, "tag-mount");
+              setOperations(prev => ({ ...prev, [id]: { status: "saved", activeReq: req2 } }));
+            }
+          }, 400);
+        }, 300);
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div>
+              <h1>
+                <span>🏆</span> Conditional Rendering & Lists: Synthesis Mastery
+              </h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                KPI 09 Capstone: Fiber Reconciliation, Identity Migration, Four-Lifetime Model & Currentness
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-gold">KPI 09 · Capstone Final</span>
+              <span className={`badge ${keyStrategy === "id" ? "badge-stable" : "badge-danger"}`}>
+                Key: {keyStrategy.toUpperCase()}
+              </span>
+            </div>
+          </header>
+
+          <div className="layout-grid">
+            {/* Control Panel */}
+            <div className="card">
+              <div className="card-title">
+                <span>⚙️</span> Capstone Controls
+              </div>
+
+              <div className="control-group">
+                <label>View Projection</label>
+                <div className="view-switcher">
+                  <button 
+                    className={`view-tab ${viewMode === "table" ? "active" : ""}`}
+                    onClick={() => { setViewMode("table"); addLog("VIEW", "Switched projection to Table View", "tag-info"); }}
+                  >
+                    📊 Table
+                  </button>
+                  <button 
+                    className={`view-tab ${viewMode === "grid" ? "active" : ""}`}
+                    onClick={() => { setViewMode("grid"); addLog("VIEW", "Switched projection to Grid View", "tag-info"); }}
+                  >
+                    🎴 Cards
+                  </button>
+                </div>
+              </div>
+
+              <div className="control-group">
+                <label>React Key Strategy</label>
+                <select value={keyStrategy} onChange={(e) => setKeyStrategy(e.target.value)}>
+                  <option value="id">Stable Domain ID (key=item.id) [CORRECT]</option>
+                  <option value="index">Array Index (key=index) [DEFECTIVE]</option>
+                  <option value="random">Random UUID (key=Math.random()) [DESTRUCTIVE]</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Draft State Ownership</label>
+                <select value={draftOwnership} onChange={(e) => setDraftOwnership(e.target.value)}>
+                  <option value="hoisted">Hoisted Draft Registry (draftsById) [PERSISTENT]</option>
+                  <option value="row_local">Row-Local useState [EPHEMERAL]</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Search Query (Filter Test)</label>
+                <input 
+                  type="text" 
+                  placeholder="Filter by name or SKU..." 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                />
+              </div>
+
+              <div className="control-group">
+                <label>Category Filter</label>
+                <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                  <option value="ALL">All Categories</option>
+                  <option value="Compute">Compute</option>
+                  <option value="Storage">Storage</option>
+                  <option value="Networking">Networking</option>
+                  <option value="Security">Security</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Array Mutations</label>
+                <div className="btn-grid">
+                  <button className="btn btn-primary" onClick={handleInsertTop}>+ Insert Top</button>
+                  <button className="btn btn-danger" onClick={handleDeleteFirst}>- Delete First</button>
+                  <button className="btn btn-warning" onClick={handleSortAsc}>Sort Price ↑</button>
+                  <button className="btn btn-warning" onClick={handleSortDesc}>Sort Price ↓</button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                <button className="btn" style={{ flex: 1 }} onClick={handleShuffle}>🔀 Shuffle</button>
+                <button className="btn" style={{ flex: 1 }} onClick={handleReset}>🔄 Reset All</button>
+              </div>
+            </div>
+
+            {/* Central Interactive Collection View */}
+            <div className="card">
+              <div className="card-title" style={{ justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>📋</span> Live Projected UI ({visibleEntities.length} of {entities.length})
+                </div>
+                <button className="btn btn-sm" onClick={handleSelectAllVisible}>
+                  {selectedIds.size === visibleEntities.length && visibleEntities.length > 0 ? "Deselect All" : "Select All Visible"}
+                </button>
+              </div>
+
+              {keyStrategy === "index" && (
+                <div className="alert-banner">
+                  <span>⚠️</span> <strong>CRUCIBLE ALERT:</strong> You are using <code>key=index</code>. Edit an input, then click <strong>"Sort Price ↑"</strong> or <strong>"+ Insert Top"</strong> to watch the draft jump to the wrong entity!
+                </div>
+              )}
+
+              <div className="stats-bar">
+                <div className="stat-item">
+                  <span className="stat-label">Key Mode</span>
+                  <span className="stat-val" style={{ color: keyStrategy === "id" ? "#10b981" : "#ef4444" }}>
+                    {keyStrategy}
+                  </span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Ownership</span>
+                  <span className="stat-val">{draftOwnership === "hoisted" ? "DraftsById" : "useState"}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Selected Items</span>
+                  <span className="stat-val">{selectedIds.size}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Active Async Ops</span>
+                  <span className="stat-val">
+                    {Object.values(operations).filter(op => op.status === "saving").length}
+                  </span>
+                </div>
+              </div>
+
+              {viewMode === "table" ? (
+                <div className="table-container">
+                  <div className="table-header">
+                    <div>Sel</div>
+                    <div>Entity ID</div>
+                    <div>Live Draft Input</div>
+                    <div>Fiber Inst.</div>
+                    <div>Async Race</div>
+                    <div>Renders</div>
+                  </div>
+
+                  <div>
+                    {visibleEntities.map((item, index) => {
+                      const resolvedKey = keyStrategy === "id" 
+                        ? item.id 
+                        : keyStrategy === "index" 
+                        ? index 
+                        : Math.random();
+
+                      return (
+                        <CapstoneRow
+                          key={resolvedKey}
+                          index={index}
+                          item={item}
+                          isSelected={selectedIds.has(item.id)}
+                          onToggleSelect={handleToggleSelect}
+                          draftOwnership={draftOwnership}
+                          hoistedDraft={draftsById[item.id]?.name}
+                          onUpdateDraft={handleUpdateDraft}
+                          operation={operations[item.id]}
+                          onTriggerRace={handleTriggerRaceTest}
+                          addLog={addLog}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid-container">
+                  {visibleEntities.map((item, index) => {
+                    const resolvedKey = keyStrategy === "id" 
+                      ? item.id 
+                      : keyStrategy === "index" 
+                      ? index 
+                      : Math.random();
+
+                    return (
+                      <CapstoneCard
+                        key={resolvedKey}
+                        index={index}
+                        item={item}
+                        isSelected={selectedIds.has(item.id)}
+                        onToggleSelect={handleToggleSelect}
+                        draftOwnership={draftOwnership}
+                        hoistedDraft={draftsById[item.id]?.name}
+                        onUpdateDraft={handleUpdateDraft}
+                        operation={operations[item.id]}
+                        onTriggerRace={handleTriggerRaceTest}
+                        addLog={addLog}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Diagnostic Telemetry Stream */}
+            <div className="card">
+              <div className="card-title" style={{ justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🔬</span> Telemetry Event Stream
+                </div>
+                <button className="btn btn-sm" onClick={() => setLogs([])}>Clear</button>
+              </div>
+
+              <div className="log-container">
+                {logs.length === 0 && (
+                  <div style={{ color: "#475569", textAlign: "center", marginTop: "40px" }}>
+                    Telemetry stream idle. Mutate the collection or trigger race tests to observe real-time events.
+                  </div>
+                )}
+                {logs.map(log => (
+                  <div key={log.id} className="log-entry">
+                    <span className="log-time">{log.time}</span>
+                    <span className={`log-tag ${log.tagClass}`}>[{log.tag}]</span>
+                    <span>{log.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Instrumented Row Component
+    function CapstoneRow({
+      index,
+      item,
+      isSelected,
+      onToggleSelect,
+      draftOwnership,
+      hoistedDraft,
+      onUpdateDraft,
+      operation,
+      onTriggerRace,
+      addLog
+    }) {
+      const [localDraft, setLocalDraft] = useState(item.name);
+      
+      const instanceIdRef = useRef(Math.random().toString(36).slice(2, 7));
+      const renderCountRef = useRef(0);
+      renderCountRef.current += 1;
+
+      useEffect(() => {
+        addLog("MOUNT", `Mounted <Row /> ID: ${item.id} (#${instanceIdRef.current})`, "tag-mount");
+        return () => {
+          addLog("UNMOUNT", `Unmounted <Row /> ID: ${item.id} (#${instanceIdRef.current})`, "tag-unmount");
+        };
+      }, [item.id]);
+
+      const activeValue = draftOwnership === "hoisted" 
+        ? (hoistedDraft !== undefined ? hoistedDraft : item.name)
+        : localDraft;
+
+      const handleInputChange = (e) => {
+        const val = e.target.value;
+        if (draftOwnership === "hoisted") {
+          onUpdateDraft(item.id, val);
+        } else {
+          setLocalDraft(val);
+        }
+      };
+
+      return (
+        <div className={`table-row ${isSelected ? "selected" : ""}`}>
+          <div>
+            <input 
+              type="checkbox" 
+              checked={isSelected} 
+              onChange={() => onToggleSelect(item.id)} 
+            />
+          </div>
+          <div className="cell-mono" style={{ color: "#38bdf8" }}>
+            {item.id}
+          </div>
+          <div>
+            <input 
+              type="text" 
+              value={activeValue} 
+              onChange={handleInputChange} 
+              style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+            />
+          </div>
+          <div>
+            <span className="instance-pill">#{instanceIdRef.current}</span>
+          </div>
+          <div>
+            <button 
+              className={`btn btn-sm ${operation?.status === "saving" ? "btn-warning" : "btn-primary"}`}
+              onClick={() => onTriggerRace(item.id)}
+              disabled={operation?.status === "saving"}
+              style={{ width: "100%" }}
+            >
+              {operation?.status === "saving" ? "⏳ Racing..." : "⚡ Race Test"}
+            </button>
+          </div>
+          <div>
+            <span className="render-badge">R:{renderCountRef.current}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Instrumented Card Component
+    function CapstoneCard({
+      index,
+      item,
+      isSelected,
+      onToggleSelect,
+      draftOwnership,
+      hoistedDraft,
+      onUpdateDraft,
+      operation,
+      onTriggerRace,
+      addLog
+    }) {
+      const [localDraft, setLocalDraft] = useState(item.name);
+      const instanceIdRef = useRef(Math.random().toString(36).slice(2, 7));
+      const renderCountRef = useRef(0);
+      renderCountRef.current += 1;
+
+      useEffect(() => {
+        addLog("MOUNT", `Mounted <Card /> ID: ${item.id} (#${instanceIdRef.current})`, "tag-mount");
+        return () => {
+          addLog("UNMOUNT", `Unmounted <Card /> ID: ${item.id} (#${instanceIdRef.current})`, "tag-unmount");
+        };
+      }, [item.id]);
+
+      const activeValue = draftOwnership === "hoisted" 
+        ? (hoistedDraft !== undefined ? hoistedDraft : item.name)
+        : localDraft;
+
+      const handleInputChange = (e) => {
+        const val = e.target.value;
+        if (draftOwnership === "hoisted") {
+          onUpdateDraft(item.id, val);
+        } else {
+          setLocalDraft(val);
+        }
+      };
+
+      return (
+        <div className={`grid-card ${isSelected ? "selected" : ""}`}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+            <span className="cell-mono" style={{ color: "#38bdf8", fontWeight: 700 }}>{item.sku}</span>
+            <span className="instance-pill">#{instanceIdRef.current}</span>
+          </div>
+          <input 
+            type="text" 
+            value={activeValue} 
+            onChange={handleInputChange} 
+            style={{ fontSize: "0.8rem", padding: "4px 8px", marginBottom: "8px" }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="cell-mono" style={{ color: "#34d399", fontWeight: 700 }}>${item.price.toFixed(2)}</span>
+            <input 
+              type="checkbox" 
+              checked={isSelected} 
+              onChange={() => onToggleSelect(item.id)} 
+            />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<FinalReviewAndMasteryHub />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 10 / Part 07 Lab — Ref-Driven Instance Values & Latest-Value Patterns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0e17;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      
+      --accent-primary: #6366f1;
+      --accent-primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-emerald: #10b981;
+      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-titles h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-titles .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #818cf8;
+    }
+
+    /* Grid */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-desc {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* Button styles */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #334155;
+      border-color: rgba(255, 255, 255, 0.25);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      border-color: #6366f1;
+      color: #fff;
+      box-shadow: 0 2px 10px var(--accent-primary-glow);
+    }
+
+    button.emerald {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+    }
+
+    button.cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.35);
+      color: #22d3ee;
+    }
+
+    button.amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    button.rose {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.35);
+      color: #fb7185;
+    }
+
+    input[type="text"], select {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #f8fafc;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-glow);
+    }
+
+    /* Metrics Grid */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-box {
+      background: #0b1120;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #38bdf8;
+      margin-top: 4px;
+    }
+
+    /* Terminal Console */
+    .terminal-window {
+      background: #050811;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      max-height: 190px;
+      overflow-y: auto;
+      margin-top: 14px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: #64748b;
+      min-width: 65px;
+    }
+    .log-cmd {
+      color: #818cf8;
+      font-weight: 600;
+    }
+    .log-info {
+      color: #22d3ee;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .log-err {
+      color: #f43f5e;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="header-titles">
+        <h1>
+          <span>⚡ Ref-Driven Instance Values & Latest-Value Patterns</span>
+        </h1>
+        <div class="subtitle">KPI 10 · Part 07 Companion Lab — Decoupling Subsystem Identity from Closure Freshness</div>
+      </div>
+      <div>
+        <span class="badge badge-primary">Level 06 Core Competency</span>
+      </div>
+    </header>
+
+    <!-- Top Grid: Stale Closure Probe vs WebSocket Identity Separation -->
+    <div class="grid-2col">
+      <!-- Panel 1: Stale Closure vs Latest-Value Probe -->
+      <div class="card">
+        <div class="card-title">
+          <span>1. Stale Closure vs useLatest Ref Bridge</span>
+          <span class="status-pill" id="closureTimerStatus" style="background: rgba(16,185,129,0.15); color:#34d399;">Interval Running (1.5s)</span>
+        </div>
+        <p class="card-desc">
+          Long-lived timers and listeners created in mount effects (<code>[]</code>) freeze their initial closure. A mutable ref container provides an up-to-date bridge without tearing down the timer.
+        </p>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Live React State</span>
+            <span class="metric-value" id="liveStateVal" style="color:#38bdf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Stale Closure Read</span>
+            <span class="metric-value" id="staleClosureVal" style="color:#f43f5e;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">latestRef.current Read</span>
+            <span class="metric-value" id="latestRefVal" style="color:#10b981;">0</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnIncrementState">➕ Increment State (count++)</button>
+          <button class="rose" id="btnResetState">🔄 Reset Counter</button>
+        </div>
+
+        <div class="terminal-window" id="closureTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Timer Mounted] Background ticker initialized with empty deps [].</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Resource Identity vs Callback Freshness (Socket Simulator) -->
+      <div class="card">
+        <div class="card-title">
+          <span>2. Resource Identity vs Callback Freshness</span>
+          <span class="status-pill" id="socketStatus" style="background: rgba(6,182,212,0.15); color:#22d3ee;">Connected: room-alpha</span>
+        </div>
+        <p class="card-desc">
+          Changing <code>roomId</code> must tear down and reconnect the socket (Resource Identity). Changing message formatters updates <code>useLatest</code> in-place with <strong>zero socket churn</strong>.
+        </p>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">RESOURCE IDENTITY (Room)</label>
+            <select id="selectRoom" style="width:100%;">
+              <option value="room-alpha">room-alpha</option>
+              <option value="room-beta">room-beta</option>
+              <option value="room-gamma">room-gamma</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">CALLBACK FRESHNESS (Currency)</label>
+            <select id="selectCurrency" style="width:100%;">
+              <option value="USD ($)">USD ($)</option>
+              <option value="EUR (€)">EUR (€)</option>
+              <option value="BTC (₿)">BTC (₿)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">Socket Reconnects</span>
+            <span class="metric-value" id="socketReconnectCount" style="color:#f59e0b;">1</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Active Currency Ref</span>
+            <span class="metric-value" id="activeCurrencyRef" style="color:#a855f7; font-size:0.95rem;">USD ($)</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Processed Trades</span>
+            <span class="metric-value" id="tradeCountVal" style="color:#10b981;">0</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="cyan" id="btnSimulateTrade">⚡ Emit Inbound Socket Event</button>
+        </div>
+
+        <div class="terminal-window" id="socketTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Socket] Connected to room-alpha. Listener registered with ref bridge.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid: Async Race Condition Guard vs Timer Handle Coordination -->
+    <div class="grid-2col">
+      <!-- Panel 3: Async Request Sequence Generation (Race Condition Guard) -->
+      <div class="card">
+        <div class="card-title">
+          <span>3. Request Generation Race Guard</span>
+          <span class="status-pill" id="raceGuardBadge" style="background: rgba(16,185,129,0.15); color:#34d399;">Guard Active</span>
+        </div>
+        <p class="card-desc">
+          When rapid search requests return out-of-order, <code>requestIdRef.current</code> verifies whether an arriving response corresponds to the latest dispatched operation before setting state.
+        </p>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">TYPEAHEAD QUERY</label>
+          <input type="text" id="typeaheadInput" placeholder="Type query to simulate search (e.g. 'react')..." style="width:100%;">
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">requestIdRef.current</span>
+            <span class="metric-value" id="latestRequestIdVal" style="color:#38bdf8;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Applied Query</span>
+            <span class="metric-value" id="appliedQueryVal" style="font-size:0.85rem; color:#10b981;">(None)</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Dropped Outdated</span>
+            <span class="metric-value" id="droppedResponsesVal" style="color:#f43f5e;">0</span>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="primary" id="btnSimulateBurst">💥 Dispatch Burst (Slow Req #1, Fast Req #2)</button>
+        </div>
+
+        <div class="terminal-window" id="typeaheadTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Typeahead] Ready. Awaiting user keystrokes...</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 4: Timer & AbortController Handle Coordination -->
+      <div class="card">
+        <div class="card-title">
+          <span>4. Debounce Timer Coordination & Cleanup</span>
+          <span class="status-pill" id="timerHandleStatus" style="background: rgba(100,116,139,0.2); color:#94a3b8;">No Active Timer</span>
+        </div>
+        <p class="card-desc">
+          Timer IDs and AbortControllers are mutable instance memory. Storing them in refs allows cancelling in-flight operations on subsequent user interactions or on unmount without re-rendering.
+        </p>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size:0.75rem; color:var(--text-dim); display:block; margin-bottom:4px;">DEBOUNCE INPUT (500ms Delay)</label>
+          <input type="text" id="debounceInput" placeholder="Rapid typing tests timer cancellation..." style="width:100%;">
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <span class="metric-label">timerRef.current</span>
+            <span class="metric-value" id="timerRefVal" style="font-size:0.85rem; color:#f59e0b;">null</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Cancellations</span>
+            <span class="metric-value" id="cancelledTimersVal" style="color:#f43f5e;">0</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Executed Saves</span>
+            <span class="metric-value" id="executedSavesVal" style="color:#10b981;">0</span>
+          </div>
+        </div>
+
+        <div class="terminal-window" id="debounceTerminal">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">[Debounce] Timer ledger initialized.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getTime() {
+      const d = new Date();
+      return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0').slice(0,2);
+    }
+
+    function log(terminalId, cmd, info, type = 'info') {
+      const term = document.getElementById(terminalId);
+      if (!term) return;
+      const row = document.createElement('div');
+      row.className = 'log-line';
+      row.innerHTML = `<span class="log-time">${getTime()}</span><span class="log-cmd">${cmd}</span><span class="log-${type}">${info}</span>`;
+      term.appendChild(row);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    // --- PANEL 1: STALE CLOSURE PROBE ---
+    let reactStateCount = 0;
+    const latestCountRef = { current: 0 };
+    const liveStateVal = document.getElementById('liveStateVal');
+    const staleClosureVal = document.getElementById('staleClosureVal');
+    const latestRefVal = document.getElementById('latestRefVal');
+
+    // Simulate mount effect capturing initial closure of count = 0
+    const capturedClosureValue = reactStateCount; 
+
+    setInterval(() => {
+      staleClosureVal.textContent = capturedClosureValue;
+      latestRefVal.textContent = latestCountRef.current;
+      log('closureTerminal', 'Interval Ticker', `Closure sees: ${capturedClosureValue} | latestRef.current: ${latestCountRef.current}`, latestCountRef.current !== capturedClosureValue ? 'warn' : 'info');
+    }, 1500);
+
+    document.getElementById('btnIncrementState').addEventListener('click', () => {
+      reactStateCount++;
+      latestCountRef.current = reactStateCount; // Synchronous ref assignment
+      liveStateVal.textContent = reactStateCount;
+      log('closureTerminal', 'setState(c => c+1)', `State is now ${reactStateCount}. latestRef.current updated.`, 'info');
+    });
+
+    document.getElementById('btnResetState').addEventListener('click', () => {
+      reactStateCount = 0;
+      latestCountRef.current = 0;
+      liveStateVal.textContent = 0;
+      log('closureTerminal', 'Reset', 'State reset to 0.', 'rose');
+    });
+
+    // --- PANEL 2: RESOURCE IDENTITY VS CALLBACK FRESHNESS ---
+    let currentRoom = "room-alpha";
+    let activeCurrency = "USD ($)";
+    const currencyRef = { current: "USD ($)" };
+    let reconnectCount = 1;
+    let tradeCount = 0;
+
+    const selectRoom = document.getElementById('selectRoom');
+    const selectCurrency = document.getElementById('selectCurrency');
+    const socketReconnectCount = document.getElementById('socketReconnectCount');
+    const activeCurrencyRef = document.getElementById('activeCurrencyRef');
+    const tradeCountVal = document.getElementById('tradeCountVal');
+    const socketStatus = document.getElementById('socketStatus');
+
+    selectRoom.addEventListener('change', (e) => {
+      currentRoom = e.target.value;
+      reconnectCount++;
+      socketReconnectCount.textContent = reconnectCount;
+      socketStatus.textContent = `Connected: ${currentRoom}`;
+      log('socketTerminal', 'useEffect([roomId])', `🔄 Room changed to ${currentRoom}. TEARING DOWN & RECONNECTING socket!`, 'warn');
+    });
+
+    selectCurrency.addEventListener('change', (e) => {
+      activeCurrency = e.target.value;
+      currencyRef.current = activeCurrency; // In-place ref update
+      activeCurrencyRef.textContent = activeCurrency;
+      log('socketTerminal', 'useLatest(currency)', `✅ Currency changed to ${activeCurrency}. Updated in-place. ZERO socket reconnection!`, 'info');
+    });
+
+    document.getElementById('btnSimulateTrade').addEventListener('click', () => {
+      tradeCount++;
+      tradeCountVal.textContent = tradeCount;
+      const price = (Math.random() * 50000 + 1000).toFixed(2);
+      log('socketTerminal', 'onMessage', `Inbound Trade on [${currentRoom}]: Price ${price} ${currencyRef.current}`, 'cmd');
+    });
+
+    // --- PANEL 3: ASYNC REQUEST SEQUENCE GENERATION ---
+    let globalRequestId = 0;
+    let droppedResponses = 0;
+    const typeaheadInput = document.getElementById('typeaheadInput');
+    const latestRequestIdVal = document.getElementById('latestRequestIdVal');
+    const appliedQueryVal = document.getElementById('appliedQueryVal');
+    const droppedResponsesVal = document.getElementById('droppedResponsesVal');
+
+    async function executeSearch(query, latencyMs, forcedId = null) {
+      const requestId = forcedId !== null ? forcedId : ++globalRequestId;
+      latestRequestIdVal.textContent = globalRequestId;
+
+      log('typeaheadTerminal', `Dispatch Req #${requestId}`, `Searching "${query}" (Latency: ${latencyMs}ms)...`, 'info');
+
+      await new Promise(r => setTimeout(r, latencyMs));
+
+      // Guard check against latest generation token
+      if (requestId !== globalRequestId) {
+        droppedResponses++;
+        droppedResponsesVal.textContent = droppedResponses;
+        log('typeaheadTerminal', `Drop Stale Req #${requestId}`, `⚠️ Response for "${query}" arrived late (Current: #${globalRequestId}). DROPPED!`, 'err');
+        return;
+      }
+
+      appliedQueryVal.textContent = `"${query}"`;
+      log('typeaheadTerminal', `Apply Req #${requestId}`, `✅ Response for "${query}" is CURRENT. State updated!`, 'emerald');
+    }
+
+    typeaheadInput.addEventListener('input', (e) => {
+      const q = e.target.value;
+      if (!q) return;
+      executeSearch(q, Math.floor(Math.random() * 400 + 100));
+    });
+
+    document.getElementById('btnSimulateBurst').addEventListener('click', () => {
+      // Req #1: Slow (700ms)
+      executeSearch("react-slow-req-1", 700);
+      // Req #2: Fast (200ms) dispatched 50ms later
+      setTimeout(() => {
+        executeSearch("react-fast-req-2", 200);
+      }, 50);
+    });
+
+    // --- PANEL 4: DEBOUNCE TIMER COORDINATION ---
+    let activeTimer = null;
+    let cancelledCount = 0;
+    let executedSaves = 0;
+    const debounceInput = document.getElementById('debounceInput');
+    const timerRefVal = document.getElementById('timerRefVal');
+    const cancelledTimersVal = document.getElementById('cancelledTimersVal');
+    const executedSavesVal = document.getElementById('executedSavesVal');
+    const timerHandleStatus = document.getElementById('timerHandleStatus');
+
+    debounceInput.addEventListener('input', (e) => {
+      const text = e.target.value;
+
+      if (activeTimer !== null) {
+        clearTimeout(activeTimer);
+        cancelledCount++;
+        cancelledTimersVal.textContent = cancelledCount;
+        log('debounceTerminal', `clearTimeout(${activeTimer})`, `Cancelled pending timer due to new keystroke.`, 'warn');
+      }
+
+      activeTimer = setTimeout(() => {
+        executedSaves++;
+        executedSavesVal.textContent = executedSaves;
+        timerRefVal.textContent = 'null';
+        timerHandleStatus.textContent = 'No Active Timer';
+        timerHandleStatus.style.background = 'rgba(100,116,139,0.2)';
+        timerHandleStatus.style.color = '#94a3b8';
+        log('debounceTerminal', 'Debounce Fired', `Saved payload: "${text}"`, 'emerald');
+        activeTimer = null;
+      }, 500);
+
+      timerRefVal.textContent = `#${activeTimer}`;
+      timerHandleStatus.textContent = `Timer Active (#${activeTimer})`;
+      timerHandleStatus.style.background = 'rgba(245,158,11,0.15)';
+      timerHandleStatus.style.color = '#fbbf24';
+    });
+  </script>
+</body>
+</html>
