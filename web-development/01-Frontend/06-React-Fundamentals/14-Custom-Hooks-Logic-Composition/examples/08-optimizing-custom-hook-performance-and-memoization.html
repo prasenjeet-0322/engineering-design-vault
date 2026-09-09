@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 12 — Part 08: Custom Hook Performance & Memoization Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useReducer, useCallback, useMemo, useRef, memo } = React;
+
+    // ==========================================
+    // EXPERIMENT 1: UNSTABLE VS STABLE RETURN OBJECT
+    // ==========================================
+    // Unmemoized Custom Hook
+    function useUnmemoizedCounter() {
+      const [count, setCount] = useState(0);
+      const inc = () => setCount(c => c + 1);
+      return { count, inc }; // Fresh object reference every render!
+    }
+
+    // Memoized Custom Hook
+    function useMemoizedCounter() {
+      const [count, setCount] = useState(0);
+      const inc = useCallback(() => setCount(c => c + 1), []);
+      return useMemo(() => ({ count, inc }), [count, inc]);
+    }
+
+    // Memoized Child Component
+    const MemoizedChild = memo(function MemoizedChild({ model, label }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">{label}</span>
+            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-xs font-bold border border-indigo-500/30">
+              Renders: {renderCount.current}
+            </span>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs text-slate-400">Count: <strong className="text-white font-mono">{model.count}</strong></span>
+            <button
+              onClick={model.inc}
+              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition"
+            >
+              Increment
+            </button>
+          </div>
+        </div>
+      );
+    });
+
+    function Exp1ReturnObjectExplorer() {
+      const [unrelatedParentState, setUnrelatedParentState] = useState(0);
+      const parentRenderCount = useRef(0);
+      parentRenderCount.current += 1;
+
+      const unmemoizedModel = useUnmemoizedCounter();
+      const memoizedModel = useMemoizedCounter();
+
+      const prevUnmemoizedRef = useRef(unmemoizedModel);
+      const prevMemoizedRef = useRef(memoizedModel);
+
+      const unmemoizedIdentitySame = Object.is(prevUnmemoizedRef.current, unmemoizedModel);
+      const memoizedIdentitySame = Object.is(prevMemoizedRef.current, memoizedModel);
+
+      useEffect(() => {
+        prevUnmemoizedRef.current = unmemoizedModel;
+        prevMemoizedRef.current = memoizedModel;
+      });
+
+      return (
+        <div className="space-y-6">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-white">Parent Component (Trigger Unrelated Renders)</h3>
+              <p className="text-xs text-slate-400 font-mono">Parent Renders: <span className="text-emerald-400 font-bold">{parentRenderCount.current}</span> | State: {unrelatedParentState}</p>
+            </div>
+            <button
+              onClick={() => setUnrelatedParentState(s => s + 1)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+            >
+              Trigger Parent Re-render (+1)
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Unmemoized Side */}
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-amber-300">Unmemoized Return Object</h4>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${unmemoizedIdentitySame ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
+                  {unmemoizedIdentitySame ? 'SAME POINTER' : 'NEW POINTER ALLOCATED'}
+                </span>
+              </div>
+              <MemoizedChild model={unmemoizedModel} label="Child using useUnmemoizedCounter()" />
+              <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-400 space-y-1">
+                <p className="text-amber-400 font-semibold">Bailout Defeated:</p>
+                <p>Even though the counter didn't change, the child re-renders on EVERY parent update because <code className="text-pink-300">Object.is(prev, next) === false</code>.</p>
+              </div>
+            </div>
+
+            {/* Memoized Side */}
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-emerald-300">Memoized Return Object</h4>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${memoizedIdentitySame ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300'}`}>
+                  {memoizedIdentitySame ? 'STABLE POINTER (BAILOUT ✓)' : 'NEW POINTER'}
+                </span>
+              </div>
+              <MemoizedChild model={memoizedModel} label="Child using useMemoizedCounter()" />
+              <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-400 space-y-1">
+                <p className="text-emerald-400 font-semibold">React.memo Bailout Success:</p>
+                <p>Child render counter stays constant during unrelated parent updates because the object pointer identity is strictly preserved.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 2: STALE CLOSURE VS LATEST REF
+    // ==========================================
+    function Exp2StaleClosureSimulator() {
+      const [tip, setTip] = useState(5);
+      const [receiptLogs, setReceiptLogs] = useState([]);
+
+      const addLog = (msg) => setReceiptLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 5)]);
+
+      // Buggy Hook: Stale Closure
+      const submitOrderBuggy = useCallback(() => {
+        addLog(`❌ BUGGY SUBMIT: Charged order with Tip = $${tip} (Captured at mount!)`);
+      }, []); // Missing [tip] dependency!
+
+      // Fixed Hook: Latest Ref Coordination
+      const tipRef = useRef(tip);
+      tipRef.current = tip;
+
+      const submitOrderFixed = useCallback(() => {
+        addLog(`✅ FIXED SUBMIT: Charged order with Tip = $${tipRef.current} (Fresh value via Ref!)`);
+      }, []); // Stable callback, fresh value!
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-white">Live Tip Adjustment</h4>
+                <p className="text-xs text-slate-400">Change the tip value below and test order submission.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {[0, 5, 15, 25].map(val => (
+                  <button
+                    key={val}
+                    onClick={() => setTip(val)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${tip === val ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    ${val}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-300">
+              Current Reactive Tip State: <span className="text-indigo-400 font-bold">${tip}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-bold text-rose-400 uppercase">A: Premature Memoization (Stale Closure)</h5>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">deps: []</span>
+              </div>
+              <p className="text-xs text-slate-400">Function reference is permanently stable, but captured the initial $5 tip forever.</p>
+              <button
+                onClick={submitOrderBuggy}
+                className="w-full px-4 py-2.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition"
+              >
+                Execute Buggy submitOrder()
+              </button>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-bold text-emerald-400 uppercase">B: Latest Ref Coordination Pattern</h5>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">ref.current</span>
+              </div>
+              <p className="text-xs text-slate-400">Function reference is 100% stable, and dynamically reads the latest reactive state.</p>
+              <button
+                onClick={submitOrderFixed}
+                className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition"
+              >
+                Execute Fixed submitOrder()
+              </button>
+            </div>
+          </div>
+
+          {receiptLogs.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Order Execution Logs</span>
+              <div className="font-mono text-xs space-y-1 text-slate-300">
+                {receiptLogs.map((log, i) => (
+                  <div key={i} className={log.includes("BUGGY") ? "text-rose-400" : "text-emerald-400"}>{log}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 3: EXPENSIVE COMPUTATION BENCHMARK (15,000 ITEMS)
+    // ==========================================
+    const GENERATED_DATASET = Array.from({ length: 12000 }, (_, i) => ({
+      id: `TXN_${10000 + i}`,
+      customer: `Client ${i % 300}`,
+      amount: Math.round((Math.sin(i) * 500 + 600) * 100) / 100,
+      risk: i % 7 === 0 ? "HIGH" : i % 3 === 0 ? "MEDIUM" : "LOW",
+    }));
+
+    function Exp3ExpensiveComputation() {
+      const [useMemoEnabled, setUseMemoEnabled] = useState(true);
+      const [filterRisk, setFilterRisk] = useState("ALL");
+      const [unrelatedTick, setUnrelatedTick] = useState(0);
+      const [lastDuration, setLastDuration] = useState(0);
+
+      // Computation Benchmark
+      const computedData = useMemo(() => {
+        if (!useMemoEnabled) return []; // Bypassed if disabled
+        const t0 = performance.now();
+        // Heavy multi-pass filter and sorting
+        const res = GENERATED_DATASET.filter(d => filterRisk === "ALL" || d.risk === filterRisk)
+          .sort((a, b) => b.amount - a.amount);
+        const t1 = performance.now();
+        setLastDuration(t1 - t0);
+        return res;
+      }, [useMemoEnabled ? filterRisk : null, useMemoEnabled]);
+
+      // Unmemoized fallback calculation
+      let displayData = computedData;
+      if (!useMemoEnabled) {
+        const t0 = performance.now();
+        displayData = GENERATED_DATASET.filter(d => filterRisk === "ALL" || d.risk === filterRisk)
+          .sort((a, b) => b.amount - a.amount);
+        const t1 = performance.now();
+        // Record duration for unmemoized execution
+        if (Math.abs(t1 - t0 - lastDuration) > 0.1) {
+          setTimeout(() => setLastDuration(t1 - t0), 0);
+        }
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-white">Dataset: 12,000 Financial Transactions</h4>
+                <p className="text-xs text-slate-400">Test CPU duration with and without useMemo caching during unrelated renders.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setUseMemoEnabled(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${useMemoEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                >
+                  useMemo: {useMemoEnabled ? "ENABLED" : "DISABLED"}
+                </button>
+                <button
+                  onClick={() => setUnrelatedTick(t => t + 1)}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition"
+                >
+                  Trigger Unrelated Render (Tick: {unrelatedTick})
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">Filtered Records</span>
+                <p className="text-lg font-bold text-white font-mono">{displayData.length.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">Calculation Duration</span>
+                <p className={`text-lg font-bold font-mono ${lastDuration > 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {lastDuration.toFixed(2)} ms
+                </p>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">Filter Risk Category</span>
+                <select
+                  value={filterRisk}
+                  onChange={(e) => setFilterRisk(e.target.value)}
+                  className="w-full mt-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                >
+                  <option value="ALL">ALL (12,000 txns)</option>
+                  <option value="HIGH">HIGH RISK</option>
+                  <option value="MEDIUM">MEDIUM RISK</option>
+                  <option value="LOW">LOW RISK</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-3">Top 5 Records (Sorted by Amount)</span>
+            <div className="space-y-1.5 font-mono text-xs">
+              {displayData.slice(0, 5).map(item => (
+                <div key={item.id} className="p-2.5 rounded bg-slate-950 border border-slate-800 flex justify-between items-center">
+                  <span className="text-slate-300">{item.id} • {item.customer}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-bold">${item.amount.toFixed(2)}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.risk === 'HIGH' ? 'bg-rose-500/20 text-rose-300' : item.risk === 'MEDIUM' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                      {item.risk}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 4: STATE PLACEMENT VS MEMOIZATION
+    // ==========================================
+    const ExpensiveStaticTree = memo(function ExpensiveStaticTree({ renderLabel }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">{renderLabel}</span>
+            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-xs font-bold">
+              Renders: {renderCount.current}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">Static Complex UI subtree (500 virtual DOM elements).</p>
+        </div>
+      );
+    });
+
+    // Local Leaf Component owning its own high-frequency state
+    function IsolatedLocalInput() {
+      const [text, setText] = useState("");
+      return (
+        <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+          <span className="text-xs font-bold text-emerald-400 uppercase">Architecture B: State Pushed Down</span>
+          <input
+            type="text"
+            placeholder="Type rapidly here..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white focus:outline-none focus:border-emerald-500"
+          />
+          <p className="text-[11px] text-slate-400 font-mono">Keystroke state isolated to this leaf. Parent never renders.</p>
+        </div>
+      );
+    }
+
+    function Exp4StatePlacement() {
+      const [parentText, setParentText] = useState("");
+      const parentRenders = useRef(0);
+      parentRenders.current += 1;
+
+      return (
+        <div className="space-y-6">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+            <div>
+              <h4 className="text-sm font-bold text-white">Parent Container</h4>
+              <p className="text-xs text-slate-400">Total Parent Fiber Renders: <span className="text-indigo-400 font-bold font-mono">{parentRenders.current}</span></p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Bad State Placement */}
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <div>
+                <h5 className="text-xs font-bold text-rose-400 uppercase">Architecture A: State at Root</h5>
+                <p className="text-xs text-slate-400 mt-1">Typing in this box forces the parent to re-render on every keystroke.</p>
+              </div>
+              <input
+                type="text"
+                placeholder="Type rapidly here..."
+                value={parentText}
+                onChange={(e) => setParentText(e.target.value)}
+                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white focus:outline-none focus:border-rose-500"
+              />
+              <ExpensiveStaticTree renderLabel="Unmemoized Sibling under Root State" />
+            </div>
+
+            {/* Clean State Placement */}
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <div>
+                <h5 className="text-xs font-bold text-emerald-400 uppercase">Architecture B: Isolated Subtree</h5>
+                <p className="text-xs text-slate-400 mt-1">Typing here confines renders strictly to the leaf input component.</p>
+              </div>
+              <IsolatedLocalInput />
+              <ExpensiveStaticTree renderLabel="Static Sibling (Zero Extra Renders!)" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 5: SENIOR CERTIFICATION EXAM
+    // ==========================================
+    const CERT_QUESTIONS = [
+      {
+        id: 1,
+        question: "Does wrapping a function in useCallback make its mathematical computation execute faster?",
+        options: [
+          "Yes, React compiles the function using WebAssembly under the hood.",
+          "Yes, React bypasses the JavaScript event loop.",
+          "No, useCallback only preserves function reference identity across renders.",
+          "No, it slows down execution by exactly 50%."
+        ],
+        correct: 2,
+        rationale: "useCallback does not optimize internal function execution speed. It only provides referential stability so memoized child components can skip re-rendering."
+      },
+      {
+        id: 2,
+        question: "Why is useMemo(() => heavy(), []) NOT a guarantee of permanent persistent storage?",
+        options: [
+          "Because React reconciler may discard cached memo values under high memory pressure.",
+          "Because JavaScript garbage collector deletes closures after 10 seconds.",
+          "Because localStorage is required for any memoization.",
+          "Because useMemo only works in class components."
+        ],
+        correct: 0,
+        rationale: "React reserves the right to release memoized values under memory pressure in concurrent mode. Also, memoized state is destroyed when the component unmounts."
+      },
+      {
+        id: 3,
+        question: "What is a 'Memoization Waterfall' in custom Hook design?",
+        options: [
+          "A waterfall chart in React DevTools Profiler.",
+          "When an unstable dependency upstream invalidates all downstream useMemo and useCallback hooks on every render.",
+          "When too many useEffect hooks run in parallel.",
+          "When a hook returns a promise that never resolves."
+        ],
+        correct: 1,
+        rationale: "If an upstream dependency is an unstable object literal or unmemoized callback, it changes identity every render, invalidating all downstream memoization."
+      },
+      {
+        id: 4,
+        question: "When a custom Hook executes, in which Fiber does its state and memoization memory reside?",
+        options: [
+          "In a dedicated 'HookFiber' node created by React.",
+          "In the Fiber of the component that invoked the custom Hook.",
+          "In the root Fiber exclusively.",
+          "In the window.__REACT_DEVTOOLS_GLOBAL_HOOK__ registry."
+        ],
+        correct: 1,
+        rationale: "Custom Hooks do not create Fibers. They execute inline and record their hook linked list records directly on the caller component's Fiber.memoizedState."
+      },
+      {
+        id: 5,
+        question: "What is the Senior Architect's first line of defense for a high-frequency performance bottleneck?",
+        options: [
+          "Add useMemo and useCallback to every variable in the file.",
+          "Convert all functional components to class components.",
+          "Evaluate state placement and push high-frequency state down to the lowest consuming leaf component.",
+          "Disable React StrictMode in production."
+        ],
+        correct: 2,
+        rationale: "State placement dictates the root of the re-render subtree. Moving high-frequency state down isolates re-renders to only the relevant leaf nodes without cargo-cult memoization."
+      }
+    ];
+
+    function Exp5CertExam() {
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, idx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: idx }));
+      };
+
+      const score = Object.keys(answers).filter(qId => answers[qId] === CERT_QUESTIONS.find(q => q.id === parseInt(qId)).correct).length;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h3 className="text-sm font-bold text-white">Senior Performance Architect Exam</h3>
+              <p className="text-xs text-slate-400">Validate your mastery of Referential Stability, State Placement, and Fiber Memoization.</p>
+            </div>
+            {submitted && (
+              <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                Score: {score} / {CERT_QUESTIONS.length} ({Math.round((score / CERT_QUESTIONS.length) * 100)}%)
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {CERT_QUESTIONS.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+              return (
+                <div key={q.id} className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-200">{q.question}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 pl-9">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700";
+                      if (selected === optIdx) btnStyle = "bg-indigo-950/60 border-indigo-500 text-indigo-200";
+                      if (submitted) {
+                        if (optIdx === q.correct) btnStyle = "bg-emerald-950/60 border-emerald-500 text-emerald-200 font-semibold";
+                        else if (selected === optIdx && !isCorrect) btnStyle = "bg-rose-950/60 border-rose-500 text-rose-200";
+                      }
+                      return (
+                        <button
+                          key={optIdx}
+                          disabled={submitted}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition ${btnStyle}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="pl-9 pt-2">
+                      <p className="text-xs text-slate-400 font-mono bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <span className="font-bold text-indigo-400">Architect Rationale:</span> {q.rationale}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            {!submitted ? (
+              <button
+                disabled={Object.keys(answers).length < CERT_QUESTIONS.length}
+                onClick={() => setSubmitted(true)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+              >
+                Submit Performance Answers
+              </button>
+            ) : (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition"
+              >
+                Retake Exam
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN LAB HARNESS
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState(0);
+
+      const TABS = [
+        { title: "Exp 1: Return Object Identity", component: <Exp1ReturnObjectExplorer /> },
+        { title: "Exp 2: Stale Closures vs Latest Ref", component: <Exp2StaleClosureSimulator /> },
+        { title: "Exp 3: Computation Benchmark", component: <Exp3ExpensiveComputation /> },
+        { title: "Exp 4: State Placement vs Memo", component: <Exp4StatePlacement /> },
+        { title: "Exp 5: Senior Performance Exam", component: <Exp5CertExam /> },
+      ];
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* Header */}
+          <header className="space-y-3 border-b border-slate-800 pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-600/30">
+                  08
+                </div>
+                <div>
+                  <h1 className="text-xl font-extrabold text-white tracking-tight">Custom Hook Performance & Memoization</h1>
+                  <p className="text-xs text-slate-400 font-mono">KPI 12 • PART 08 • Interactive Architectural Diagnostic Lab</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-indigo-950/60 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold">
+                React 18 Reconciler Certified
+              </span>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <nav className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            {TABS.map((tab, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveTab(idx)}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${activeTab === idx ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+              >
+                {tab.title}
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <main className="min-h-[500px]">
+            {TABS[activeTab].component}
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-800 pt-6 text-center text-xs text-slate-500 space-y-1">
+            <p>Engineering Design Vault • Level 06 — React Fundamentals • Author: Srikar Kudurmalla | Co-Author: Prasenjeet</p>
+            <p className="font-mono text-[11px] text-slate-600">Referential Stability, React.memo Bailout & Fiber Dependency Topology</p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
