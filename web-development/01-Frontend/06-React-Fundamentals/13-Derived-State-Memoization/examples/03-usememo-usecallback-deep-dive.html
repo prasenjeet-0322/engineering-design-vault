@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 13 Part 03 — useMemo & useCallback Deep Dive Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+    @keyframes pulseFlash {
+      0%, 100% { background-color: transparent; }
+      50% { background-color: rgba(99, 102, 241, 0.25); }
+    }
+    .flash-pulse { animation: pulseFlash 0.5s ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo } = React;
+
+    // --- HEAP REGISTRY ---
+    let heapIdCounter = 2000;
+    const heapRegistry = new WeakMap();
+    function getHeapId(obj) {
+      if (typeof obj !== 'object' && typeof obj !== 'function') return null;
+      if (obj === null) return null;
+      if (!heapRegistry.has(obj)) {
+        heapRegistry.set(obj, `0x${(++heapIdCounter).toString(16).toUpperCase()}`);
+      }
+      return heapRegistry.get(obj);
+    }
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'usememo-topology', label: '1. useMemo Invalidation' },
+        { id: 'stale-closures', label: '2. Stale Closure Simulator' },
+        { id: 'memo-child-props', label: '3. React.memo & Callbacks' },
+        { id: 'memo-chains', label: '4. Cascading Memo Chains' },
+        { id: 'benchmark', label: '5. CPU Cost Benchmark' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    KPI 13 · Part 03
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">React 18.3 Internals</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  useMemo & useCallback Deep Dive Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Fiber Linked-Lists, Closure Lifecycles, Invalidation Graphs & Cost Models
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../03-usememo-usecallback-deep-dive.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // --- TAB 1: USEMEMO TOPOLOGY & DEPENDENCY INVALIDATION ---
+    function UseMemoTopology() {
+      const [parentTick, setParentTick] = useState(0);
+      const [searchTerm, setSearchTerm] = useState('react');
+      const [strategy, setStrategy] = useState('flawed'); // 'flawed' vs 'fixed'
+
+      const calcRunsRef = useRef(0);
+
+      // Dataset
+      const mockDatabase = useMemo(() => [
+        { id: 1, title: 'React Fundamentals', category: 'Frontend' },
+        { id: 2, title: 'State Architecture & Reducers', category: 'Frontend' },
+        { id: 3, title: 'Node.js Microservices', category: 'Backend' },
+        { id: 4, title: 'Distributed Systems & Raft', category: 'Backend' },
+        { id: 5, title: 'PostgreSQL Index Tuning', category: 'Database' },
+      ], []);
+
+      // FLAWED: Recreated object literal as dependency
+      const flawedOptions = { query: searchTerm.toLowerCase() };
+      const flawedHeap = getHeapId(flawedOptions);
+
+      // Memoized result
+      const filteredResults = useMemo(() => {
+        calcRunsRef.current += 1;
+        const target = strategy === 'flawed' ? flawedOptions.query : searchTerm.toLowerCase();
+        return mockDatabase.filter(item => 
+          item.title.toLowerCase().includes(target) || 
+          item.category.toLowerCase().includes(target)
+        );
+      }, strategy === 'flawed' 
+        ? [mockDatabase, flawedOptions] // 💥 flawedOptions is a new pointer every render!
+        : [mockDatabase, searchTerm]    // ✅ searchTerm is a primitive string!
+      );
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">useMemo Dependency Invalidation Inspector</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Toggle between passing an inline object literal dependency vs a primitive string dependency. Observe how unrelated parent re-renders defeat <code className="text-indigo-400">useMemo</code>.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Controls */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">Component Controller</span>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    Parent Renders: {parentTick}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Search Term (Filter Input)</label>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                    placeholder="Search titles or categories..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-2">Dependency Design Strategy</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 p-3 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input
+                        type="radio"
+                        name="strategy"
+                        value="flawed"
+                        checked={strategy === 'flawed'}
+                        onChange={() => setStrategy('flawed')}
+                        className="text-indigo-600 focus:ring-0"
+                      />
+                      <div>
+                        <div className="font-mono text-rose-300">deps: [mockDatabase, &#123; query &#125;]</div>
+                        <div className="text-[11px] text-slate-500">Flawed: Recreates object literal pointer every render</div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-3 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input
+                        type="radio"
+                        name="strategy"
+                        value="fixed"
+                        checked={strategy === 'fixed'}
+                        onChange={() => setStrategy('fixed')}
+                        className="text-indigo-600 focus:ring-0"
+                      />
+                      <div>
+                        <div className="font-mono text-emerald-300">deps: [mockDatabase, searchTerm]</div>
+                        <div className="text-[11px] text-slate-500">Optimal: Depends directly on primitive string value</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setParentTick(t => t + 1)}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-amber-600/20"
+                >
+                  ⚡ Trigger Unrelated Parent Re-render
+                </button>
+              </div>
+
+              {/* Cache Telemetry Panel */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hook Telemetry</span>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                    strategy === 'flawed' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {strategy === 'flawed' ? '100% CACHE INVALIDATION 💥' : 'BAILOUT OPTIMIZED ✅'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Factory Calculations</div>
+                    <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{calcRunsRef.current}</div>
+                    <div className="text-[11px] text-slate-500 mt-1">Number of times factory ran</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Dependency Heap Pointer</div>
+                    <div className="text-sm font-bold font-mono text-amber-300 mt-2 truncate">
+                      {strategy === 'flawed' ? flawedHeap : '(Primitive String)'}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">
+                      {strategy === 'flawed' ? 'Allocated new pointer' : 'Checked by string value'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtered output preview */}
+                <div>
+                  <div className="text-xs font-medium text-slate-400 mb-2">Filtered Items ({filteredResults.length}):</div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {filteredResults.map(item => (
+                      <div key={item.id} className="p-2 bg-slate-900 rounded border border-slate-800 text-xs flex justify-between">
+                        <span className="text-slate-200">{item.title}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300">{item.category}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 2: STALE CLOSURE SIMULATOR ---
+    function StaleClosureSimulator() {
+      const [count, setCount] = useState(0);
+      const [activeToken, setActiveToken] = useState('token-alpha-123');
+      const [logs, setLogs] = useState([]);
+
+      // 💥 Stale Closure #1: []
+      const staleSubmit = useCallback(async () => {
+        setLogs(prev => [`[💥 STALE CALLBACK] Submitted with count=${count} | token=${activeToken}`, ...prev.slice(0, 4)]);
+      }, []); // 💥 Empty deps captures initial render forever!
+
+      // ✅ Fresh Closure #2: [count, activeToken]
+      const freshSubmit = useCallback(async () => {
+        setLogs(prev => [`[✅ FRESH CALLBACK] Submitted with count=${count} | token=${activeToken}`, ...prev.slice(0, 4)]);
+      }, [count, activeToken]);
+
+      // ⚡ Functional Updater #3: [activeToken] (removes count dependency)
+      const updaterIncrement = useCallback(() => {
+        setCount(c => c + 1);
+        setLogs(prev => [`[⚡ FUNCTIONAL UPDATER] Atomic increment without capturing count state`, ...prev.slice(0, 4)]);
+      }, []);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">useCallback Stale Closure & Functional Updater Simulator</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Observe how omitting dependencies creates stale closures that execute on obsolete render scope data vs how functional updaters safely eliminate state dependencies.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* State Controls */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <h3 className="text-sm font-bold text-white">Live Reactive State</h3>
+
+                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Current Count:</span>
+                    <span className="font-mono text-lg font-bold text-indigo-400">{count}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Auth Token:</span>
+                    <span className="font-mono text-xs text-amber-300">{activeToken}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCount(c => c + 1)}
+                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition"
+                  >
+                    Increment Count (+1)
+                  </button>
+                  <button
+                    onClick={() => setActiveToken(`token-${Math.random().toString(36).substring(2, 7)}`)}
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition"
+                  >
+                    Rotate Token 🔄
+                  </button>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800 space-y-2.5">
+                  <button
+                    onClick={staleSubmit}
+                    className="w-full py-2.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold transition shadow-lg shadow-rose-600/20"
+                  >
+                    1. Execute staleSubmit() [deps: []]
+                  </button>
+
+                  <button
+                    onClick={freshSubmit}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold transition shadow-lg shadow-emerald-600/20"
+                  >
+                    2. Execute freshSubmit() [deps: [count, token]]
+                  </button>
+
+                  <button
+                    onClick={updaterIncrement}
+                    className="w-full py-2.5 bg-indigo-600/80 hover:bg-indigo-500 text-white rounded-lg text-xs font-mono font-bold transition"
+                  >
+                    3. Execute updaterIncrement() [deps: [] via setCount(c =&gt; ...)]
+                  </button>
+                </div>
+              </div>
+
+              {/* Execution Audit Log */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Closure Audit Log</span>
+                  <button onClick={() => setLogs([])} className="text-[11px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+
+                {logs.length === 0 ? (
+                  <div className="text-xs text-slate-600 font-mono">Increment count or rotate token, then click execution buttons.</div>
+                ) : (
+                  <div className="space-y-2 font-mono text-xs">
+                    {logs.map((entry, idx) => {
+                      const isStale = entry.includes('STALE');
+                      const isFresh = entry.includes('FRESH');
+                      return (
+                        <div key={idx} className={`p-2.5 rounded border ${
+                          isStale ? 'bg-rose-950/30 border-rose-800/60 text-rose-300' :
+                          isFresh ? 'bg-emerald-950/30 border-emerald-800/60 text-emerald-300' :
+                          'bg-indigo-950/30 border-indigo-800/60 text-indigo-300'
+                        }`}>
+                          {entry}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 3: REACT.MEMO & CALLBACK STABILITY SANDBOX ---
+    const MemoizedActionButton = memo(function MemoizedActionButton({ label, onClick }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-bold text-slate-200 font-mono">&lt;MemoizedButton label="{label}" /&gt;</div>
+            <div className="text-xs text-slate-400 mt-0.5">Function Pointer: <span className="font-mono text-indigo-400">{getHeapId(onClick)}</span></div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              Renders: {renderCount.current}
+            </span>
+            <button
+              onClick={onClick}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition"
+            >
+              Trigger
+            </button>
+          </div>
+        </div>
+      );
+    });
+
+    function MemoChildPropsSandbox() {
+      const [parentTick, setParentTick] = useState(0);
+      const [mode, setMode] = useState('inline'); // 'inline' vs 'useCallback'
+      const [lastEvent, setLastEvent] = useState('None');
+
+      // 💥 Inline arrow callback
+      const inlineHandler = () => {
+        setLastEvent(`Inline Click at ${new Date().toLocaleTimeString()}`);
+      };
+
+      // ✅ Stabilized callback
+      const stableHandler = useCallback(() => {
+        setLastEvent(`useCallback Click at ${new Date().toLocaleTimeString()}`);
+      }, []);
+
+      const activeHandler = mode === 'inline' ? inlineHandler : stableHandler;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">React.memo & Callback Pointer Stability</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Demonstrate how passing inline function literals into <code className="text-indigo-400">React.memo()</code> children defeats bailout checks vs how <code className="text-indigo-400">useCallback</code> preserves memoization boundaries.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-amber-400 font-mono">&lt;ParentContainer /&gt;</span>
+                  <span className="text-xs font-mono font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                    Parent Renders: {parentTick}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-2">Callback Prop Strategy:</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 p-3 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input
+                        type="radio"
+                        name="cbMode"
+                        value="inline"
+                        checked={mode === 'inline'}
+                        onChange={() => setMode('inline')}
+                        className="text-indigo-600 focus:ring-0"
+                      />
+                      <div>
+                        <div className="font-mono text-rose-300">onClick=&#123;() =&gt; handleClick()&#125;</div>
+                        <div className="text-[11px] text-slate-500">Unstable: Recreates inline closure on every parent render</div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-3 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input
+                        type="radio"
+                        name="cbMode"
+                        value="useCallback"
+                        checked={mode === 'useCallback'}
+                        onChange={() => setMode('useCallback')}
+                        className="text-indigo-600 focus:ring-0"
+                      />
+                      <div>
+                        <div className="font-mono text-emerald-300">onClick=&#123;useCallback(..., [])&#125;</div>
+                        <div className="text-[11px] text-slate-500">Optimal: Preserves identical function pointer across renders</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setParentTick(t => t + 1)}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-amber-600/20"
+                >
+                  ⚡ Trigger Parent Re-render (Unrelated State)
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <MemoizedActionButton
+                  label="Submit Transaction"
+                  onClick={activeHandler}
+                />
+
+                <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl">
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Last Click Event</div>
+                  <div className="text-xs font-mono text-indigo-300">{lastEvent}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 4: CASCADING MEMOIZATION CHAINS ---
+    function MemoChainsExplorer() {
+      const [itemsCount, setItemsCount] = useState(10);
+      const [filterChar, setFilterChar] = useState('A');
+      const [sortDir, setSortDir] = useState('ASC');
+      const [page, setPage] = useState(1);
+
+      // Invalidation counters
+      const runCounts = useRef({ filter: 0, sort: 0, paginate: 0, combined: 0 });
+
+      // Dataset
+      const rawItems = useMemo(() => {
+        return Array.from({ length: itemsCount }, (_, i) => ({
+          id: i + 1,
+          name: `${String.fromCharCode(65 + (i % 5))} - Item ${i + 1}`,
+          value: Math.floor(Math.sin(i + 1) * 1000)
+        }));
+      }, [itemsCount]);
+
+      // Chain Step 1: Filter
+      const filtered = useMemo(() => {
+        runCounts.current.filter += 1;
+        return rawItems.filter(item => item.name.startsWith(filterChar));
+      }, [rawItems, filterChar]);
+
+      // Chain Step 2: Sort
+      const sorted = useMemo(() => {
+        runCounts.current.sort += 1;
+        return [...filtered].sort((a, b) => sortDir === 'ASC' ? a.value - b.value : b.value - a.value);
+      }, [filtered, sortDir]);
+
+      // Chain Step 3: Paginate
+      const paginated = useMemo(() => {
+        runCounts.current.paginate += 1;
+        const start = (page - 1) * 3;
+        return sorted.slice(start, start + 3);
+      }, [sorted, page]);
+
+      // Alternative: Single Combined useMemo
+      const combinedResult = useMemo(() => {
+        runCounts.current.combined += 1;
+        const f = rawItems.filter(item => item.name.startsWith(filterChar));
+        const s = [...f].sort((a, b) => sortDir === 'ASC' ? a.value - b.value : b.value - a.value);
+        const start = (page - 1) * 3;
+        return s.slice(start, start + 3);
+      }, [rawItems, filterChar, sortDir, page]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Memoization Chain Invalidation Graph</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Visualize how a mutation at the top of a 3-tier memoization chain cascades through downstream hooks vs how a consolidated single memoization reduces Hook overhead.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+              <button
+                onClick={() => setItemsCount(c => c + 5)}
+                className="p-3 bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-lg text-left text-xs transition"
+              >
+                <div className="text-slate-400">Mutate Top Root:</div>
+                <div className="font-bold text-indigo-300 mt-1">itemsCount (+5)</div>
+                <div className="text-[10px] text-slate-500 mt-1">Invalidates Tier 1, 2 & 3</div>
+              </button>
+
+              <button
+                onClick={() => setFilterChar(prev => prev === 'A' ? 'B' : 'A')}
+                className="p-3 bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-lg text-left text-xs transition"
+              >
+                <div className="text-slate-400">Mutate Tier 1 Input:</div>
+                <div className="font-bold text-indigo-300 mt-1">Filter Char ({filterChar})</div>
+                <div className="text-[10px] text-slate-500 mt-1">Invalidates Tier 1, 2 & 3</div>
+              </button>
+
+              <button
+                onClick={() => setSortDir(d => d === 'ASC' ? 'DESC' : 'ASC')}
+                className="p-3 bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-lg text-left text-xs transition"
+              >
+                <div className="text-slate-400">Mutate Tier 2 Input:</div>
+                <div className="font-bold text-indigo-300 mt-1">Sort Direction ({sortDir})</div>
+                <div className="text-[10px] text-slate-500 mt-1">Skips Tier 1! Invals Tier 2 & 3</div>
+              </button>
+
+              <button
+                onClick={() => setPage(p => p === 1 ? 2 : 1)}
+                className="p-3 bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-lg text-left text-xs transition"
+              >
+                <div className="text-slate-400">Mutate Tier 3 Input:</div>
+                <div className="font-bold text-indigo-300 mt-1">Page ({page})</div>
+                <div className="text-[10px] text-slate-500 mt-1">Skips Tier 1 & 2! Invals Tier 3 only</div>
+              </button>
+            </div>
+
+            {/* Invalidation Counters Comparison */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-950 p-5 rounded-xl border border-slate-800">
+              <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800">
+                <div className="text-xs text-slate-400 font-mono">Tier 1: Filter</div>
+                <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{runCounts.current.filter}</div>
+                <div className="text-[11px] text-slate-500 mt-1">Output: {filtered.length} items</div>
+              </div>
+
+              <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800">
+                <div className="text-xs text-slate-400 font-mono">Tier 2: Sort</div>
+                <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{runCounts.current.sort}</div>
+                <div className="text-[11px] text-slate-500 mt-1">Output: {sorted.length} items</div>
+              </div>
+
+              <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-800">
+                <div className="text-xs text-slate-400 font-mono">Tier 3: Paginate</div>
+                <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{runCounts.current.paginate}</div>
+                <div className="text-[11px] text-slate-500 mt-1">Output: {paginated.length} items</div>
+              </div>
+
+              <div className="bg-slate-900 p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-950/10">
+                <div className="text-xs text-emerald-400 font-mono font-bold">Consolidated (1 Hook)</div>
+                <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">{runCounts.current.combined}</div>
+                <div className="text-[11px] text-slate-400 mt-1">Single clean boundary</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 5: CPU COST BENCHMARK ---
+    function CpuBenchmark() {
+      const [size, setSize] = useState(25000);
+      const [result, setResult] = useState(null);
+      const [isBenchmarking, setIsBenchmarking] = useState(false);
+
+      const runBenchmark = () => {
+        setIsBenchmarking(true);
+        setTimeout(() => {
+          // Synthetic complex dataset
+          const dataset = Array.from({ length: size }, (_, i) => ({
+            id: i,
+            score: Math.sin(i) * 100,
+            meta: { flag: i % 2 === 0 }
+          }));
+
+          // 1. Unmemoized Pure Derivation (Full run)
+          const t0 = performance.now();
+          const unmemoized = dataset
+            .filter(d => d.meta.flag)
+            .map(d => ({ ...d, score: Math.sqrt(Math.abs(d.score)) }))
+            .reduce((acc, d) => acc + d.score, 0);
+          const t1 = performance.now();
+          const unmemoizedDuration = (t1 - t0).toFixed(3);
+
+          // 2. Memoized Cache Hit (Simulated O(1) Object.is comparison)
+          const prevDeps = [dataset, true];
+          const nextDeps = [dataset, true];
+          const t2 = performance.now();
+          let areEqual = true;
+          for (let i = 0; i < prevDeps.length; i++) {
+            if (!Object.is(prevDeps[i], nextDeps[i])) { areEqual = false; break; }
+          }
+          const t3 = performance.now();
+          const cacheHitDuration = (t3 - t2).toFixed(4);
+
+          setResult({
+            size,
+            unmemoized: parseFloat(unmemoizedDuration),
+            cacheHit: parseFloat(cacheHitDuration),
+            savedRatio: (parseFloat(unmemoizedDuration) / (parseFloat(cacheHitDuration) || 0.0001)).toFixed(1)
+          });
+          setIsBenchmarking(false);
+        }, 50);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">CPU Computation Cost vs Memoization Cache Hit Benchmark</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Measure the actual CPU duration of running an intensive array transformation vs the sub-microsecond cost of an <code className="text-indigo-400">Object.is</code> dependency comparison.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Dataset Element Count</label>
+                <select
+                  value={size}
+                  onChange={e => setSize(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                >
+                  <option value={10000}>10,000 Elements</option>
+                  <option value={25000}>25,000 Elements</option>
+                  <option value={50000}>50,000 Elements</option>
+                </select>
+              </div>
+
+              <button
+                onClick={runBenchmark}
+                disabled={isBenchmarking}
+                className="mt-5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+              >
+                {isBenchmarking ? 'Running...' : '🚀 Execute CPU Benchmark'}
+              </button>
+            </div>
+
+            {result && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Unmemoized Execution</div>
+                    <div className="text-2xl font-bold font-mono text-rose-400 mt-1">{result.unmemoized} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">Full Array Filter + Map + Reduce</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">useMemo Cache Hit</div>
+                    <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">{result.cacheHit} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">Object.is Dependency Check</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Speedup Factor</div>
+                    <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{result.savedRatio}x FASTER</div>
+                    <div className="text-xs text-slate-500 mt-1">Avoided CPU time on re-render</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-300">
+                  ✅ <strong>Senior Verdict:</strong> When computations exceed ~1.0ms on standard client devices and dependencies remain stable, <code className="font-mono">useMemo</code> provides a massive frame-rate win by bypassing heavy CPU loops.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 6: SENIOR CERTIFICATION EXAM ---
+    function SeniorExam() {
+      const questions = [
+        {
+          id: 1,
+          q: 'What does useCallback(fn, deps) specifically memoize?',
+          options: [
+            'The return value of executing fn()',
+            'The JavaScript function pointer/identity across renders',
+            'The asynchronous promise result of fn()',
+            'The React Fiber reconciliation phase'
+          ],
+          answer: 1,
+          explanation: 'useCallback memoizes the function reference (identity) itself, not the execution output of the function body.'
+        },
+        {
+          id: 2,
+          q: 'Why does passing an empty dependency array `useCallback(..., [])` to a callback that references `userId` cause a bug?',
+          options: [
+            'Because React throws a compile error on empty dependency arrays',
+            'Because the callback captures `userId` from the initial render in its closure and never updates (Stale Closure)',
+            'Because `[]` forces React to run the callback asynchronously',
+            'Because empty arrays cause memory leaks in Fiber'
+          ],
+          answer: 1,
+          explanation: 'JavaScript closures capture variable values at instantiation. When dependencies are omitted, React reuses the original closure indefinitely.'
+        },
+        {
+          id: 3,
+          q: 'How can you eliminate a state dependency from `useCallback` when updating state?',
+          options: [
+            'By using `// eslint-disable-next-line`',
+            'By switching to a functional state updater: `setItems(prev => [...prev, newItem])`',
+            'By placing the callback inside `useEffect`',
+            'By wrapping the state in a Symbol'
+          ],
+          answer: 1,
+          explanation: 'Functional state updaters receive the current state as an argument during update dispatch, removing the need to capture state from the component scope.'
+        },
+        {
+          id: 4,
+          q: 'When is using `useCallback` considered an unnecessary anti-pattern?',
+          options: [
+            'When the callback is passed to a `React.memo` component',
+            'When the callback is passed to an unmemoized native HTML element like `<button onClick={...}>`',
+            'When the callback is listed in a `useEffect` dependency array',
+            'When the callback is passed to a Context Provider value'
+          ],
+          answer: 1,
+          explanation: 'Native HTML elements re-create their React Virtual DOM objects on every render anyway. Wrapping handlers in useCallback for native elements adds pure overhead with zero avoided renders.'
+        },
+        {
+          id: 5,
+          q: 'Does `useMemo` guarantee that a cached value will never be recalculated if dependencies do not change?',
+          options: [
+            'Yes, React guarantees permanent cache retention for component lifetime',
+            'No, React treats useMemo as a performance hint and may evict the cache in low-memory or concurrent rendering scenarios',
+            'Yes, but only in production mode',
+            'No, useMemo clears its cache every 60 seconds automatically'
+          ],
+          answer: 1,
+          explanation: 'The official React specification treats `useMemo` as a performance optimization, not a semantic guarantee. Your code must remain correct if React evicts the cache.'
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const score = useMemo(() => {
+        return Object.keys(selectedAnswers).reduce((acc, qId) => {
+          const q = questions.find(item => item.id === Number(qId));
+          return q && selectedAnswers[qId] === q.answer ? acc + 1 : acc;
+        }, 0);
+      }, [selectedAnswers, questions]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Senior Hook Memoization Certification</h2>
+                <p className="text-sm text-slate-400">Validate your mastery of useMemo, useCallback, Fiber internals & closures.</p>
+              </div>
+              {submitted && (
+                <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                  score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  Score: {score} / {questions.length} ({Math.round((score / questions.length) * 100)}%)
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {questions.map((q, idx) => (
+                <div key={q.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                  <div className="text-sm font-bold text-slate-200 mb-3 font-mono">
+                    {idx + 1}. {q.q}
+                  </div>
+
+                  <div className="space-y-2">
+                    {q.options.map((opt, oIdx) => {
+                      const isSelected = selectedAnswers[q.id] === oIdx;
+                      const isCorrect = q.answer === oIdx;
+
+                      let btnStyle = 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850';
+                      if (submitted) {
+                        if (isCorrect) btnStyle = 'bg-emerald-950/60 border-emerald-500 text-emerald-300';
+                        else if (isSelected) btnStyle = 'bg-rose-950/60 border-rose-500 text-rose-300';
+                      } else if (isSelected) {
+                        btnStyle = 'bg-indigo-950/60 border-indigo-500 text-indigo-300';
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          disabled={submitted}
+                          onClick={() => setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }))}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span>{opt}</span>
+                          {submitted && isCorrect && <span className="font-bold text-emerald-400">✓ Correct</span>}
+                          {submitted && isSelected && !isCorrect && <span className="font-bold text-rose-400">✗ Wrong</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="mt-3 p-3 bg-slate-900 rounded border border-slate-800 text-xs text-slate-400">
+                      💡 <strong>Explanation:</strong> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {!submitted ? (
+                <button
+                  onClick={() => setSubmitted(true)}
+                  disabled={Object.keys(selectedAnswers).length < questions.length}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+                >
+                  Submit Certification Exam
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSubmitted(false);
+                    setSelectedAnswers({});
+                  }}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition"
+                >
+                  Retake Exam
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('usememo-topology');
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            {activeTab === 'usememo-topology' && <UseMemoTopology />}
+            {activeTab === 'stale-closures' && <StaleClosureSimulator />}
+            {activeTab === 'memo-child-props' && <MemoChildPropsSandbox />}
+            {activeTab === 'memo-chains' && <MemoChainsExplorer />}
+            {activeTab === 'benchmark' && <CpuBenchmark />}
+            {activeTab === 'exam' && <SeniorExam />}
+          </main>
+
+          <footer className="border-t border-slate-800 bg-slate-900/40 py-6 text-center text-xs text-slate-500">
+            <p>React 18 Architecture Masterclass · Level 06 — KPI 13 · Engineering Design Vault</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
