@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 15 Part 01 — Async UI State Machines Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, useReducer } = React;
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'boolean-explosion', label: '1. Boolean Explosion' },
+        { id: 'state-machine', label: '2. FSM Interactive Engine' },
+        { id: 'invalid-transitions', label: '3. Invalid Transition Interceptor' },
+        { id: 'production-incidents', label: '4. Production Incidents' },
+        { id: 'prediction-mode', label: '5. Prediction Sandbox' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    KPI 15 · Part 01
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">Async UI State & Data Lifecycle</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  Async UI State Machines Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Finite State Modeling, Discriminated Unions, Zombie Spinner Eradication & Transition Tables
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../01-async-state-machines-ui.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // =========================================================================
+    // TAB 1: BOOLEAN EXPLOSION SANDBOX (2^3 = 8 Combinations)
+    // =========================================================================
+    function TabBooleanExplosion() {
+      const [isLoading, setIsLoading] = useState(false);
+      const [isError, setIsError] = useState(false);
+      const [isSuccess, setIsSuccess] = useState(false);
+
+      const combinations = [
+        { l: false, e: false, s: false, status: 'IDLE (Valid)', type: 'valid' },
+        { l: true, e: false, s: false, status: 'LOADING (Valid)', type: 'valid' },
+        { l: false, e: true, s: false, status: 'ERROR (Valid)', type: 'valid' },
+        { l: false, e: false, s: true, status: 'SUCCESS (Valid)', type: 'valid' },
+        { l: true, e: true, s: false, status: 'CONTRADICTORY (Loading + Error)', type: 'invalid' },
+        { l: true, e: false, s: true, status: 'CONTRADICTORY (Loading + Success)', type: 'invalid' },
+        { l: false, e: true, s: true, status: 'CONTRADICTORY (Error + Success)', type: 'invalid' },
+        { l: true, e: true, s: true, status: '💥 CATASTROPHIC (All 3 Booleans True)', type: 'invalid' },
+      ];
+
+      const currentMatch = combinations.find(
+        c => c.l === isLoading && c.e === isError && c.s === isSuccess
+      );
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-white mb-1">The Boolean Explosion Hazard</h2>
+            <p className="text-xs text-slate-400 mb-4">
+              When using 3 independent booleans, you create $2^3 = 8$ mathematical states. 4 of them are contradictory invalid combinations!
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-800">
+              <label className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer">
+                <span className="text-xs font-mono text-cyan-400 font-bold">isLoading</span>
+                <input 
+                  type="checkbox" 
+                  checked={isLoading} 
+                  onChange={e => setIsLoading(e.target.checked)} 
+                  className="w-5 h-5 accent-cyan-500 rounded"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer">
+                <span className="text-xs font-mono text-rose-400 font-bold">isError</span>
+                <input 
+                  type="checkbox" 
+                  checked={isError} 
+                  onChange={e => setIsError(e.target.checked)} 
+                  className="w-5 h-5 accent-rose-500 rounded"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer">
+                <span className="text-xs font-mono text-emerald-400 font-bold">isSuccess</span>
+                <input 
+                  type="checkbox" 
+                  checked={isSuccess} 
+                  onChange={e => setIsSuccess(e.target.checked)} 
+                  className="w-5 h-5 accent-emerald-500 rounded"
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Current Evaluation Status */}
+          <div className={`p-5 rounded-xl border ${
+            currentMatch.type === 'valid' 
+              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200' 
+              : 'bg-rose-950/40 border-rose-500/60 text-rose-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono uppercase tracking-wider font-bold">Current Combination Evaluation:</span>
+              <span className={`px-2.5 py-1 rounded text-xs font-mono font-bold ${
+                currentMatch.type === 'valid' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/30 text-rose-200'
+              }`}>
+                {currentMatch.type === 'valid' ? '✅ VALID DOMAIN STATE' : '❌ CONTRADICTORY STATE'}
+              </span>
+            </div>
+            <div className="text-xl font-bold font-mono mt-2">{currentMatch.status}</div>
+            <p className="text-xs text-slate-400 mt-1 font-mono">
+              isLoading={String(isLoading)} | isError={String(isError)} | isSuccess={String(isSuccess)}
+            </p>
+          </div>
+
+          {/* Truth Table of 8 States */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 overflow-x-auto">
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono mb-3">
+              Full 8-State Mathematical Matrix
+            </h3>
+            <table className="w-full text-xs font-mono text-left border border-slate-800">
+              <thead className="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                <tr>
+                  <th className="p-2.5">isLoading</th>
+                  <th className="p-2.5">isError</th>
+                  <th className="p-2.5">isSuccess</th>
+                  <th className="p-2.5">Semantic Interpretation</th>
+                  <th className="p-2.5 text-right">Validity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {combinations.map((c, i) => {
+                  const isCurrent = c.l === isLoading && c.e === isError && c.s === isSuccess;
+                  return (
+                    <tr key={i} className={isCurrent ? 'bg-indigo-900/40 font-bold' : 'hover:bg-slate-800/30'}>
+                      <td className={`p-2.5 ${c.l ? 'text-cyan-400' : 'text-slate-500'}`}>{String(c.l)}</td>
+                      <td className={`p-2.5 ${c.e ? 'text-rose-400' : 'text-slate-500'}`}>{String(c.e)}</td>
+                      <td className={`p-2.5 ${c.s ? 'text-emerald-400' : 'text-slate-500'}`}>{String(c.s)}</td>
+                      <td className="p-2.5 text-slate-200">{c.status}</td>
+                      <td className="p-2.5 text-right">
+                        {c.type === 'valid' ? (
+                          <span className="text-emerald-400">Valid</span>
+                        ) : (
+                          <span className="text-rose-400">Contradictory</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: FSM INTERACTIVE ENGINE (useReducer State Machine)
+    // =========================================================================
+    const initialFsmState = { status: 'idle' };
+
+    function fsmReducer(state, action) {
+      switch (action.type) {
+        case 'START':
+          return { status: 'loading' };
+        case 'RESOLVE':
+          if (state.status === 'loading') {
+            return { 
+              status: 'success', 
+              data: { id: 101, name: 'Alice Walker', role: 'Staff Systems Architect', latency: '42ms' } 
+            };
+          }
+          return state; // ignore invalid
+        case 'REJECT':
+          if (state.status === 'loading') {
+            return { 
+              status: 'error', 
+              error: new Error('Network Timeout: Gateway 504 connection aborted') 
+            };
+          }
+          return state;
+        case 'RETRY':
+          if (state.status === 'error') {
+            return { status: 'loading' };
+          }
+          return state;
+        case 'RESET':
+          return { status: 'idle' };
+        default:
+          return state;
+      }
+    }
+
+    function TabStateMachine() {
+      const [state, dispatch] = useReducer(fsmReducer, initialFsmState);
+      const [log, setLog] = useState([]);
+
+      const handleAction = (type) => {
+        const prevStatus = state.status;
+        dispatch({ type });
+        setLog(prev => [
+          { time: new Date().toLocaleTimeString(), prev: prevStatus, action: type },
+          ...prev.slice(0, 7)
+        ]);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-1">Deterministic FSM Interactive Engine</h2>
+            <p className="text-xs text-slate-400 mb-4">
+              Dispatched actions execute pure transitions. Payloads are bound directly to their corresponding variant.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-800">
+              <button
+                onClick={() => handleAction('START')}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition shadow-lg shadow-cyan-600/20 font-mono"
+              >
+                dispatch(START)
+              </button>
+              <button
+                onClick={() => handleAction('RESOLVE')}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow-lg shadow-emerald-600/20 font-mono"
+              >
+                dispatch(RESOLVE)
+              </button>
+              <button
+                onClick={() => handleAction('REJECT')}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg transition shadow-lg shadow-rose-600/20 font-mono"
+              >
+                dispatch(REJECT)
+              </button>
+              <button
+                onClick={() => handleAction('RETRY')}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition shadow-lg shadow-amber-600/20 font-mono"
+              >
+                dispatch(RETRY)
+              </button>
+              <button
+                onClick={() => handleAction('RESET')}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg transition font-mono"
+              >
+                dispatch(RESET)
+              </button>
+            </div>
+          </div>
+
+          {/* Current State Projection Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase">Active State Payload</span>
+                <span className={`px-2.5 py-1 rounded text-xs font-mono font-bold ${
+                  state.status === 'idle' ? 'bg-slate-800 text-slate-300' :
+                  state.status === 'loading' ? 'bg-cyan-500/20 text-cyan-300' :
+                  state.status === 'success' ? 'bg-emerald-500/20 text-emerald-300' :
+                  'bg-rose-500/20 text-rose-300'
+                }`}>
+                  status: "{state.status}"
+                </span>
+              </div>
+
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 min-h-[160px] flex items-center justify-center font-mono text-xs">
+                {state.status === 'idle' && (
+                  <div className="text-slate-500 text-center">
+                    💤 Machine is IDLE. Awaiting START action.
+                  </div>
+                )}
+                {state.status === 'loading' && (
+                  <div className="flex items-center gap-3 text-cyan-400">
+                    <span className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Operation in progress (Syncing)...</span>
+                  </div>
+                )}
+                {state.status === 'success' && (
+                  <div className="space-y-1 w-full text-slate-300">
+                    <div className="text-emerald-400 font-bold">✅ Data Loaded Successfully:</div>
+                    <div>User: <strong className="text-white">{state.data.name}</strong></div>
+                    <div>Role: <span className="text-slate-400">{state.data.role}</span></div>
+                    <div>Latency: <span className="text-cyan-400">{state.data.latency}</span></div>
+                  </div>
+                )}
+                {state.status === 'error' && (
+                  <div className="space-y-2 w-full text-rose-400">
+                    <div className="font-bold">❌ Error Encountered:</div>
+                    <div className="bg-rose-950/40 p-2 rounded border border-rose-800/60 text-[11px] text-rose-300">
+                      {state.error.message}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Audit Log */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase font-mono">Transition History Log</h3>
+              <div className="space-y-2 font-mono text-xs max-h-[180px] overflow-y-auto">
+                {log.map((entry, i) => (
+                  <div key={i} className="p-2 bg-slate-950 rounded border border-slate-800/80 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">{entry.time}</span>
+                    <span className="text-slate-400">{entry.prev} ──►</span>
+                    <span className="text-cyan-400 font-bold">{entry.action}</span>
+                  </div>
+                ))}
+                {log.length === 0 && (
+                  <div className="text-slate-600 text-center py-8">No transitions recorded yet.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: INVALID TRANSITION INTERCEPTOR
+    // =========================================================================
+    function TabInvalidTransitions() {
+      const [interceptLog, setInterceptLog] = useState([]);
+      const [currentState, setCurrentState] = useState('idle');
+
+      const attemptTransition = (event) => {
+        let valid = false;
+        let next = currentState;
+
+        if (currentState === 'idle' && event === 'START') { valid = true; next = 'loading'; }
+        else if (currentState === 'loading' && event === 'RESOLVE') { valid = true; next = 'success'; }
+        else if (currentState === 'loading' && event === 'REJECT') { valid = true; next = 'error'; }
+        else if (currentState === 'error' && event === 'RETRY') { valid = true; next = 'loading'; }
+        else if (currentState === 'success' && event === 'START') { valid = true; next = 'loading'; }
+        else if (event === 'RESET') { valid = true; next = 'idle'; }
+
+        setCurrentState(next);
+        setInterceptLog(prev => [
+          {
+            state: currentState,
+            event,
+            valid,
+            result: valid ? `Transitioned to ${next}` : 'BLOCKED: Illegal transition discarded!'
+          },
+          ...prev.slice(0, 6)
+        ]);
+      };
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Invalid Transition Interceptor</h2>
+            <p className="text-sm text-slate-400">
+              Notice what happens when an invalid event is dispatched (e.g. attempting <code className="text-rose-400">RESOLVE</code> when current state is <code className="text-cyan-400">idle</code>).
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+            <span className="text-xs font-mono text-slate-400">CURRENT STATE:</span>
+            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 font-mono font-bold text-sm rounded-lg border border-indigo-500/30">
+              {currentState.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button onClick={() => attemptTransition('START')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-cyan-400 rounded">
+              Attempt START
+            </button>
+            <button onClick={() => attemptTransition('RESOLVE')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-emerald-400 rounded">
+              Attempt RESOLVE
+            </button>
+            <button onClick={() => attemptTransition('REJECT')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-rose-400 rounded">
+              Attempt REJECT
+            </button>
+            <button onClick={() => attemptTransition('RETRY')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-amber-400 rounded">
+              Attempt RETRY
+            </button>
+            <button onClick={() => attemptTransition('RESET')} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-mono font-bold text-slate-300 rounded">
+              Attempt RESET
+            </button>
+          </div>
+
+          <div className="space-y-2 font-mono text-xs">
+            {interceptLog.map((log, i) => (
+              <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${
+                log.valid ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+              }`}>
+                <span>[{log.state}] + {log.event}</span>
+                <span className="font-bold">{log.result}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: PRODUCTION INCIDENTS
+    // =========================================================================
+    function TabProductionIncidents() {
+      const [scenario, setScenario] = useState('zombie');
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-2">Production Incident Post-Mortems</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                onClick={() => setScenario('zombie')}
+                className={`p-3 rounded-lg text-xs font-bold text-left transition ${
+                  scenario === 'zombie' ? 'bg-rose-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                }`}
+              >
+                1. Zombie Spinner Disaster
+              </button>
+              <button
+                onClick={() => setScenario('drift')}
+                className={`p-3 rounded-lg text-xs font-bold text-left transition ${
+                  scenario === 'drift' ? 'bg-rose-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                }`}
+              >
+                2. Frankenstein Data + Error
+              </button>
+              <button
+                onClick={() => setScenario('refresh')}
+                className={`p-3 rounded-lg text-xs font-bold text-left transition ${
+                  scenario === 'refresh' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                }`}
+              >
+                3. Refresh Preserves Stale Data
+              </button>
+            </div>
+          </div>
+
+          {scenario === 'zombie' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-bold text-rose-400 font-mono">Incident #1: The Infinite Zombie Spinner</h3>
+              <div className="p-4 bg-slate-950 rounded-lg text-xs font-mono text-slate-300 space-y-2">
+                <p className="text-rose-300 font-semibold">// ❌ Root Cause: Catch block forgot to clear isLoading</p>
+                <pre>{`async function load() {
+  setIsLoading(true);
+  try {
+    const res = await api.get();
+    setData(res);
+    setIsLoading(false);
+  } catch (err) {
+    setError(err); // 💥 BUG: isLoading stays TRUE forever!
+  }
+}`}</pre>
+              </div>
+              <div className="p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-xs font-mono text-emerald-300">
+                ✅ FSM Fix: Atomic replacement of state prevents any residual boolean flags.
+              </div>
+            </div>
+          )}
+
+          {scenario === 'drift' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-bold text-rose-400 font-mono">Incident #2: Data + Error Contradiction</h3>
+              <div className="p-4 bg-slate-950 rounded-lg text-xs font-mono text-slate-300 space-y-2">
+                <p className="text-rose-300 font-semibold">// ❌ Root Cause: setError without clearing previous data</p>
+                <pre>{`// User sees error banner AND old bank balance simultaneously!
+{error && <ErrorBanner error={error} />}
+{data && <BalanceCard balance={data.balance} />}`}</pre>
+              </div>
+              <div className="p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-xs font-mono text-emerald-300">
+                ✅ FSM Fix: Explicit discriminated union allows either `error` or `refresh-error` (with cachedData).
+              </div>
+            </div>
+          )}
+
+          {scenario === 'refresh' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-bold text-emerald-400 font-mono">Senior Pattern: Background Refresh</h3>
+              <div className="p-4 bg-slate-950 rounded-lg text-xs font-mono text-slate-300 space-y-2">
+                <p className="text-emerald-300 font-semibold">// ✅ Intentional Refresh State with Cached Data</p>
+                <pre>{`type QueryState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'refreshing'; data: T }; // Data preserved during background re-fetch!`}</pre>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 5: PREDICTION SANDBOX
+    // =========================================================================
+    function TabPredictionSandbox() {
+      const [currState, setCurrState] = useState('idle');
+      const [predicted, setPredicted] = useState(null);
+      const [feedback, setFeedback] = useState(null);
+
+      const triggerAction = (action) => {
+        let actualNext = currState;
+        if (currState === 'idle' && action === 'START') actualNext = 'loading';
+        else if (currState === 'loading' && action === 'RESOLVE') actualNext = 'success';
+        else if (currState === 'loading' && action === 'REJECT') actualNext = 'error';
+        else if (currState === 'error' && action === 'RETRY') actualNext = 'loading';
+        else if (action === 'RESET') actualNext = 'idle';
+
+        if (predicted === actualNext) {
+          setFeedback({ correct: true, text: `Correct! ${currState} + ${action} ──► ${actualNext}` });
+        } else {
+          setFeedback({ correct: false, text: `Incorrect. Predicted: ${predicted}, Actual: ${actualNext}` });
+        }
+        setCurrState(actualNext);
+        setPredicted(null);
+      };
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Prediction-First State Transition Crucible</h2>
+            <p className="text-sm text-slate-400">
+              Select your predicted next state BEFORE triggering the action.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+            <span className="text-xs font-mono text-slate-400">CURRENT STATE:</span>
+            <span className="text-sm font-bold text-cyan-400 font-mono">{currState.toUpperCase()}</span>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-400 font-mono">1. Select Predicted Next State:</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {['idle', 'loading', 'success', 'error'].map(st => (
+                <button
+                  key={st}
+                  onClick={() => setPredicted(st)}
+                  className={`p-3 rounded-lg text-xs font-mono font-bold transition ${
+                    predicted === st ? 'bg-cyan-600 text-white shadow-lg' : 'bg-slate-950 text-slate-400 border border-slate-800'
+                  }`}
+                >
+                  {st.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-400 font-mono">2. Dispatch Action:</span>
+            <div className="flex flex-wrap gap-2">
+              {['START', 'RESOLVE', 'REJECT', 'RETRY', 'RESET'].map(act => (
+                <button
+                  key={act}
+                  disabled={!predicted}
+                  onClick={() => triggerAction(act)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-mono font-bold text-slate-200 rounded-lg transition"
+                >
+                  {act}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {feedback && (
+            <div className={`p-4 rounded-xl border font-mono text-xs ${
+              feedback.correct ? 'bg-emerald-950/30 border-emerald-500 text-emerald-300' : 'bg-rose-950/30 border-rose-500 text-rose-300'
+            }`}>
+              {feedback.text}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 6: SENIOR CERTIFICATION EXAM
+    // =========================================================================
+    function TabExam() {
+      const questions = [
+        {
+          id: 1,
+          question: "Why is a TypeScript Discriminated Union superior to independent optional state properties?",
+          options: [
+            "It speeds up V8 garbage collection.",
+            "It guarantees at compile-time that data only exists on success and error only exists on error, eliminating contradictory combinations.",
+            "It allows components to bypass React reconciliation.",
+            "Discriminated unions are automatically serialized into localStorage."
+          ],
+          correct: 1,
+          explanation: "Discriminated unions bind payload properties to their specific discriminant status, preventing invalid combinations like { status: 'loading', data: user, error: err }."
+        },
+        {
+          id: 2,
+          question: "What is the primary root cause of the 'Zombie Spinner' production incident?",
+          options: [
+            "React.memo failing to bail out.",
+            "A try/catch block where an exception occurs and setIsLoading(false) is omitted in the catch block.",
+            "Excessive CSS transitions on the spinner element.",
+            "Using useReducer instead of useState."
+          ],
+          correct: 1,
+          explanation: "Without an atomic transition model or finally cleanup, errors can leave independent boolean loading flags stuck at true."
+        },
+        {
+          id: 3,
+          question: "How should an empty API response (e.g. HTTP 200 with []) be represented in the state machine?",
+          options: [
+            "As status: 'error' with an EmptyDataError.",
+            "As status: 'idle'.",
+            "As status: 'success' with data: [], deriving isEmpty = data.length === 0 in the view layer.",
+            "As status: 'loading'."
+          ],
+          correct: 2,
+          explanation: "The request succeeded at the transport level. Empty data is a domain fact derived from successful data, not a transport error."
+        },
+        {
+          id: 4,
+          question: "Why must state reducers in React remain pure functions?",
+          options: [
+            "To allow deterministic state transitions, time-travel debugging, and prevent duplicate side effects during React concurrent re-renders.",
+            "Because JavaScript forbids calling fetch inside switch statements.",
+            "Pure reducers automatically cancel HTTP network requests.",
+            "To prevent CSS reflows."
+          ],
+          correct: 0,
+          explanation: "Reducers must be pure (s, a) -> s' functions. Side effects like fetch() belong outside the reducer in event handlers or effects."
+        },
+        {
+          id: 5,
+          question: "Does using useReducer automatically prevent asynchronous out-of-order race conditions?",
+          options: [
+            "Yes, useReducer cancels obsolete HTTP requests automatically.",
+            "No. A reducer models state transitions, but if two async requests resolve out-of-order, both RESOLVE actions will be processed unless request cancellation/currentness guards are implemented.",
+            "Yes, React 18 Scheduler handles HTTP sockets.",
+            "No, unless wrapped in React.memo."
+          ],
+          correct: 1,
+          explanation: "Reducers govern state transitions, not network lifecycles. Handling out-of-order responses requires operation currentness IDs and AbortController."
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const score = Object.keys(selectedAnswers).reduce((acc, qId) => {
+        const q = questions.find(item => item.id === Number(qId));
+        return selectedAnswers[qId] === q.correct ? acc + 1 : acc;
+      }, 0);
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">Async UI State Machine Architecture Certification</h2>
+              <p className="text-xs text-slate-400 mt-1">Test your mastery of FSM lifecycles, discriminated unions, and invariant contracts.</p>
+            </div>
+            {submitted && (
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                score === 5 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
+                Score: {score} / 5 ({((score / 5) * 100).toFixed(0)}%)
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="font-semibold text-sm text-slate-200">
+                  <span className="text-emerald-400 font-mono mr-2">Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correct === optIdx;
+                    let optionStyle = 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700';
+
+                    if (submitted) {
+                      if (isCorrect) {
+                        optionStyle = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                      } else if (isSelected && !isCorrect) {
+                        optionStyle = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                      }
+                    } else if (isSelected) {
+                      optionStyle = 'bg-emerald-600/20 border-emerald-500 text-emerald-200';
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => handleSelect(q.id, optIdx)}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition ${optionStyle}`}
+                      >
+                        <span className="font-mono font-semibold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {submitted && (
+                  <div className="p-3 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-800 font-mono">
+                    💡 <strong className="text-slate-200">Explanation:</strong> {q.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            {submitted ? (
+              <button
+                onClick={() => { setSelectedAnswers({}); setSubmitted(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition"
+              >
+                Retake Exam
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(selectedAnswers).length < questions.length}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-xs font-bold text-white rounded-lg transition shadow-lg shadow-emerald-600/20"
+              >
+                Submit Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- ROOT APP CONTAINER ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('boolean-explosion');
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            {activeTab === 'boolean-explosion' && <TabBooleanExplosion />}
+            {activeTab === 'state-machine' && <TabStateMachine />}
+            {activeTab === 'invalid-transitions' && <TabInvalidTransitions />}
+            {activeTab === 'production-incidents' && <TabProductionIncidents />}
+            {activeTab === 'prediction-mode' && <TabPredictionSandbox />}
+            {activeTab === 'exam' && <TabExam />}
+          </main>
+          <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+            KPI 15 · Part 01 — Async UI State Machines Lab · React 18 Architecture
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
