@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 12 — Part 11: Form Handling, Validation & Field Cascades Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useReducer, useCallback, useMemo, useRef, memo } = React;
+
+    // ==========================================
+    // EXPERIMENT 1: MULTI-TIER LOCATION CASCADE (Country -> State -> City)
+    // ==========================================
+    const LOCATION_DATABASE = {
+      USA: {
+        states: {
+          California: ["San Francisco", "Los Angeles", "San Diego"],
+          Texas: ["Austin", "Houston", "Dallas"],
+          NewYork: ["New York City", "Buffalo", "Rochester"]
+        }
+      },
+      India: {
+        states: {
+          Maharashtra: ["Mumbai", "Pune", "Nagpur"],
+          Karnataka: ["Bengaluru", "Mysuru", "Hubballi"],
+          Telangana: ["Hyderabad", "Warangal", "Nizamabad"]
+        }
+      },
+      Germany: {
+        states: {
+          Bavaria: ["Munich", "Nuremberg", "Augsburg"],
+          Berlin: ["Berlin City", "Spandau"],
+          Hesse: ["Frankfurt", "Wiesbaden"]
+        }
+      }
+    };
+
+    function Exp1LocationCascade() {
+      const [country, setCountry] = useState("USA");
+      const [state, setState] = useState("California");
+      const [city, setCity] = useState("San Francisco");
+      const [cascadeLog, setCascadeLog] = useState([]);
+
+      const addLog = (msg) => setCascadeLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 5)]);
+
+      const handleCountryChange = (nextCountry) => {
+        setCountry(nextCountry);
+        const firstState = Object.keys(LOCATION_DATABASE[nextCountry].states)[0];
+        const firstCity = LOCATION_DATABASE[nextCountry].states[firstState][0];
+        setState(firstState);
+        setCity(firstCity);
+        addLog(`Cascade Trigger: Changed Country to '${nextCountry}' ──► Auto-reset State to '${firstState}' and City to '${firstCity}'`);
+      };
+
+      const handleStateChange = (nextState) => {
+        setState(nextState);
+        const firstCity = LOCATION_DATABASE[country].states[nextState][0];
+        setCity(firstCity);
+        addLog(`Cascade Trigger: Changed State to '${nextState}' ──► Auto-reset City to '${firstCity}'`);
+      };
+
+      const availableStates = country ? Object.keys(LOCATION_DATABASE[country].states) : [];
+      const availableCities = country && state ? LOCATION_DATABASE[country].states[state] || [] : [];
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-bold text-white">Multi-Tier Location Cascade Engine</h3>
+              <p className="text-xs text-slate-400">Deterministic event-boundary cascading without useEffect synchronization loops.</p>
+            </div>
+            <span className="text-xs font-mono text-indigo-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+              Selected: {city}, {state}, {country}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+              <label className="text-xs font-bold text-slate-300">1. Select Country</label>
+              <select
+                value={country}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+              >
+                {Object.keys(LOCATION_DATABASE).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+              <label className="text-xs font-bold text-slate-300">2. Select State / Region</label>
+              <select
+                value={state}
+                onChange={(e) => handleStateChange(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+              >
+                {availableStates.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+              <label className="text-xs font-bold text-slate-300">3. Select City</label>
+              <select
+                value={city}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  addLog(`City Selected: '${e.target.value}'`);
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+              >
+                {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {cascadeLog.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Cascade Event Log</span>
+              <div className="font-mono text-xs space-y-1 text-indigo-300">
+                {cascadeLog.map((log, i) => <div key={i}>{log}</div>)}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 2: CROSS-FIELD VALIDATION DAG (Password & Confirm Password)
+    // ==========================================
+    function Exp2ValidationDag() {
+      const [password, setPassword] = useState("");
+      const [confirmPassword, setConfirmPassword] = useState("");
+      const [touched, setTouched] = useState({ password: false, confirmPassword: false });
+
+      // Cross-Field Validation DAG logic
+      const errors = useMemo(() => {
+        const errs = {};
+        if (password.length > 0 && password.length < 8) {
+          errs.password = "Password must be at least 8 characters long.";
+        }
+        if (confirmPassword.length > 0 && confirmPassword !== password) {
+          errs.confirmPassword = "Passwords do not match.";
+        }
+        return errs;
+      }, [password, confirmPassword]);
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+            <div>
+              <h4 className="text-sm font-bold text-white">Cross-Field Validation DAG</h4>
+              <p className="text-xs text-slate-400">Editing 'Password' re-evaluates both Password and downstream ConfirmPassword.</p>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${Object.keys(errors).length === 0 && password ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40'}`}>
+              {Object.keys(errors).length === 0 && password ? "VALID" : "PENDING VALIDATION"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Password (Root Node in DAG)</label>
+                <input
+                  type="password"
+                  placeholder="Enter 8+ chars..."
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+                {touched.password && errors.password && (
+                  <p className="text-xs text-rose-400 font-mono">{errors.password}</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Confirm Password (Dependent Node in DAG)</label>
+                <input
+                  type="password"
+                  placeholder="Re-enter password..."
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onBlur={() => setTouched(prev => ({ ...prev, confirmPassword: true }))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+                {touched.confirmPassword && errors.confirmPassword && (
+                  <p className="text-xs text-rose-400 font-mono">{errors.confirmPassword}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+              <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Validation DAG Visualizer</h5>
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${errors.password ? 'bg-rose-500' : password ? 'bg-emerald-500' : 'bg-slate-600'}`}></span>
+                  <span className="text-slate-200 font-bold">Node: Password</span>
+                  <span className="text-slate-500 text-[10px]">({password.length} chars)</span>
+                </div>
+                <div className="pl-6 border-l-2 border-indigo-500/40 space-y-1 text-slate-400 text-[11px]">
+                  <p>↓ Dependents: ["confirmPassword"]</p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className={`w-2.5 h-2.5 rounded-full ${errors.confirmPassword ? 'bg-rose-500' : confirmPassword && !errors.confirmPassword ? 'bg-emerald-500' : 'bg-slate-600'}`}></span>
+                    <span className="text-slate-200">Node: ConfirmPassword</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 3: ASYNC USERNAME AVAILABILITY CHECKER
+    // ==========================================
+    const TAKEN_USERNAMES = ["admin", "root", "alex", "john_doe", "sarah"];
+
+    function Exp3AsyncValidation() {
+      const [username, setUsername] = useState("");
+      const [isValidating, setIsValidating] = useState(false);
+      const [asyncError, setAsyncError] = useState(null);
+      const [ticketLog, setTicketLog] = useState([]);
+      const requestIdRef = useRef(0);
+
+      const checkAvailability = (val) => {
+        const ticket = ++requestIdRef.current;
+        setIsValidating(true);
+        setAsyncError(null);
+
+        const latency = Math.floor(Math.random() * 800) + 400;
+
+        setTimeout(() => {
+          if (ticket === requestIdRef.current) {
+            setIsValidating(false);
+            if (TAKEN_USERNAMES.includes(val.toLowerCase())) {
+              setAsyncError(`Username '${val}' is already taken.`);
+            } else if (val.length < 3) {
+              setAsyncError("Username must be at least 3 characters.");
+            } else {
+              setAsyncError(null);
+            }
+            setTicketLog(prev => [`[Ticket #${ticket}] ACCEPTED validation for "${val}" (${latency}ms)`, ...prev.slice(0, 4)]);
+          } else {
+            setTicketLog(prev => [`[Ticket #${ticket}] DROPPED stale response for "${val}" (Current Ticket is #${requestIdRef.current})`, ...prev.slice(0, 4)]);
+          }
+        }, latency);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h4 className="text-sm font-bold text-white">Async Username Validation with Race Protection</h4>
+                <p className="text-xs text-slate-400">Type rapidly to observe out-of-order ticket drop protection.</p>
+              </div>
+              <span className="text-xs font-mono text-indigo-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                Current Ticket: #{requestIdRef.current}
+              </span>
+            </div>
+
+            <div className="max-w-md space-y-2">
+              <label className="text-xs font-bold text-slate-300">Choose Username</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="e.g. alex, sarah, neo123..."
+                  value={username}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setUsername(val);
+                    checkAvailability(val);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 pr-24"
+                />
+                <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
+                  {isValidating && (
+                    <span className="text-[10px] font-mono text-amber-400 animate-pulse font-bold">Checking...</span>
+                  )}
+                  {!isValidating && username && !asyncError && (
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">Available ✓</span>
+                  )}
+                </div>
+              </div>
+              {asyncError && <p className="text-xs text-rose-400 font-mono">{asyncError}</p>}
+            </div>
+          </div>
+
+          {ticketLog.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Async Ticket Telemetry</span>
+              <div className="font-mono text-xs space-y-1">
+                {ticketLog.map((log, i) => (
+                  <div key={i} className={log.includes("DROPPED") ? "text-amber-400" : "text-emerald-400"}>{log}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 4: DYNAMIC FIELD ARRAY (Stable UUIDs vs Index Keys)
+    // ==========================================
+    function Exp4DynamicFieldArray() {
+      const [contacts, setContacts] = useState([
+        { id: "cnt_101", name: "Alice Smith", role: "Frontend Lead" },
+        { id: "cnt_202", name: "Bob Jones", role: "DevOps Engineer" },
+        { id: "cnt_303", name: "Charlie Day", role: "Product Manager" },
+      ]);
+
+      const addContact = () => {
+        const id = `cnt_${Date.now()}`;
+        setContacts(prev => [...prev, { id, name: "", role: "Developer" }]);
+      };
+
+      const removeContact = (id) => {
+        setContacts(prev => prev.filter(c => c.id !== id));
+      };
+
+      const moveContact = (fromIdx, toIdx) => {
+        setContacts(prev => {
+          const next = [...prev];
+          const [moved] = next.splice(fromIdx, 1);
+          next.splice(toIdx, 0, moved);
+          return next;
+        });
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex justify-between items-center">
+            <div>
+              <h4 className="text-sm font-bold text-white">Dynamic Field Array (Stable Domain UUIDs)</h4>
+              <p className="text-xs text-slate-400">Reordering or deleting preserves field metadata and input focus.</p>
+            </div>
+            <button
+              onClick={addContact}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+            >
+              + Add Contact
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {contacts.map((contact, idx) => (
+              <div key={contact.id} className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center font-mono">
+                    {idx + 1}
+                  </span>
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      placeholder="Contact Name..."
+                      value={contact.name}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, name: val } : c));
+                      }}
+                      className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    />
+                    <p className="text-[10px] font-mono text-slate-500">UUID Key: <strong className="text-indigo-400">{contact.id}</strong></p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={idx === 0}
+                    onClick={() => moveContact(idx, idx - 1)}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 rounded text-xs transition"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    disabled={idx === contacts.length - 1}
+                    onClick={() => moveContact(idx, idx + 1)}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 rounded text-xs transition"
+                  >
+                    ▼
+                  </button>
+                  <button
+                    onClick={() => removeContact(contact.id)}
+                    className="px-3 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded text-xs font-semibold transition"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 5: SENIOR FORM ARCHITECT EXAM
+    // ==========================================
+    const CERT_QUESTIONS = [
+      {
+        id: 1,
+        question: "Why should synchronous form validation NOT be executed inside a useEffect hook?",
+        options: [
+          "Because useEffect cannot access form values.",
+          "Because pure validation is a deterministic derivation of current values and running it in useEffect causes unnecessary extra renders and risks infinite loops.",
+          "Because TypeScript requires validation to be asynchronous.",
+          "Because useEffect is deprecated in React 18."
+        ],
+        correct: 1,
+        rationale: "Pure validation can be derived directly in the render phase or reducer transition without scheduling a second render pass."
+      },
+      {
+        id: 2,
+        question: "What is a Validation Dependency DAG in custom form hooks?",
+        options: [
+          "A database schema migration tool.",
+          "A directed acyclic graph that automatically triggers revalidation of dependent fields (e.g. confirmPassword) when a prerequisite field (password) changes.",
+          "A CSS layout mechanism for flexbox.",
+          "A method to encrypt form data before HTTP submission."
+        ],
+        correct: 1,
+        rationale: "A validation DAG defines cross-field relationships so mutating a root field re-evaluates all dependent fields."
+      },
+      {
+        id: 3,
+        question: "What is the difference between an initial value and a baseline value?",
+        options: [
+          "There is no difference; they are exact synonyms.",
+          "Initial values are default seeds on mount; baseline values represent the last server-persisted snapshot used to compute isDirty and form.reset().",
+          "Initial values are strings; baseline values are numbers.",
+          "Baseline values can only be stored in cookies."
+        ],
+        correct: 1,
+        rationale: "After a successful autosave, the baseline is updated to match current values, resetting isDirty to false without wiping user inputs."
+      },
+      {
+        id: 4,
+        question: "Why must dynamic repeatable field lists use stable UUID keys instead of array indices?",
+        options: [
+          "Because array indices cause compilation errors in TypeScript.",
+          "Because deleting or reordering items causes React reconciler to associate input state and errors with array positions rather than entity identities.",
+          "Because UUIDs make the form submit faster.",
+          "Because array indices take up 100x more memory."
+        ],
+        correct: 1,
+        rationale: "Index keys corrupt input focus, validation messages, and internal component state when rows are deleted or moved."
+      },
+      {
+        id: 5,
+        question: "Why is touched state tracked independently from dirty state?",
+        options: [
+          "Because a user can modify a field via autofill without blurring (dirty=true, touched=false), or blur an untouched default (touched=true, dirty=false).",
+          "Because HTML5 standards require two separate booleans.",
+          "Because dirty state only exists on the backend server.",
+          "Because touched state only works on mobile touchscreen devices."
+        ],
+        correct: 0,
+        rationale: "Touched and dirty represent distinct interaction semantics: user focus completion vs semantic deviation from baseline."
+      }
+    ];
+
+    function Exp5CertExam() {
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, idx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: idx }));
+      };
+
+      const score = Object.keys(answers).filter(qId => answers[qId] === CERT_QUESTIONS.find(q => q.id === parseInt(qId)).correct).length;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h3 className="text-sm font-bold text-white">Senior Form Architect Exam</h3>
+              <p className="text-xs text-slate-400">Validate your mastery of Validation DAGs, Cascades, and Baseline Management.</p>
+            </div>
+            {submitted && (
+              <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                Score: {score} / {CERT_QUESTIONS.length} ({Math.round((score / CERT_QUESTIONS.length) * 100)}%)
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {CERT_QUESTIONS.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+              return (
+                <div key={q.id} className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-200">{q.question}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 pl-9">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700";
+                      if (selected === optIdx) btnStyle = "bg-indigo-950/60 border-indigo-500 text-indigo-200";
+                      if (submitted) {
+                        if (optIdx === q.correct) btnStyle = "bg-emerald-950/60 border-emerald-500 text-emerald-200 font-semibold";
+                        else if (selected === optIdx && !isCorrect) btnStyle = "bg-rose-950/60 border-rose-500 text-rose-200";
+                      }
+                      return (
+                        <button
+                          key={optIdx}
+                          disabled={submitted}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition ${btnStyle}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="pl-9 pt-2">
+                      <p className="text-xs text-slate-400 font-mono bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <span className="font-bold text-indigo-400">Architect Rationale:</span> {q.rationale}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            {!submitted ? (
+              <button
+                disabled={Object.keys(answers).length < CERT_QUESTIONS.length}
+                onClick={() => setSubmitted(true)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+              >
+                Submit Certification Answers
+              </button>
+            ) : (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition"
+              >
+                Retake Exam
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN LAB HARNESS
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState(0);
+
+      const TABS = [
+        { title: "Exp 1: Location Cascades", component: <Exp1LocationCascade /> },
+        { title: "Exp 2: Validation DAG", component: <Exp2ValidationDag /> },
+        { title: "Exp 3: Async Validation", component: <Exp3AsyncValidation /> },
+        { title: "Exp 4: Dynamic Field Array", component: <Exp4DynamicFieldArray /> },
+        { title: "Exp 5: Senior Form Exam", component: <Exp5CertExam /> },
+      ];
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* Header */}
+          <header className="space-y-3 border-b border-slate-800 pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-600/30">
+                  11
+                </div>
+                <div>
+                  <h1 className="text-xl font-extrabold text-white tracking-tight">Form Handling, Validation & Field Cascades</h1>
+                  <p className="text-xs text-slate-400 font-mono">KPI 12 • PART 11 • Interactive Architectural Diagnostic Lab</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-indigo-950/60 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold">
+                Form Architecture Certified
+              </span>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <nav className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            {TABS.map((tab, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveTab(idx)}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${activeTab === idx ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+              >
+                {tab.title}
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <main className="min-h-[500px]">
+            {TABS[activeTab].component}
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-800 pt-6 text-center text-xs text-slate-500 space-y-1">
+            <p>Engineering Design Vault • Level 06 — React Fundamentals • Author: Srikar Kudurmalla | Co-Author: Prasenjeet</p>
+            <p className="font-mono text-[11px] text-slate-600">Validation DAGs, Field Cascades & Multi-Phase Form State Machines</p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
