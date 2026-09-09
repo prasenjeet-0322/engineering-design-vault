@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 - Part 16: Context & Dependency Distribution Final Review & Mastery Lab</title>
+  <!-- React 18 & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    :root {
+      --bg-main: #0B0F19;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --card-border: rgba(75, 85, 99, 0.4);
+      --accent-cyan: #06B6D4;
+      --accent-indigo: #6366F1;
+      --accent-emerald: #10B981;
+      --accent-rose: #F43F5E;
+      --accent-amber: #F59E0B;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: #F3F4F6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4B5563;
+    }
+
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+    }
+  </style>
+</head>
+<body class="custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useRef, memo, useCallback } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('builder');
+
+      const tabs = [
+        { id: 'builder', label: '1. Architecture Builder', icon: '🏗️' },
+        { id: 'tree', label: '2. Multi-Tier Tree Scope', icon: '🌲' },
+        { id: 'identity', label: '3. Identity Dissector', icon: '🔬' },
+        { id: 'matrix', label: '4. Dependency Matrix', icon: '📋' },
+        { id: 'simulator', label: '5. Pipeline Simulator', icon: '⚡' },
+        { id: 'mastery', label: '6. Graduation Exam', icon: '🎓' },
+      ];
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="border-b border-gray-800 bg-gray-950/80 sticky top-0 z-50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-800">KPI 11 • TERMINAL PART 16</span>
+                <span className="text-gray-400 text-sm">React Fundamentals & Fiber Architecture</span>
+              </div>
+              <h1 className="text-xl font-extrabold text-white mt-1">Context & Dependency Distribution: Final Review & Mastery Lab</h1>
+            </div>
+            <div className="text-xs text-gray-400 text-right hidden sm:block">
+              <div>Lead Architect: <span className="text-cyan-400 font-semibold">Srikar Kudurmalla</span></div>
+              <div>Co-Author: <span className="text-gray-300 font-semibold">Prasenjeet</span></div>
+            </div>
+          </header>
+
+          {/* Navigation Bar */}
+          <nav className="bg-gray-900/60 border-b border-gray-800 px-6 py-2.5 flex items-center gap-2 overflow-x-auto custom-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm shadow-emerald-900/30'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 border border-transparent'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+            {activeTab === 'builder' && <LabBuilder />}
+            {activeTab === 'tree' && <LabTreeScope />}
+            {activeTab === 'identity' && <LabIdentityDissector />}
+            {activeTab === 'matrix' && <LabDependencyMatrix />}
+            {activeTab === 'simulator' && <LabPipelineSimulator />}
+            {activeTab === 'mastery' && <LabGraduationExam />}
+          </main>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 1: ARCHITECTURE BUILDER
+    // ==========================================
+    function LabBuilder() {
+      const [depName, setDepName] = useState('Theme Tokens');
+      const [owner, setOwner] = useState('Application Root');
+      const [scope, setScope] = useState('Global Scope');
+      const [freq, setFreq] = useState('Low (< 1/min)');
+      const [mechanism, setMechanism] = useState('React Context');
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-emerald-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-emerald-400">🏗️ Module 1:</span> Architectural Dependency Pipeline Builder
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Construct an end-to-end dependency architecture specification following the Senior Context Architecture Formula.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+            <div className="glass-panel p-5 rounded-xl space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Dependency Specification</h3>
+              
+              <div>
+                <label className="text-gray-400 block mb-1">Dependency Capability:</label>
+                <select
+                  value={depName}
+                  onChange={(e) => setDepName(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-cyan-300"
+                >
+                  <option>Theme Tokens (Dark/Light)</option>
+                  <option>Document Workspace Filters</option>
+                  <option>Editor Selection & Undo History</option>
+                  <option>Mouse Pointer 60 FPS Coordinates</option>
+                  <option>Single Modal Dialog Open State</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-gray-400 block mb-1">Semantic Scope:</label>
+                <select
+                  value={scope}
+                  onChange={(e) => setScope(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-indigo-300"
+                >
+                  <option>Global Scope (App Root)</option>
+                  <option>Feature Scope (Workspace)</option>
+                  <option>Instance Scope (Per Editor)</option>
+                  <option>Local Component Scope (Form/Menu)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-gray-400 block mb-1">Update Frequency:</label>
+                <select
+                  value={freq}
+                  onChange={(e) => setFreq(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-amber-300"
+                >
+                  <option>Low (< 1/min)</option>
+                  <option>Medium (Intermittent clicks)</option>
+                  <option>High (Typing keystrokes)</option>
+                  <option>Ultra-High (60fps ticks/mouse)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-gray-400 block mb-1">Distribution Mechanism:</label>
+                <select
+                  value={mechanism}
+                  onChange={(e) => setMechanism(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-emerald-300"
+                >
+                  <option>React Context</option>
+                  <option>Split Context (State + Dispatch)</option>
+                  <option>Component Composition (Slots)</option>
+                  <option>Local useState</option>
+                  <option>External Store (useSyncExternalStore)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Architecture Blueprint Summary</h3>
+              <div className="p-4 bg-gray-950 rounded-xl space-y-3 border border-gray-800">
+                <div className="flex justify-between"><span className="text-gray-400">Capability:</span> <span className="text-cyan-300 font-bold">{depName}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Scope:</span> <span className="text-indigo-300 font-bold">{scope}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Update Pace:</span> <span className="text-amber-300 font-bold">{freq}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Mechanism:</span> <span className="text-emerald-300 font-bold">{mechanism}</span></div>
+                
+                <div className="pt-3 border-t border-gray-800 text-[11px] text-gray-400">
+                  {freq.includes('Ultra-High') && mechanism === 'React Context' ? (
+                    <span className="text-rose-400 font-bold">⚠️ Warning: High frequency updates in broad Context will trigger reconciliation storms. Consider an external store.</span>
+                  ) : (
+                    <span className="text-emerald-400">✅ Coherent Architecture: Distribution mechanism aligns with frequency and scope bounds.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 2: MULTI-TIER TREE SCOPE
+    // ==========================================
+    function LabTreeScope() {
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-emerald-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-emerald-400">🌲 Module 2:</span> Multi-Tier Enterprise Tree Architecture
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Visualize the 4 semantic tiers of React Context: Global, Feature, Instance, and Local.
+            </p>
+          </div>
+
+          <div className="p-5 bg-gray-950 rounded-xl border border-gray-800 font-mono text-xs space-y-3">
+            <div className="text-emerald-400 font-bold flex items-center gap-2">
+              <span>[Tier 1: Global]</span> &lt;AppProviders&gt; &lt;ThemeProvider&gt; &lt;SessionProvider&gt;
+            </div>
+
+            <div className="pl-6 border-l border-gray-800 space-y-3">
+              <div className="text-indigo-400 font-bold flex items-center gap-2">
+                <span>[Tier 2: Feature Scope]</span> &lt;WorkspaceProvider workspaceId="ws_100"&gt;
+              </div>
+
+              <div className="pl-6 border-l border-gray-800 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-900 rounded-lg border border-cyan-800 space-y-1">
+                    <div className="text-cyan-300 font-bold">[Tier 3: Instance A]</div>
+                    <div>&lt;EditorProvider key="doc_1"&gt;</div>
+                    <div className="pl-4 text-gray-400">├── Canvas (useEditorState)</div>
+                    <div className="pl-4 text-gray-400">└── Toolbar (useEditorCommands)</div>
+                  </div>
+
+                  <div className="p-3 bg-gray-900 rounded-lg border border-cyan-800 space-y-1">
+                    <div className="text-cyan-300 font-bold">[Tier 3: Instance B]</div>
+                    <div>&lt;EditorProvider key="doc_2"&gt;</div>
+                    <div className="pl-4 text-gray-400">├── Canvas (useEditorState)</div>
+                    <div className="pl-4 text-gray-400">└── Toolbar (useEditorCommands)</div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-gray-900/60 rounded-lg border border-amber-800 text-amber-300">
+                  <span className="font-bold">[Tier 4: Local Compound Scope]</span> &lt;Select&gt; &lt;SelectContext&gt; (Scoped to Single Dropdown)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 3: IDENTITY DISSECTOR
+    // ==========================================
+    function LabIdentityDissector() {
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-emerald-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-emerald-400">🔬 Module 3:</span> The Seven Distinct Identities
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Never collapse these 7 distinct architectural concepts into generic "Context state".
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
+            {[
+              { label: '1. Context Token (C)', desc: 'Constant object returned by createContext(). Stable for app lifetime.' },
+              { label: '2. Context Default', desc: 'Fallback value used ONLY when a consumer has no ancestor Provider.' },
+              { label: '3. Provider Fiber (P)', desc: 'React component instance. Remounts when key or position changes.' },
+              { label: '4. Context Value (V)', desc: 'Reference equality (Object.is) of the value prop passed to Provider.' },
+              { label: '5. Consumer Fiber (F)', desc: 'Component instance executing useContext() during its render pass.' },
+              { label: '6. Domain Identity', desc: 'Real-world business entity identifier (documentId, workspaceId).' },
+              { label: '7. Host DOM (D)', desc: 'Physical browser DOM element mutated during the React commit phase.' }
+            ].map((id, idx) => (
+              <div key={idx} className="glass-panel p-4 rounded-xl space-y-1">
+                <div className="text-cyan-400 font-bold">{id.label}</div>
+                <div className="text-gray-300 text-[11px]">{id.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 4: DEPENDENCY MATRIX
+    // ==========================================
+    function LabDependencyMatrix() {
+      const rows = [
+        { consumer: 'AppNavbar', theme: '✓ (Reads)', auth: '✓ (Reads)', editor: '—', freq: 'Low' },
+        { consumer: 'EditorCanvas', theme: '—', auth: '—', editor: '✓ (State + Cursor)', freq: 'Ultra-High' },
+        { consumer: 'EditorToolbar', theme: '—', auth: '—', editor: '✓ (Commands only)', freq: 'Low' },
+        { consumer: 'WorkspaceFilters', theme: '—', auth: '—', editor: '—', freq: 'Medium' },
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-emerald-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-emerald-400">📋 Module 4:</span> Blast-Radius Dependency Matrix
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Audit consumer subscriptions across multiple context channels to identify and eliminate broad update cascades.
+            </p>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl overflow-x-auto font-mono text-xs">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-400">
+                  <th className="pb-3">Consumer Node</th>
+                  <th className="pb-3">ThemeContext</th>
+                  <th className="pb-3">AuthContext</th>
+                  <th className="pb-3">EditorScope</th>
+                  <th className="pb-3">Update Pace</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60">
+                {rows.map((r, idx) => (
+                  <tr key={idx} className="hover:bg-gray-800/30">
+                    <td className="py-3 text-white font-bold">{r.consumer}</td>
+                    <td className="py-3 text-emerald-400">{r.theme}</td>
+                    <td className="py-3 text-indigo-400">{r.auth}</td>
+                    <td className="py-3 text-cyan-400">{r.editor}</td>
+                    <td className="py-3 text-amber-300 font-bold">{r.freq}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 5: PIPELINE SIMULATOR
+    // ==========================================
+    function LabPipelineSimulator() {
+      const [step, setStep] = useState(0);
+
+      const steps = [
+        { label: "1. State Transition Triggered", desc: "User clicks or dispatches an action in the Provider owner." },
+        { label: "2. Provider Owner Renders", desc: "React executes the Provider component function." },
+        { label: "3. Context Value Evaluated", desc: "Object.is(prevValue, nextValue) is computed." },
+        { label: "4. Consumer Work Scheduled", desc: "Dependent Fiber nodes are flagged in the reconciler lane." },
+        { label: "5. Reconciliation & Commit", desc: "Virtual DOM diffed, and host DOM updated." }
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-emerald-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-emerald-400">⚡ Module 5:</span> Runtime Execution Pipeline Simulator
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Step through the 5 runtime stages from state dispatch to browser DOM commit.
+            </p>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl space-y-4 font-mono text-xs">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStep(s => Math.max(0, s - 1))}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded font-bold"
+              >
+                Previous Step
+              </button>
+              <button
+                onClick={() => setStep(s => Math.min(steps.length - 1, s + 1))}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold"
+              >
+                Next Step
+              </button>
+              <button
+                onClick={() => setStep(0)}
+                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-gray-400 rounded"
+              >
+                Reset
+              </button>
+            </div>
+
+            <div className="p-4 bg-gray-950 rounded-xl border border-gray-800 space-y-2">
+              <div className="text-emerald-400 font-bold text-sm">{steps[step].label}</div>
+              <div className="text-gray-300">{steps[step].desc}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MODULE 6: GRADUATION EXAM
+    // ==========================================
+    function LabGraduationExam() {
+      const questions = [
+        {
+          id: 1,
+          q: "Does wrapping a consumer component in React.memo prevent it from re-rendering when Context value changes?",
+          options: ["Yes, React.memo stops all renders", "No, Context dependencies bypass React.memo"],
+          correct: "No, Context dependencies bypass React.memo"
+        },
+        {
+          id: 2,
+          q: "Why is a custom domain gateway hook (e.g. useEditorSelection) superior to raw useContext(EditorContext)?",
+          options: ["It provides encapsulation and allows internal store migration", "It is 10x faster in V8 engine"],
+          correct: "It provides encapsulation and allows internal store migration"
+        },
+        {
+          id: 3,
+          q: "When should you prefer an external store (useSyncExternalStore) over React Context?",
+          options: ["When state updates at high frequency (60fps) with fine-grained subscriptions", "Whenever you have more than 2 components"],
+          correct: "When state updates at high frequency (60fps) with fine-grained subscriptions"
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [evaluated, setEvaluated] = useState(false);
+
+      const handleSelect = (qid, opt) => {
+        setAnswers(prev => ({ ...prev, [qid]: opt }));
+      };
+
+      const score = questions.filter(q => answers[q.id] === q.correct).length;
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-emerald-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-emerald-400">🎓 Module 6:</span> KPI 11 Senior Architecture Mastery Exam
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Verify your full architectural mastery of Context & Dependency Distribution.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {questions.map((q) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+              return (
+                <div key={q.id} className="glass-panel p-5 rounded-xl space-y-3 font-mono text-xs">
+                  <div className="text-sm font-bold text-white">{q.q}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {q.options.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => handleSelect(q.id, opt)}
+                        className={`px-4 py-2 rounded-lg transition-all ${
+                          selected === opt
+                            ? 'bg-emerald-600 text-white font-bold'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  {evaluated && (
+                    <div className={`p-2.5 rounded border ${isCorrect ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300' : 'bg-rose-950/80 border-rose-800 text-rose-300'}`}>
+                      {isCorrect ? '✓ Correct' : `✗ Expected: ${q.correct}`}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-between items-center glass-panel p-4 rounded-xl font-mono">
+            <button
+              onClick={() => setEvaluated(true)}
+              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase rounded-lg transition-all"
+            >
+              Grade Mastery Certification
+            </button>
+            {evaluated && (
+              <div className="text-sm font-bold text-white">
+                Score: <span className="text-emerald-400">{score} / {questions.length}</span> ({Math.round((score/questions.length)*100)}%) — <span className="text-cyan-400">KPI 11 MASTERED</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
