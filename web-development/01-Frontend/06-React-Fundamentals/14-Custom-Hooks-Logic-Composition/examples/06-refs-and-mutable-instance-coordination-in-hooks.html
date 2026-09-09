@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 — Part 06: Refs & Mutable Instance Coordination in Hooks</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useCallback, useMemo, useRef } = React;
+
+    // --- EXPERIMENT 1: MUTABLE REF IDENTITY VS STATE RE-RENDERS ---
+    function RefVsStateExplorer() {
+      const [stateCount, setStateCount] = useState(0);
+      const refCount = useRef(0);
+      const renderCountRef = useRef(0);
+      const [lastAction, setLastAction] = useState('Initialized');
+
+      renderCountRef.current += 1;
+
+      const handleStateIncrement = () => {
+        setStateCount(c => c + 1);
+        setLastAction('setState() invoked ➔ Re-render scheduled');
+      };
+
+      const handleRefIncrement = () => {
+        refCount.current += 1;
+        setLastAction(`refCount.current mutated to ${refCount.current} ➔ NO re-render`);
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+              <i class="fa-solid fa-code-compare"></i>
+              Experiment 1: Mutable Ref Memory vs. Reactive State Re-renders
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Mutate <code class="text-pink-400 font-mono">useRef</code> vs updating <code class="text-indigo-300 font-mono">useState</code> and observe component render triggers.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* useState Card */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-indigo-900/60 space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-indigo-300">useState (Reactive UI State)</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300">
+                  Rerender: YES
+                </span>
+              </div>
+
+              <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] text-slate-500 font-mono">State Value</div>
+                <div class="text-4xl font-black text-indigo-400 my-1">{stateCount}</div>
+                <div class="text-[11px] text-slate-400">Triggers Virtual DOM diffing</div>
+              </div>
+
+              <button
+                onClick={handleStateIncrement}
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg text-xs transition shadow"
+              >
+                + Increment State (Causes Render)
+              </button>
+            </div>
+
+            {/* useRef Card */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-pink-900/60 space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-pink-300">useRef (Mutable Instance Memory)</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-pink-950 border border-pink-800 text-pink-300">
+                  Rerender: NO
+                </span>
+              </div>
+
+              <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] text-slate-500 font-mono">Ref `.current` Value (Inspected at Render)</div>
+                <div class="text-4xl font-black text-pink-400 my-1">{refCount.current}</div>
+                <div class="text-[11px] text-slate-400">Direct synchronous property write</div>
+              </div>
+
+              <button
+                onClick={handleRefIncrement}
+                class="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold py-2 rounded-lg text-xs transition shadow"
+              >
+                + Mutate Ref (Does NOT Cause Render)
+              </button>
+            </div>
+          </div>
+
+          <div class="p-4 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between font-mono text-xs">
+            <div class="flex items-center gap-2 text-slate-300">
+              <span class="text-slate-500">Total Component Renders:</span>
+              <span class="text-amber-400 font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-800">{renderCountRef.current}</span>
+            </div>
+            <div class="text-slate-400 text-[11px] truncate max-w-md">
+              Last Action: <span class="text-slate-200">{lastAction}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 2: STALE INTERVAL TRAP VS USELATEST ---
+    function StaleIntervalSimulator() {
+      const [count, setCount] = useState(0);
+      const [mode, setMode] = useState('latest'); // 'stale' | 'latest'
+      const [intervalLogs, setIntervalLogs] = useState([]);
+
+      const latestCountRef = useRef(count);
+      useEffect(() => {
+        latestCountRef.current = count;
+      }, [count]);
+
+      useEffect(() => {
+        const id = setInterval(() => {
+          if (mode === 'stale') {
+            // Closes over captured 'count'
+            setIntervalLogs(prev => [{ id: Date.now() + Math.random(), msg: `TICK reading captured count: ${count}`, type: 'stale', time: new Date().toLocaleTimeString() }, ...prev.slice(0, 4)]);
+          } else {
+            // Reads latestCountRef.current
+            setIntervalLogs(prev => [{ id: Date.now() + Math.random(), msg: `TICK reading latestCountRef.current: ${latestCountRef.current}`, type: 'latest', time: new Date().toLocaleTimeString() }, ...prev.slice(0, 4)]);
+          }
+        }, 1500);
+
+        return () => clearInterval(id);
+      }, [mode]); // Notice: 'count' is intentionally not in deps to show stale closure
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-clock"></i>
+                Experiment 2: The Stale Interval Trap vs. `useLatest` Callback Ref
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Increment state while an active timer is running and compare captured closure reads vs mutable ref lookups.
+              </p>
+            </div>
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setMode('stale')}
+                class={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${mode === 'stale' ? 'bg-rose-950 text-rose-300 border border-rose-800 font-bold' : 'text-slate-400'}`}
+              >
+                ❌ Stale Closure
+              </button>
+              <button
+                onClick={() => setMode('latest')}
+                class={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${mode === 'latest' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold' : 'text-slate-400'}`}
+              >
+                ✓ Latest Ref (`useLatest`)
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live User State</span>
+                <span class="text-2xl font-mono font-black text-indigo-400">{count}</span>
+              </div>
+
+              <div class="flex gap-2">
+                <button
+                  onClick={() => setCount(c => c + 1)}
+                  class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2 rounded-lg font-bold transition shadow"
+                >
+                  + Increment State (Count: {count})
+                </button>
+                <button
+                  onClick={() => setCount(0)}
+                  class="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-lg border border-slate-700"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-300 space-y-1">
+                <div class="font-bold text-slate-200">Timer Configuration:</div>
+                <div class="text-[11px] text-slate-400">
+                  {mode === 'stale' 
+                    ? 'Interval was created when count was 0. It permanently reads count = 0 even if you increment to 10!' 
+                    : 'Interval accesses latestCountRef.current dynamically. Always reads the freshest count value without resetting the timer.'}
+                </div>
+              </div>
+            </div>
+
+            {/* Interval Logs */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>1500ms Interval Execution Log</span>
+                  <button onClick={() => setIntervalLogs([])} class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+
+                <div class="space-y-1.5 font-mono text-xs max-h-36 overflow-y-auto custom-scrollbar">
+                  {intervalLogs.length === 0 ? (
+                    <div class="text-slate-600 text-xs italic py-6 text-center">Ticking interval logs will appear here...</div>
+                  ) : (
+                    intervalLogs.map(item => (
+                      <div
+                        key={item.id}
+                        class={`p-2 rounded border text-[11px] flex items-center justify-between ${
+                          item.type === 'stale' ? 'bg-rose-950/60 border-rose-800 text-rose-300' : 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                        }`}
+                      >
+                        <span>{item.msg}</span>
+                        <span class="text-slate-500 text-[9px]">{item.time}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <span class="font-bold text-amber-400">Key Takeaway:</span> <code class="text-slate-300">useLatest</code> separates <span class="text-indigo-300 font-bold">subscription lifecycle</span> from <span class="text-indigo-300 font-bold">closure state freshness</span>.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 3: USEPREVIOUS TIMELINE VISUALIZER ---
+    function UsePreviousExplorer() {
+      const [currentValue, setCurrentValue] = useState('Alpha');
+      const prevRef = useRef();
+      const [prevSnapshot, setPrevSnapshot] = useState(undefined);
+
+      const handleChangeValue = (val) => {
+        prevRef.current = currentValue; // Capture before transition
+        setPrevSnapshot(prevRef.current);
+        setCurrentValue(val);
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-cyan-400 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              Experiment 3: `usePrevious` Temporal Bookkeeping Explorer
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Observe how `usePrevious` retains the previous render's committed value across state transitions.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {['Alpha', 'Beta', 'Gamma', 'Delta'].map(val => (
+              <button
+                key={val}
+                onClick={() => handleChangeValue(val)}
+                class={`p-3 rounded-xl border text-xs font-bold font-mono transition ${
+                  currentValue === val
+                    ? 'bg-cyan-600 text-slate-950 border-cyan-500 shadow-lg'
+                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-900'
+                }`}
+              >
+                Set Value: "{val}"
+              </button>
+            ))}
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+              <div class="text-[10px] text-slate-500 font-mono uppercase">Current Committed Value</div>
+              <div class="text-3xl font-black font-mono text-cyan-400 my-1">"{currentValue}"</div>
+              <div class="text-[10px] text-slate-400">Current render snapshot</div>
+            </div>
+
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+              <div class="text-[10px] text-slate-500 font-mono uppercase">`usePrevious(value)` Result</div>
+              <div class="text-3xl font-black font-mono text-indigo-400 my-1">
+                {prevSnapshot !== undefined ? `"${prevSnapshot}"` : 'undefined'}
+              </div>
+              <div class="text-[10px] text-slate-400">Observed prior to latest commit</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 4: REQUEST GENERATIONAL COUNTING & RACE RESOLVER ---
+    function GenerationalRaceResolver() {
+      const [result, setResult] = useState('No query executed');
+      const [loading, setLoading] = useState(false);
+      const generationRef = useRef(0);
+      const [traceLogs, setTraceLogs] = useState([]);
+
+      const addTrace = (msg, type = 'info') => {
+        setTraceLogs(prev => [{ id: Date.now() + Math.random(), msg, type, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 5)]);
+      };
+
+      const dispatchQuery = (queryText, latencyMs) => {
+        const genTag = ++generationRef.current;
+        setLoading(true);
+        addTrace(`Dispatched Gen #${genTag} ("${queryText}") with ${latencyMs}ms delay`, 'warn');
+
+        setTimeout(() => {
+          if (genTag === generationRef.current) {
+            setResult(`Gen #${genTag}: "${queryText}" (COMMITTED)`);
+            setLoading(false);
+            addTrace(`✓ Gen #${genTag} resolved & committed (Matches current generation #${generationRef.current})`, 'success');
+          } else {
+            addTrace(`❌ Gen #${genTag} resolved but was DISCARDED (Current generation is #${generationRef.current})`, 'stale');
+          }
+        }, latencyMs);
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-purple-400 flex items-center gap-2">
+              <i class="fa-solid fa-layer-group"></i>
+              Experiment 4: Request Generational Counting & Async Race Resolver
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Simulate rapid out-of-order async responses and see how <code class="text-purple-300 font-mono">generationRef.current</code> discards obsolete requests.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
+              <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Simulate Asynchronous Queries
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => dispatchQuery('Initial Search', 1600)}
+                  class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2.5 rounded-lg font-semibold border border-slate-700 transition flex flex-col items-center"
+                >
+                  <span>Query A: "Initial"</span>
+                  <span class="text-[10px] text-amber-400 font-mono">Slow (1600ms)</span>
+                </button>
+                <button
+                  onClick={() => dispatchQuery('Refined Search', 300)}
+                  class="bg-purple-600 hover:bg-purple-500 text-white text-xs py-2.5 rounded-lg font-bold transition shadow flex flex-col items-center"
+                >
+                  <span>Query B: "Refined"</span>
+                  <span class="text-[10px] text-purple-200 font-mono">Fast (300ms)</span>
+                </button>
+              </div>
+
+              <div class="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-1">
+                <div class="text-[10px] text-slate-500 font-mono uppercase">Authoritative UI State</div>
+                <div class="text-sm font-bold text-purple-300 font-mono truncate">{result}</div>
+                <div class="text-[10px] text-slate-400">Current Generation Tag: #{generationRef.current}</div>
+              </div>
+            </div>
+
+            {/* Trace Logs */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Generational Tag Resolution Trace</span>
+                  <button onClick={() => setTraceLogs([])} class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+
+                <div class="space-y-1.5 font-mono text-xs max-h-36 overflow-y-auto custom-scrollbar">
+                  {traceLogs.length === 0 ? (
+                    <div class="text-slate-600 text-xs italic py-6 text-center">Click Query A then immediately Query B...</div>
+                  ) : (
+                    traceLogs.map(item => (
+                      <div
+                        key={item.id}
+                        class={`p-2 rounded border text-[11px] ${
+                          item.type === 'stale' ? 'bg-rose-950/60 border-rose-800 text-rose-300' :
+                          item.type === 'warn' ? 'bg-amber-950/60 border-amber-800 text-amber-300' :
+                          item.type === 'success' ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' :
+                          'bg-slate-900 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <span class="text-slate-500 text-[9px] mr-2">{item.time}</span>
+                        <span>{item.msg}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <span class="font-bold text-purple-400">Mathematical Guarantee:</span> Only responses matching the exact latest <code class="text-slate-300">generationRef.current</code> are accepted into state.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 5: CERTIFICATION ASSESSMENT ---
+    function InteractiveAssessment() {
+      const questions = [
+        {
+          id: 1,
+          question: "Why doesn't mutating `ref.current` trigger a component re-render?",
+          options: [
+            "React automatically disables re-renders for functions containing useRef.",
+            "useRef is a plain mutable JavaScript object; mutating its properties does not call React's internal update scheduling dispatcher.",
+            "Refs are only stored in the browser's localStorage.",
+            "React 18 Concurrent Mode converts all refs to read-only proxies."
+          ],
+          correct: 1,
+          explanation: "Mutating ref.current is a synchronous property assignment that bypasses scheduleUpdateOnFiber completely."
+        },
+        {
+          id: 2,
+          question: "What is the primary architectural purpose of the Latest-Value Ref Pattern (`useLatest`)?",
+          options: [
+            "To make all state variables accessible globally.",
+            "To allow long-lived subscriptions or timers to read the freshest state and callbacks dynamically without restarting the subscription.",
+            "To improve CSS animation performance.",
+            "To convert promises into synchronous values."
+          ],
+          correct: 1,
+          explanation: "useLatest decouples resource subscription lifetimes from closure state freshness, preventing unnecessary teardown/reconnect loops."
+        },
+        {
+          id: 3,
+          question: "Why is declaring a mutable object at module scope (`const cache = { current: null }`) an anti-pattern?",
+          options: [
+            "Module variables cannot store objects.",
+            "A module variable is shared across ALL component instances and user sessions globally, destroying instance isolation.",
+            "Module variables crash in TypeScript.",
+            "React forbids importing module variables."
+          ],
+          correct: 1,
+          explanation: "useRef provides instance-local memory tied to an individual Fiber. Module-scoped objects pollute all instances globally."
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optIdx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: optIdx }));
+      };
+
+      const calculateScore = () => {
+        let score = 0;
+        questions.forEach(q => {
+          if (answers[q.id] === q.correct) score += 1;
+        });
+        return score;
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-pink-400 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap"></i>
+                Senior Architect Certification Challenge
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">Test your mastery of custom Hook ref coordination, temporal algebra, and concurrency.</p>
+            </div>
+            {submitted && (
+              <div class="text-xs font-bold px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-800 text-purple-300">
+                Score: {calculateScore()} / {questions.length} ({Math.round((calculateScore() / questions.length) * 100)}%)
+              </div>
+            )}
+          </div>
+
+          <div class="space-y-4">
+            {questions.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+
+              return (
+                <div key={q.id} class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div class="text-xs font-bold text-slate-200">
+                    <span class="text-pink-400 font-mono mr-2">Q{idx + 1}.</span>
+                    {q.question}
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-2">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800";
+                      if (selected === optIdx) {
+                        btnStyle = "bg-indigo-950 border-indigo-600 text-indigo-200 font-semibold";
+                      }
+                      if (submitted) {
+                        if (optIdx === q.correct) {
+                          btnStyle = "bg-emerald-950 border-emerald-600 text-emerald-200 font-semibold";
+                        } else if (selected === optIdx && !isCorrect) {
+                          btnStyle = "bg-rose-950 border-rose-600 text-rose-200";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          class={`p-3 rounded-lg text-xs text-left border transition flex items-start gap-2.5 ${btnStyle}`}
+                        >
+                          <span class="font-mono text-[10px] text-slate-500 mt-0.5">[{String.fromCharCode(65 + optIdx)}]</span>
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div class={`p-3 rounded-lg text-[11px] leading-relaxed border ${isCorrect ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'}`}>
+                      <span class="font-bold">{isCorrect ? '✓ Correct:' : '❌ Incorrect:'}</span> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+            {submitted ? (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition"
+              >
+                Reset Assessment
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(answers).length < questions.length}
+                class="px-6 py-2.5 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-900/30"
+              >
+                Submit & Grade Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      return (
+        <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+          {/* Header Navigation */}
+          <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl backdrop-blur">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono text-indigo-400">
+                <span>KPI 14</span>
+                <span>•</span>
+                <span>CUSTOM HOOKS & LOGIC COMPOSITION</span>
+                <span>•</span>
+                <span class="text-pink-400">PART 06</span>
+              </div>
+              <h1 class="text-xl md:text-2xl font-black text-slate-100 tracking-tight mt-1">
+                Refs & Mutable Instance Coordination in Hooks
+              </h1>
+            </div>
+            <div class="flex items-center gap-2">
+              <a
+                href="../06-refs-and-mutable-instance-coordination.md"
+                class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-book"></i> Read Guide
+              </a>
+              <a
+                href="../../README.md"
+                class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-house"></i> Curriculum
+              </a>
+            </div>
+          </div>
+
+          <RefVsStateExplorer />
+          <StaleIntervalSimulator />
+          <UsePreviousExplorer />
+          <GenerationalRaceResolver />
+          <InteractiveAssessment />
+
+          <footer class="text-center py-6 border-t border-slate-800/80 text-xs text-slate-500 font-mono">
+            Engineering Design Vault • Level 06 React Fundamentals • Lead Architect: Srikar Kudurmalla • Co-Author: Prasenjeet
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
