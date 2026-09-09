@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 — Part 05: Custom Hooks with useEffect: Lifecycle & Cleanup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useCallback, useMemo, useRef } = React;
+
+    // --- EXPERIMENT 1: EFFECT LIFECYCLE & SYMMETRIC TIMELINE ---
+    function LifecycleTimelineExplorer() {
+      const [roomId, setRoomId] = useState('general');
+      const [isMounted, setIsMounted] = useState(true);
+      const [timeline, setTimeline] = useState([]);
+
+      const logEvent = (type, message, badge) => {
+        setTimeline(prev => [
+          { id: Date.now() + Math.random(), type, message, badge, time: new Date().toLocaleTimeString() },
+          ...prev.slice(0, 7)
+        ]);
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                <i class="fa-solid fa-timeline"></i>
+                Experiment 1: Effect Setup & Cleanup Lifecycle Timeline
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Switch rooms or unmount the subscriber to inspect the exact execution sequence of setup and teardown.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onClick={() => setIsMounted(!isMounted)}
+                class={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border ${
+                  isMounted ? 'bg-rose-950 text-rose-300 border-rose-800' : 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                }`}
+              >
+                {isMounted ? '✕ Unmount Component' : '✓ Remount Component'}
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Channel Selector</span>
+                <span class="text-xs font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                  Room: {roomId}
+                </span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                {['general', 'engineering', 'incidents'].map(room => (
+                  <button
+                    key={room}
+                    onClick={() => setRoomId(room)}
+                    class={`py-2 px-3 rounded-lg text-xs font-semibold font-mono transition border ${
+                      roomId === room
+                        ? 'bg-indigo-600 text-white border-indigo-500 shadow'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                    }`}
+                  >
+                    #{room}
+                  </button>
+                ))}
+              </div>
+
+              {/* Nested Subscriber Component */}
+              {isMounted ? (
+                <RoomSubscriber roomId={roomId} onLog={logEvent} />
+              ) : (
+                <div class="p-6 bg-slate-900/40 rounded-xl border border-dashed border-slate-800 text-center text-slate-500 text-xs italic">
+                  Component is currently unmounted. All subscriptions severed.
+                </div>
+              )}
+            </div>
+
+            {/* Execution Trace */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Lifecycle Event Log</span>
+                  <button onClick={() => setTimeline([])} class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div class="space-y-1.5 font-mono text-xs max-h-48 overflow-y-auto custom-scrollbar">
+                  {timeline.length === 0 ? (
+                    <div class="text-slate-600 text-xs italic py-8 text-center">Switch rooms to observe setup/cleanup ordering...</div>
+                  ) : (
+                    timeline.map(item => (
+                      <div
+                        key={item.id}
+                        class={`p-2 rounded border text-[11px] flex items-start justify-between gap-2 ${
+                          item.type === 'cleanup' ? 'bg-amber-950/60 border-amber-800 text-amber-300' :
+                          item.type === 'setup' ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' :
+                          'bg-slate-900 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <div class="flex items-center gap-2">
+                          <span class="text-slate-500 text-[9px]">{item.time}</span>
+                          <span>{item.message}</span>
+                        </div>
+                        <span class={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                          item.type === 'cleanup' ? 'bg-amber-900 text-amber-200' : 'bg-emerald-900 text-emerald-200'
+                        }`}>
+                          {item.type}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <span class="font-bold text-indigo-400">Crucial Sequence:</span> On dependency change, <span class="text-amber-400 font-bold">Cleanup of previous room</span> runs *before* <span class="text-emerald-400 font-bold">Setup of new room</span>.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function RoomSubscriber({ roomId, onLog }) {
+      useEffect(() => {
+        onLog('setup', `Connected WebSocket to #${roomId}`, 'setup');
+
+        return () => {
+          onLog('cleanup', `Disconnected WebSocket from #${roomId}`, 'cleanup');
+        };
+      }, [roomId]);
+
+      return (
+        <div class="p-3.5 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-emerald-300 text-xs flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>Actively Synchronized with <strong>#{roomId}</strong></span>
+          </div>
+          <span class="font-mono text-[10px] text-emerald-400/80">Active Handle: WS-#{roomId}</span>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 2: EVENT LISTENER IDENTITY & MEMORY LEAK DEBUGGER ---
+    function ListenerLeakDebugger() {
+      const [useSymmetricListener, setUseSymmetricListener] = useState(true);
+      const [renders, setRenders] = useState(0);
+      const [simulatedHeapCount, setSimulatedHeapCount] = useState(1);
+      const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+      const handleSimulateRender = () => {
+        setRenders(r => r + 1);
+        if (!useSymmetricListener) {
+          setSimulatedHeapCount(c => c + 1); // Simulating leaked orphan listener
+        }
+      };
+
+      const handleResetHeap = () => {
+        setRenders(0);
+        setSimulatedHeapCount(1);
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-bug"></i>
+                Experiment 2: Listener Identity Mismatch & Heap Leak Probe
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Inspect how anonymous arrow functions fail <code class="text-amber-300 font-mono">removeEventListener</code> vs symmetric stable function pointers.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setUseSymmetricListener(!useSymmetricListener);
+                  handleResetHeap();
+                }}
+                class={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border ${
+                  useSymmetricListener ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-rose-950 text-rose-300 border-rose-800'
+                }`}
+              >
+                {useSymmetricListener ? '✓ Symmetric Function Reference' : '❌ Anonymous Arrow Function (Leaking)'}
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 font-mono text-xs">
+              <div class="text-slate-400 text-[11px] font-sans font-bold uppercase tracking-wider">Hook Code Comparison</div>
+              <pre class="bg-slate-900 p-3 rounded-lg text-slate-200 overflow-x-auto leading-relaxed">
+{useSymmetricListener ? (
+`// ✅ STABLE SYMMETRIC REFERENCE:
+useEffect(() => {
+  const handler = (e) => setPos(e);
+  window.addEventListener("mousemove", handler);
+  return () => {
+    window.removeEventListener("mousemove", handler);
+  };
+}, []);`
+) : (
+`// ❌ ANONYMOUS INLINE ARROW (LEAKS!):
+useEffect(() => {
+  window.addEventListener("mousemove", (e) => setPos(e));
+  return () => {
+    // 💥 Different object instance! Removal fails!
+    window.removeEventListener("mousemove", (e) => setPos(e));
+  };
+}, [reRenderTrigger]);`
+)}
+              </pre>
+
+              <div class="pt-2 flex gap-2">
+                <button
+                  onClick={handleSimulateRender}
+                  class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-sans text-xs py-2 rounded-lg font-semibold transition shadow"
+                >
+                  Simulate Component Re-Render (x{renders})
+                </button>
+                <button
+                  onClick={handleResetHeap}
+                  class="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-sans text-xs py-2 rounded-lg border border-slate-700"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Heap Inspector */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Browser DOM Event Registry
+                </div>
+
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-400">Active Listeners on <code class="text-indigo-300">window</code>:</span>
+                    <span class={`text-lg font-black font-mono ${simulatedHeapCount > 1 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
+                      {simulatedHeapCount}
+                    </span>
+                  </div>
+
+                  {simulatedHeapCount > 1 && (
+                    <div class="p-2.5 bg-rose-950/60 border border-rose-800 rounded-lg text-rose-300 text-[11px] leading-relaxed">
+                      ⚠️ <strong>Memory Leak Detected:</strong> {simulatedHeapCount - 1} orphaned event handler closures retained in JavaScript heap.
+                    </div>
+                  )}
+
+                  <div class="text-[11px] text-slate-500">
+                    Total Component Renders: <span class="text-slate-300 font-bold">{renders}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <span class="font-bold text-amber-400">The Mechanical Reason:</span> <code class="text-slate-300">removeEventListener</code> searches the DOM listener hash table by exact reference (<code class="text-indigo-300">===</code>). Passing a new arrow function produces a reference mismatch.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 3: ASYNC RACE CONDITIONS & ABORTCONTROLLER PROBE ---
+    function AsyncRaceConditionLab() {
+      const [query, setQuery] = useState('');
+      const [result, setResult] = useState(null);
+      const [isLoading, setIsLoading] = useState(false);
+      const [useAbort, setUseAbort] = useState(true);
+      const [useCurrentness, setUseCurrentness] = useState(true);
+      const [flightLog, setFlightLog] = useState([]);
+
+      const addFlightLog = (msg, type = 'info') => {
+        setFlightLog(prev => [{ id: Date.now() + Math.random(), msg, type, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 5)]);
+      };
+
+      const handleSimulateSearch = (targetQuery, delayMs) => {
+        setQuery(targetQuery);
+        setIsLoading(true);
+        addFlightLog(`Dispatched request for "${targetQuery}" (${delayMs}ms delay)`, 'warn');
+
+        let isCurrent = true;
+        const controller = new AbortController();
+
+        setTimeout(() => {
+          if (useAbort && controller.signal.aborted) {
+            addFlightLog(`Request for "${targetQuery}" aborted via AbortController`, 'error');
+            return;
+          }
+
+          if (useCurrentness && !isCurrent) {
+            addFlightLog(`Discarded stale response for "${targetQuery}" (Currentness check failed)`, 'error');
+            return;
+          }
+
+          setResult({ query: targetQuery, timestamp: Date.now() });
+          setIsLoading(false);
+          addFlightLog(`✓ Successfully committed results for "${targetQuery}" to UI`, 'success');
+        }, delayMs);
+
+        // Cleanup simulation
+        return () => {
+          isCurrent = false;
+          if (useAbort) {
+            controller.abort();
+          }
+        };
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-cyan-400 flex items-center gap-2">
+                <i class="fa-solid fa-bolt-lightning"></i>
+                Experiment 3: Async Race Conditions & Cancellation Probe
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Simulate out-of-order network responses (e.g. slow initial query vs fast subsequent query).
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+              <button
+                onClick={() => setUseAbort(!useAbort)}
+                class={`px-3 py-1 rounded-lg font-bold transition border ${useAbort ? 'bg-cyan-950 text-cyan-300 border-cyan-800' : 'bg-slate-800 text-slate-500 border-slate-700'}`}
+              >
+                {useAbort ? '✓ AbortController Enabled' : '✕ AbortController Disabled'}
+              </button>
+              <button
+                onClick={() => setUseCurrentness(!useCurrentness)}
+                class={`px-3 py-1 rounded-lg font-bold transition border ${useCurrentness ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-slate-800 text-slate-500 border-slate-700'}`}
+              >
+                {useCurrentness ? '✓ Currentness Guard' : '✕ No Currentness Guard'}
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
+              <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Simulate Rapid Search Inputs
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleSimulateSearch('React', 1800)}
+                  class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2.5 rounded-lg font-semibold border border-slate-700 transition flex flex-col items-center"
+                >
+                  <span>Query 1: "React"</span>
+                  <span class="text-[10px] text-amber-400 font-mono">Slow (1800ms)</span>
+                </button>
+                <button
+                  onClick={() => handleSimulateSearch('React Hooks', 300)}
+                  class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs py-2.5 rounded-lg font-bold transition shadow flex flex-col items-center"
+                >
+                  <span>Query 2: "React Hooks"</span>
+                  <span class="text-[10px] text-cyan-950 font-mono">Fast (300ms)</span>
+                </button>
+              </div>
+
+              <div class="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
+                <div class="text-xs text-slate-500 uppercase font-mono">Committed UI Result</div>
+                <div class="text-base font-bold text-indigo-300 font-mono">
+                  {isLoading ? '⏳ Fetching...' : (result ? `Results for: "${result.query}"` : 'No search executed')}
+                </div>
+              </div>
+            </div>
+
+            {/* Inflight Trace */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Network Inflight Dispatch Log</span>
+                  <button onClick={() => setFlightLog([])} class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div class="space-y-1.5 font-mono text-xs max-h-40 overflow-y-auto custom-scrollbar">
+                  {flightLog.length === 0 ? (
+                    <div class="text-slate-600 text-xs italic py-6 text-center">Click both query buttons rapidly to test race conditions...</div>
+                  ) : (
+                    flightLog.map(item => (
+                      <div
+                        key={item.id}
+                        class={`p-2 rounded border text-[11px] ${
+                          item.type === 'error' ? 'bg-rose-950/60 border-rose-800 text-rose-300' :
+                          item.type === 'warn' ? 'bg-amber-950/60 border-amber-800 text-amber-300' :
+                          item.type === 'success' ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' :
+                          'bg-slate-900 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <span class="text-slate-500 text-[9px] mr-2">{item.time}</span>
+                        <span>{item.msg}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <span class="font-bold text-cyan-400">Senior Insight:</span> Always combine <code class="text-slate-300">AbortController</code> (hardware transport cancellation) with <code class="text-slate-300">isCurrent</code> guards (UI state protection).
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 4: BROWSER API CUSTOM HOOKS SANDBOX ---
+    function BrowserApiHooksSandbox() {
+      const [seconds, setSeconds] = useState(0);
+      const [isRunning, setIsRunning] = useState(true);
+      const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+      useEffect(() => {
+        if (!isRunning) return;
+        const id = setInterval(() => setSeconds(s => s + 1), 1000);
+        return () => clearInterval(id);
+      }, [isRunning]);
+
+      useEffect(() => {
+        const handleResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      }, []);
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-pink-400 flex items-center gap-2">
+              <i class="fa-solid fa-window-restore"></i>
+              Experiment 4: Browser API Custom Hooks Sandbox (`useInterval` & `useWindowSize`)
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Test live browser synchronization with window resizing and interval timer teardown.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* useInterval Box */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase font-mono">useInterval(tick, 1000)</span>
+                <span class={`text-xs px-2 py-0.5 rounded font-mono font-bold ${isRunning ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-900 text-slate-500'}`}>
+                  {isRunning ? 'RUNNING' : 'PAUSED'}
+                </span>
+              </div>
+              <div class="text-3xl font-black font-mono text-pink-400 text-center py-3">
+                {seconds}s
+              </div>
+              <div class="flex gap-2">
+                <button
+                  onClick={() => setIsRunning(!isRunning)}
+                  class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 rounded-lg font-semibold border border-slate-700 transition"
+                >
+                  {isRunning ? 'Pause Interval' : 'Resume Interval'}
+                </button>
+                <button
+                  onClick={() => setSeconds(0)}
+                  class="px-3 bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 text-xs py-2 rounded-lg border border-slate-700 transition"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* useWindowSize Box */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase font-mono">useWindowSize()</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono">
+                  {windowWidth >= 1024 ? 'Desktop (lg)' : windowWidth >= 768 ? 'Tablet (md)' : 'Mobile (sm)'}
+                </span>
+              </div>
+              <div class="text-3xl font-black font-mono text-indigo-400 text-center py-3">
+                {windowWidth}px
+              </div>
+              <div class="text-[11px] text-slate-500 text-center">
+                Resize browser window to observe real-time listener updates
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 5: CERTIFICATION ASSESSMENT ---
+    function InteractiveAssessment() {
+      const questions = [
+        {
+          id: 1,
+          question: "When does an effect cleanup function execute?",
+          options: [
+            "Only when the entire React application is closed.",
+            "Before the next effect setup when dependencies change, and when the host component unmounts from the DOM.",
+            "Synchronously during the initial render phase.",
+            "Only after a button click event."
+          ],
+          correct: 1,
+          explanation: "Cleanup executes before the next effect setup on dependency transitions (with previous render closure) and on unmount."
+        },
+        {
+          id: 2,
+          question: "Why does `useEffect(async () => ...)` trigger runtime bugs in React?",
+          options: [
+            "Async functions are not supported by Babel.",
+            "An async function returns a Promise instead of a synchronous cleanup function, breaking React's teardown protocol.",
+            "Promises crash the browser during DOM rendering.",
+            "React forbids asynchronous network calls."
+          ],
+          correct: 1,
+          explanation: "React expects useEffect to return either undefined or a synchronous cleanup function. Returning a Promise prevents cleanup execution."
+        },
+        {
+          id: 3,
+          question: "Why will `window.removeEventListener('scroll', () => handleScroll())` fail to remove a listener?",
+          options: [
+            "The browser requires scroll listeners to be passive.",
+            "The inline arrow function creates a fresh function object with a different memory reference that does not match the registered listener.",
+            "Window listeners can only be removed during full browser reload.",
+            "Arrow functions cannot be passed to removeEventListener."
+          ],
+          correct: 1,
+          explanation: "removeEventListener requires the exact identical function reference (===) passed to addEventListener."
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optIdx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: optIdx }));
+      };
+
+      const calculateScore = () => {
+        let score = 0;
+        questions.forEach(q => {
+          if (answers[q.id] === q.correct) score += 1;
+        });
+        return score;
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-purple-400 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap"></i>
+                Senior Architect Certification Challenge
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">Test your mastery of custom Effect Hook lifecycles, cleanup symmetry, and race conditions.</p>
+            </div>
+            {submitted && (
+              <div class="text-xs font-bold px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-800 text-purple-300">
+                Score: {calculateScore()} / {questions.length} ({Math.round((calculateScore() / questions.length) * 100)}%)
+              </div>
+            )}
+          </div>
+
+          <div class="space-y-4">
+            {questions.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+
+              return (
+                <div key={q.id} class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div class="text-xs font-bold text-slate-200">
+                    <span class="text-purple-400 font-mono mr-2">Q{idx + 1}.</span>
+                    {q.question}
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-2">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800";
+                      if (selected === optIdx) {
+                        btnStyle = "bg-indigo-950 border-indigo-600 text-indigo-200 font-semibold";
+                      }
+                      if (submitted) {
+                        if (optIdx === q.correct) {
+                          btnStyle = "bg-emerald-950 border-emerald-600 text-emerald-200 font-semibold";
+                        } else if (selected === optIdx && !isCorrect) {
+                          btnStyle = "bg-rose-950 border-rose-600 text-rose-200";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          class={`p-3 rounded-lg text-xs text-left border transition flex items-start gap-2.5 ${btnStyle}`}
+                        >
+                          <span class="font-mono text-[10px] text-slate-500 mt-0.5">[{String.fromCharCode(65 + optIdx)}]</span>
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div class={`p-3 rounded-lg text-[11px] leading-relaxed border ${isCorrect ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'}`}>
+                      <span class="font-bold">{isCorrect ? '✓ Correct:' : '❌ Incorrect:'}</span> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+            {submitted ? (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition"
+              >
+                Reset Assessment
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(answers).length < questions.length}
+                class="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-lg shadow-purple-900/30"
+              >
+                Submit & Grade Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      return (
+        <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+          {/* Header Navigation */}
+          <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl backdrop-blur">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono text-indigo-400">
+                <span>KPI 14</span>
+                <span>•</span>
+                <span>CUSTOM HOOKS & LOGIC COMPOSITION</span>
+                <span>•</span>
+                <span class="text-pink-400">PART 05</span>
+              </div>
+              <h1 class="text-xl md:text-2xl font-black text-slate-100 tracking-tight mt-1">
+                Custom Hooks with useEffect: Lifecycle & Cleanup
+              </h1>
+            </div>
+            <div class="flex items-center gap-2">
+              <a
+                href="../05-effects-lifecycle-and-cleanup-in-hooks.md"
+                class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-book"></i> Read Guide
+              </a>
+              <a
+                href="../../README.md"
+                class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-house"></i> Curriculum
+              </a>
+            </div>
+          </div>
+
+          <LifecycleTimelineExplorer />
+          <ListenerLeakDebugger />
+          <AsyncRaceConditionLab />
+          <BrowserApiHooksSandbox />
+          <InteractiveAssessment />
+
+          <footer class="text-center py-6 border-t border-slate-800/80 text-xs text-slate-500 font-mono">
+            Engineering Design Vault • Level 06 React Fundamentals • Lead Architect: Srikar Kudurmalla • Co-Author: Prasenjeet
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
