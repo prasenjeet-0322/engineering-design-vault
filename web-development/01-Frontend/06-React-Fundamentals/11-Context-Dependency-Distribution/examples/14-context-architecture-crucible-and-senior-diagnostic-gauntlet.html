@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 - Part 14: Context Architecture Crucible & Senior Diagnostic Gauntlet</title>
+  <!-- React 18 & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    :root {
+      --bg-main: #0B0F19;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --card-border: rgba(75, 85, 99, 0.4);
+      --accent-cyan: #06B6D4;
+      --accent-indigo: #6366F1;
+      --accent-emerald: #10B981;
+      --accent-rose: #F43F5E;
+      --accent-amber: #F59E0B;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: #F3F4F6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4B5563;
+    }
+
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+    }
+  </style>
+</head>
+<body class="custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useRef, memo, useCallback } = React;
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('labA');
+
+      const tabs = [
+        { id: 'labA', label: 'Lab A: Decision Engine', icon: '⚡' },
+        { id: 'labB', label: 'Lab B: Scope Simulator', icon: '🌲' },
+        { id: 'labC', label: 'Lab C: Identity Probe [C,P,V,F,D]', icon: '🔬' },
+        { id: 'labD', label: 'Lab D: Render Predictor', icon: '🎯' },
+        { id: 'labE', label: 'Lab E: God Context Refactor', icon: '🧩' },
+        { id: 'labF', label: 'Lab F: State Model Matrix', icon: '⚙️' },
+        { id: 'labG', label: 'Lab G: Incident Debugger', icon: '🚨' },
+      ];
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="border-b border-gray-800 bg-gray-950/80 sticky top-0 z-50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-800">KPI 11 • PART 14</span>
+                <span className="text-gray-400 text-sm">React Fundamentals</span>
+              </div>
+              <h1 className="text-xl font-extrabold text-white mt-1">Context Architecture Crucible & Senior Diagnostic Gauntlet</h1>
+            </div>
+            <div className="text-xs text-gray-400 text-right hidden sm:block">
+              <div>Author: <span className="text-cyan-400 font-semibold">Srikar Kudurmalla</span></div>
+              <div>Co-Author: <span className="text-gray-300 font-semibold">Prasenjeet</span></div>
+            </div>
+          </header>
+
+          {/* Navigation Bar */}
+          <nav className="bg-gray-900/60 border-b border-gray-800 px-6 py-2.5 flex items-center gap-2 overflow-x-auto custom-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm shadow-cyan-900/30'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 border border-transparent'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+            {activeTab === 'labA' && <LabADecisionEngine />}
+            {activeTab === 'labB' && <LabBScopeSimulator />}
+            {activeTab === 'labC' && <LabCIdentityProbe />}
+            {activeTab === 'labD' && <LabDRenderPredictor />}
+            {activeTab === 'labE' && <LabEGodContextRefactor />}
+            {activeTab === 'labF' && <LabFStateModelMatrix />}
+            {activeTab === 'labG' && <LabGIncidentDebugger />}
+          </main>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB A: CONTEXT DECISION ENGINE
+    // ==========================================
+    function LabADecisionEngine() {
+      const scenarios = [
+        {
+          id: 1,
+          title: 'Search input text inside header',
+          desc: 'Only the SearchBox component reads and updates the keystroke query.',
+          correct: 'Local State',
+          rationale: 'No sibling or distant consumers need the live query string. Local useState is the most cohesive boundary.',
+        },
+        {
+          id: 2,
+          title: 'Application Theme (Dark / Light Mode)',
+          desc: 'Dozens of arbitrary UI widgets across every page require the current theme tokens.',
+          correct: 'Context',
+          rationale: 'Low update frequency, deep tree reachability, ambient environmental dependency.',
+        },
+        {
+          id: 3,
+          title: 'Passing avatar into layout sidebar',
+          desc: 'The Page knows the user, Header needs avatar, intermediate Layout does not care about user.',
+          correct: 'Composition',
+          rationale: 'Pass <Sidebar slot={<Avatar user={user} />} />. Eliminates prop drilling without introducing ambient Context.',
+        },
+        {
+          id: 4,
+          title: '60 FPS Canvas Mouse Pointer Coordinates',
+          desc: 'Coordinates change 60+ times/second, consumed by specific cursor overlay and status bar.',
+          correct: 'External Store',
+          rationale: 'High frequency updates in Context trigger broad re-render storms. An external store with useSyncExternalStore or refs avoids React render churn.',
+        },
+        {
+          id: 5,
+          title: 'Dialog Open / Closed flag for a single modal trigger',
+          desc: 'A Button opens a confirmation modal rendered immediately adjacent.',
+          correct: 'Local State',
+          rationale: 'Creating a ModalContext for a single trigger/dialog pair is premature abstraction.',
+        }
+      ];
+
+      const options = ['Local State', 'Props', 'Composition', 'Context', 'External Store'];
+      const [userSelections, setUserSelections] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (scenarioId, option) => {
+        setUserSelections(prev => ({ ...prev, [scenarioId]: option }));
+      };
+
+      const score = scenarios.filter(s => userSelections[s.id] === s.correct).length;
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">⚡ Lab A:</span> Architectural Decision Engine
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Evaluate each production dependency scenario and choose the most appropriate distribution mechanism according to the Senior Context Decision Model.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {scenarios.map((sc) => {
+              const selected = userSelections[sc.id];
+              const isCorrect = selected === sc.correct;
+              return (
+                <div key={sc.id} className="glass-panel p-5 rounded-xl space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-white font-bold text-sm">{sc.title}</h3>
+                      <p className="text-gray-400 text-xs mt-0.5">{sc.desc}</p>
+                    </div>
+                    {submitted && (
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                        isCorrect ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'
+                      }`}>
+                        {isCorrect ? '✓ Correct' : `✗ Expected: ${sc.correct}`}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {options.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => handleSelect(sc.id, opt)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          selected === opt
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {submitted && (
+                    <div className="mt-2 p-3 bg-gray-950/80 rounded-lg text-xs text-gray-300 border border-gray-800 font-mono">
+                      <span className="text-cyan-400 font-bold">Architectural Rationale:</span> {sc.rationale}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between glass-panel p-4 rounded-xl">
+            <button
+              onClick={() => setSubmitted(true)}
+              className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider transition-all"
+            >
+              Evaluate Architecture Decisions
+            </button>
+            {submitted && (
+              <div className="text-sm font-bold text-white">
+                Score: <span className={score === scenarios.length ? 'text-emerald-400' : 'text-amber-400'}>{score} / {scenarios.length}</span> ({Math.round((score/scenarios.length)*100)}%)
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB B: SCOPE SIMULATOR
+    // ==========================================
+    function LabBScopeSimulator() {
+      const [providerPlacement, setProviderPlacement] = useState('Workspace'); // 'App', 'Workspace', 'Editor'
+      const [themePlacement, setThemePlacement] = useState('App');
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🌲 Lab B:</span> Tree Scope & Reachability Simulator
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Experiment with Provider placement in the component hierarchy. Observe how moving <code className="text-cyan-300">EditorProvider</code> affects consumer reachability, lifecycle bounds, and isolation.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Control Panel */}
+            <div className="glass-panel p-5 rounded-xl space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Provider Placement Controls</h3>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1.5 font-semibold">EditorProvider Mount Scope:</label>
+                <div className="space-y-1.5">
+                  {['App (Global Anti-pattern)', 'Workspace (Feature Scope)', 'Editor (Local Scope)'].map((opt) => {
+                    const val = opt.split(' ')[0];
+                    return (
+                      <button
+                        key={val}
+                        onClick={() => setProviderPlacement(val)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          providerPlacement === val
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-950 rounded-lg text-xs space-y-2 border border-gray-800">
+                <div className="text-cyan-400 font-bold">Scope Analysis:</div>
+                <div className="text-gray-300">
+                  {providerPlacement === 'App' && '⚠️ Global: Pollutes unrelated nodes (Header, Settings). Multiple editor instances will cross-contaminate state.'}
+                  {providerPlacement === 'Workspace' && '✅ Feature Scope: Scopes editor tools to workspace tabs while isolating Settings and global nav.'}
+                  {providerPlacement === 'Editor' && '🎯 Local Scope: Isolated per editor canvas. Unmounted when editor closes.'}
+                </div>
+              </div>
+            </div>
+
+            {/* Tree Visualization */}
+            <div className="md:col-span-2 glass-panel p-5 rounded-xl font-mono text-xs space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Fiber Tree Dependency Reachability</h3>
+              
+              <div className="p-4 bg-gray-950 rounded-xl space-y-2 overflow-x-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 font-bold">App</span>
+                  <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded text-[10px] border border-emerald-800">&lt;ThemeProvider&gt;</span>
+                  {providerPlacement === 'App' && (
+                    <span className="text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded text-[10px] border border-indigo-800">&lt;EditorProvider&gt;</span>
+                  )}
+                </div>
+
+                <div className="pl-6 border-l border-gray-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">├── Header</span>
+                    <span className="text-emerald-300 text-[10px]">[Theme: ✓]</span>
+                    <span className={`text-[10px] ${providerPlacement === 'App' ? 'text-rose-400' : 'text-gray-600'}`}>
+                      [Editor: {providerPlacement === 'App' ? 'Exposed (Leak)' : '✗'}]
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-300 font-bold">├── Workspace</span>
+                      {providerPlacement === 'Workspace' && (
+                        <span className="text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded text-[10px] border border-indigo-800">&lt;EditorProvider&gt;</span>
+                      )}
+                    </div>
+
+                    <div className="pl-6 border-l border-gray-800 space-y-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-200">├── DocumentEditor</span>
+                          {providerPlacement === 'Editor' && (
+                            <span className="text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded text-[10px] border border-indigo-800">&lt;EditorProvider&gt;</span>
+                          )}
+                        </div>
+
+                        <div className="pl-6 border-l border-gray-800 space-y-1">
+                          <div className="flex items-center gap-2 text-indigo-300">
+                            <span>├── Toolbar (useEditor)</span>
+                            <span className="text-emerald-400 font-bold">✓ Connected</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-indigo-300">
+                            <span>└── Canvas (useEditor)</span>
+                            <span className="text-emerald-400 font-bold">✓ Connected</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">└── Comments</span>
+                        <span className="text-emerald-300 text-[10px]">[Theme: ✓]</span>
+                        <span className={`text-[10px] ${providerPlacement === 'Editor' ? 'text-gray-600' : 'text-indigo-300'}`}>
+                          [Editor: {providerPlacement === 'Editor' ? '✗ Isolated' : '✓ Available'}]
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">└── Settings</span>
+                    <span className="text-emerald-300 text-[10px]">[Theme: ✓]</span>
+                    <span className={`text-[10px] ${providerPlacement === 'App' ? 'text-rose-400' : 'text-gray-600'}`}>
+                      [Editor: {providerPlacement === 'App' ? 'Exposed (Leak)' : '✗ Isolated'}]
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB C: IDENTITY PROBE [C, P, V, F, D]
+    // ==========================================
+    function LabCIdentityProbe() {
+      const [providerKey, setProviderKey] = useState(1);
+      const [count, setCount] = useState(0);
+      const [theme, setTheme] = useState('dark');
+      const [logs, setLogs] = useState([]);
+
+      const contextTokenId = "CTX_TOKEN_0x89FA"; // Context identity is constant
+
+      const addLog = (event, msg) => {
+        setLogs(prev => [{ id: Date.now() + Math.random(), event, msg, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
+      };
+
+      const handleRemount = () => {
+        setProviderKey(prev => prev + 1);
+        addLog('Provider Remount', `Key changed to #${providerKey + 1}. Old Provider Fiber destroyed.`);
+      };
+
+      const handleValueChange = () => {
+        setCount(prev => prev + 1);
+        addLog('Value Change', `Counter updated to ${count + 1}. Context value identity changed.`);
+      };
+
+      const handleUnrelatedState = () => {
+        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+        addLog('Theme Toggle', `Theme toggled to ${theme === 'dark' ? 'light' : 'dark'}.`);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🔬 Lab C:</span> The Crucible Identity Probe: [C, P, V, F, D]
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Dissect the 5 distinct identities of React Context: Context token (<code className="text-cyan-300">C</code>), Provider Fiber (<code className="text-cyan-300">P</code>), Context Value (<code className="text-cyan-300">V</code>), Consumer Fiber (<code className="text-cyan-300">F</code>), and Host DOM (<code className="text-cyan-300">D</code>).
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Identity Status Dashboard */}
+            <div className="glass-panel p-5 rounded-xl space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Active Identity Matrix</h3>
+              
+              <div className="space-y-2 text-xs font-mono">
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800 flex justify-between">
+                  <span className="text-gray-400">C (Context Token):</span>
+                  <span className="text-cyan-400 font-bold">{contextTokenId}</span>
+                </div>
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800 flex justify-between">
+                  <span className="text-gray-400">P (Provider Fiber):</span>
+                  <span className="text-indigo-400 font-bold">Fiber_P_Instance_{providerKey}</span>
+                </div>
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800 flex justify-between">
+                  <span className="text-gray-400">V (Value Reference):</span>
+                  <span className="text-emerald-400 font-bold">Tuple({count}, "{theme}")</span>
+                </div>
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800 flex justify-between">
+                  <span className="text-gray-400">F (Consumer Fiber):</span>
+                  <span className="text-amber-400 font-bold">Fiber_Consumer_Stable</span>
+                </div>
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800 flex justify-between">
+                  <span className="text-gray-400">D (DOM Element):</span>
+                  <span className="text-rose-400 font-bold">&lt;div#node-inspector&gt;</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={handleValueChange}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all"
+                >
+                  Mutate Value Identity (V) [count + 1]
+                </button>
+                <button
+                  onClick={handleRemount}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all"
+                >
+                  Change Provider Key (P) [Remount Fiber]
+                </button>
+                <button
+                  onClick={handleUnrelatedState}
+                  className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-bold transition-all"
+                >
+                  Toggle Theme (V)
+                </button>
+              </div>
+            </div>
+
+            {/* Event Log */}
+            <div className="lg:col-span-2 glass-panel p-5 rounded-xl space-y-3 font-mono">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Fiber & Mutation Event Stream</h3>
+              
+              <div className="space-y-2 h-72 overflow-y-auto custom-scrollbar p-3 bg-gray-950 rounded-xl">
+                {logs.length === 0 ? (
+                  <div className="text-gray-600 text-xs text-center py-12">Trigger identity mutations to observe Fiber & DOM lifecycles.</div>
+                ) : (
+                  logs.map((log) => (
+                    <div key={log.id} className="p-2 bg-gray-900 rounded border border-gray-800 text-xs flex items-start gap-2">
+                      <span className="text-gray-500 text-[10px]">{log.time}</span>
+                      <span className="text-cyan-400 font-bold">[{log.event}]</span>
+                      <span className="text-gray-300">{log.msg}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB D: RENDER PREDICTOR
+    // ==========================================
+    function LabDRenderPredictor() {
+      const questions = [
+        {
+          id: 1,
+          code: `const Child = memo(function Child() {
+  const value = useContext(ThemeContext);
+  return <div>{value}</div>;
+});`,
+          scenario: "ThemeContext changes from 'dark' to 'light'. Parent does NOT re-render.",
+          question: "Will Child re-render?",
+          options: ["Yes, Context overrides memo", "No, memo blocks re-render"],
+          correct: "Yes, Context overrides memo",
+          explanation: "React.memo only shallow-compares incoming props. It does NOT shield against Context dependency updates recorded in Fiber.dependencies."
+        },
+        {
+          id: 2,
+          code: `function Provider({ children }) {
+  const [query, setQuery] = useState("");
+  return <Context.Provider value={{ query }}>{children}</Context.Provider>;
+}`,
+          scenario: "User types in query. Value is an unmemoized object literal {{ query }}. Children passed via props.",
+          question: "Will children components (who do NOT use useContext) re-render?",
+          options: ["No, children prop preserves element identity", "Yes, all descendants always re-render"],
+          correct: "No, children prop preserves element identity",
+          explanation: "Since children was instantiated outside Provider, its React Element reference is identical across Provider re-renders, triggering a React reconciliation bailout for non-consumers."
+        },
+        {
+          id: 3,
+          code: `<WorkspaceProvider key={workspaceId}>
+  <Editor />
+</WorkspaceProvider>`,
+          scenario: "workspaceId changes from 'ws_1' to 'ws_2'.",
+          question: "What happens to the internal state of WorkspaceProvider?",
+          options: ["State resets because old Fiber is unmounted", "State is preserved with new value"],
+          correct: "State resets because old Fiber is unmounted",
+          explanation: "Changing the key prop changes the component Fiber's React identity, tearing down the old tree and remounting a fresh instance."
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [showResults, setShowResults] = useState(false);
+
+      const handleAnswer = (qid, opt) => {
+        setAnswers(prev => ({ ...prev, [qid]: opt }));
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🎯 Lab D:</span> Senior Render & Fiber Predictor
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Test your mechanical intuition. Predict Fiber reconciliation outcomes, memoization bailouts, and key resets.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            {questions.map((q) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+              return (
+                <div key={q.id} className="glass-panel p-5 rounded-xl space-y-3">
+                  <pre className="p-3 bg-gray-950 rounded-lg text-xs font-mono text-cyan-300 border border-gray-800 overflow-x-auto">
+                    {q.code}
+                  </pre>
+                  <div className="text-xs text-amber-300 font-semibold">Scenario: {q.scenario}</div>
+                  <div className="text-sm font-bold text-white">{q.question}</div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {q.options.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => handleAnswer(q.id, opt)}
+                        className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          selected === opt
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {showResults && (
+                    <div className={`p-3 rounded-lg text-xs border font-mono ${
+                      isCorrect ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300' : 'bg-rose-950/80 border-rose-800 text-rose-300'
+                    }`}>
+                      <div className="font-bold">{isCorrect ? '✓ Correct Assessment' : '✗ Incorrect Assumption'}</div>
+                      <div className="mt-1 text-gray-300">{q.explanation}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => setShowResults(true)}
+            className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all"
+          >
+            Check Predictions
+          </button>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB E: GOD CONTEXT REFACTOR
+    // ==========================================
+    function LabEGodContextRefactor() {
+      const [splitMode, setSplitMode] = useState(false);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🧩 Lab E:</span> God Context Teardown & Segregation
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Compare a monolithic "God Context" against a cleanly partitioned multi-tier architecture. Notice how splitting prevents unrelated domain updates from triggering cascading renders.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setSplitMode(false)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                !splitMode ? 'bg-rose-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              ❌ Monolithic "God Context"
+            </button>
+            <button
+              onClick={() => setSplitMode(true)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                splitMode ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              ✅ Refactored Multi-Tier Architecture
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+            <div className="glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Provider Structure</h3>
+              <pre className="p-3 bg-gray-950 rounded-lg text-gray-300 border border-gray-800 overflow-x-auto custom-scrollbar">
+                {!splitMode ? `// ❌ Single massive context channel
+<AppContext.Provider value={{
+  user, theme, locale,
+  editorMode, cursor,
+  cartItems, checkoutStep,
+  activeModal, filters
+}}>
+  <AppLayout />
+</AppContext.Provider>` : `// ✅ Multi-Tier Segregation
+<ThemeProvider>
+  <SessionProvider>
+    <CartFeatureScope>
+      <EditorFeatureScope>
+        <AppLayout />
+      </EditorFeatureScope>
+    </CartFeatureScope>
+  </SessionProvider>
+</ThemeProvider>`}
+              </pre>
+            </div>
+
+            <div className="glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Dependency Blast Radius</h3>
+              <div className="space-y-2">
+                {!splitMode ? (
+                  <div className="p-3 bg-rose-950/40 border border-rose-800/80 rounded-lg text-rose-300 space-y-1">
+                    <div className="font-bold">⚠️ High Blast Radius:</div>
+                    <p className="text-[11px] text-gray-300">
+                      When <code className="text-rose-400">cursor</code> position updates during typing:
+                    </p>
+                    <ul className="list-disc pl-4 text-[10px] space-y-0.5 text-gray-400">
+                      <li>Header (reading <code className="text-cyan-300">user</code>) renders</li>
+                      <li>CartBadge (reading <code className="text-cyan-300">cartItems</code>) renders</li>
+                      <li>ModalContainer (reading <code className="text-cyan-300">activeModal</code>) renders</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-800/80 rounded-lg text-emerald-300 space-y-1">
+                    <div className="font-bold">🎯 Isolated Channels:</div>
+                    <p className="text-[11px] text-gray-300">
+                      When <code className="text-emerald-400">cursor</code> updates inside EditorFeatureScope:
+                    </p>
+                    <ul className="list-disc pl-4 text-[10px] space-y-0.5 text-gray-400">
+                      <li>Header: <strong className="text-emerald-400">0 Renders</strong> (Bailed out)</li>
+                      <li>CartBadge: <strong className="text-emerald-400">0 Renders</strong> (Bailed out)</li>
+                      <li>Only Editor Canvas & Status line render.</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB F: STATE MODEL MATRIX
+    // ==========================================
+    function LabFStateModelMatrix() {
+      const items = [
+        { feature: "Dropdown Menu (Open/Closed)", best: "useState", reason: "Single boolean toggle; no transitions or invariant guards required." },
+        { feature: "Multi-Step Checkout Flow", best: "State Machine", reason: "Guards, invalid transitions, async validation stages, error rollbacks." },
+        { feature: "Document Undo/Redo History", best: "useReducer", reason: "Complex transition math over past/present/future arrays." },
+        { feature: "High-Frequency Animation Canvas", best: "External Store", reason: "Avoids React Fiber scheduling overhead on each 60fps tick." },
+        { feature: "Search Bar Text Input", best: "useState (Local)", reason: "Simple transient string value owned by input." }
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">⚙️ Lab F:</span> State Modeling Matrix: useState vs useReducer vs State Machine
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              A reducer is not automatically a state machine. Match features with the exact state model needed.
+            </p>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-400">
+                  <th className="pb-3">Domain Feature</th>
+                  <th className="pb-3">Recommended Model</th>
+                  <th className="pb-3">Architectural Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60">
+                {items.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-gray-800/30 transition-colors">
+                    <td className="py-3 text-white font-bold">{item.feature}</td>
+                    <td className="py-3">
+                      <span className="px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold">
+                        {item.best}
+                      </span>
+                    </td>
+                    <td className="py-3 text-gray-300">{item.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB G: INCIDENT DEBUGGER
+    // ==========================================
+    function LabGIncidentDebugger() {
+      const incidents = [
+        {
+          id: 1,
+          title: "Incident #104: Keystroke Stutter on 500-Item Grid",
+          symptoms: "Every keystroke in the grid filter causes 200ms frame drops.",
+          diagnosis: "High-frequency search string placed directly into GridDataContext, triggering mass re-renders on all cells.",
+          fix: "Decouple filter state from cell renderers or isolate search query to local state with debounced filter dispatch."
+        },
+        {
+          id: 2,
+          title: "Incident #209: Stale User Token in Analytics Event",
+          symptoms: "trackEvent() continues sending the previous user ID after account switch.",
+          diagnosis: "AnalyticsService closed over stale snapshot inside useMemo without proper dependency array inclusion.",
+          fix: "Add user ID to useMemo dependencies or pass user dynamically at call-site via ref/gateway."
+        },
+        {
+          id: 3,
+          title: "Incident #312: Tabs Unexpectedly Reset on Theme Toggle",
+          symptoms: "Switching dark mode unmounts and remounts all open editor tabs.",
+          diagnosis: "Keyed Provider pattern applied incorrectly (<EditorProvider key={theme}>).",
+          fix: "Separate ThemeProvider from EditorProvider so theme updates do not change the React identity of the editor."
+        }
+      ];
+
+      const [selectedIncident, setSelectedIncident] = useState(incidents[0]);
+      const [revealed, setRevealed] = useState(false);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🚨 Lab G:</span> Senior Diagnostic Gauntlet & Production Incidents
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Real-world production triage. Identify root causes and apply surgical architectural fixes.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="glass-panel p-4 rounded-xl space-y-2">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Triage Gauntlet</h3>
+              {incidents.map((inc) => (
+                <button
+                  key={inc.id}
+                  onClick={() => { setSelectedIncident(inc); setRevealed(false); }}
+                  className={`w-full text-left p-3 rounded-lg text-xs transition-all ${
+                    selectedIncident.id === inc.id
+                      ? 'bg-cyan-950 text-cyan-300 border border-cyan-700 font-bold'
+                      : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
+                  }`}
+                >
+                  {inc.title}
+                </button>
+              ))}
+            </div>
+
+            <div className="md:col-span-2 glass-panel p-5 rounded-xl space-y-4 font-mono text-xs">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">{selectedIncident.title}</h3>
+              
+              <div className="p-3 bg-gray-950 rounded-lg border border-gray-800 space-y-1">
+                <span className="text-amber-400 font-bold block">Reported Symptoms:</span>
+                <p className="text-gray-300">{selectedIncident.symptoms}</p>
+              </div>
+
+              {revealed ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-rose-950/40 border border-rose-800 rounded-lg text-rose-300 space-y-1">
+                    <span className="font-bold block">Root Cause Diagnosis:</span>
+                    <p className="text-gray-300">{selectedIncident.diagnosis}</p>
+                  </div>
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-800 rounded-lg text-emerald-300 space-y-1">
+                    <span className="font-bold block">Surgical Remediation:</span>
+                    <p className="text-gray-300">{selectedIncident.fix}</p>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setRevealed(true)}
+                  className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-all"
+                >
+                  Reveal Senior Diagnostic Analysis & Fix
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
