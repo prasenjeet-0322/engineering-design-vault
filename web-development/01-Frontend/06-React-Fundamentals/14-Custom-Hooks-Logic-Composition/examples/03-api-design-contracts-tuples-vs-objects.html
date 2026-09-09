@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 — Part 03: API Design Contracts: Tuples vs. Objects</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useCallback, useMemo } = React;
+
+    // --- EXPERIMENT 1: TUPLE VS OBJECT COMPARATOR ---
+    function TupleVsObjectExplorer() {
+      const [mode, setMode] = useState('tuple'); // 'tuple' | 'object'
+      const [count, setCount] = useState(5);
+      const [status, setStatus] = useState('idle');
+      const [step, setStep] = useState(1);
+
+      const increment = () => setCount(c => c + step);
+      const decrement = () => setCount(c => c - step);
+      const reset = () => { setCount(0); setStatus('idle'); };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                <i class="fa-solid fa-code-compare"></i>
+                Experiment 1: Contract Access Model (Positional vs Named)
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Toggle between Tuple <code class="text-pink-400">[val, setVal]</code> and Object <code class="text-cyan-400">&#123; val, increment &#125;</code> contracts.
+              </p>
+            </div>
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setMode('tuple')}
+                class={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${mode === 'tuple' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <i class="fa-solid fa-layer-group mr-1.5"></i> Tuple Contract
+              </button>
+              <button
+                onClick={() => setMode('object')}
+                class={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${mode === 'object' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <i class="fa-solid fa-cube mr-1.5"></i> Object Contract
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Live Hook State Panel */}
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Internal Hook State Engine</span>
+                  <span class="text-emerald-400 text-[10px] bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">Reactive</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                  <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <div class="text-slate-500 text-[10px]">count</div>
+                    <div class="text-lg font-bold text-indigo-300">{count}</div>
+                  </div>
+                  <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <div class="text-slate-500 text-[10px]">status</div>
+                    <div class="text-sm font-bold text-amber-400 capitalize">{status}</div>
+                  </div>
+                  <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <div class="text-slate-500 text-[10px]">step</div>
+                    <div class="text-lg font-bold text-cyan-300">{step}</div>
+                  </div>
+                </div>
+                <div class="flex gap-2 mt-4">
+                  <button onClick={decrement} class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700">
+                    - Decrement
+                  </button>
+                  <button onClick={increment} class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-1.5 rounded-lg text-xs font-semibold transition shadow">
+                    + Increment
+                  </button>
+                  <button onClick={reset} class="px-3 bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700">
+                    <i class="fa-solid fa-rotate-left"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Contract Code Representation */}
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Hook Definition Return
+                </div>
+                <pre class="text-xs font-mono text-slate-300 overflow-x-auto p-2 bg-slate-900/60 rounded-lg">
+                  {mode === 'tuple' ? (
+`function useCounter(initial = 0) {
+  const [count, setCount] = useState(initial);
+  // Positional 2-element tuple
+  return [count, setCount] as const;
+}`
+                  ) : (
+`function useCounter(initial = 0) {
+  const [count, setCount] = useState(initial);
+  const increment = () => setCount(c => c + 1);
+  const decrement = () => setCount(c => c - 1);
+  // Named semantic object
+  return { count, increment, decrement };
+}`
+                  )}
+                </pre>
+              </div>
+            </div>
+
+            {/* Consumer Call Site Simulation */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+                  <span>Consumer Call Site Simulation</span>
+                  <span class={`text-[10px] px-2 py-0.5 rounded-full font-mono ${mode === 'tuple' ? 'bg-indigo-950 text-indigo-300 border border-indigo-800' : 'bg-cyan-950 text-cyan-300 border border-cyan-800'}`}>
+                    {mode === 'tuple' ? 'Positional Binding' : 'Named Key Binding'}
+                  </span>
+                </div>
+
+                <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 font-mono text-xs space-y-3">
+                  <div class="text-slate-400">// Consuming in Widget.tsx:</div>
+                  {mode === 'tuple' ? (
+                    <div>
+                      <div class="text-pink-400 font-bold">const [currentCount, updateCount] = useCounter(5);</div>
+                      <p class="text-slate-400 text-[11px] mt-2 leading-relaxed">
+                        ✓ Consumer chooses custom variable names freely (<code class="text-indigo-300">currentCount</code>, <code class="text-indigo-300">updateCount</code>).<br/>
+                        ⚠️ Bound strictly to <span class="text-amber-400 font-bold">Index 0</span> and <span class="text-amber-400 font-bold">Index 1</span>.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div class="text-cyan-400 font-bold">const &#123; count, increment &#125; = useCounter(5);</div>
+                      <p class="text-slate-400 text-[11px] mt-2 leading-relaxed">
+                        ✓ Consumer extracts exactly what is needed by key.<br/>
+                        ✓ Self-documenting semantic commands (<code class="text-cyan-300">increment()</code>).<br/>
+                        ⚠️ Renaming requires alias syntax: <code class="text-slate-300">&#123; count: myCount &#125;</code>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div class="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-800 text-xs text-slate-300 space-y-1">
+                  <div class="font-bold text-slate-200">Architectural Trade-off:</div>
+                  <div class="text-[11px] text-slate-400">
+                    {mode === 'tuple' 
+                      ? 'Tuples are ideal for 1-2 generic primitive abstractions mimicking useState. Minimal typing overhead.'
+                      : 'Objects are mandatory for multi-capability controllers. Prevents argument drift and allows safe backward-compatible additions.'}
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-500 font-mono">
+                <span>Contract Type: {mode.toUpperCase()}</span>
+                <span>TypeScript: {mode === 'tuple' ? 'readonly [number, Dispatch]' : 'CounterResult'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 2: TUPLE REORDERING HAZARD SIMULATOR ---
+    function TupleEvolutionHazardSimulator() {
+      const [v2Reordered, setV2Reordered] = useState(false);
+      const [stateVal, setStateVal] = useState(100);
+      const [log, setLog] = useState([]);
+
+      const addLog = (msg, type = 'info') => {
+        setLog(prev => [{ id: Date.now() + Math.random(), msg, type, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)]);
+      };
+
+      const handleSimulateCall = () => {
+        if (!v2Reordered) {
+          // Normal: [state, setter]
+          const [val, setVal] = [stateVal, (n) => { setStateVal(n); addLog(`State updated to ${n}`, 'success'); }];
+          setVal(stateVal + 10);
+        } else {
+          // Reordered: [setter, state]
+          // Consumer expected [val, setVal], so consumer sets 'val' as setter and 'setVal' as number!
+          const [val, setVal] = [(n) => { setStateVal(n); addLog(`Called actual setter via wrong variable 'val'!`, 'warn'); }, stateVal];
+          try {
+            if (typeof setVal === 'function') {
+              setVal(stateVal + 10);
+            } else {
+              addLog(`💥 RUNTIME TYPE ERROR: 'setVal' is a number (${setVal}), not a function!`, 'error');
+            }
+          } catch (err) {
+            addLog(`Exception: ${err.message}`, 'error');
+          }
+        }
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              Experiment 2: The "Tuple Reordering" Production Hazard
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Simulate what occurs when a shared Hook maintainer reorders tuple elements in Version 2.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-300">Hook Version Configuration</span>
+                  <button
+                    onClick={() => {
+                      setV2Reordered(!v2Reordered);
+                      addLog(v2Reordered ? 'Switched to V1 (Standard Order)' : '⚠️ Switched to V2 (Reordered Tuple)', 'warn');
+                    }}
+                    class={`px-3 py-1 text-xs rounded-lg font-semibold transition border ${v2Reordered ? 'bg-rose-950 text-rose-300 border-rose-800' : 'bg-slate-800 text-slate-300 border-slate-700'}`}
+                  >
+                    {v2Reordered ? 'V2: Reordered [setter, value]' : 'V1: Standard [value, setter]'}
+                  </button>
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg font-mono text-xs text-slate-300 border border-slate-800">
+                  <div class="text-slate-500">// Hook Return Definition:</div>
+                  {v2Reordered ? (
+                    <div class="text-rose-400 font-bold">return [setValue, value] as const; // ⚠️ Order Swapped!</div>
+                  ) : (
+                    <div class="text-emerald-400 font-bold">return [value, setValue] as const; // ✓ Standard</div>
+                  )}
+                </div>
+
+                <div class="bg-slate-900 p-3 rounded-lg font-mono text-xs text-slate-300 border border-slate-800">
+                  <div class="text-slate-500">// Consuming Component (Untouched):</div>
+                  <div class="text-slate-200">const [value, setValue] = useData();</div>
+                  <div class="text-indigo-400 mt-1">setValue(value + 10);</div>
+                </div>
+
+                <button
+                  onClick={handleSimulateCall}
+                  class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition shadow flex items-center justify-center gap-2"
+                >
+                  <i class="fa-solid fa-play"></i> Execute Consumer Code: setValue(value + 10)
+                </button>
+              </div>
+            </div>
+
+            {/* Diagnostic Log Output */}
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Runtime Execution Log</span>
+                  <button onClick={() => setLog([])} class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div class="space-y-1.5 font-mono text-xs max-h-48 overflow-y-auto custom-scrollbar">
+                  {log.length === 0 ? (
+                    <div class="text-slate-600 text-[11px] italic py-6 text-center">Click execute to test runtime behavior...</div>
+                  ) : (
+                    log.map(item => (
+                      <div
+                        key={item.id}
+                        class={`p-2 rounded border text-[11px] flex items-start gap-2 ${
+                          item.type === 'error' ? 'bg-rose-950/70 border-rose-800/80 text-rose-300' :
+                          item.type === 'warn' ? 'bg-amber-950/60 border-amber-800/80 text-amber-300' :
+                          item.type === 'success' ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300' :
+                          'bg-slate-900 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <span class="text-slate-500 text-[9px]">{item.time}</span>
+                        <span>{item.msg}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                <span class="font-bold text-slate-300">Senior Architectural Insight:</span> In tuple APIs, <span class="text-amber-400 font-bold">element position is the contract</span>. If you reorder elements, all consuming call sites experience catastrophic misalignment. Objects prevent this entirely.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 3: GENERIC SETTERS VS SEMANTIC COMMANDS ---
+    function SemanticCommandPlayground() {
+      const [isOpen, setIsOpen] = useState(false);
+      const [mode, setMode] = useState('setter'); // 'setter' | 'command'
+      const [actionsAudit, setActionsAudit] = useState([]);
+
+      const pushAudit = (action, caller) => {
+        setActionsAudit(prev => [{ id: Date.now() + Math.random(), action, caller, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 5)]);
+      };
+
+      // Semantic commands
+      const openModal = () => { setIsOpen(true); pushAudit('open() invoked (Validation & Metrics checked)', 'Semantic Command'); };
+      const closeModal = () => { setIsOpen(false); pushAudit('close() invoked (Cleaned up session)', 'Semantic Command'); };
+      const toggleModal = () => { setIsOpen(v => !v); pushAudit('toggle() invoked', 'Semantic Command'); };
+
+      // Generic setter
+      const rawSetOpen = (val) => { setIsOpen(val); pushAudit(`setIsOpen(${val}) called directly`, 'Generic Mutation'); };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved"></i>
+                Experiment 3: Generic Setters vs. Encapsulated Semantic Commands
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Observe how semantic commands protect domain invariants vs raw unconstrained mutations.
+              </p>
+            </div>
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setMode('setter')}
+                class={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${mode === 'setter' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Raw Setter <code class="text-amber-200 text-[10px]">setIsOpen(val)</code>
+              </button>
+              <button
+                onClick={() => setMode('command')}
+                class={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${mode === 'command' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Domain Commands <code class="text-emerald-200 text-[10px]">open() / close()</code>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">UI Modal State</span>
+                <span class={`text-xs px-3 py-1 rounded-full font-bold font-mono border ${isOpen ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-slate-900 text-slate-400 border-slate-800'}`}>
+                  {isOpen ? '● OPEN' : '○ CLOSED'}
+                </span>
+              </div>
+
+              {/* Modal Visual Simulation */}
+              <div class="h-32 rounded-xl border border-slate-800 bg-slate-900/50 flex items-center justify-center p-4 transition-all">
+                {isOpen ? (
+                  <div class="bg-indigo-950/80 border border-indigo-700/80 text-indigo-200 p-4 rounded-xl shadow-2xl text-center animate-bounce duration-300">
+                    <div class="font-bold text-sm">Protected Dialog Container</div>
+                    <div class="text-[11px] text-indigo-300/80 mt-1">Invariants guaranteed by Hook</div>
+                  </div>
+                ) : (
+                  <div class="text-slate-600 text-xs italic">Modal is currently dormant</div>
+                )}
+              </div>
+
+              {/* Action Trigger Buttons */}
+              {mode === 'setter' ? (
+                <div class="space-y-2">
+                  <div class="text-xs text-amber-300/80 font-mono">// Generic Setter: Caller must dictate exact boolean state</div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button onClick={() => rawSetOpen(true)} class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 rounded-lg font-mono border border-slate-700">
+                      setIsOpen(true)
+                    </button>
+                    <button onClick={() => rawSetOpen(false)} class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 rounded-lg font-mono border border-slate-700">
+                      setIsOpen(false)
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div class="space-y-2">
+                  <div class="text-xs text-emerald-300/80 font-mono">// Semantic Commands: High-level intention</div>
+                  <div class="grid grid-cols-3 gap-2">
+                    <button onClick={openModal} class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg font-semibold shadow">
+                      open()
+                    </button>
+                    <button onClick={closeModal} class="bg-slate-800 hover:bg-rose-900 text-slate-200 text-xs py-2 rounded-lg font-semibold border border-slate-700">
+                      close()
+                    </button>
+                    <button onClick={toggleModal} class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2 rounded-lg font-semibold shadow">
+                      toggle()
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Audit Trail & Architecture Analysis */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Domain Transition Audit Log
+                </div>
+                <div class="space-y-2 font-mono text-xs">
+                  {actionsAudit.length === 0 ? (
+                    <div class="text-slate-600 text-xs italic py-6 text-center">No state transitions executed yet...</div>
+                  ) : (
+                    actionsAudit.map(item => (
+                      <div key={item.id} class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] flex justify-between items-center">
+                        <span class="text-slate-300 font-semibold">{item.action}</span>
+                        <span class={`text-[9px] px-2 py-0.5 rounded ${item.caller.includes('Semantic') ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}`}>
+                          {item.caller}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
+                <span class="font-bold text-emerald-400">Why Senior Devs Prefer Commands:</span> Raw setters expose internal mechanics. If opening a modal requires logging analytics, resetting an input, or locking body scroll, semantic commands handle it in one place without leaking logic into components.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 4: TYPESCRIPT `AS CONST` PROBE ---
+    function TypeScriptAsConstProbe() {
+      const [useAsConst, setUseAsConst] = useState(true);
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-blue-400 flex items-center gap-2">
+                <i class="fa-solid fa-code"></i>
+                Experiment 4: TypeScript Type Widening vs. `as const` Tuple Locking
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Inspect how TypeScript type inference changes when returning tuples with vs without <code class="text-blue-300 font-bold">as const</code>.
+              </p>
+            </div>
+            <button
+              onClick={() => setUseAsConst(!useAsConst)}
+              class={`px-4 py-1.5 rounded-xl text-xs font-bold transition border ${useAsConst ? 'bg-blue-600 text-white border-blue-500 shadow' : 'bg-rose-950 text-rose-300 border-rose-800'}`}
+            >
+              {useAsConst ? '✓ With "as const"' : '❌ Without "as const" (Widened)'}
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 font-mono text-xs">
+              <div class="text-slate-400 text-[11px] font-sans font-bold uppercase tracking-wider">Hook Implementation</div>
+              <pre class="bg-slate-900 p-3 rounded-lg text-slate-200 overflow-x-auto leading-relaxed">
+{`function useToggle(initial = false) {
+  const [value, setValue] = useState(initial);
+  const toggle = () => setValue(v => !v);
+
+  // Return Statement:
+  return [value, toggle]${useAsConst ? ' as const;' : ';'}
+}`}
+              </pre>
+            </div>
+
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between font-mono text-xs">
+              <div>
+                <div class="text-slate-400 text-[11px] font-sans font-bold uppercase tracking-wider mb-2">TypeScript Compiler Inferred Type</div>
+                
+                {useAsConst ? (
+                  <div class="bg-blue-950/60 border border-blue-800 p-3.5 rounded-xl space-y-2">
+                    <div class="text-blue-300 font-bold text-xs">readonly [boolean, () =&gt; void]</div>
+                    <div class="text-[11px] text-slate-300 font-sans leading-relaxed">
+                      ✓ Position 0 is strictly <code class="text-emerald-400 font-mono">boolean</code>.<br/>
+                      ✓ Position 1 is strictly <code class="text-emerald-400 font-mono">() =&gt; void</code>.<br/>
+                      ✓ Destructuring provides full autocomplete and zero type union confusion.
+                    </div>
+                  </div>
+                ) : (
+                  <div class="bg-rose-950/60 border border-rose-800 p-3.5 rounded-xl space-y-2">
+                    <div class="text-rose-300 font-bold text-xs">(boolean | (() =&gt; void))[]</div>
+                    <div class="text-[11px] text-rose-200/90 font-sans leading-relaxed">
+                      💥 <strong>Array Type Widening:</strong> TS treats this as a generic array containing mixed types.<br/>
+                      Index 0 type: <code class="text-amber-300 font-mono">boolean | (() =&gt; void)</code><br/>
+                      Index 1 type: <code class="text-amber-300 font-mono">boolean | (() =&gt; void)</code><br/>
+                      Calling <code class="text-rose-400">toggle()</code> throws a TS type error: <em>"Cannot invoke an expression whose type lacks a call signature."</em>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] font-sans text-slate-400">
+                Always append <code class="text-blue-300 font-mono font-bold">as const</code> or declare an explicit <code class="text-indigo-300 font-mono">readonly [T, Dispatch]</code> return type when authoring tuple-returning Hooks.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 5: INTERACTIVE 50-POINT CERTIFICATION QUIZ ---
+    function InteractiveCertificationQuiz() {
+      const questions = [
+        {
+          id: 1,
+          question: "When is a tuple return ([val, setVal]) contract superior to an object return ({ val, setVal })?",
+          options: [
+            "Whenever the Hook has more than 5 distinct methods.",
+            "For 1-2 tightly coupled primitive values mimicking useState where custom naming at call sites is paramount.",
+            "Whenever performance and Fiber memory allocation must be strictly minimized.",
+            "When returning complex domain reducers with 10+ actions."
+          ],
+          correct: 1,
+          explanation: "Tuples excel for tiny, 1-2 element primitive contracts analogous to useState, enabling call sites to name variables freely without destructuring aliases."
+        },
+        {
+          id: 2,
+          question: "Why does returning [state, setState] as const solve TypeScript type widening?",
+          options: [
+            "It automatically freezes the returned values at runtime using Object.freeze().",
+            "It turns the return value into a stable React Fiber node.",
+            "It locks positional types as a fixed-length readonly tuple rather than widening to a union array (T | Dispatch)[].",
+            "It prevents consumers from creating re-renders."
+          ],
+          correct: 2,
+          explanation: "'as const' signals TypeScript to infer the precise literal tuple type (readonly [T, Dispatch]) instead of a widened union array."
+        },
+        {
+          id: 3,
+          question: "What is the primary danger of exposing { state, dispatch } directly from a custom Hook?",
+          options: [
+            "Dispatch causes React to crash if called inside useEffect.",
+            "It leaks internal reducer implementation details and action vocabularies, tightly coupling consumers to internal mechanics.",
+            "Objects cannot be destructured in React components.",
+            "TypeScript cannot infer the types of actions."
+          ],
+          correct: 1,
+          explanation: "Exposing dispatch allows consumers to dispatch arbitrary internal actions. Wrapping dispatch behind semantic domain commands (open(), submit()) protects abstraction boundaries."
+        },
+        {
+          id: 4,
+          question: "If a shared library custom Hook changes its return from [a, b] to [a, c, b], what occurs to existing consumers?",
+          options: [
+            "Nothing, TypeScript automatically remaps the variable names.",
+            "Existing consumers receiving [a, b] silently bind 'b' to 'c' because tuples bind by index, causing severe production bugs.",
+            "React triggers a hydration error.",
+            "The compiler automatically converts the tuple to an object."
+          ],
+          correct: 1,
+          explanation: "In tuple contracts, index position is the contract. Inserting a new element in the middle breaks all downstream positional destructuring."
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const calculateScore = () => {
+        let score = 0;
+        questions.forEach(q => {
+          if (answers[q.id] === q.correct) score += 1;
+        });
+        return score;
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-purple-400 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap"></i>
+                Senior Architect Certification Challenge
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">Test your mastery of Custom Hook API design contracts and architectural boundaries.</p>
+            </div>
+            {submitted && (
+              <div class="text-xs font-bold px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-800 text-purple-300">
+                Score: {calculateScore()} / {questions.length} ({Math.round((calculateScore() / questions.length) * 100)}%)
+              </div>
+            )}
+          </div>
+
+          <div class="space-y-6">
+            {questions.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+
+              return (
+                <div key={q.id} class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div class="text-xs font-bold text-slate-200">
+                    <span class="text-purple-400 font-mono mr-2">Q{idx + 1}.</span>
+                    {q.question}
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-2">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800";
+                      if (selected === optIdx) {
+                        btnStyle = "bg-indigo-950 border-indigo-600 text-indigo-200 font-semibold";
+                      }
+                      if (submitted) {
+                        if (optIdx === q.correct) {
+                          btnStyle = "bg-emerald-950 border-emerald-600 text-emerald-200 font-semibold";
+                        } else if (selected === optIdx && !isCorrect) {
+                          btnStyle = "bg-rose-950 border-rose-600 text-rose-200";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          class={`p-3 rounded-lg text-xs text-left border transition flex items-start gap-2.5 ${btnStyle}`}
+                        >
+                          <span class="font-mono text-[10px] text-slate-500 mt-0.5">[{String.fromCharCode(65 + optIdx)}]</span>
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div class={`p-3 rounded-lg text-[11px] leading-relaxed border ${isCorrect ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'}`}>
+                      <span class="font-bold">{isCorrect ? '✓ Correct:' : '❌ Incorrect:'}</span> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+            {submitted ? (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition"
+              >
+                Reset Assessment
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(answers).length < questions.length}
+                class="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-lg shadow-purple-900/30"
+              >
+                Submit & Grade Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP SHELL ---
+    function App() {
+      return (
+        <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+          {/* Header Navigation */}
+          <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl backdrop-blur">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono text-indigo-400">
+                <span>KPI 14</span>
+                <span>•</span>
+                <span>CUSTOM HOOKS & LOGIC COMPOSITION</span>
+                <span>•</span>
+                <span class="text-pink-400">PART 03</span>
+              </div>
+              <h1 class="text-xl md:text-2xl font-black text-slate-100 tracking-tight mt-1">
+                API Design Contracts: Tuples vs. Objects
+              </h1>
+            </div>
+            <div class="flex items-center gap-2">
+              <a
+                href="../03-api-design-contracts-tuples-vs-objects.md"
+                class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-book"></i> Read Guide
+              </a>
+              <a
+                href="../../README.md"
+                class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-house"></i> Curriculum
+              </a>
+            </div>
+          </div>
+
+          {/* Interactive Lab Sections */}
+          <TupleVsObjectExplorer />
+          <TupleEvolutionHazardSimulator />
+          <SemanticCommandPlayground />
+          <TypeScriptAsConstProbe />
+          <InteractiveCertificationQuiz />
+
+          {/* Footer */}
+          <footer class="text-center py-6 border-t border-slate-800/80 text-xs text-slate-500 font-mono">
+            Engineering Design Vault • Level 06 React Fundamentals • Lead Architect: Srikar Kudurmalla • Co-Author: Prasenjeet
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
