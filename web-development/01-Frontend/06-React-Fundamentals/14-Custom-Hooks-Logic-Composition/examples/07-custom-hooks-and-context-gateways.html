@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 12 — Part 07: Custom Hooks & Context Gateways Diagnostic Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useReducer, useCallback, useMemo, useRef, Component } = React;
+
+    // --- ERROR BOUNDARY FOR LAB EXPERIMENTS ---
+    class LabErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        if (this.props.onErrorLogged) {
+          this.props.onErrorLogged(error.message);
+        }
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="p-4 rounded-xl bg-red-950/60 border border-red-500/50 text-red-200">
+              <div className="flex items-center gap-2 text-red-400 font-bold mb-1">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Runtime Invariant Caught by Boundary</span>
+              </div>
+              <p className="text-xs font-mono bg-black/40 p-2.5 rounded text-red-300 break-words mb-3">
+                {this.state.error?.message}
+              </p>
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-semibold transition"
+              >
+                Reset Boundary & Retry
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ==========================================
+    // EXPERIMENT 1: CONTEXT GATEWAY VS RAW USECONTEXT
+    // ==========================================
+    // 1. Private Context
+    const AuthPrivateContext = createContext(null);
+
+    function AuthGatewayProvider({ children, initialUser = { id: 'usr_101', name: 'Dr. Sarah Connor', role: 'SecOps Architect' } }) {
+      const [user, setUser] = useState(initialUser);
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (msg) => setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 7)]);
+
+      const signIn = (name, role) => {
+        const newUser = { id: `usr_${Math.floor(Math.random()*900+100)}`, name, role };
+        setUser(newUser);
+        addLog(`Domain Command: Signed in as ${name} (${role})`);
+      };
+
+      const signOut = () => {
+        setUser(null);
+        addLog(`Domain Command: Terminated session`);
+      };
+
+      const value = useMemo(() => ({
+        user,
+        isAuthenticated: user !== null,
+        signIn,
+        signOut,
+        logs,
+      }), [user, logs]);
+
+      return (
+        <AuthPrivateContext.Provider value={value}>
+          {children}
+        </AuthPrivateContext.Provider>
+      );
+    }
+
+    // Gateway Hook
+    function useAuth() {
+      const context = useContext(AuthPrivateContext);
+      if (context === null) {
+        throw new Error(
+          "Invariant Violation: useAuth() was invoked outside an <AuthProvider>. " +
+          "Ensure your component is wrapped in an AuthProvider ancestor."
+        );
+      }
+      return context;
+    }
+
+    function ConsumerWithGateway() {
+      const { user, isAuthenticated, signIn, signOut } = useAuth();
+      return (
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-indigo-500/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Gateway Consumer</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isAuthenticated ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+              {isAuthenticated ? 'AUTHENTICATED' : 'ANONYMOUS'}
+            </span>
+          </div>
+          {isAuthenticated ? (
+            <div>
+              <p className="text-sm font-semibold text-white">{user.name}</p>
+              <p className="text-xs text-slate-400 font-mono">{user.role} • ID: {user.id}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">No active domain session detected.</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            {isAuthenticated ? (
+              <button
+                onClick={signOut}
+                className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded text-xs font-medium transition"
+              >
+                Execute signOut()
+              </button>
+            ) : (
+              <button
+                onClick={() => signIn("Alex Mercer", "Staff SRE")}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium transition"
+              >
+                Execute signIn("Alex Mercer")
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function Exp1GatewayExplorer() {
+      const [wrapProvider, setWrapProvider] = useState(true);
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h3 className="text-sm font-semibold text-white">Provider Hierarchy Toggle</h3>
+              <p className="text-xs text-slate-400">Dynamically mount or unmount the wrapping &lt;AuthProvider&gt; to test the gateway invariant.</p>
+            </div>
+            <button
+              onClick={() => setWrapProvider(prev => !prev)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${wrapProvider ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-red-600 text-white hover:bg-red-500'}`}
+            >
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+              {wrapProvider ? "Provider Mounted (Healthy)" : "Provider Unmounted (Violated)"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-slate-200">Component Render Tree</h4>
+                  <span className="text-[11px] font-mono text-indigo-400">Fiber Traversal</span>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 font-mono text-xs text-slate-300 space-y-1">
+                  <p className="text-slate-500">&lt;AppRoot&gt;</p>
+                  {wrapProvider ? (
+                    <div className="pl-4 text-emerald-400">
+                      <p>&lt;AuthProvider value=&#123;contract&#125;&gt;</p>
+                      <p className="pl-4 text-indigo-300">&lt;ConsumerWithGateway /&gt; <span className="text-emerald-500">✓ Invariant OK</span></p>
+                      <p>&lt;/AuthProvider&gt;</p>
+                    </div>
+                  ) : (
+                    <div className="pl-4 text-red-400">
+                      <p>&lt;ConsumerWithGateway /&gt; <span className="text-red-500">✗ Missing Provider!</span></p>
+                    </div>
+                  )}
+                  <p className="text-slate-500">&lt;/AppRoot&gt;</p>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <LabErrorBoundary>
+                  {wrapProvider ? (
+                    <AuthGatewayProvider>
+                      <ConsumerWithGateway />
+                    </AuthGatewayProvider>
+                  ) : (
+                    <ConsumerWithGateway />
+                  )}
+                </LabErrorBoundary>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-4">
+              <h4 className="text-sm font-bold text-slate-200">Gateway Architectural Contract</h4>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono space-y-2 text-slate-300">
+                <p className="text-emerald-400 font-semibold">// TypeScript Narrowing in useAuth()</p>
+                <p>const val = useContext(AuthContext);</p>
+                <p className="text-amber-400">if (val === null) throw new Error(...);</p>
+                <p className="text-slate-400">// Return type is strictly AuthContract (Non-Null)</p>
+                <p className="text-indigo-300">return val;</p>
+              </div>
+              <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-200 space-y-1">
+                <p className="font-semibold text-indigo-300">Key Architectural Advantage:</p>
+                <p>Consumers never need <code className="text-pink-300">auth?.user</code> or <code className="text-pink-300">auth?.signIn?.()</code>. The invariant eliminates null checks across all 500+ consuming files.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 2: FAIL-FAST VS FAKE MOCK DEFAULT
+    // ==========================================
+    const FakeDefaultContext = createContext({
+      user: null,
+      balance: 0,
+      transferMoney: () => {
+        console.warn("Silent dummy transfer money invoked!");
+      }
+    });
+
+    const FailFastContext = createContext(null);
+
+    function useFailFastBilling() {
+      const ctx = useContext(FailFastContext);
+      if (!ctx) {
+        throw new Error(
+          "Invariant Violation: useFailFastBilling requires <BillingProvider> ancestor in component hierarchy."
+        );
+      }
+      return ctx;
+    }
+
+    function MockDefaultConsumer({ onAction }) {
+      const { user, balance, transferMoney } = useContext(FakeDefaultContext);
+      return (
+        <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-400 uppercase">Naive Mock Default Pattern</span>
+            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">SILENT GHOST STATE</span>
+          </div>
+          <p className="text-xs text-slate-300">User: <code className="text-amber-300">{user ? user.name : "null"}</code> | Balance: <code className="text-amber-300">${balance}</code></p>
+          <button
+            onClick={() => {
+              transferMoney(100);
+              onAction("Clicked 'Transfer $100' on Mock Default: Silent No-Op executed without network or state change.");
+            }}
+            className="w-full px-3 py-1.5 bg-amber-600/80 hover:bg-amber-600 text-white rounded text-xs font-semibold transition"
+          >
+            Transfer $100 (Click to Test)
+          </button>
+        </div>
+      );
+    }
+
+    function FailFastConsumer({ onAction }) {
+      const { user, balance, transferMoney } = useFailFastBilling();
+      return (
+        <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-400 uppercase">Fail-Fast Gateway Pattern</span>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">INVARIANT PROTECTED</span>
+          </div>
+          <p className="text-xs text-slate-300">User: <code className="text-emerald-300">{user.name}</code> | Balance: <code className="text-emerald-300">${balance}</code></p>
+          <button
+            onClick={() => {
+              transferMoney(100);
+              onAction("Executed transferMoney(100) via valid Provider!");
+            }}
+            className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold transition"
+          >
+            Transfer $100 (Click to Test)
+          </button>
+        </div>
+      );
+    }
+
+    function Exp2MockVsFailFast() {
+      const [logs, setLogs] = useState([]);
+      const addLog = (msg) => setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 5)]);
+
+      return (
+        <div className="space-y-6">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-1">
+            <p className="font-bold text-white text-sm">Experiment Goal:</p>
+            <p>Compare what happens when a billing component is accidentally rendered outside its Provider in a micro-frontend or modal.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-amber-300 mb-1">Scenario A: createContext(&#123; fakeMock &#125;)</h4>
+                <p className="text-xs text-slate-400 mb-3">Rendered without Provider. Does not crash, but actions silently disappear.</p>
+              </div>
+              <MockDefaultConsumer onAction={addLog} />
+              <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-400 space-y-1">
+                <p className="text-red-400 font-semibold">Production Hazard:</p>
+                <p>Buttons appear enabled, forms accept input, but clicking "Submit" silently does nothing. Sentry receives zero errors.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-emerald-300 mb-1">Scenario B: createContext(null) + Guard</h4>
+                <p className="text-xs text-slate-400 mb-3">Rendered without Provider. Fails fast immediately at the architectural boundary.</p>
+              </div>
+              <LabErrorBoundary onErrorLogged={(err) => addLog(`Fail-Fast Invariant caught: ${err}`)}>
+                <FailFastConsumer onAction={addLog} />
+              </LabErrorBoundary>
+              <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-400 space-y-1">
+                <p className="text-emerald-400 font-semibold">Architectural Guarantee:</p>
+                <p>Missing dependency topology is caught instantly during unit tests, CI/CD builds, and dev renders.</p>
+              </div>
+            </div>
+          </div>
+
+          {logs.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Simulation Action Log</span>
+              <div className="font-mono text-xs space-y-1 text-indigo-300">
+                {logs.map((l, i) => <div key={i}>{l}</div>)}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 3: ENCAPSULATED DOMAIN COMMAND API
+    // ==========================================
+    const WorkspacePrivateContext = createContext(null);
+
+    const initialWsState = {
+      workspace: { id: "ws_alpha", name: "Alpha Fleet", tier: "Team" },
+      members: ["Alice (Owner)", "Bob (Editor)"],
+      isLocked: false,
+    };
+
+    function wsReducer(state, action) {
+      switch (action.type) {
+        case "LOCK_WORKSPACE":
+          return { ...state, isLocked: true };
+        case "UNLOCK_WORKSPACE":
+          return { ...state, isLocked: false };
+        case "UPGRADE_TIER":
+          return { ...state, workspace: { ...state.workspace, tier: action.payload.tier } };
+        case "ADD_MEMBER":
+          return { ...state, members: [...state.members, action.payload.name] };
+        default:
+          return state;
+      }
+    }
+
+    function WorkspaceProvider({ children }) {
+      const [state, dispatch] = useReducer(wsReducer, initialWsState);
+      const [actionHistory, setActionHistory] = useState([]);
+
+      const recordAction = (type, payload) => {
+        setActionHistory(prev => [`[${new Date().toLocaleTimeString()}] ${type}: ${JSON.stringify(payload || {})}`, ...prev.slice(0, 6)]);
+      };
+
+      // Semantic Domain Commands
+      const lockWorkspace = useCallback((reason) => {
+        recordAction("Domain Command: lockWorkspace()", { reason });
+        dispatch({ type: "LOCK_WORKSPACE" });
+      }, []);
+
+      const unlockWorkspace = useCallback(() => {
+        recordAction("Domain Command: unlockWorkspace()", {});
+        dispatch({ type: "UNLOCK_WORKSPACE" });
+      }, []);
+
+      const upgradeTier = useCallback((tier) => {
+        recordAction("Domain Command: upgradeTier()", { newTier: tier });
+        dispatch({ type: "UPGRADE_TIER", payload: { tier } });
+      }, []);
+
+      const inviteMember = useCallback((name) => {
+        if (!name.trim()) return;
+        recordAction("Domain Command: inviteMember()", { name });
+        dispatch({ type: "ADD_MEMBER", payload: { name } });
+      }, []);
+
+      const value = useMemo(() => ({
+        workspace: state.workspace,
+        members: state.members,
+        isLocked: state.isLocked,
+        lockWorkspace,
+        unlockWorkspace,
+        upgradeTier,
+        inviteMember,
+        actionHistory,
+      }), [state, lockWorkspace, unlockWorkspace, upgradeTier, inviteMember, actionHistory]);
+
+      return (
+        <WorkspacePrivateContext.Provider value={value}>
+          {children}
+        </WorkspacePrivateContext.Provider>
+      );
+    }
+
+    function useWorkspace() {
+      const ctx = useContext(WorkspacePrivateContext);
+      if (!ctx) throw new Error("useWorkspace must be used within <WorkspaceProvider>");
+      return ctx;
+    }
+
+    function WorkspaceDashboard() {
+      const { workspace, members, isLocked, lockWorkspace, unlockWorkspace, upgradeTier, inviteMember, actionHistory } = useWorkspace();
+      const [newMemberName, setNewMemberName] = useState("");
+
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-5">
+            <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-base font-bold text-white">{workspace.name}</h4>
+                  <p className="text-xs text-slate-400 font-mono">Tier: <span className="text-indigo-400 font-bold">{workspace.tier}</span> • ID: {workspace.id}</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${isLocked ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'}`}>
+                  {isLocked ? '🔒 LOCKED' : '🔓 ACTIVE'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button
+                  disabled={isLocked}
+                  onClick={() => upgradeTier("Enterprise Ultra")}
+                  className="px-3 py-2 bg-indigo-600/80 hover:bg-indigo-600 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition"
+                >
+                  upgradeTier("Enterprise")
+                </button>
+                {isLocked ? (
+                  <button
+                    onClick={unlockWorkspace}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition"
+                  >
+                    unlockWorkspace()
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => lockWorkspace("Compliance Audit")}
+                    className="px-3 py-2 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-medium transition"
+                  >
+                    lockWorkspace("Audit")
+                  </button>
+                )}
+                <button
+                  disabled={isLocked}
+                  onClick={() => upgradeTier("Startup Pro")}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 rounded-lg text-xs font-medium transition"
+                >
+                  upgradeTier("Startup")
+                </button>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex gap-2">
+                <input
+                  type="text"
+                  placeholder="New member name..."
+                  value={newMemberName}
+                  disabled={isLocked}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-40"
+                />
+                <button
+                  disabled={isLocked || !newMemberName.trim()}
+                  onClick={() => {
+                    inviteMember(newMemberName);
+                    setNewMemberName("");
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  inviteMember()
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">Team Members ({members.length})</span>
+              <div className="flex flex-wrap gap-2">
+                {members.map((m, idx) => (
+                  <span key={idx} className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded-md text-xs font-mono border border-slate-700">
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col justify-between">
+            <div>
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-3">Domain Command Stream</span>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 font-mono text-[11px] space-y-2 text-indigo-300">
+                {actionHistory.length === 0 ? (
+                  <p className="text-slate-500">No domain commands executed yet.</p>
+                ) : (
+                  actionHistory.map((h, i) => <div key={i} className="break-all">{h}</div>)
+                )}
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-indigo-950/20 border border-indigo-500/20 rounded-lg text-xs text-indigo-300">
+              <p className="font-semibold">Pure Abstraction:</p>
+              <p>The consumer component has no knowledge of <code className="text-pink-300">dispatch(&#123; type: "LOCK_WORKSPACE" &#125;)</code>. All transition mechanics are encapsulated.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 4: SUBTREE SCOPING & SHADOWING
+    // ==========================================
+    const TenantPrivateContext = createContext(null);
+
+    function TenantProvider({ tenantId, tenantName, primaryColor, children }) {
+      const [tickets, setTickets] = useState([
+        { id: `${tenantId}-TK-1`, title: "Setup DNS Records", status: "open" },
+        { id: `${tenantId}-TK-2`, title: "Configure SAML SSO", status: "resolved" },
+      ]);
+
+      const addTicket = (title) => {
+        setTickets(prev => [...prev, { id: `${tenantId}-TK-${prev.length + 1}`, title, status: "open" }]);
+      };
+
+      const value = useMemo(() => ({
+        tenantId,
+        tenantName,
+        primaryColor,
+        tickets,
+        addTicket,
+      }), [tenantId, tenantName, primaryColor, tickets]);
+
+      return (
+        <TenantPrivateContext.Provider value={value}>
+          {children}
+        </TenantPrivateContext.Provider>
+      );
+    }
+
+    function useTenant() {
+      const ctx = useContext(TenantPrivateContext);
+      if (!ctx) throw new Error("useTenant must be used within <TenantProvider>");
+      return ctx;
+    }
+
+    function TenantWidget({ label }) {
+      const { tenantId, tenantName, primaryColor, tickets, addTicket } = useTenant();
+      const [title, setTitle] = useState("");
+
+      return (
+        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div>
+              <span className="text-[10px] font-mono text-slate-400 uppercase">{label}</span>
+              <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: primaryColor }}></span>
+                {tenantName}
+              </h5>
+            </div>
+            <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">{tenantId}</span>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase">Isolated Tickets ({tickets.length})</span>
+            <div className="max-h-28 overflow-y-auto space-y-1 custom-scrollbar">
+              {tickets.map(t => (
+                <div key={t.id} className="p-2 rounded bg-slate-950 border border-slate-800/80 text-xs flex justify-between items-center">
+                  <span className="text-slate-300">{t.title}</span>
+                  <span className={`text-[10px] font-mono font-bold ${t.status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>{t.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <input
+              type="text"
+              placeholder="New ticket title..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="flex-1 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+            <button
+              onClick={() => {
+                if (title.trim()) {
+                  addTicket(title);
+                  setTitle("");
+                }
+              }}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function Exp4SubtreeScoping() {
+      return (
+        <div className="space-y-6">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-1">
+            <p className="font-bold text-white text-sm">Provider Subtree Isolation & Shadowing Topology:</p>
+            <p>Two side-by-side TenantProviders maintain distinct state. Below them, a nested TenantProvider demonstrates tree shadowing.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sibling A */}
+            <TenantProvider tenantId="TNT_ACME" tenantName="Acme Corp" primaryColor="#6366f1">
+              <TenantWidget label="Subtree A: Acme Tenant" />
+            </TenantProvider>
+
+            {/* Sibling B */}
+            <TenantProvider tenantId="TNT_GLOBEX" tenantName="Globex Global" primaryColor="#10b981">
+              <TenantWidget label="Subtree B: Globex Tenant" />
+            </TenantProvider>
+          </div>
+
+          {/* Nested Shadowing Demonstration */}
+          <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-slate-200">Subtree Shadowing Hierarchy</h4>
+              <span className="text-xs font-mono text-amber-400">Nearest Ancestor Rule</span>
+            </div>
+            
+            <TenantProvider tenantId="TNT_OUTER" tenantName="Outer Holding Co" primaryColor="#f59e0b">
+              <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-4">
+                <TenantWidget label="Outer Level Component (Reads Outer Provider)" />
+
+                <div className="pl-4 border-l-2 border-indigo-500/40">
+                  <TenantProvider tenantId="TNT_INNER_SHADOW" tenantName="Inner Subsidiary LLC" primaryColor="#ec4899">
+                    <TenantWidget label="Inner Level Component (Shadows Outer Provider!)" />
+                  </TenantProvider>
+                </div>
+              </div>
+            </TenantProvider>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 5: SENIOR ARCHITECT CERTIFICATION
+    // ==========================================
+    const CERT_QUESTIONS = [
+      {
+        id: 1,
+        question: "Why is 'createContext(null)' combined with an invariant guard preferred over providing a mock default object?",
+        options: [
+          "Because mock defaults increase bundle size by 400KB.",
+          "Because mock defaults mask missing Providers as valid states, causing silent failure bugs.",
+          "Because React reconciler will crash if a non-null default object is provided.",
+          "Because TypeScript compiler does not allow object literals in createContext."
+        ],
+        correct: 1,
+        rationale: "Mock defaults make an invalid dependency topology appear valid. When components call methods on fake defaults, silent no-ops occur without reporting errors."
+      },
+      {
+        id: 2,
+        question: "Does invoking a Context Gateway custom Hook (e.g., useAuth()) allocate a new Fiber node in React?",
+        options: [
+          "Yes, every custom Hook generates an internal 'HookFiber' in React 18.",
+          "Yes, but only if the Hook contains useEffect.",
+          "No, custom Hooks are pure JavaScript functions and participate in the calling component's Fiber hook list.",
+          "No, it attaches directly to the RootFiber exclusively."
+        ],
+        correct: 2,
+        rationale: "Custom Hooks do not create Fibers. They execute inline within the caller's Fiber execution and register context dependencies on that caller Fiber."
+      },
+      {
+        id: 3,
+        question: "Why is exposing raw reducer 'dispatch' from a Context considered an architectural anti-pattern?",
+        options: [
+          "Because dispatch is asynchronous and cannot be used in event handlers.",
+          "Because it leaks internal action string vocabularies and reducer mechanics across all consumers.",
+          "Because React will re-render all providers when dispatch is invoked.",
+          "Because dispatch cannot be typed in TypeScript."
+        ],
+        correct: 1,
+        rationale: "Raw dispatch couples every consumer component to the reducer's internal action types, preventing centralized validation, async encapsulation, and refactoring."
+      },
+      {
+        id: 4,
+        question: "How does the Context Gateway pattern transform TypeScript typing for consumers?",
+        options: [
+          "It forces consumers to use the 'any' type.",
+          "It converts all properties into ReadonlyArray types.",
+          "It narrows the return type from 'T | null' to strict non-null 'T' via the runtime guard.",
+          "It automatically generates GraphQL schema definitions."
+        ],
+        correct: 2,
+        rationale: "Because the gateway throws if value is null, TypeScript automatically narrows the return type to non-null T, eliminating optional chaining across all consumers."
+      },
+      {
+        id: 5,
+        question: "When two identical <ProductProvider id='A'> and <ProductProvider id='B'> are mounted in sibling subtrees, what state do their respective useProduct() consumers observe?",
+        options: [
+          "Both consumers share the state of Provider A (first mounted).",
+          "Both consumers throw a duplicate provider error.",
+          "Each consumer resolves and observes only its nearest ancestor Provider instance independently.",
+          "The state is merged via deep object spread."
+        ],
+        correct: 2,
+        rationale: "React reconciler resolves useContext by traversing up the Fiber ancestry to the nearest matching Provider, establishing completely isolated state containers."
+      }
+    ];
+
+    function Exp5ArchitectQuiz() {
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const calculateScore = () => {
+        let correctCount = 0;
+        CERT_QUESTIONS.forEach(q => {
+          if (answers[q.id] === q.correct) correctCount++;
+        });
+        return correctCount;
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h3 className="text-sm font-bold text-white">Senior Architecture Certification Exam</h3>
+              <p className="text-xs text-slate-400">Validate your mastery of Context Gateways, Invariant Guards, and Fiber Dependency Mechanics.</p>
+            </div>
+            {submitted && (
+              <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${calculateScore() >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                Score: {calculateScore()} / {CERT_QUESTIONS.length} ({Math.round(calculateScore() / CERT_QUESTIONS.length * 100)}%)
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {CERT_QUESTIONS.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+              return (
+                <div key={q.id} className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-200">{q.question}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 pl-9">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700";
+                      if (selected === optIdx) {
+                        btnStyle = "bg-indigo-950/60 border-indigo-500 text-indigo-200";
+                      }
+                      if (submitted) {
+                        if (optIdx === q.correct) {
+                          btnStyle = "bg-emerald-950/60 border-emerald-500 text-emerald-200 font-semibold";
+                        } else if (selected === optIdx && !isCorrect) {
+                          btnStyle = "bg-rose-950/60 border-rose-500 text-rose-200";
+                        }
+                      }
+                      return (
+                        <button
+                          key={optIdx}
+                          disabled={submitted}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition ${btnStyle}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="pl-9 pt-2">
+                      <p className="text-xs text-slate-400 font-mono bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <span className="font-bold text-indigo-400">Architect Rationale:</span> {q.rationale}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            {!submitted ? (
+              <button
+                disabled={Object.keys(answers).length < CERT_QUESTIONS.length}
+                onClick={() => setSubmitted(true)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+              >
+                Submit Certification Answers
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setAnswers({});
+                }}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition"
+              >
+                Retake Exam
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN LAB HARNESS
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState(0);
+
+      const TABS = [
+        { title: "Exp 1: Gateway vs Raw Context", component: <Exp1GatewayExplorer /> },
+        { title: "Exp 2: Fail-Fast vs Fake Default", component: <Exp2MockVsFailFast /> },
+        { title: "Exp 3: Encapsulated Domain Commands", component: <WorkspaceProvider><WorkspaceDashboard /></WorkspaceProvider> },
+        { title: "Exp 4: Subtree Scoping & Shadowing", component: <Exp4SubtreeScoping /> },
+        { title: "Exp 5: Senior Certification Exam", component: <Exp5ArchitectQuiz /> },
+      ];
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* Header */}
+          <header className="space-y-3 border-b border-slate-800 pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-600/30">
+                  07
+                </div>
+                <div>
+                  <h1 className="text-xl font-extrabold text-white tracking-tight">Context Gateways & Ambient Dependency Hooks</h1>
+                  <p className="text-xs text-slate-400 font-mono">KPI 12 • PART 07 • Interactive Architectural Diagnostic Lab</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-indigo-950/60 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold">
+                  React 18 Fiber Certified
+                </span>
+              </div>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <nav className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            {TABS.map((tab, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveTab(idx)}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${activeTab === idx ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+              >
+                {tab.title}
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <main className="min-h-[500px]">
+            {TABS[activeTab].component}
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-800 pt-6 text-center text-xs text-slate-500 space-y-1">
+            <p>Engineering Design Vault • Level 06 — React Fundamentals • Author: Srikar Kudurmalla | Co-Author: Prasenjeet</p>
+            <p className="font-mono text-[11px] text-slate-600">Fiber Dependency Propagation & Runtime Invariant Gateway Architecture</p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
