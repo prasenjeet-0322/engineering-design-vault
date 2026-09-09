@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 Part 02 — useTransition & Non-Blocking UI Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } = React;
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'search-benchmark', label: '1. Dual-State Benchmark' },
+        { id: 'input-antipattern', label: '2. Input Anti-Pattern' },
+        { id: 'async-boundary', label: '3. Async Transitions' },
+        { id: 'starvation-test', label: '4. Transition Starvation' },
+        { id: 'decision-matrix', label: '5. Architecture Matrix' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    KPI 14 · Part 02
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">React 18.3 Concurrency Primitives</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  useTransition & Non-Blocking UI Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Dual-Timeline Scheduling, Interruptible Fiber Loops, Stale UI Cues & Starvation Testing
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../02-usetransition-and-non-blocking-rendering.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // --- TAB 1: DUAL-STATE SEARCH BENCHMARK ---
+    function DualStateSearchTab() {
+      const [inputVal, setInputVal] = useState('');
+      const [filterQuery, setFilterQuery] = useState('');
+      const [mode, setMode] = useState('transition'); // 'sync' vs 'transition'
+      const [isPending, startTransition] = useTransition();
+
+      const [inputLatency, setInputLatency] = useState(0);
+      const [recordCount] = useState(10000);
+
+      // Generate 10,000 records
+      const dataset = useMemo(() => {
+        return Array.from({ length: recordCount }, (_, i) => ({
+          id: i + 1,
+          name: `Shipment order tracking record #${i + 1} (${String.fromCharCode(65 + (i % 26))})`,
+          weight: (Math.sin(i) * 50 + 50).toFixed(1)
+        }));
+      }, [recordCount]);
+
+      const handleInputChange = (e) => {
+        const nextVal = e.target.value;
+        const t0 = performance.now();
+
+        if (mode === 'sync') {
+          // 💥 Single Synchronous State (Coupled Urgency)
+          setInputVal(nextVal);
+          setFilterQuery(nextVal);
+          const t1 = performance.now();
+          setInputLatency(parseFloat((t1 - t0).toFixed(2)));
+        } else {
+          // ✅ Dual-State Transition (Decoupled Urgency)
+          setInputVal(nextVal); // Urgent (0ms delay)
+          const t1 = performance.now();
+          setInputLatency(parseFloat((t1 - t0).toFixed(2)));
+
+          startTransition(() => {
+            setFilterQuery(nextVal); // Non-urgent transition
+          });
+        }
+      };
+
+      // Filtered items
+      const filtered = useMemo(() => {
+        if (!filterQuery) return dataset.slice(0, 100);
+        return dataset.filter(item => 
+          item.name.toLowerCase().includes(filterQuery.toLowerCase())
+        );
+      }, [dataset, filterQuery]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Dual-Timeline Search Benchmark (10,000 Records)</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Compare <strong>Synchronous Coupling</strong> (where filtering 10,000 rows blocks the text input) against <strong>React 18 Transitions</strong> (where input responds at 60 FPS while results render in the background).
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Controller */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">Mode Selector</span>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                    isPending ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {isPending ? 'TRANSITION PENDING ⏳' : 'IDLE 🟢'}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMode('sync')}
+                    className={`flex-1 py-2 rounded text-xs font-bold transition ${
+                      mode === 'sync' ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    1. Synchronous (Blocking)
+                  </button>
+                  <button
+                    onClick={() => setMode('transition')}
+                    className={`flex-1 py-2 rounded text-xs font-bold transition ${
+                      mode === 'transition' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    2. useTransition (Non-Blocking)
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Type Rapidly in Search Box:</label>
+                  <input
+                    type="text"
+                    value={inputVal}
+                    onChange={handleInputChange}
+                    placeholder="Type rapidly to test responsiveness..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <div className="text-slate-500">Input Response Latency:</div>
+                    <div className={`text-lg font-bold font-mono ${inputLatency > 16 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {inputLatency} ms
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Filtered Results:</div>
+                    <div className="text-lg font-bold font-mono text-indigo-300">{filtered.length} rows</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtered Subtree */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Results Viewport</span>
+                    {isPending && <span className="text-xs font-mono text-amber-400 animate-pulse">Filtering 10,000 items...</span>}
+                  </div>
+
+                  <div className={`space-y-1 max-h-56 overflow-y-auto pr-1 transition-opacity duration-200 ${isPending ? 'opacity-40' : 'opacity-100'}`}>
+                    {filtered.slice(0, 100).map(item => (
+                      <div key={item.id} className="p-2 bg-slate-900 rounded border border-slate-800 text-xs flex justify-between font-mono">
+                        <span className="text-slate-300">{item.name}</span>
+                        <span className="text-slate-500">{item.weight} kg</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 p-2 bg-slate-900 rounded border border-slate-800 text-[11px] text-slate-400 font-mono">
+                  {mode === 'sync' ? '💥 Stutters when typing because array filtering and VDOM reconciliation run synchronously.' : '✅ Smooth typing because React yields to the keyboard event loop!'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 2: INPUT ANTI-PATTERN SANDBOX ---
+    function InputAntiPatternTab() {
+      const [badVal, setBadVal] = useState('');
+      const [goodVal, setGoodVal] = useState('');
+      const [, startTransition] = useTransition();
+
+      const handleBadChange = (e) => {
+        const next = e.target.value;
+        // 💥 DISASTROUS ANTI-PATTERN: Wrapping controlled input setter in startTransition
+        startTransition(() => {
+          setBadVal(next);
+        });
+      };
+
+      const handleGoodChange = (e) => {
+        const next = e.target.value;
+        // ✅ CORRECT: Input setter is urgent
+        setGoodVal(next);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">The "Transition Wrapped Around Input" Anti-Pattern</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Observe why wrapping a controlled text input's state setter inside <code className="text-rose-400">startTransition</code> causes cursor jumping, dropped keystrokes, and severe UI lag.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Bad Input */}
+              <div className="bg-slate-950 border border-rose-900/40 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-400 uppercase font-mono">💥 Flawed: Transition on Input</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">ANTI-PATTERN</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">startTransition(() =&gt; setVal(e.target.value)):</label>
+                  <input
+                    type="text"
+                    value={badVal}
+                    onChange={handleBadChange}
+                    placeholder="Type fast here (laggy)..."
+                    className="w-full bg-slate-900 border border-rose-800/60 rounded px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+
+                <div className="p-3 bg-rose-950/20 border border-rose-800/40 rounded text-[11px] text-rose-300">
+                  ⚠️ <strong>Why it breaks:</strong> The controlled text input value is non-urgent. Typed letters are deferred, causing the text input to fall behind user keystrokes!
+                </div>
+              </div>
+
+              {/* Good Input */}
+              <div className="bg-slate-950 border border-emerald-900/40 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-400 uppercase font-mono">✅ Optimal: Urgent Input</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">SENIOR STANDARD</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">setVal(e.target.value) (Urgent SyncLane):</label>
+                  <input
+                    type="text"
+                    value={goodVal}
+                    onChange={handleGoodChange}
+                    placeholder="Type fast here (instant)..."
+                    className="w-full bg-slate-900 border border-emerald-800/60 rounded px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+
+                <div className="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded text-[11px] text-emerald-300">
+                  ✅ <strong>Why it works:</strong> The controlled input updates immediately in the current frame, providing 0ms physical feedback to the user.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 3: ASYNC TRANSITION & BOUNDARY INSPECTOR ---
+    function AsyncBoundaryTab() {
+      const [userId, setUserId] = useState('1');
+      const [userData, setUserData] = useState(null);
+      const [isPending, startTransition] = useTransition();
+      const [log, setLog] = useState([]);
+
+      const handleFetchUser = async (id) => {
+        setUserId(id);
+        setLog(prev => [`[${new Date().toLocaleTimeString()}] Fetching User #${id}...`, ...prev.slice(0, 4)]);
+
+        // Simulated asynchronous network latency
+        setTimeout(() => {
+          // Explicitly wrap the state update in startTransition
+          startTransition(() => {
+            setUserData({
+              id,
+              name: `User Profile #${id} (Architect)`,
+              email: `user${id}@enterprise.io`,
+              timestamp: Date.now()
+            });
+            setLog(prev => [`[${new Date().toLocaleTimeString()}] ✅ Committed User #${id} via startTransition`, ...prev.slice(0, 4)]);
+          });
+        }, 800);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Asynchronous Boundaries & Explicit Transition Markers</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Learn how to explicitly wrap state updates in <code className="text-indigo-400">startTransition</code> after asynchronous I/O boundaries to cleanly decouple network fetches from render priorities.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">Select User Profile:</span>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                    isPending ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {isPending ? 'TRANSITION PENDING ⏳' : 'IDLE 🟢'}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  {['1', '2', '3'].map(id => (
+                    <button
+                      key={id}
+                      onClick={() => handleFetchUser(id)}
+                      className={`flex-1 py-2 rounded text-xs font-bold transition ${
+                        userId === id ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      User #{id}
+                    </button>
+                  ))}
+                </div>
+
+                {userData && (
+                  <div className={`p-4 bg-slate-900 rounded-lg border border-slate-800 transition-opacity ${isPending ? 'opacity-50' : 'opacity-100'}`}>
+                    <div className="text-xs font-mono text-indigo-400">ID: {userData.id}</div>
+                    <div className="text-sm font-bold text-white mt-1">{userData.name}</div>
+                    <div className="text-xs text-slate-400">{userData.email}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Transition Audit Log */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Execution Audit Log</div>
+                <div className="space-y-2 font-mono text-xs text-slate-300">
+                  {log.map((entry, idx) => (
+                    <div key={idx} className="p-2 bg-slate-900 rounded border border-slate-800">{entry}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 4: TRANSITION STARVATION & THROTTLING ---
+    function StarvationTestTab() {
+      const [keystrokeCount, setKeystrokeCount] = useState(0);
+      const [transitionCompletions, setTransitionCompletions] = useState(0);
+      const [isPending, startTransition] = useTransition();
+
+      const simulateRapidTyping = () => {
+        let count = 0;
+        const interval = setInterval(() => {
+          count++;
+          setKeystrokeCount(c => c + 1);
+
+          startTransition(() => {
+            // Simulated heavy work
+            const start = performance.now();
+            while (performance.now() - start < 30) {}
+            setTransitionCompletions(c => c + 1);
+          });
+
+          if (count >= 10) clearInterval(interval);
+        }, 40); // 40ms rapid keystroke interval
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Transition Starvation & Superseded Work Simulator</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Simulate 10 rapid keystrokes arriving every 40ms. Notice how React discards superseded intermediate transition renders to prioritize incoming urgent keystrokes!
+            </p>
+
+            <div className="flex gap-4 mb-6">
+              <button
+                onClick={simulateRapidTyping}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+              >
+                ⚡ Trigger 10 Rapid Keystrokes (Simulate Rapid Typing)
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-950 p-5 rounded-xl border border-slate-800">
+              <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                <div className="text-xs text-slate-400 font-mono">Urgent Keystrokes Dispatched</div>
+                <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{keystrokeCount}</div>
+                <div className="text-[11px] text-slate-500 mt-1">100% processed with zero delay</div>
+              </div>
+
+              <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                <div className="text-xs text-slate-400 font-mono">Completed Transitions</div>
+                <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">{transitionCompletions}</div>
+                <div className="text-[11px] text-slate-500 mt-1">Intermediates safely abandoned</div>
+              </div>
+
+              <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                <div className="text-xs text-slate-400 font-mono">Current Status</div>
+                <div className="text-sm font-bold font-mono text-amber-300 mt-2">
+                  {isPending ? '⏳ Processing Final Transition' : '🟢 Idle & Synchronized'}
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1">Superseded work saved CPU time</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 5: ARCHITECTURE MATRIX ---
+    function DecisionMatrixTab() {
+      const strategies = [
+        { name: 'startTransition', thread: 'Main Thread', goal: 'Priority Scheduling', bestFor: 'Heavy React rendering, search filters, tab switching' },
+        { name: 'setTimeout(0)', thread: 'Main Thread', goal: 'Macrotask Deferral', bestFor: 'Artificial delays, breaking callstacks' },
+        { name: 'Web Worker', thread: 'Worker Thread', goal: 'CPU Offloading', bestFor: 'Heavy pure math, crypto, image encoding' },
+        { name: 'useMemo', thread: 'Main Thread', goal: 'Work Reuse', bestFor: 'Avoiding repeated expensive calculations' },
+        { name: 'Virtualization', thread: 'Main Thread', goal: 'DOM Reduction', bestFor: 'Rendering 10,000+ list/table records' },
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">The 5 Performance Mechanisms Comparison Matrix</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Understand the precise boundary between Transitions, Timers, Workers, Memoization, and Virtualization.
+            </p>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400">
+                    <th className="p-3">Mechanism</th>
+                    <th className="p-3">Execution Thread</th>
+                    <th className="p-3">Core Goal</th>
+                    <th className="p-3">Best Applied To</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {strategies.map((s, idx) => (
+                    <tr key={idx} className="border-b border-slate-800/60 hover:bg-slate-850">
+                      <td className="p-3 font-bold font-mono text-indigo-400">{s.name}</td>
+                      <td className="p-3 text-slate-300">{s.thread}</td>
+                      <td className="p-3 font-semibold text-emerald-400">{s.goal}</td>
+                      <td className="p-3 text-slate-400">{s.bestFor}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 6: SENIOR CERTIFICATION EXAM ---
+    function SeniorExam() {
+      const questions = [
+        {
+          id: 1,
+          q: 'What is the primary architectural purpose of startTransition in React 18?',
+          options: [
+            'To move JavaScript execution to a background Web Worker thread',
+            'To mark a state update as non-urgent so React can yield to higher-priority interactions',
+            'To automatically debounce input state by 300ms',
+            'To memoize component props'
+          ],
+          answer: 1,
+          explanation: 'startTransition assigns Transition priority to state updates, allowing React to yield and prioritize urgent tasks on the main thread.'
+        },
+        {
+          id: 2,
+          q: 'Why should controlled input state setters (e.g. setInputValue) NEVER be wrapped in startTransition?',
+          options: [
+            'Because React will throw a compile error',
+            'Because the input value is urgent; marking it non-urgent delays character display and causes cursor stutter',
+            'Because inputs only work with Redux',
+            'Because text inputs run in WebAssembly'
+          ],
+          answer: 1,
+          explanation: 'Controlled inputs must update in the current frame to provide 0ms physical feedback to user typing.'
+        },
+        {
+          id: 3,
+          q: 'What is the difference between `isPending` and `isLoading`?',
+          options: [
+            'They are identical aliases in React 18',
+            'isPending indicates React transition rendering is computing in memory; isLoading indicates external network HTTP I/O is in-flight',
+            'isPending is for class components; isLoading is for hooks',
+            'isLoading is deprecated in React 19'
+          ],
+          answer: 1,
+          explanation: 'isPending reflects React Scheduler state; isLoading reflects network/fetch lifecycle state.'
+        },
+        {
+          id: 4,
+          q: 'What happens when a new keystroke arrives while React is halfway through rendering a transition?',
+          options: [
+            'React crashes with a concurrent exception',
+            'React yields immediately to process the urgent keystroke and discards or restarts the stale transition work',
+            'React forces the user to wait until the transition finishes',
+            'The browser tab crashes'
+          ],
+          answer: 1,
+          explanation: 'Concurrent rendering is interruptible; superseded transition work is abandoned to save CPU time.'
+        },
+        {
+          id: 5,
+          q: 'Does `startTransition` reduce the mathematical time complexity (e.g. O(N^2)) of an algorithm?',
+          options: [
+            'Yes, it automatically converts O(N^2) algorithms to O(1)',
+            'No, it only changes scheduling priority; the underlying CPU computation still takes the same total time',
+            'Yes, by utilizing multi-core CPU parallelism',
+            'No, but it compresses the JavaScript bundle'
+          ],
+          answer: 1,
+          explanation: 'startTransition changes when and how work is scheduled; algorithmic optimization or Workers are required to reduce CPU workload.'
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const score = useMemo(() => {
+        return Object.keys(selectedAnswers).reduce((acc, qId) => {
+          const q = questions.find(item => item.id === Number(qId));
+          return q && selectedAnswers[qId] === q.answer ? acc + 1 : acc;
+        }, 0);
+      }, [selectedAnswers, questions]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">KPI 14 Part 02 Senior Certification</h2>
+                <p className="text-sm text-slate-400">Validate your mastery of useTransition, startTransition & Non-Blocking UI.</p>
+              </div>
+              {submitted && (
+                <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                  score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  Score: {score} / {questions.length} ({Math.round((score / questions.length) * 100)}%)
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {questions.map((q, idx) => (
+                <div key={q.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                  <div className="text-sm font-bold text-slate-200 mb-3 font-mono">
+                    {idx + 1}. {q.q}
+                  </div>
+
+                  <div className="space-y-2">
+                    {q.options.map((opt, oIdx) => {
+                      const isSelected = selectedAnswers[q.id] === oIdx;
+                      const isCorrect = q.answer === oIdx;
+
+                      let btnStyle = 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850';
+                      if (submitted) {
+                        if (isCorrect) btnStyle = 'bg-emerald-950/60 border-emerald-500 text-emerald-300';
+                        else if (isSelected) btnStyle = 'bg-rose-950/60 border-rose-500 text-rose-300';
+                      } else if (isSelected) {
+                        btnStyle = 'bg-indigo-950/60 border-indigo-500 text-indigo-300';
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          disabled={submitted}
+                          onClick={() => setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }))}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span>{opt}</span>
+                          {submitted && isCorrect && <span className="font-bold text-emerald-400">✓ Correct</span>}
+                          {submitted && isSelected && !isCorrect && <span className="font-bold text-rose-400">✗ Wrong</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="mt-3 p-3 bg-slate-900 rounded border border-slate-800 text-xs text-slate-400">
+                      💡 <strong>Explanation:</strong> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {!submitted ? (
+                <button
+                  onClick={() => setSubmitted(true)}
+                  disabled={Object.keys(selectedAnswers).length < questions.length}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+                >
+                  Submit Certification Exam
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSubmitted(false);
+                    setSelectedAnswers({});
+                  }}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition"
+                >
+                  Retake Exam
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('search-benchmark');
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            {activeTab === 'search-benchmark' && <DualStateSearchTab />}
+            {activeTab === 'input-antipattern' && <InputAntiPatternTab />}
+            {activeTab === 'async-boundary' && <AsyncBoundaryTab />}
+            {activeTab === 'starvation-test' && <StarvationTestTab />}
+            {activeTab === 'decision-matrix' && <DecisionMatrixTab />}
+            {activeTab === 'exam' && <SeniorExam />}
+          </main>
+
+          <footer className="border-t border-slate-800 bg-slate-900/40 py-6 text-center text-xs text-slate-500">
+            <p>React 18 Architecture Masterclass · Level 06 — KPI 14 · Engineering Design Vault</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
