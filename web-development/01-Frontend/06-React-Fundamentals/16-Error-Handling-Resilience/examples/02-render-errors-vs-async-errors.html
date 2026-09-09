@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 16 — Part 02 Companion Lab: Error Surfaces & Execution Zones</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, Component } = React;
+
+    // ==========================================
+    // REUSABLE ERROR BOUNDARY
+    // ==========================================
+    class ErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        if (this.props.onError) {
+          this.props.onError(error, errorInfo, this.props.name || "Boundary");
+        }
+      }
+
+      reset = () => {
+        this.setState({ hasError: false, error: null });
+        if (this.props.onReset) this.props.onReset();
+      };
+
+      render() {
+        if (this.state.hasError) {
+          if (this.props.fallbackRender) {
+            return this.props.fallbackRender({ error: this.state.error, reset: this.reset });
+          }
+          return (
+            <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl text-rose-300 space-y-2">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-rose-400">
+                🛡️ {this.props.name || "ErrorBoundary"} Intercepted Render Error
+              </h4>
+              <p className="text-xs font-mono">{this.state.error?.message}</p>
+              <button
+                onClick={this.reset}
+                className="px-3 py-1 bg-rose-700 hover:bg-rose-600 text-white rounded text-xs font-semibold transition"
+              >
+                Reset Boundary
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ==========================================
+    // ASYNC ERROR BRIDGE HOOK
+    // ==========================================
+    function useAsyncErrorBridge() {
+      const [, setAsyncError] = useState();
+      return useCallback((error) => {
+        const normalized = error instanceof Error ? error : new Error(String(error));
+        setAsyncError(() => {
+          throw normalized;
+        });
+      }, []);
+    }
+
+    // ==========================================
+    // MAIN APPLICATION
+    // ==========================================
+    function App() {
+      const [logs, setLogs] = useState([]);
+      const [renderCrash, setRenderCrash] = useState(false);
+      const [eventError, setEventError] = useState(null);
+      const [asyncState, setAsyncState] = useState({ status: "idle", data: null, error: null });
+
+      const logEvent = (surface, caughtBy, message, type = "info") => {
+        const entry = {
+          id: "log_" + Math.random().toString(36).substring(2, 7),
+          time: new Date().toLocaleTimeString() + "." + Math.floor(performance.now() % 1000).toString().padStart(3, "0"),
+          surface,
+          caughtBy,
+          message,
+          type
+        };
+        setLogs(prev => [entry, ...prev.slice(0, 49)]);
+      };
+
+      const clearLogs = () => setLogs([]);
+
+      // 1. Trigger Event Handler Error
+      const triggerEventError = () => {
+        try {
+          logEvent("Event Handler (onClick)", "Local try/catch", "Dispatched button click handler", "info");
+          // Simulating an unhandled error inside an event handler
+          throw new Error("UNCAUGHT_EVENT_ERROR: Failed to process mutation in onClick callback");
+        } catch (err) {
+          setEventError(err.message);
+          logEvent("Event Handler (onClick)", "Local State Machine (MISSED by Boundary)", err.message, "warn");
+        }
+      };
+
+      // 2. Trigger Async Fetch 500 Failure
+      const triggerAsync500 = () => {
+        setAsyncState({ status: "loading", data: null, error: null });
+        logEvent("Async Promise (fetch)", "Async State Machine", "Dispatched GET /api/orders (will return 500)", "info");
+
+        setTimeout(() => {
+          setAsyncState({
+            status: "error",
+            data: null,
+            error: "HTTP 500 Internal Server Error: Database pool exhausted"
+          });
+          logEvent("Async Promise (fetch)", "Async State Machine (MISSED by Boundary)", "HTTP 500 Handled gracefully without crash", "error");
+        }, 1200);
+      };
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <header className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl border-cyan-500/20">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-semibold uppercase tracking-wider">
+                  Level 06 — KPI 16 / Part 02
+                </span>
+                <span className="px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded-full text-xs font-semibold">
+                  Failure-Surface Classifier
+                </span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2 text-white">
+                Render Errors vs Async & Event Execution Zones
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Inspect what Error Boundaries catch (Render Phase) versus what they silently miss (Macrotasks & Microtasks).
+              </p>
+            </div>
+            <button
+              onClick={clearLogs}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono font-semibold transition"
+            >
+              Clear Telemetry
+            </button>
+          </header>
+
+          {/* Master Failure Injection Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Action 1: Render Error */}
+            <button
+              onClick={() => {
+                logEvent("Render Phase (Fiber Loop)", "ErrorBoundary", "Injected synchronous throw into render body", "error");
+                setRenderCrash(true);
+              }}
+              className="glass-panel p-4 rounded-xl text-left border-rose-500/30 hover:border-rose-500 transition space-y-1 group"
+            >
+              <div className="text-xs font-bold text-rose-400 font-mono">1. Synchronous Render Throw</div>
+              <div className="text-[11px] text-slate-400">Caught by ErrorBoundary</div>
+              <span className="inline-block mt-1 px-2 py-0.5 bg-rose-950/60 text-rose-300 text-[10px] font-mono rounded">
+                Zone: Fiber WorkLoop
+              </span>
+            </button>
+
+            {/* Action 2: Event Handler Error */}
+            <button
+              onClick={triggerEventError}
+              className="glass-panel p-4 rounded-xl text-left border-amber-500/30 hover:border-amber-500 transition space-y-1 group"
+            >
+              <div className="text-xs font-bold text-amber-400 font-mono">2. Event Handler Throw</div>
+              <div className="text-[11px] text-slate-400">Missed by Boundary (Local try/catch)</div>
+              <span className="inline-block mt-1 px-2 py-0.5 bg-amber-950/60 text-amber-300 text-[10px] font-mono rounded">
+                Zone: Macrotask Queue
+              </span>
+            </button>
+
+            {/* Action 3: Async Fetch 500 */}
+            <button
+              onClick={triggerAsync500}
+              className="glass-panel p-4 rounded-xl text-left border-cyan-500/30 hover:border-cyan-500 transition space-y-1 group"
+            >
+              <div className="text-xs font-bold text-cyan-400 font-mono">3. Async Network 500</div>
+              <div className="text-[11px] text-slate-400">Missed by Boundary (Async State)</div>
+              <span className="inline-block mt-1 px-2 py-0.5 bg-cyan-950/60 text-cyan-300 text-[10px] font-mono rounded">
+                Zone: Microtask Queue
+              </span>
+            </button>
+
+            {/* Action 4: Bridge Async to Boundary */}
+            <BridgeLauncher onLog={logEvent} />
+          </div>
+
+          {/* Main Inspection Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Live Component Area (2 Cols) */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="glass-panel p-6 rounded-2xl space-y-5">
+                <div className="flex justify-between items-center pb-4 border-b border-slate-800">
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                    Execution Zone Interactive Workspace
+                  </h3>
+                  <span className="text-xs font-mono text-slate-500">Fiber Tree: 4 Nodes</span>
+                </div>
+
+                {/* ZONE 1: RENDER ERROR BOUNDARY CONTAINER */}
+                <div className="space-y-2">
+                  <div className="text-xs font-bold font-mono text-slate-400">Zone 1: Component Render Boundary</div>
+                  <ErrorBoundary
+                    name="AnalyticsWidgetBoundary"
+                    onError={(err, info, name) => {
+                      logEvent("Render Phase", name, err.message, "error");
+                    }}
+                    onReset={() => setRenderCrash(false)}
+                  >
+                    <RenderPhaseWidget crash={renderCrash} />
+                  </ErrorBoundary>
+                </div>
+
+                {/* ZONE 2 & 3: EVENT & ASYNC STATE CONTAINER */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  {/* Event Error State */}
+                  <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span className="text-amber-400 font-semibold">Zone 2: Event Handler State</span>
+                      <span className="text-[10px] text-slate-500">Macrotask</span>
+                    </div>
+                    {eventError ? (
+                      <div className="p-3 bg-amber-950/40 border border-amber-800 rounded text-xs text-amber-200 space-y-1">
+                        <div className="font-bold">⚠️ Event Exception Caught</div>
+                        <div className="font-mono text-[11px]">{eventError}</div>
+                        <button
+                          onClick={() => setEventError(null)}
+                          className="mt-2 px-2 py-0.5 bg-amber-700 hover:bg-amber-600 text-white rounded text-[10px] font-semibold"
+                        >
+                          Clear Event Error
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-950 rounded text-xs text-slate-500 font-mono">
+                        No event handler errors active. Click Action 2 above.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Async 500 State */}
+                  <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span className="text-cyan-400 font-semibold">Zone 3: Async Query State</span>
+                      <span className="text-[10px] text-slate-500">Microtask</span>
+                    </div>
+                    {asyncState.status === "loading" && (
+                      <div className="p-3 bg-cyan-950/40 border border-cyan-800 rounded text-xs text-cyan-300 font-mono animate-pulse">
+                        Fetching live API data...
+                      </div>
+                    )}
+                    {asyncState.status === "error" && (
+                      <div className="p-3 bg-rose-950/40 border border-rose-800 rounded text-xs text-rose-300 space-y-1">
+                        <div className="font-bold">⚠️ API Request Failed (Handled)</div>
+                        <div className="font-mono text-[11px]">{asyncState.error}</div>
+                        <button
+                          onClick={() => setAsyncState({ status: "idle", data: null, error: null })}
+                          className="mt-2 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-semibold"
+                        >
+                          Reset Async State
+                        </button>
+                      </div>
+                    )}
+                    {asyncState.status === "idle" && (
+                      <div className="p-3 bg-slate-950 rounded text-xs text-slate-500 font-mono">
+                        Async query idle. Click Action 3 above.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Telemetry Log Stream (1 Col) */}
+            <div className="glass-panel p-5 rounded-2xl flex flex-col h-[600px] shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                  <h3 className="font-bold text-sm text-slate-200">Failure Surface Log</h3>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500">{logs.length} events</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2.5 pt-4 pr-1">
+                {logs.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
+                    <p className="text-xs font-mono">Trigger failure buttons above to stream execution zone diagnostics.</p>
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div
+                      key={log.id}
+                      className={`p-3 rounded-xl border font-mono text-xs space-y-1 ${
+                        log.type === "error"
+                          ? "bg-rose-950/40 border-rose-800 text-rose-300"
+                          : log.type === "warn"
+                          ? "bg-amber-950/40 border-amber-800 text-amber-300"
+                          : "bg-slate-900 border-slate-800 text-slate-300"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center text-[10px] opacity-75">
+                        <span className="font-bold uppercase">{log.surface}</span>
+                        <span>{log.time}</span>
+                      </div>
+                      <div className="text-[11px] font-semibold">{log.message}</div>
+                      <div className="text-[10px] text-cyan-400">Handler: {log.caughtBy}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LEAF WIDGETS
+    // ==========================================
+    function RenderPhaseWidget({ crash }) {
+      if (crash) {
+        throw new Error("RENDER_CRASH: Cannot read property 'metrics' of undefined during Fiber evaluation");
+      }
+      return (
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl flex justify-between items-center">
+          <div>
+            <div className="text-xs font-bold text-slate-200 font-mono">Operational Revenue Metrics</div>
+            <div className="text-base font-bold text-emerald-400 font-mono mt-0.5">$392,400.00 MRR</div>
+          </div>
+          <span className="px-2.5 py-1 bg-emerald-950/40 border border-emerald-800 text-emerald-300 text-xs font-mono rounded-full">
+            ● Healthy Render
+          </span>
+        </div>
+      );
+    }
+
+    function BridgeLauncher({ onLog }) {
+      const throwToBoundary = useAsyncErrorBridge();
+
+      const triggerBridgedAsyncError = () => {
+        onLog("WebSocket Stream", "useAsyncErrorBridge", "Async stream failure scheduled to throw into render phase", "error");
+        setTimeout(() => {
+          throwToBoundary(new Error("FATAL_STREAM_DROP: WebSocket socket closed abnormally (Code 1006)"));
+        }, 600);
+      };
+
+      return (
+        <button
+          onClick={triggerBridgedAsyncError}
+          className="glass-panel p-4 rounded-xl text-left border-purple-500/30 hover:border-purple-500 transition space-y-1 group"
+        >
+          <div className="text-xs font-bold text-purple-400 font-mono">4. Bridge Async to Boundary</div>
+          <div className="text-[11px] text-slate-400">Re-throws async error into Render</div>
+          <span className="inline-block mt-1 px-2 py-0.5 bg-purple-950/60 text-purple-300 text-[10px] font-mono rounded">
+            useAsyncErrorBridge Hook
+          </span>
+        </button>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
