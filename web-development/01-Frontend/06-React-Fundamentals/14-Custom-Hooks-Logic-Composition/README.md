@@ -31,7 +31,7 @@ A custom Hook is a reusable composition boundary for React-aware behavior. It co
 | Part & File | Status | Key Focus & Mechanics | Companion Lab |
 | :--- | :---: | :--- | :---: |
 | [01. Custom Hooks Mental Model & Logic Reuse](./01-custom-hooks-mental-model-and-logic-reuse.md) | ✅ Completed | Reusable behavior vs shared state, Fiber execution vs state persistence, 5-way placement matrix. | [🧪 Lab 01](./examples/01-custom-hooks-mental-model-and-logic-reuse.html) |
-| [02. Hook Composition & The Rules of Hooks](./02-hook-composition-and-the-rules-of-hooks.md) | ⏳ Pending | Hook linked list topology, call order invariants, conditional hook hazards. | 🧪 Lab 02 |
+| [02. Hook Composition & The Rules of Hooks](./02-hook-composition-and-the-rules-of-hooks.md) | ✅ Completed | Hook linked list topology, call order invariants, conditional hook hazards. | [🧪 Lab 02](./examples/02-hook-composition-and-the-rules-of-hooks.html) |
 | [03. API Design Contracts: Tuples vs Objects](./03-api-design-contracts-tuples-vs-objects.md) | ⏳ Pending | Tuple renaming ergonomics vs object extensibility, strict TypeScript contracts. | 🧪 Lab 03 |
 | [04. Local State & Reducer Composition in Custom Hooks](./04-local-state-and-reducers-in-custom-hooks.md) | ⏳ Pending | Complex transition algebra, state machines, hiding reducers behind command APIs. | 🧪 Lab 04 |
 | [05. Effects, Lifecycle & Resource Cleanup in Hooks](./05-effects-lifecycle-and-cleanup-in-hooks.md) | ⏳ Pending | Event listeners, timers, abort controllers, resilient effect synchronization. | 🧪 Lab 05 |
