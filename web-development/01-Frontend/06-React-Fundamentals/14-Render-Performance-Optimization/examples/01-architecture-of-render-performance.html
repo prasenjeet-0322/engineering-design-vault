@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 Part 01 — Architecture of Render Performance Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+    @keyframes spinLinear {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-smooth { animation: spinLinear 1s linear infinite; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo, useTransition } = React;
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'js-stress', label: '1. Layer 1: JS CPU Bottleneck' },
+        { id: 'react-stress', label: '2. Layer 2: React Subtree Stress' },
+        { id: 'layout-stress', label: '3. Layer 3: Layout Thrashing' },
+        { id: 'main-thread', label: '4. Main-Thread Lockup' },
+        { id: 'transition-preview', label: '5. Transitions Preview' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    KPI 14 · Part 01
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">React 18.3 Performance Architecture</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  The Architecture of Render Performance Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Isolate JS Execution vs Fiber Work vs Browser Layout Thrashing & Concurrent Schedulers
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../01-architecture-of-render-performance.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // --- TAB 1: LAYER 1 - JS CPU BOTTLENECK ---
+    function JsStressTab() {
+      const [recordCount, setRecordCount] = useState(25000);
+      const [filterQuery, setFilterQuery] = useState('data');
+      const [timing, setTiming] = useState(null);
+      const [isCalculating, setIsCalculating] = useState(false);
+
+      const runBenchmark = () => {
+        setIsCalculating(true);
+        setTimeout(() => {
+          const t0 = performance.now();
+          // Generate raw array
+          const rawItems = Array.from({ length: recordCount }, (_, i) => ({
+            id: i,
+            title: `Item record data item ${i}`,
+            score: Math.sin(i) * 1000
+          }));
+
+          // Pure JS calculation: filter + sort + math reduce
+          const filtered = rawItems
+            .filter(item => item.title.includes(filterQuery))
+            .sort((a, b) => b.score - a.score);
+          const totalScore = filtered.reduce((acc, curr) => acc + curr.score, 0);
+
+          const t1 = performance.now();
+          const duration = (t1 - t0).toFixed(2);
+
+          setTiming({
+            duration: parseFloat(duration),
+            count: filtered.length,
+            totalScore: Math.round(totalScore)
+          });
+          setIsCalculating(false);
+        }, 50);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Layer 1: Pure JavaScript Execution Bottleneck</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Observe how heavy CPU loops, massive array transformations, and $\mathcal{O}(N)$ algorithms freeze the main thread <strong>before React reconciliation or DOM mutations even begin</strong>.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Record Count:</label>
+                <select
+                  value={recordCount}
+                  onChange={e => setRecordCount(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                >
+                  <option value={10000}>10,000 Records</option>
+                  <option value={25000}>25,000 Records</option>
+                  <option value={75000}>75,000 Records</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Filter String:</label>
+                <input
+                  type="text"
+                  value={filterQuery}
+                  onChange={e => setFilterQuery(e.target.value)}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                />
+              </div>
+
+              <button
+                onClick={runBenchmark}
+                disabled={isCalculating}
+                className="mt-5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+              >
+                {isCalculating ? 'Computing...' : '🚀 Run Pure JS Benchmark'}
+              </button>
+            </div>
+
+            {timing && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-400 font-mono">JS Execution Duration</div>
+                  <div className="text-2xl font-bold font-mono text-indigo-400 mt-1">{timing.duration} ms</div>
+                  <div className="text-[11px] text-slate-500 mt-1">Filter + Sort + Reduce</div>
+                </div>
+
+                <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-400 font-mono">Processed Records</div>
+                  <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">{timing.count} items</div>
+                  <div className="text-[11px] text-slate-500 mt-1">Matched query criteria</div>
+                </div>
+
+                <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-400 font-mono">Classification</div>
+                  <div className="text-sm font-bold font-mono text-amber-300 mt-2">
+                    {timing.duration > 50 ? '⚠️ Long Task (>50ms)' : '✅ Sub-budget Task'}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Layer 1 JS Bottleneck</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 2: LAYER 2 - REACT SUBTREE STRESS ---
+    function RowItem({ id, value }) {
+      return (
+        <div className="p-2 bg-slate-900 rounded border border-slate-800/80 text-[11px] flex justify-between">
+          <span className="font-mono text-slate-400">#{id}</span>
+          <span className="font-semibold text-slate-200">Value: {value}</span>
+        </div>
+      );
+    }
+
+    function ReactStressTab() {
+      const [parentCount, setParentCount] = useState(0);
+      const [rowCount, setRowCount] = useState(500);
+      const [renderDuration, setRenderDuration] = useState(0);
+
+      const handleUpdate = () => {
+        const t0 = performance.now();
+        setParentCount(c => c + 1);
+        setTimeout(() => {
+          const t1 = performance.now();
+          setRenderDuration(parseFloat((t1 - t0).toFixed(2)));
+        }, 0);
+      };
+
+      const items = useMemo(() => {
+        return Array.from({ length: rowCount }, (_, i) => ({
+          id: i + 1,
+          value: Math.floor(Math.sin(i + parentCount) * 100)
+        }));
+      }, [rowCount, parentCount]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Layer 2: React Fiber Reconciliation Stress</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Observe how re-rendering a large un-virtualized component subtree forces React to traverse thousands of Fiber nodes and evaluate element props.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">Subtree Controller</span>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    Parent Renders: {parentCount}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Mounted Row Components:</label>
+                  <select
+                    value={rowCount}
+                    onChange={e => setRowCount(Number(e.target.value))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                  >
+                    <option value={200}>200 Subtree Components</option>
+                    <option value={500}>500 Subtree Components</option>
+                    <option value={1000}>1,000 Subtree Components</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleUpdate}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-amber-600/20"
+                >
+                  ⚡ Trigger Subtree Re-render
+                </button>
+
+                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs">
+                  <div>Estimated Reconciliation Duration: <span className="font-bold text-amber-400 font-mono">{renderDuration} ms</span></div>
+                </div>
+              </div>
+
+              {/* Subtree View */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                  Mounted Component Subtree ({items.length} Fibers)
+                </div>
+                <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                  {items.map(item => (
+                    <RowItem key={item.id} id={item.id} value={item.value} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 3: LAYER 3 - LAYOUT THRASHING SIMULATOR ---
+    function LayoutStressTab() {
+      const [mode, setMode] = useState('thrashing'); // 'thrashing' vs 'batched'
+      const [timing, setTiming] = useState(null);
+      const containerRef = useRef(null);
+
+      const runLayoutBenchmark = () => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const boxes = container.querySelectorAll('.benchmark-box');
+        const count = boxes.length;
+
+        const t0 = performance.now();
+
+        if (mode === 'thrashing') {
+          // 💥 Anti-pattern: WRITE -> READ -> WRITE -> READ (Forced Synchronous Layout)
+          for (let i = 0; i < count; i++) {
+            const el = boxes[i];
+            el.style.width = `${(i % 50) + 50}px`; // WRITE
+            const width = el.getBoundingClientRect().width; // 💥 READ (FORCES REFLOW!)
+            el.style.transform = `translateX(${width / 10}px)`; // WRITE
+          }
+        } else {
+          // ✅ Senior pattern: Batch All Calculations / Reads, then Apply Writes
+          const widths = [];
+          for (let i = 0; i < count; i++) {
+            widths.push((i % 50) + 50);
+          }
+          for (let i = 0; i < count; i++) {
+            const el = boxes[i];
+            el.style.width = `${widths[i]}px`;
+            el.style.transform = `translateX(${widths[i] / 10}px)`;
+          }
+        }
+
+        const t1 = performance.now();
+        setTiming(parseFloat((t1 - t0).toFixed(2)));
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Layer 3: Browser Layout Thrashing & Forced Reflow</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Compare unbatched geometric queries (<code className="text-rose-400">getBoundingClientRect()</code>) that force synchronous browser reflows on every iteration vs clean, batched DOM writes.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode('thrashing')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    mode === 'thrashing' ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  💥 Forced Reflow (Thrashing)
+                </button>
+                <button
+                  onClick={() => setMode('batched')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    mode === 'batched' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  ✅ Batched DOM Writes
+                </button>
+              </div>
+
+              <button
+                onClick={runLayoutBenchmark}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+              >
+                🚀 Execute Layout Benchmark
+              </button>
+            </div>
+
+            {timing !== null && (
+              <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl mb-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-400 font-mono">Execution Duration: </span>
+                  <span className={`text-2xl font-bold font-mono ${mode === 'thrashing' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {timing} ms
+                  </span>
+                </div>
+                <span className={`px-2.5 py-1 rounded text-xs font-bold font-mono ${
+                  mode === 'thrashing' ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                }`}>
+                  {mode === 'thrashing' ? 'REFLOW PENALTY 💥' : 'OPTIMAL BATCH ✅'}
+                </span>
+              </div>
+            )}
+
+            {/* Simulated DOM Elements */}
+            <div ref={containerRef} className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex flex-wrap gap-1 max-h-32 overflow-hidden">
+              {Array.from({ length: 300 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="benchmark-box h-4 bg-indigo-600/40 border border-indigo-500/30 rounded text-[9px] text-center text-slate-300 transition-none"
+                  style={{ width: '60px' }}
+                >
+                  {i}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 4: MAIN-THREAD LOCKUP SIMULATOR ---
+    function MainThreadLockupTab() {
+      const [isFrozen, setIsFrozen] = useState(false);
+      const [testText, setTestText] = useState('');
+      const [clickCount, setClickCount] = useState(0);
+
+      const triggerLockup = (durationMs) => {
+        setIsFrozen(true);
+        setTimeout(() => {
+          const start = performance.now();
+          // Deliberate synchronous blocking loop
+          while (performance.now() - start < durationMs) {
+            // Monopolize CPU main thread
+          }
+          setIsFrozen(false);
+        }, 10);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Main-Thread Saturation & UI Freeze Simulator</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Trigger a synchronous CPU block on the main thread and attempt to type in the input box, click buttons, or observe the spinner animation.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Controls */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Trigger Main-Thread Freeze</h3>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => triggerLockup(200)}
+                    disabled={isFrozen}
+                    className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs font-bold transition"
+                  >
+                    200ms Freeze
+                  </button>
+                  <button
+                    onClick={() => triggerLockup(600)}
+                    disabled={isFrozen}
+                    className="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold transition"
+                  >
+                    600ms Freeze
+                  </button>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 space-y-3">
+                  <label className="block text-xs text-slate-400">Test Live Input Responsiveness:</label>
+                  <input
+                    type="text"
+                    value={testText}
+                    onChange={e => setTestText(e.target.value)}
+                    placeholder="Try typing during freeze..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white font-mono"
+                  />
+
+                  <button
+                    onClick={() => setClickCount(c => c + 1)}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-semibold"
+                  >
+                    Test Live Button Click (Clicks: {clickCount})
+                  </button>
+                </div>
+              </div>
+
+              {/* Visual Animation Indicator */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin-smooth" />
+                <div className="text-center">
+                  <div className="text-sm font-bold text-slate-200">60 FPS Hardware Spinner</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {isFrozen ? '💥 FROZEN (Main Thread Saturated)' : '🟢 Smoothly Spinning'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 5: TRANSITIONS PREVIEW ---
+    function TransitionPreviewTab() {
+      const [inputVal, setInputVal] = useState('');
+      const [filterVal, setFilterVal] = useState('');
+      const [isPending, startTransition] = useTransition();
+      const [strategy, setStrategy] = useState('transition'); // 'sync' vs 'transition'
+
+      const dataset = useMemo(() => {
+        return Array.from({ length: 8000 }, (_, i) => ({
+          id: i,
+          name: `Transaction item record index #${i} (${String.fromCharCode(65 + (i % 26))})`
+        }));
+      }, []);
+
+      const handleChange = (e) => {
+        const val = e.target.value;
+        setInputVal(val);
+
+        if (strategy === 'sync') {
+          // 💥 Urgent synchronous block
+          setFilterVal(val);
+        } else {
+          // ✅ Concurrent transition (non-urgent)
+          startTransition(() => {
+            setFilterVal(val);
+          });
+        }
+      };
+
+      const filteredItems = useMemo(() => {
+        if (!filterVal) return dataset.slice(0, 100);
+        return dataset.filter(d => d.name.toLowerCase().includes(filterVal.toLowerCase()));
+      }, [dataset, filterVal]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Concurrent Transitions & Scheduling Preview</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Compare <strong>Synchronous Blocking State</strong> vs <strong>React 18 Transitions (`startTransition`)</strong> when filtering 8,000 items while typing.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">Scheduling Mode</span>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                    isPending ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {isPending ? 'TRANSITION PENDING ⏳' : 'IDLE 🟢'}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStrategy('sync')}
+                    className={`flex-1 py-2 rounded text-xs font-bold transition ${
+                      strategy === 'sync' ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    1. Synchronous Blocking
+                  </button>
+                  <button
+                    onClick={() => setStrategy('transition')}
+                    className={`flex-1 py-2 rounded text-xs font-bold transition ${
+                      strategy === 'transition' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    2. React Transition
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Type Rapidly in Search Input:</label>
+                  <input
+                    type="text"
+                    value={inputVal}
+                    onChange={handleChange}
+                    placeholder="Type to test input latency..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded border border-slate-800 text-[11px] text-slate-400">
+                  {strategy === 'sync'
+                    ? '💥 Typing latency occurs as JS filter and 8,000 DOM rows reconcile on every single keystroke.'
+                    : '✅ Input text responds at 60 FPS immediately while 8,000 items filter cooperatively in background!'}
+                </div>
+              </div>
+
+              {/* Filtered Results */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filtered Items ({filteredItems.length})</span>
+                  {isPending && <span className="text-xs text-amber-400 font-mono animate-pulse">Filtering...</span>}
+                </div>
+                <div className={`space-y-1 max-h-56 overflow-y-auto pr-1 transition-opacity ${isPending ? 'opacity-40' : 'opacity-100'}`}>
+                  {filteredItems.slice(0, 100).map(item => (
+                    <div key={item.id} className="p-2 bg-slate-900 rounded text-xs font-mono text-slate-300">
+                      {item.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 6: SENIOR CERTIFICATION EXAM ---
+    function SeniorExam() {
+      const questions = [
+        {
+          id: 1,
+          q: 'What are the three distinct computational layers of a React web application?',
+          options: [
+            'HTML, CSS, and JavaScript',
+            'Pure JavaScript (Layer 1), React Fiber Reconciliation (Layer 2), and Browser Layout/Paint (Layer 3)',
+            'Client, Server, and Database',
+            'Redux, Zustand, and React Context'
+          ],
+          answer: 1,
+          explanation: 'Performance bottlenecks can originate in pure JavaScript algorithms, React Virtual DOM reconciliation, or browser layout/paint.'
+        },
+        {
+          id: 2,
+          q: 'Does Concurrent Rendering execute React code on multiple operating system threads?',
+          options: [
+            'Yes, it creates background Web Worker threads automatically',
+            'No, React runs on the single browser main thread using cooperative time-slicing and priority scheduling',
+            'Yes, but only in production mode',
+            'No, it delegates rendering to the GPU compositor'
+          ],
+          answer: 1,
+          explanation: 'Concurrent React does not provide multithreading; it implements cooperative time-slicing on the single main thread.'
+        },
+        {
+          id: 3,
+          q: 'Why is `getBoundingClientRect()` dangerous when called after a style write in JavaScript?',
+          options: [
+            'It creates a memory leak in the browser',
+            'It forces a synchronous layout reflow on the main thread (Layout Thrashing)',
+            'It resets component state in React',
+            'It deletes DOM event listeners'
+          ],
+          answer: 1,
+          explanation: 'Reading geometric properties immediately after modifying styles forces the browser to flush pending layouts synchronously.'
+        },
+        {
+          id: 4,
+          q: 'What is the correct priority classification for controlled text input changes?',
+          options: [
+            'Non-urgent Transition priority',
+            'Urgent priority (SyncLane / InputContinuousLane)',
+            'Idle background priority',
+            'Offscreen priority'
+          ],
+          answer: 1,
+          explanation: 'Controlled text inputs must remain urgent so characters appear on screen with zero perceptible delay.'
+        },
+        {
+          id: 5,
+          q: 'Which performance lever should be applied to render a dataset of 50,000 records in a table?',
+          options: [
+            'Lever 1: Eliminate useMemo',
+            'Lever 4: Virtualization (rendering only visible rows in the viewport)',
+            'Lever 2: Wrap all table cells in React.memo',
+            'Lever 3: Wrap all state in setTimeout(..., 0)'
+          ],
+          answer: 1,
+          explanation: 'Mounting 50,000 DOM nodes freezes the browser layout engine. Windowing/virtualization limits active DOM elements to ~20 visible rows.'
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const score = useMemo(() => {
+        return Object.keys(selectedAnswers).reduce((acc, qId) => {
+          const q = questions.find(item => item.id === Number(qId));
+          return q && selectedAnswers[qId] === q.answer ? acc + 1 : acc;
+        }, 0);
+      }, [selectedAnswers, questions]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">KPI 14 Part 01 Senior Certification</h2>
+                <p className="text-sm text-slate-400">Validate your mastery of Render Bottlenecks, Scheduler Internals & Priority Lanes.</p>
+              </div>
+              {submitted && (
+                <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                  score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  Score: {score} / {questions.length} ({Math.round((score / questions.length) * 100)}%)
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {questions.map((q, idx) => (
+                <div key={q.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                  <div className="text-sm font-bold text-slate-200 mb-3 font-mono">
+                    {idx + 1}. {q.q}
+                  </div>
+
+                  <div className="space-y-2">
+                    {q.options.map((opt, oIdx) => {
+                      const isSelected = selectedAnswers[q.id] === oIdx;
+                      const isCorrect = q.answer === oIdx;
+
+                      let btnStyle = 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850';
+                      if (submitted) {
+                        if (isCorrect) btnStyle = 'bg-emerald-950/60 border-emerald-500 text-emerald-300';
+                        else if (isSelected) btnStyle = 'bg-rose-950/60 border-rose-500 text-rose-300';
+                      } else if (isSelected) {
+                        btnStyle = 'bg-indigo-950/60 border-indigo-500 text-indigo-300';
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          disabled={submitted}
+                          onClick={() => setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }))}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span>{opt}</span>
+                          {submitted && isCorrect && <span className="font-bold text-emerald-400">✓ Correct</span>}
+                          {submitted && isSelected && !isCorrect && <span className="font-bold text-rose-400">✗ Wrong</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="mt-3 p-3 bg-slate-900 rounded border border-slate-800 text-xs text-slate-400">
+                      💡 <strong>Explanation:</strong> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {!submitted ? (
+                <button
+                  onClick={() => setSubmitted(true)}
+                  disabled={Object.keys(selectedAnswers).length < questions.length}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+                >
+                  Submit Certification Exam
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSubmitted(false);
+                    setSelectedAnswers({});
+                  }}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition"
+                >
+                  Retake Exam
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('js-stress');
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            {activeTab === 'js-stress' && <JsStressTab />}
+            {activeTab === 'react-stress' && <ReactStressTab />}
+            {activeTab === 'layout-stress' && <LayoutStressTab />}
+            {activeTab === 'main-thread' && <MainThreadLockupTab />}
+            {activeTab === 'transition-preview' && <TransitionPreviewTab />}
+            {activeTab === 'exam' && <SeniorExam />}
+          </main>
+
+          <footer className="border-t border-slate-800 bg-slate-900/40 py-6 text-center text-xs text-slate-500">
+            <p>React 18 Architecture Masterclass · Level 06 — KPI 14 · Engineering Design Vault</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
