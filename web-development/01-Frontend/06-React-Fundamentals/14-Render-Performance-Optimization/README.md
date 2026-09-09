@@ -21,7 +21,7 @@ Render phase vs Commit phase, Concurrent Transitions, `useTransition`, `useDefer
 | [useTransition, startTransition & Non-Blocking UI](./02-usetransition-and-non-blocking-rendering.md) | ✅ Completed | Decoupling urgent input state from transition state, interruptibility, isPending feedback. | [🧪 Lab 02](./examples/02-usetransition-and-non-blocking-rendering.html) |
 | [useDeferredValue & Deferred Subtree Optimization](./03-usedeferredvalue-and-deferred-props.md) | ✅ Completed | Deferring values vs debouncing, dual-pass rendering, pairing with React.memo for bailouts. | [🧪 Lab 03](./examples/03-usedeferredvalue-and-deferred-props.html) |
 | [DOM Virtualization, Windowing & High-Density UI](./04-virtualization-and-large-dataset-rendering.md) | ✅ Completed | Rendering 100,000 records with 20 viewport DOM nodes, `@tanstack/react-virtual`, overscan math. | [🧪 Lab 04](./examples/04-dom-virtualization-and-windowing.html) |
-| [Render Performance Crucible & Master Synthesis](./05-render-performance-crucible-and-mastery.md) | ⏳ Pending | INP / TBT Web Vitals, Chrome Performance flame charts, Long Tasks, master decision trees. |
+| [Render Performance Crucible & Master Synthesis](./05-render-performance-crucible-and-mastery.md) | ✅ Completed | INP / TBT Web Vitals, Chrome Performance flame charts, Long Tasks, master decision trees. | [🧪 Lab 05](./examples/05-render-performance-crucible.html) |
 
 ---
 

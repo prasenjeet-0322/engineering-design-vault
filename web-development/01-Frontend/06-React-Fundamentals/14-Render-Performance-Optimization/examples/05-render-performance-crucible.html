@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 Part 05 — Render Performance Crucible Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo, useDeferredValue, useTransition } = React;
+
+    // --- MOCK ENTERPRISE TRADING INSTRUMENTS (50,000 items) ---
+    const SECTORS = ['Semiconductors', 'Cloud Infrastructure', 'Cybersecurity', 'Autonomous Systems', 'Quantum Computing', 'Fintech', 'Biotech', 'Energy'];
+    const SYMBOLS = ['NVDA', 'MSFT', 'AAPL', 'GOOGL', 'AMZN', 'META', 'TSLA', 'AVGO', 'ASML', 'AMD', 'PLTR', 'SNOW', 'CRWD', 'ARM', 'PANW', 'NET'];
+
+    function generateTradingDataset(count) {
+      const items = [];
+      for (let i = 0; i < count; i++) {
+        const symbol = `${SYMBOLS[i % SYMBOLS.length]}_${(i + 100).toString(36).toUpperCase()}`;
+        const sector = SECTORS[i % SECTORS.length];
+        const basePrice = (Math.sin(i * 0.05) * 150 + 200).toFixed(2);
+        const changePercent = (Math.cos(i * 0.1) * 6).toFixed(2);
+        const volume = ((i * 47) % 850000 + 15000).toLocaleString();
+
+        items.push({
+          id: `inst-${i}`,
+          index: i,
+          symbol,
+          name: `${sector} Instrument Alpha-${i}`,
+          sector,
+          price: Number(basePrice),
+          change: Number(changePercent),
+          volume,
+          bid: (Number(basePrice) - 0.05).toFixed(2),
+          ask: (Number(basePrice) + 0.05).toFixed(2),
+        });
+      }
+      return items;
+    }
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'crucible', label: '1. Master Performance Crucible' },
+        { id: 'bottlenecks', label: '2. Three Bottleneck Inspector' },
+        { id: 'flame-chart', label: '3. INP & Flame Chart Lab' },
+        { id: 'trading-case', label: '4. Trading Dashboard Refactor' },
+        { id: 'decision-tree', label: '5. Architecture Decision Matrix' },
+        { id: 'exam', label: '6. Master Certification Exam' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                    KPI 14 · Part 05
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">Master Synthesis & Performance Crucible</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  Render Performance Crucible & Master Synthesis
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Full Pipeline Diagnostics, INP Flame Charts, Subsystem Profiling & Architectural Refactoring
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../05-render-performance-crucible-and-mastery.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // =========================================================================
+    // TAB 1: MASTER PERFORMANCE CRUCIBLE SANDBOX
+    // =========================================================================
+    // Memoized Row Component
+    const MemoizedRow = memo(function MemoizedRow({ item, isSelected, onSelect }) {
+      return (
+        <div 
+          onClick={() => onSelect(item.id)}
+          className={`grid grid-cols-12 gap-2 items-center px-4 py-2 border-b border-slate-800/60 text-xs cursor-pointer transition ${
+            isSelected ? 'bg-indigo-900/40 border-l-2 border-l-indigo-400' : 'hover:bg-slate-800/40'
+          }`}
+        >
+          <span className="col-span-2 font-mono font-bold text-white">{item.symbol}</span>
+          <span className="col-span-4 text-slate-300 truncate">{item.name}</span>
+          <span className="col-span-2 font-mono text-cyan-400">${item.price.toFixed(2)}</span>
+          <span className={`col-span-2 font-mono font-semibold ${item.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {item.change >= 0 ? '+' : ''}{item.change}%
+          </span>
+          <span className="col-span-2 font-mono text-right text-slate-400">{item.volume}</span>
+        </div>
+      );
+    });
+
+    function UnmemoizedRow({ item, isSelected, onSelect }) {
+      return <MemoizedRow item={item} isSelected={isSelected} onSelect={onSelect} />;
+    }
+
+    function TabCrucible() {
+      const [datasetSize, setDatasetSize] = useState(25000);
+      const [query, setQuery] = useState('');
+      const [selectedId, setSelectedId] = useState(null);
+      const [cpuDelay, setCpuDelay] = useState(15); // ms artificial JS loop
+
+      // Optimization Toggles
+      const [optStateColocation, setOptStateColocation] = useState(true);
+      const [optDeferred, setOptDeferred] = useState(true);
+      const [optMemo, setOptMemo] = useState(true);
+      const [optUseMemo, setOptUseMemo] = useState(true);
+      const [optVirtualization, setOptVirtualization] = useState(true);
+      const [overscan, setOverscan] = useState(10);
+      const [scrollTop, setScrollTop] = useState(0);
+
+      const rawDataset = useMemo(() => generateTradingDataset(datasetSize), [datasetSize]);
+      const deferredQuery = useDeferredValue(query);
+
+      const activeFilterQuery = optDeferred ? deferredQuery : query;
+      const isStale = optDeferred && (query !== deferredQuery);
+
+      // Filtering with/without useMemo and artificial CPU delay
+      const filteredRecords = optUseMemo
+        ? useMemo(() => {
+            const start = performance.now();
+            const q = activeFilterQuery.toLowerCase().trim();
+            const res = rawDataset.filter(item => 
+              !q || item.symbol.toLowerCase().includes(q) || item.name.toLowerCase().includes(q) || item.sector.toLowerCase().includes(q)
+            );
+            if (cpuDelay > 0) {
+              const end = performance.now() + cpuDelay;
+              while (performance.now() < end) {}
+            }
+            return res;
+          }, [rawDataset, activeFilterQuery, cpuDelay])
+        : (() => {
+            const q = activeFilterQuery.toLowerCase().trim();
+            const res = rawDataset.filter(item => 
+              !q || item.symbol.toLowerCase().includes(q) || item.name.toLowerCase().includes(q) || item.sector.toLowerCase().includes(q)
+            );
+            if (cpuDelay > 0) {
+              const end = performance.now() + cpuDelay;
+              while (performance.now() < end) {}
+            }
+            return res;
+          })();
+
+      // Virtualization Math
+      const ROW_HEIGHT = 38;
+      const VIEW_HEIGHT = 420;
+      const totalHeight = filteredRecords.length * ROW_HEIGHT;
+      const visibleCount = Math.ceil(VIEW_HEIGHT / ROW_HEIGHT);
+      const visibleStart = Math.floor(scrollTop / ROW_HEIGHT);
+      const visibleEnd = visibleStart + visibleCount;
+
+      const startIndex = Math.max(0, visibleStart - overscan);
+      const endIndex = Math.min(filteredRecords.length, visibleEnd + overscan);
+      const offsetY = startIndex * ROW_HEIGHT;
+
+      const displayList = optVirtualization 
+        ? filteredRecords.slice(startIndex, endIndex)
+        : filteredRecords.slice(0, 2000); // capped for safety in browser
+
+      const domNodeCount = optVirtualization
+        ? displayList.length * 6 + 10
+        : displayList.length * 6 + 10;
+
+      // Telemetry estimations
+      const estimatedJsTime = optUseMemo && !isStale ? 0.2 : (cpuDelay + 4.5);
+      const estimatedReactTime = optMemo && optVirtualization ? 1.2 : 38.5;
+      const estimatedLayoutTime = optVirtualization ? 1.8 : 85.0;
+      const estimatedTotalInp = estimatedJsTime + estimatedReactTime + estimatedLayoutTime;
+
+      return (
+        <div className="space-y-6">
+          {/* Top Crucible Control Console */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>⚡ Enterprise Concurrency & Rendering Crucible</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono border border-rose-500/30">
+                    50,000 Records
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Toggle individual layers to isolate their exact contribution to interaction latency and frame rate.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setOptStateColocation(true);
+                    setOptDeferred(true);
+                    setOptMemo(true);
+                    setOptUseMemo(true);
+                    setOptVirtualization(true);
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition"
+                >
+                  ⚡ Max Optimization
+                </button>
+                <button
+                  onClick={() => {
+                    setOptStateColocation(false);
+                    setOptDeferred(false);
+                    setOptMemo(false);
+                    setOptUseMemo(false);
+                    setOptVirtualization(false);
+                  }}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold transition"
+                >
+                  ⚠️ Reset to Naive
+                </button>
+              </div>
+            </div>
+
+            {/* Strategy Toggles */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-slate-800">
+              <label className={`flex items-center gap-2 text-xs p-2.5 rounded-lg border cursor-pointer transition ${optStateColocation ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`}>
+                <input type="checkbox" checked={optStateColocation} onChange={e => setOptStateColocation(e.target.checked)} className="accent-indigo-500" />
+                <span className="font-semibold">1. State Colocation</span>
+              </label>
+
+              <label className={`flex items-center gap-2 text-xs p-2.5 rounded-lg border cursor-pointer transition ${optDeferred ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`}>
+                <input type="checkbox" checked={optDeferred} onChange={e => setOptDeferred(e.target.checked)} className="accent-cyan-500" />
+                <span className="font-semibold">2. useDeferredValue</span>
+              </label>
+
+              <label className={`flex items-center gap-2 text-xs p-2.5 rounded-lg border cursor-pointer transition ${optUseMemo ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`}>
+                <input type="checkbox" checked={optUseMemo} onChange={e => setOptUseMemo(e.target.checked)} className="accent-emerald-500" />
+                <span className="font-semibold">3. useMemo Cache</span>
+              </label>
+
+              <label className={`flex items-center gap-2 text-xs p-2.5 rounded-lg border cursor-pointer transition ${optMemo ? 'bg-amber-950/40 border-amber-500/50 text-amber-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`}>
+                <input type="checkbox" checked={optMemo} onChange={e => setOptMemo(e.target.checked)} className="accent-amber-500" />
+                <span className="font-semibold">4. React.memo Bailout</span>
+              </label>
+
+              <label className={`flex items-center gap-2 text-xs p-2.5 rounded-lg border cursor-pointer transition ${optVirtualization ? 'bg-rose-950/40 border-rose-500/50 text-rose-200' : 'bg-slate-950 border-slate-800 text-slate-400'}`}>
+                <input type="checkbox" checked={optVirtualization} onChange={e => setOptVirtualization(e.target.checked)} className="accent-rose-500" />
+                <span className="font-semibold">5. Virtualization</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Interactive Search & Live Telemetry HUD */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Input & Search Section */}
+            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-white uppercase font-mono tracking-wider">
+                  Live Trading Search Stream
+                </label>
+                <div className="text-xs font-mono text-slate-400">
+                  Matches: <strong className="text-cyan-400">{filteredRecords.length.toLocaleString()}</strong> / {rawDataset.length.toLocaleString()}
+                </div>
+              </div>
+
+              <input 
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Type 'NVDA', 'Semiconductors', 'Cloud', 'Cybersecurity'..."
+                className="w-full bg-slate-950 border-2 border-slate-700 focus:border-rose-500 rounded-xl px-4 py-3 text-white font-mono placeholder-slate-500 focus:outline-none transition shadow-inner"
+              />
+
+              {/* Virtualized Table Container */}
+              <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+                <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-slate-800/80 border-b border-slate-700 text-xs font-bold text-slate-300 font-mono">
+                  <span className="col-span-2">Ticker</span>
+                  <span className="col-span-4">Instrument Description</span>
+                  <span className="col-span-2">Price</span>
+                  <span className="col-span-2">Change</span>
+                  <span className="col-span-2 text-right">Volume</span>
+                </div>
+
+                <div 
+                  onScroll={e => setScrollTop(e.target.scrollTop)}
+                  style={{ height: `${VIEW_HEIGHT}px` }}
+                  className="overflow-y-auto custom-scrollbar relative"
+                >
+                  <section 
+                    aria-busy={isStale}
+                    style={{
+                      opacity: isStale ? 0.6 : 1,
+                      filter: isStale ? 'grayscale(30%)' : 'none',
+                      transition: 'opacity 0.2s'
+                    }}
+                  >
+                    {optVirtualization ? (
+                      <div style={{ height: `${totalHeight}px`, position: 'relative', width: '100%' }}>
+                        <div style={{ transform: `translateY(${offsetY}px)`, willChange: 'transform' }}>
+                          {displayList.map(item => (
+                            optMemo ? (
+                              <MemoizedRow 
+                                key={item.id} 
+                                item={item} 
+                                isSelected={selectedId === item.id} 
+                                onSelect={setSelectedId} 
+                              />
+                            ) : (
+                              <UnmemoizedRow 
+                                key={item.id} 
+                                item={item} 
+                                isSelected={selectedId === item.id} 
+                                onSelect={setSelectedId} 
+                              />
+                            )
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        {displayList.map(item => (
+                          <UnmemoizedRow 
+                            key={item.id} 
+                            item={item} 
+                            isSelected={selectedId === item.id} 
+                            onSelect={setSelectedId} 
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </div>
+            </div>
+
+            {/* Telemetry & Subsystem Diagnostics Panel */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono border-b border-slate-800 pb-2">
+                Subsystem Latency Breakdown
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-slate-400">1. Pure JS Filtering:</span>
+                    <span className="text-amber-400 font-bold">{estimatedJsTime.toFixed(1)}ms</span>
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div className="bg-amber-500 h-full" style={{ width: `${Math.min(100, estimatedJsTime * 2)}%` }}></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-slate-400">2. React Reconciliation:</span>
+                    <span className="text-cyan-400 font-bold">{estimatedReactTime.toFixed(1)}ms</span>
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div className="bg-cyan-500 h-full" style={{ width: `${Math.min(100, estimatedReactTime * 2)}%` }}></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-mono mb-1">
+                    <span className="text-slate-400">3. Browser Layout & Paint:</span>
+                    <span className="text-rose-400 font-bold">{estimatedLayoutTime.toFixed(1)}ms</span>
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div className="bg-rose-500 h-full" style={{ width: `${Math.min(100, estimatedLayoutTime * 2)}%` }}></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total INP Gauge */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="text-[10px] uppercase font-mono text-slate-400">Estimated Interaction to Next Paint (INP)</div>
+                <div className={`text-2xl font-bold font-mono ${
+                  estimatedTotalInp <= 50 ? 'text-emerald-400' : estimatedTotalInp <= 200 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {estimatedTotalInp.toFixed(1)} ms
+                </div>
+                <div className="text-xs text-slate-400">
+                  {estimatedTotalInp <= 50 
+                    ? '⚡ Exceptional: 60 FPS silky smooth'
+                    : estimatedTotalInp <= 200 
+                    ? '⚠️ Acceptable: Minor frame drop risk'
+                    : '🔴 Failing INP: Noticeable user lag & long task!'}
+                </div>
+              </div>
+
+              {/* Physical DOM Stats */}
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="p-2.5 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">DOM NODES</span>
+                  <span className="text-cyan-400 font-bold">{domNodeCount.toLocaleString()}</span>
+                </div>
+                <div className="p-2.5 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">RENDER STATUS</span>
+                  <span className={isStale ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                    {isStale ? 'Deferred' : 'Sync'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: THREE BOTTLENECKS INSPECTOR
+    // =========================================================================
+    function TabBottlenecks() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">The 3 Core Computational Bottlenecks</h2>
+            <p className="text-sm text-slate-400">
+              Never apply an optimization without identifying which architectural layer is consuming the frame budget.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Bottleneck A */}
+            <div className="p-5 bg-slate-950 border border-amber-500/30 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 font-mono">Layer 1: Pure JavaScript</span>
+                <span className="px-2 py-0.5 text-[10px] rounded bg-amber-500/20 text-amber-300 font-mono">CPU Bound</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Filter, sort, map, deep object cloning, crypto algorithms, parsing huge JSON responses.
+              </p>
+              <div className="text-xs text-slate-400 font-mono bg-slate-900 p-3 rounded border border-slate-800">
+                ❌ React.memo does NOT fix this.<br/>
+                ✅ Use indexing, useMemo, Web Workers, or server pagination.
+              </div>
+            </div>
+
+            {/* Bottleneck B */}
+            <div className="p-5 bg-slate-950 border border-cyan-500/30 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-400 font-mono">Layer 2: React Reconciler</span>
+                <span className="px-2 py-0.5 text-[10px] rounded bg-cyan-500/20 text-cyan-300 font-mono">Fiber Tree</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Unnecessary component rerenders, broad context invalidation, unstable prop references.
+              </p>
+              <div className="text-xs text-slate-400 font-mono bg-slate-900 p-3 rounded border border-slate-800">
+                ❌ Virtualization alone doesn't fix broad state.<br/>
+                ✅ Use State Colocation, React.memo, useDeferredValue.
+              </div>
+            </div>
+
+            {/* Bottleneck C */}
+            <div className="p-5 bg-slate-950 border border-rose-500/30 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-400 font-mono">Layer 3: Browser Engine</span>
+                <span className="px-2 py-0.5 text-[10px] rounded bg-rose-500/20 text-rose-300 font-mono">DOM / Paint</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                50,000 DOM nodes, layout thrashing (forced reflows), expensive CSS filters, composite layers.
+              </p>
+              <div className="text-xs text-slate-400 font-mono bg-slate-900 p-3 rounded border border-slate-800">
+                ❌ useTransition does NOT shrink DOM.<br/>
+                ✅ Use DOM Virtualization (Windowing & Overscan).
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: INP & CHROME PERFORMANCE FLAME CHART SIMULATOR
+    // =========================================================================
+    function TabFlameChart() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Chrome Performance Flame Chart & Long Task Analysis</h2>
+            <p className="text-sm text-slate-400">
+              Visualizing how a 180ms Long Task violates the 50ms main-thread threshold and ruins INP.
+            </p>
+          </div>
+
+          <div className="p-5 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-400 border-b border-slate-800 pb-2">
+              <span>Main Thread Task Visualization</span>
+              <span className="text-rose-400 font-bold">⚠️ Long Task: 180ms (&gt;50ms Limit)</span>
+            </div>
+
+            {/* Visual Flame Chart Bars */}
+            <div className="space-y-2 font-mono text-xs">
+              <div className="w-full bg-rose-950/60 border border-rose-500/60 p-2 rounded text-rose-200">
+                [Task: 180ms] Main Thread Execution
+              </div>
+
+              <div className="grid grid-cols-12 gap-1 pl-4">
+                <div className="col-span-1 bg-amber-900/60 border border-amber-500/50 p-1.5 rounded text-[11px] text-amber-200 truncate">
+                  Input (4ms)
+                </div>
+                <div className="col-span-6 bg-cyan-900/60 border border-cyan-500/50 p-1.5 rounded text-[11px] text-cyan-200 truncate">
+                  React performConcurrentWorkOnRoot (94ms)
+                </div>
+                <div className="col-span-5 bg-purple-900/60 border border-purple-500/50 p-1.5 rounded text-[11px] text-purple-200 truncate">
+                  Recalculate Style & Layout (82ms)
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-1 pl-8">
+                <div className="col-span-1"></div>
+                <div className="col-span-4 bg-emerald-900/60 border border-emerald-500/50 p-1 rounded text-[10px] text-emerald-200 truncate">
+                  filterInstruments (68ms)
+                </div>
+                <div className="col-span-2 bg-blue-900/60 border border-blue-500/50 p-1 rounded text-[10px] text-blue-200 truncate">
+                  reconcile (26ms)
+                </div>
+                <div className="col-span-5"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: TRADING DASHBOARD REFACTORING CASE STUDY
+    // =========================================================================
+    function TabTradingCase() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Enterprise Trading Dashboard Architecture Refactoring</h2>
+            <p className="text-sm text-slate-400">
+              Comparing the catastrophic broad Context invalidation with the high-performance fine-grained selector architecture.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-xl bg-slate-950 border border-rose-500/40 space-y-3">
+              <span className="text-xs font-bold text-rose-400 font-mono uppercase">❌ Before Refactor: Monolithic Context</span>
+              <ul className="text-xs text-slate-300 space-y-2">
+                <li>• Single global Context provider holds market ticks and search state.</li>
+                <li>• 1 price tick on $AAPL rerenders all 10,000 table rows, charts, and header.</li>
+                <li>• 10,000 physical DOM nodes in memory.</li>
+                <li>• INP = 450ms (Unusable input lag).</li>
+              </ul>
+            </div>
+
+            <div className="p-5 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-3">
+              <span className="text-xs font-bold text-emerald-400 font-mono uppercase">✅ After Refactor: 5-Stage Architecture</span>
+              <ul className="text-xs text-slate-300 space-y-2">
+                <li>• Search state colocated in SearchFeature container.</li>
+                <li>• Fine-grained store subscriptions (only affected ticker row rerenders).</li>
+                <li>• DOM Virtualization mounts only 30 visible rows + 10 overscan.</li>
+                <li>• useDeferredValue keeps search input at 0ms latency.</li>
+                <li>• INP = 8ms (Silky smooth 60 FPS).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 5: ARCHITECTURE DECISION MATRIX
+    // =========================================================================
+    function TabDecisionTree() {
+      const rules = [
+        { symptom: 'Input typing drops frames / lags', root: 'React Reconciliation / JS', fix: 'Colocate state + useDeferredValue + React.memo' },
+        { symptom: 'Scrolling a large collection stutters', root: 'Browser DOM Volume', fix: 'DOM Virtualization (Windowing + Overscan)' },
+        { symptom: 'Heavy data parsing takes 150ms+', root: 'Pure JavaScript CPU', fix: 'Web Worker / Indexing / useMemo' },
+        { symptom: 'Unrelated components rerender on tick', root: 'Invalidation Scope', fix: 'Selector Subscriptions / Split Context' },
+        { symptom: 'White flash during fast scrolling', root: 'Virtualizer Overscan', fix: 'Increase overscan buffer (5-15 rows)' },
+        { symptom: 'Chat jumps when older messages prepend', root: 'Scroll Geometry', fix: 'Preserve logical entity scroll anchor' },
+      ];
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Master Performance Decision Matrix</h2>
+            <p className="text-sm text-slate-400">Quick-reference diagnostic runbook for production frontend incidents.</p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left text-slate-300 font-mono border border-slate-800">
+              <thead className="bg-slate-950 text-slate-400 uppercase text-[11px] border-b border-slate-800">
+                <tr>
+                  <th className="p-3">Observed Symptom</th>
+                  <th className="p-3">Dominant Layer</th>
+                  <th className="p-3">Architectural Prescription</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 bg-slate-900/60">
+                {rules.map((r, i) => (
+                  <tr key={i} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-semibold text-white">{r.symptom}</td>
+                    <td className="p-3 text-cyan-400">{r.root}</td>
+                    <td className="p-3 text-emerald-400">{r.fix}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 6: MASTER CERTIFICATION EXAM
+    // =========================================================================
+    function TabExam() {
+      const questions = [
+        {
+          id: 1,
+          question: "Why can wrapping every component in React.memo fail to improve an application's INP metric?",
+          options: [
+            "Because React.memo is ignored by modern Chromium browsers.",
+            "Because React reconciliation may only represent a fraction of the interaction latency; JavaScript event algorithms, layout thrashing, and browser paint may dominate.",
+            "Because React.memo only works with server components.",
+            "Because INP only measures network latency."
+          ],
+          correct: 1,
+          explanation: "Interaction latency is distributed across JS, React, and browser layout/paint. If the bottleneck is a 150ms filter or 50,000 DOM nodes, React.memo alone will not fix it."
+        },
+        {
+          id: 2,
+          question: "What defines a 'Long Task' in Chrome DevTools performance engineering?",
+          options: [
+            "Any network request exceeding 1 second.",
+            "Any main-thread task execution exceeding 50ms, which risks blocking user interactions.",
+            "Any React component with more than 50 lines of JSX.",
+            "Any useEffect with more than 3 dependencies."
+          ],
+          correct: 1,
+          explanation: "Chromium flags main-thread tasks > 50ms as Long Tasks because they consume the user interaction frame budget and cause INP degradation."
+        },
+        {
+          id: 3,
+          question: "What is the primary architectural benefit of State Colocation?",
+          options: [
+            "It converts synchronous state updates into WebAssembly.",
+            "It narrows the invalidation scope so state updates only rerender the immediate feature subtree rather than the root tree.",
+            "It automatically virtualizes all child lists.",
+            "It enables React Compiler beta features."
+          ],
+          correct: 1,
+          explanation: "State placement defines the root of the invalidation tree; placing state at the lowest common ancestor eliminates parent/sibling rerenders by design."
+        },
+        {
+          id: 4,
+          question: "When should a senior architect recommend a Web Worker instead of useTransition or useDeferredValue?",
+          options: [
+            "Whenever JSX is rendered.",
+            "When heavy pure JavaScript CPU computation (e.g., parsing, spatial indexing, crypto) takes 100ms+ and cannot be time-sliced on the UI thread.",
+            "To replace React.useState.",
+            "Web Workers are obsolete in React 18."
+          ],
+          correct: 1,
+          explanation: "React transitions schedule UI rendering work; pure CPU-bound mathematical operations that freeze the main thread belong in dedicated Web Workers."
+        },
+        {
+          id: 5,
+          question: "What is the One-Change Rule in senior performance debugging?",
+          options: [
+            "Only edit one line of code per git commit.",
+            "Apply exactly one architectural optimization at a time, capture before/after profiles, and verify improvement with quantitative metrics.",
+            "Never use more than one React hook per component.",
+            "Refactor all components into single-file components."
+          ],
+          correct: 1,
+          explanation: "Applying multiple optimizations simultaneously obscures which intervention resolved the bottleneck and can introduce unnecessary complexity overhead."
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const score = Object.keys(selectedAnswers).reduce((acc, qId) => {
+        const q = questions.find(item => item.id === Number(qId));
+        return selectedAnswers[qId] === q.correct ? acc + 1 : acc;
+      }, 0);
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">KPI 14 Master Architecture Certification</h2>
+              <p className="text-xs text-slate-400 mt-1">Validate your full mastery of React Concurrency, Subsystems, Profiling & Virtualization.</p>
+            </div>
+            {submitted && (
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                score === 5 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
+                Score: {score} / 5 ({((score / 5) * 100).toFixed(0)}%)
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="font-semibold text-sm text-slate-200">
+                  <span className="text-rose-400 font-mono mr-2">Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correct === optIdx;
+                    let optionStyle = 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700';
+
+                    if (submitted) {
+                      if (isCorrect) {
+                        optionStyle = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                      } else if (isSelected && !isCorrect) {
+                        optionStyle = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                      }
+                    } else if (isSelected) {
+                      optionStyle = 'bg-rose-600/20 border-rose-500 text-rose-200';
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => handleSelect(q.id, optIdx)}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition ${optionStyle}`}
+                      >
+                        <span className="font-mono font-semibold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {submitted && (
+                  <div className="p-3 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-800 font-mono">
+                    💡 <strong className="text-slate-200">Explanation:</strong> {q.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            {submitted ? (
+              <button
+                onClick={() => { setSelectedAnswers({}); setSubmitted(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition"
+              >
+                Retake Exam
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(selectedAnswers).length < questions.length}
+                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-xs font-bold text-white rounded-lg transition shadow-lg shadow-rose-600/20"
+              >
+                Submit Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- ROOT APP CONTAINER ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('crucible');
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            {activeTab === 'crucible' && <TabCrucible />}
+            {activeTab === 'bottlenecks' && <TabBottlenecks />}
+            {activeTab === 'flame-chart' && <TabFlameChart />}
+            {activeTab === 'trading-case' && <TabTradingCase />}
+            {activeTab === 'decision-tree' && <TabDecisionTree />}
+            {activeTab === 'exam' && <TabExam />}
+          </main>
+          <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+            KPI 14 · Part 05 — Render Performance Crucible Lab · Complete KPI 14 Synthesis
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
