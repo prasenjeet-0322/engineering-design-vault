@@ -21,7 +21,7 @@ Idle/Loading/Success/Error state machines, optimistic UI, cancellation, race con
 | [Request Cancellation & Race Condition Guards](./02-request-cancellation-race-guards.md) | ✅ Completed | AbortController integration, latest-request-id guards, discarding stale responses. | [🧪 Lab 02](./examples/02-request-cancellation-race-guards.html) |
 | [Loading, Stale Data, Error Recovery & Revalidation](./03-loading-stale-error-revalidation.md) | ✅ Completed | Stale-while-revalidate, non-blocking refresh, stale-error recovery, TTL timestamps. | [🧪 Lab 03](./examples/03-loading-stale-error-revalidation.html) |
 | [Optimistic UI, Mutation Lifecycles & Authoritative Server Reconciliation](./04-optimistic-ui-mutation-reconciliation.md) | ✅ Completed | Immediate 0ms predictions, layered rollback, temporary ID migration & server reconciliation. | [🧪 Lab 04](./examples/04-optimistic-ui-mutation-reconciliation.html) |
-| [Async Data Architecture Crucible & Master Synthesis](./05-async-data-architecture-crucible.md) | ⏳ Pending | Distributed state edge cases, mutation cascades, architectural synthesis & master decision matrices. | ⏳ Pending |
+| [Async Data Architecture Crucible & Master Synthesis](./05-async-data-architecture-crucible.md) | ✅ Completed | Distributed state edge cases, mutation cascades, architectural synthesis & master decision matrices. | [🧪 Lab 05](./examples/05-async-data-architecture-crucible.html) |
 
 
 ---

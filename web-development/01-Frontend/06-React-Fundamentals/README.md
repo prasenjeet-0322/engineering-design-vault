@@ -59,8 +59,8 @@
 | **KPI 11** | [Context & Dependency Distribution](./11-Context-Dependency-Distribution/README.md) | ✅ Completed | Dependency distribution, Provider nesting, context propagation, performance pitfalls. |
 | **KPI 12** | [Forms & Controlled Inputs](./12-Forms-Controlled-Uncontrolled/README.md) | ✅ Completed | Controlled vs uncontrolled inputs, multi-timeline state machines, validation DAGs, baseline reconciliation. |
 | **KPI 13** | [Derived State, Memoization & Render Optimization](./13-Derived-State-Memoization/README.md) | ✅ Completed | Derived data, `useMemo`, `useCallback`, `React.memo`, referential equality, memoization cost. |
-| **KPI 14** | [Render Performance, Transitions & Concurrency](./14-Render-Performance-Optimization/README.md) | 🟡 In Progress | Concurrent transitions, `useTransition`, `useDeferredValue`, virtualization, priority lanes. |
-| **KPI 15** | `15-Async-UI-State-Lifecycle` | ⏳ Pending | Idle/Loading/Success/Error state machines, optimistic UI, cancellation, race conditions. |
+| **KPI 14** | [Render Performance, Transitions & Concurrency](./14-Render-Performance-Optimization/README.md) | ✅ Completed | Concurrent transitions, `useTransition`, `useDeferredValue`, virtualization, priority lanes. |
+| **KPI 15** | [Async UI State & Data Lifecycle](./15-Async-UI-State-Lifecycle/README.md) | ✅ Completed | Idle/Loading/Success/Error state machines, optimistic UI, cancellation, race guards, and layered reconciliation. |
 | **KPI 16** | `16-Error-Handling-Resilience` | ⏳ Pending | Error Boundaries, render errors vs async errors, failure isolation, fallback UI architecture. |
 | **KPI 17** | `17-Accessibility-React` | ⏳ Pending | Semantic HTML, accessible APIs, focus management via refs, ARIA live announcements. |
 | **KPI 18** | `18-React-TypeScript-Engineering` | ⏳ Pending | Generic components/hooks, discriminated props, polymorphic components, event/ref typing. |

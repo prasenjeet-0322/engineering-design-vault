@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 15 — Part 05 Companion Lab: Async UI Lifecycle Crucible</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useRef } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState("scenario-a");
+      const [telemetryLogs, setTelemetryLogs] = useState([]);
+
+      const addLog = (tag, message, type = "info") => {
+        setTelemetryLogs(prev => [
+          {
+            id: Math.random().toString(36).substring(2, 9),
+            time: new Date().toLocaleTimeString() + "." + Math.floor(performance.now() % 1000).toString().padStart(3, "0"),
+            tag,
+            message,
+            type
+          },
+          ...prev.slice(0, 49)
+        ]);
+      };
+
+      const clearLogs = () => setTelemetryLogs([]);
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <header className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl border-cyan-500/20">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-semibold uppercase tracking-wider">
+                  Level 06 — KPI 15 / Part 05
+                </span>
+                <span className="px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded-full text-xs font-semibold">
+                  Interactive Crucible Lab
+                </span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2 text-white">
+                Async UI Lifecycle & Distributed Edge Case Simulator
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Simulate adversarial timing, race conditions, stale error preservation, layered rollbacks, and concurrency policies.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={clearLogs}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                Clear Telemetry
+              </button>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <nav className="flex flex-wrap gap-2 p-1.5 glass-panel rounded-xl">
+            {[
+              { id: "scenario-a", label: "Scenario A: Search Race Guard" },
+              { id: "scenario-b", label: "Scenario B: Background Refresh" },
+              { id: "scenario-c", label: "Scenario C: Error With Data" },
+              { id: "scenario-d", label: "Scenario D: Layered Optimistic" },
+              { id: "scenario-e", label: "Scenario E: Unknown Timeout" },
+              { id: "scenario-f", label: "Scenario F: Concurrency Crucible" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 rounded-lg text-xs font-semibold transition duration-200 ${
+                  activeTab === tab.id
+                    ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/30"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Scenario Content Area (2 Cols) */}
+            <div className="lg:col-span-2 space-y-6">
+              {activeTab === "scenario-a" && <ScenarioSearchRace onLog={addLog} />}
+              {activeTab === "scenario-b" && <ScenarioBackgroundRefresh onLog={addLog} />}
+              {activeTab === "scenario-c" && <ScenarioErrorWithData onLog={addLog} />}
+              {activeTab === "scenario-d" && <ScenarioOptimisticLayer onLog={addLog} />}
+              {activeTab === "scenario-e" && <ScenarioUnknownTimeout onLog={addLog} />}
+              {activeTab === "scenario-f" && <ScenarioConcurrencyPolicy onLog={addLog} />}
+            </div>
+
+            {/* Live Telemetry & Inspector Panel (1 Col) */}
+            <div className="glass-panel p-5 rounded-2xl flex flex-col h-[700px] shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                  <h3 className="font-bold text-sm text-slate-200">Async Telemetry Stream</h3>
+                </div>
+                <span className="text-[10px] font-mono text-slate-500">{telemetryLogs.length} events recorded</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2.5 pt-4 pr-1">
+                {telemetryLogs.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
+                    <svg className="w-10 h-10 mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <p className="text-xs font-mono">Trigger scenario actions to stream temporal events.</p>
+                  </div>
+                ) : (
+                  telemetryLogs.map(log => (
+                    <div 
+                      key={log.id} 
+                      className={`p-2.5 rounded-lg font-mono text-xs border ${
+                        log.type === "error" 
+                          ? "bg-rose-950/40 border-rose-800/50 text-rose-300"
+                          : log.type === "warn"
+                          ? "bg-amber-950/40 border-amber-800/50 text-amber-300"
+                          : log.type === "success"
+                          ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-300"
+                          : "bg-slate-900/60 border-slate-800 text-slate-300"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center text-[10px] opacity-70 mb-1">
+                        <span className="font-semibold uppercase tracking-wider">{log.tag}</span>
+                        <span>{log.time}</span>
+                      </div>
+                      <p className="leading-relaxed">{log.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // SCENARIO A: SEARCH RACE GUARD
+    // ==========================================
+    function ScenarioSearchRace({ onLog }) {
+      const [displayedResults, setDisplayedResults] = useState([]);
+      const [activeRequestId, setActiveRequestId] = useState(null);
+      const [mode, setMode] = useState("guarded"); // 'guarded' vs 'naive'
+      const activeIdRef = useRef(0);
+
+      const triggerSearchA = () => {
+        const id = ++activeIdRef.current;
+        setActiveRequestId(id);
+        onLog("Search A", `Dispatched Query: "rea" (RequestId #${id}) - Will take 3000ms`, "info");
+        
+        setTimeout(() => {
+          if (mode === "guarded" && activeIdRef.current !== id) {
+            onLog("Search A Guard", `DROPPED obsolete completion for RequestId #${id}. Current active is #${activeIdRef.current}`, "warn");
+            return;
+          }
+          setDisplayedResults(["React (from 'rea')", "ReactiveX (from 'rea')", "Reactor (from 'rea')"]);
+          onLog("Search A", `COMMITTED results for "rea" (RequestId #${id})`, "success");
+        }, 3000);
+      };
+
+      const triggerSearchB = () => {
+        const id = ++activeIdRef.current;
+        setActiveRequestId(id);
+        onLog("Search B", `Dispatched Query: "react" (RequestId #${id}) - Will take 800ms`, "info");
+        
+        setTimeout(() => {
+          if (mode === "guarded" && activeIdRef.current !== id) {
+            onLog("Search B Guard", `DROPPED obsolete completion for RequestId #${id}. Current active is #${activeIdRef.current}`, "warn");
+            return;
+          }
+          setDisplayedResults(["React 18 Hooks", "React Server Components", "React Native Architecture"]);
+          onLog("Search B", `COMMITTED results for "react" (RequestId #${id})`, "success");
+        }, 800);
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                Scenario A: Search-As-You-Type Race Guard
+              </h2>
+              <p className="text-slate-400 text-xs mt-1">
+                Demonstrates how slow early requests can overwrite faster newer requests if operation currentness is omitted.
+              </p>
+            </div>
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs">
+              <button
+                onClick={() => setMode("guarded")}
+                className={`px-3 py-1 rounded font-semibold transition ${mode === "guarded" ? "bg-emerald-600 text-white" : "text-slate-400"}`}
+              >
+                Guarded (Currentness Check)
+              </button>
+              <button
+                onClick={() => setMode("naive")}
+                className={`px-3 py-1 rounded font-semibold transition ${mode === "naive" ? "bg-rose-600 text-white" : "text-slate-400"}`}
+              >
+                Naïve (Race-Vulnerable)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={triggerSearchA}
+              className="p-4 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-left transition space-y-1"
+            >
+              <div className="text-xs font-bold text-amber-400 font-mono">1. Trigger Slow Query "rea"</div>
+              <div className="text-[11px] text-slate-400">Simulates 3,000ms latency</div>
+            </button>
+
+            <button
+              onClick={triggerSearchB}
+              className="p-4 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-left transition space-y-1"
+            >
+              <div className="text-xs font-bold text-cyan-400 font-mono">2. Trigger Fast Query "react"</div>
+              <div className="text-[11px] text-slate-400">Simulates 800ms latency</div>
+            </button>
+          </div>
+
+          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl space-y-3">
+            <div className="flex justify-between items-center text-xs font-mono text-slate-400">
+              <span>Active Operation Token: <strong className="text-cyan-400">#{activeRequestId || "None"}</strong></span>
+              <span>Guard Mode: <strong className={mode === "guarded" ? "text-emerald-400" : "text-rose-400"}>{mode.toUpperCase()}</strong></span>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-lg border border-slate-800/60 min-h-[120px]">
+              <div className="text-xs font-semibold text-slate-400 mb-2 font-mono">Current UI Rendered Results:</div>
+              {displayedResults.length === 0 ? (
+                <div className="text-slate-600 text-xs italic">No search results rendered yet. Click Slow Query then Fast Query.</div>
+              ) : (
+                <ul className="space-y-1.5">
+                  {displayedResults.map((r, i) => (
+                    <li key={i} className="text-xs font-mono text-slate-200 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // SCENARIO B: BACKGROUND REFRESH & SWR
+    // ==========================================
+    function ScenarioBackgroundRefresh({ onLog }) {
+      const [state, setState] = useState({
+        status: "success",
+        data: { mrr: "$142,500", activeUsers: 4892, churn: "1.2%" },
+        fetchedAt: Date.now() - 45000,
+        isRefreshing: false
+      });
+
+      const handleRefreshSuccess = () => {
+        setState(prev => ({ ...prev, isRefreshing: true }));
+        onLog("Refresh", "Background revalidation initiated...", "info");
+
+        setTimeout(() => {
+          const newData = {
+            mrr: "$" + (142500 + Math.floor(Math.random() * 5000)).toLocaleString(),
+            activeUsers: 4892 + Math.floor(Math.random() * 50),
+            churn: "1.1%"
+          };
+          setState({
+            status: "success",
+            data: newData,
+            fetchedAt: Date.now(),
+            isRefreshing: false
+          });
+          onLog("Refresh", "Authoritative background payload reconciled smoothly without flash!", "success");
+        }, 1500);
+      };
+
+      const handleRefreshFail = () => {
+        setState(prev => ({ ...prev, isRefreshing: true }));
+        onLog("Refresh", "Background revalidation initiated (will fail 503)...", "warn");
+
+        setTimeout(() => {
+          setState(prev => ({ ...prev, isRefreshing: false }));
+          onLog("Refresh", "Background revalidation failed (503 Service Unavailable). Visible data preserved!", "error");
+        }, 1500);
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                Scenario B: Stale-While-Revalidate & Flash Prevention
+              </h2>
+              <p className="text-slate-400 text-xs mt-1">
+                Demonstrates background revalidation where existing data is preserved while a subtle indicator communicates sync status.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                disabled={state.isRefreshing}
+                onClick={handleRefreshSuccess}
+                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition"
+              >
+                Trigger Refresh
+              </button>
+              <button
+                disabled={state.isRefreshing}
+                onClick={handleRefreshFail}
+                className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition"
+              >
+                Fail Refresh (503)
+              </button>
+            </div>
+          </div>
+
+          <div className="relative bg-slate-900/90 border border-slate-800 p-5 rounded-xl space-y-4">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-400 font-mono">Last Synced: {new Date(state.fetchedAt).toLocaleTimeString()}</span>
+              {state.isRefreshing && (
+                <div className="flex items-center gap-2 text-cyan-400 bg-cyan-950/60 border border-cyan-800 px-2.5 py-1 rounded-full text-xs font-mono">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></div>
+                  Syncing live metrics...
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                <div className="text-slate-500 text-xs font-medium">Monthly Recurring Revenue</div>
+                <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">{state.data.mrr}</div>
+              </div>
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                <div className="text-slate-500 text-xs font-medium">Active Subscriptions</div>
+                <div className="text-xl font-bold text-cyan-400 mt-1 font-mono">{state.data.activeUsers.toLocaleString()}</div>
+              </div>
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800">
+                <div className="text-slate-500 text-xs font-medium">Gross Churn Rate</div>
+                <div className="text-xl font-bold text-amber-400 mt-1 font-mono">{state.data.churn}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // SCENARIO C: ERROR WITH DATA
+    // ==========================================
+    function ScenarioErrorWithData({ onLog }) {
+      const [state, setState] = useState({
+        status: "error-with-data",
+        data: { quotaUsed: 840, quotaLimit: 1000, plan: "Enterprise Tier" },
+        error: "Gateway Timeout (504)",
+        fetchedAt: Date.now() - 120000
+      });
+
+      const retry = () => {
+        onLog("Retry", "Attempting manual re-fetch...", "info");
+        setTimeout(() => {
+          setState({
+            status: "success",
+            data: { quotaUsed: 865, quotaLimit: 1000, plan: "Enterprise Tier" },
+            error: null,
+            fetchedAt: Date.now()
+          });
+          onLog("Retry", "Recovery successful! Updated quota metrics displayed.", "success");
+        }, 1000);
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              Scenario C: Error-With-Data as a First-Class Citizen
+            </h2>
+            <p className="text-slate-400 text-xs mt-1">
+              Demonstrates why background failures must not obliterate previously verified data into a blank error state.
+            </p>
+          </div>
+
+          {state.error && (
+            <div className="bg-amber-950/40 border border-amber-800/60 p-4 rounded-xl flex items-center justify-between text-xs text-amber-300">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚠️</span>
+                <span>
+                  Showing cached data from {new Date(state.fetchedAt).toLocaleTimeString()}. Background refresh failed: <strong>{state.error}</strong>
+                </span>
+              </div>
+              <button 
+                onClick={retry}
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded transition"
+              >
+                Retry Revalidation
+              </button>
+            </div>
+          )}
+
+          <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-3">
+            <div className="flex justify-between items-center text-xs font-mono text-slate-400">
+              <span>Plan Status: <strong className="text-white">{state.data.plan}</strong></span>
+              <span>API Gateway Status: <strong className={state.error ? "text-amber-400" : "text-emerald-400"}>{state.error ? "DEGRADED" : "HEALTHY"}</strong></span>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-slate-400">API Quota Utilization</span>
+                <span className="text-white font-bold">{state.data.quotaUsed} / {state.data.quotaLimit} calls</span>
+              </div>
+              <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                <div 
+                  className="bg-gradient-to-r from-cyan-500 to-amber-500 h-full transition-all duration-500" 
+                  style={{ width: `${(state.data.quotaUsed / state.data.quotaLimit) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // SCENARIO D: LAYERED OPTIMISTIC PROJECTIONS
+    // ==========================================
+    function ScenarioOptimisticLayer({ onLog }) {
+      const [authoritativeCount, setAuthoritativeCount] = useState(10);
+      const [pendingMutations, setPendingMutations] = useState([]);
+      const mutationIdRef = useRef(0);
+
+      // Visible = Authoritative + sum(Pending)
+      const visibleCount = authoritativeCount + pendingMutations.reduce((acc, m) => acc + m.delta, 0);
+
+      const addOptimistic = (delta) => {
+        const id = ++mutationIdRef.current;
+        const mutation = { id, delta, timestamp: Date.now() };
+        setPendingMutations(prev => [...prev, mutation]);
+        onLog("Optimistic Intent", `Queued Mutation #${id} (Delta: ${delta > 0 ? "+" + delta : delta}). Visible projection: ${visibleCount + delta}`, "info");
+      };
+
+      const resolveOldest = (success) => {
+        if (pendingMutations.length === 0) return;
+        const [oldest, ...rest] = pendingMutations;
+
+        if (success) {
+          setAuthoritativeCount(prev => prev + oldest.delta);
+          setPendingMutations(rest);
+          onLog("Reconcile Success", `Server accepted Mutation #${oldest.id}. Authoritative base updated to ${authoritativeCount + oldest.delta}`, "success");
+        } else {
+          setPendingMutations(rest);
+          onLog("Reconcile Failure", `Server REJECTED Mutation #${oldest.id}. Layer dropped; subsequent mutations preserved cleanly!`, "error");
+        }
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                Scenario D: Layered Optimistic Projections
+              </h2>
+              <p className="text-slate-400 text-xs mt-1">
+                Visible = Authoritative Base + Pending Queue. Demonstrates how dropping one failed mutation preserves newer valid mutations.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => addOptimistic(1)}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold font-mono transition"
+              >
+                +1 Increment
+              </button>
+              <button
+                onClick={() => addOptimistic(-1)}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold font-mono transition"
+              >
+                -1 Decrement
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+              <div className="text-slate-500 text-xs font-mono">Authoritative Base</div>
+              <div className="text-3xl font-extrabold text-slate-300 font-mono mt-1">{authoritativeCount}</div>
+            </div>
+            <div className="bg-slate-900 p-4 rounded-xl border border-purple-800/40">
+              <div className="text-purple-400 text-xs font-mono">Pending Mutations</div>
+              <div className="text-3xl font-extrabold text-purple-300 font-mono mt-1">{pendingMutations.length}</div>
+            </div>
+            <div className="bg-slate-900 p-4 rounded-xl border border-cyan-800/40">
+              <div className="text-cyan-400 text-xs font-mono">Rendered Visible State</div>
+              <div className="text-3xl font-extrabold text-cyan-300 font-mono mt-1">{visibleCount}</div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              disabled={pendingMutations.length === 0}
+              onClick={() => resolveOldest(true)}
+              className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold font-mono transition"
+            >
+              Resolve Oldest as Succeeded ✓
+            </button>
+            <button
+              disabled={pendingMutations.length === 0}
+              onClick={() => resolveOldest(false)}
+              className="flex-1 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white rounded-lg text-xs font-semibold font-mono transition"
+            >
+              Resolve Oldest as Failed ✗ (Rollback Layer)
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // SCENARIO E: UNKNOWN OUTCOME & TIMEOUTS
+    // ==========================================
+    function ScenarioUnknownTimeout({ onLog }) {
+      const [orderState, setOrderState] = useState("idle"); // 'idle', 'submitting', 'timeout_unknown', 'confirmed'
+      const idempotencyKeyRef = useRef(null);
+
+      const triggerSubmit = () => {
+        idempotencyKeyRef.current = "idem_" + Math.random().toString(36).substring(2, 9);
+        setOrderState("submitting");
+        onLog("Payment", `POST /charge-card initiated with Idempotency-Key: ${idempotencyKeyRef.current}`, "info");
+
+        setTimeout(() => {
+          setOrderState("timeout_unknown");
+          onLog("Payment Gateway", `Gateway socket timed out after 5000ms. Outcome is UNKNOWN (not confirmed failure).`, "warn");
+        }, 2000);
+      };
+
+      const reconcileStatus = () => {
+        onLog("Status Query", `Querying GET /payments/status?key=${idempotencyKeyRef.current}...`, "info");
+        setTimeout(() => {
+          setOrderState("confirmed");
+          onLog("Status Query", `Server confirms payment was processed successfully! Charge ID: ch_849204`, "success");
+        }, 1200);
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+              Scenario E: Network Timeout vs Unknown Outcome
+            </h2>
+            <p className="text-slate-400 text-xs mt-1">
+              Demonstrates why network timeouts must not trigger a blind payment retry (risking double charges) and requires idempotency reconciliation.
+            </p>
+          </div>
+
+          <div className="p-5 bg-slate-900 rounded-xl border border-slate-800 space-y-4">
+            <div className="flex justify-between items-center text-xs font-mono">
+              <span className="text-slate-400">Transaction State:</span>
+              <span className={`font-bold uppercase ${
+                orderState === "confirmed" ? "text-emerald-400" :
+                orderState === "timeout_unknown" ? "text-amber-400" :
+                orderState === "submitting" ? "text-cyan-400" : "text-slate-500"
+              }`}>
+                {orderState}
+              </span>
+            </div>
+
+            {orderState === "timeout_unknown" && (
+              <div className="bg-amber-950/40 border border-amber-800 p-4 rounded-lg space-y-3">
+                <p className="text-xs text-amber-200">
+                  ⚠️ Request timed out. The charge may have been processed by your bank. Do not retry blindly.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={reconcileStatus}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold font-mono transition"
+                  >
+                    Reconcile Transaction Status
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {orderState === "confirmed" && (
+              <div className="bg-emerald-950/40 border border-emerald-800 p-4 rounded-lg text-xs text-emerald-300 font-mono">
+                ✓ Order #ORD-9821 Confirmed & Paid ($249.00)
+              </div>
+            )}
+
+            {orderState === "idle" && (
+              <button
+                onClick={triggerSubmit}
+                className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold font-mono transition"
+              >
+                Submit Payment ($249.00)
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // SCENARIO F: CONCURRENCY POLICY CRUCIBLE
+    // ==========================================
+    function ScenarioConcurrencyPolicy({ onLog }) {
+      const [policy, setPolicy] = useState("latest-wins");
+      const [history, setHistory] = useState([]);
+      const inFlightRef = useRef(new Set());
+
+      const runBatch = () => {
+        onLog("Batch", `Starting adversarial batch with policy: ${policy.toUpperCase()}`, "info");
+        
+        // Simulating 3 requests with reversed completion order
+        const tasks = [
+          { id: 1, val: "Payload A", delay: 2000 },
+          { id: 2, val: "Payload B", delay: 1200 },
+          { id: 3, val: "Payload C", delay: 500 }
+        ];
+
+        tasks.forEach(task => {
+          inFlightRef.current.add(task.id);
+          onLog("Task Started", `Dispatched Task #${task.id} (${task.val}) with ${task.delay}ms delay`, "info");
+
+          setTimeout(() => {
+            if (policy === "latest-wins") {
+              // Only Task 3 should stick
+              setHistory(prev => [task.val, ...prev]);
+              onLog("Latest-Wins", `Task #${task.id} finished. Recorded: ${task.val}`, "success");
+            } else if (policy === "first-wins") {
+              // Task 3 finishes first in time
+              setHistory(prev => (prev.length === 0 ? [task.val] : prev));
+              onLog("First-Wins", `Task #${task.id} resolved.`, "success");
+            }
+          }, task.delay);
+        });
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                Scenario F: Concurrency Policy Crucible
+              </h2>
+              <p className="text-slate-400 text-xs mt-1">
+                Configure concurrency policies against adversarial out-of-order responses.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {["latest-wins", "first-wins"].map(p => (
+                <button
+                  key={p}
+                  onClick={() => { setPolicy(p); setHistory([]); }}
+                  className={`px-3 py-1 rounded text-xs font-mono font-semibold transition ${
+                    policy === p ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={runBatch}
+            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 rounded-xl text-xs font-mono font-bold transition"
+          >
+            Execute Adversarial Inversion Batch (A:2000ms, B:1200ms, C:500ms)
+          </button>
+
+          <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+            <div className="text-xs font-mono text-slate-400">Resolved Value Timeline:</div>
+            {history.length === 0 ? (
+              <div className="text-xs text-slate-600 italic">No batches run yet.</div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {history.map((h, i) => (
+                  <span key={i} className="px-3 py-1 bg-slate-950 border border-cyan-800/60 rounded text-xs font-mono text-cyan-300">
+                    {h}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
