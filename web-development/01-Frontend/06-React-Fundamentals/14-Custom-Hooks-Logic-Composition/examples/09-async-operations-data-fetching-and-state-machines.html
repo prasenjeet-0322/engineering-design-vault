@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 12 — Part 09: Async Operations, Data Fetching & State Machines Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+    }
+    pre, code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useReducer, useCallback, useMemo, useRef, memo } = React;
+
+    // ==========================================
+    // EXPERIMENT 1: OUT-OF-ORDER RACE CONDITION SIMULATOR
+    // ==========================================
+    function Exp1RaceSimulator() {
+      const [currentQuery, setCurrentQuery] = useState("San Francisco");
+      const [displayedResult, setDisplayedResult] = useState(null);
+      const [useCurrentnessGuard, setUseCurrentnessGuard] = useState(true);
+      const [activeRequests, setActiveRequests] = useState([]);
+      const [logs, setLogs] = useState([]);
+
+      const requestIdRef = useRef(0);
+
+      const addLog = (msg) => setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 6)]);
+
+      const triggerSearch = (query, latency) => {
+        const ticket = ++requestIdRef.current;
+        const newReq = { id: ticket, query, latency, status: "IN_FLIGHT" };
+        setActiveRequests(prev => [newReq, ...prev]);
+        addLog(`Initiated Request #${ticket} for "${query}" (Latency: ${latency}ms)`);
+
+        setTimeout(() => {
+          setActiveRequests(prev => prev.map(r => r.id === ticket ? { ...r, status: "SETTLED" } : r));
+
+          if (useCurrentnessGuard) {
+            // Guarded check: Is this ticket the latest?
+            if (ticket === requestIdRef.current) {
+              setDisplayedResult({ query, ticket, timestamp: new Date().toLocaleTimeString() });
+              addLog(`✅ ACCEPTED Request #${ticket} ("${query}") - Matches Current Ticket #${requestIdRef.current}`);
+            } else {
+              addLog(`⚠️ DROPPED Request #${ticket} ("${query}") - Stale! Current is #${requestIdRef.current}`);
+            }
+          } else {
+            // Naive: Set state regardless of order
+            setDisplayedResult({ query, ticket, timestamp: new Date().toLocaleTimeString() });
+            addLog(`❌ NAIVE CLOBBER: Request #${ticket} ("${query}") overwrote UI state!`);
+          }
+        }, latency);
+      };
+
+      const simulateClassicRace = () => {
+        // Request 1: Slow query "San Antonio" (1800ms)
+        triggerSearch("San Antonio", 1800);
+        // Request 2: Fast query "San Francisco" (400ms)
+        setTimeout(() => {
+          triggerSearch("San Francisco", 400);
+        }, 150);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-white">Out-of-Order Race Simulator</h3>
+              <p className="text-xs text-slate-400">Simulate slow Request #1 (1800ms) followed by fast Request #2 (400ms).</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setUseCurrentnessGuard(prev => !prev)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${useCurrentnessGuard ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+              >
+                Currentness Guard: {useCurrentnessGuard ? "ENABLED (Protected)" : "DISABLED (Vulnerable)"}
+              </button>
+              <button
+                onClick={simulateClassicRace}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+              >
+                Fire Race Condition Test
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* UI Display State */}
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-slate-200">Current UI Render Output</h4>
+                <span className="text-xs font-mono text-indigo-400">Current Ticket: #{requestIdRef.current}</span>
+              </div>
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 min-h-[120px] flex flex-col justify-center items-center text-center">
+                {displayedResult ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400">Displayed Results For:</p>
+                    <h3 className="text-lg font-bold text-white font-mono">"{displayedResult.query}"</h3>
+                    <p className="text-[11px] font-mono text-emerald-400">Accepted from Request #{displayedResult.ticket} at {displayedResult.timestamp}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No active results. Click "Fire Race Condition Test" above.</p>
+                )}
+              </div>
+              <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-slate-400">
+                <span className="text-indigo-400 font-bold">Rule:</span> When currentness guard is ON, Request #1 ("San Antonio") finishes last but is safely ignored.
+              </div>
+            </div>
+
+            {/* In-Flight Pipeline */}
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+              <h4 className="text-sm font-bold text-slate-200">Active Request Timeline</h4>
+              <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
+                {activeRequests.length === 0 ? (
+                  <p className="text-xs text-slate-500">No requests in pipeline.</p>
+                ) : (
+                  activeRequests.map(r => (
+                    <div key={r.id} className="p-2.5 rounded bg-slate-950 border border-slate-800 flex justify-between items-center text-xs font-mono">
+                      <div>
+                        <span className="text-white font-bold">Req #{r.id}</span>: "{r.query}" ({r.latency}ms)
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${r.status === 'IN_FLIGHT' ? 'bg-amber-500/20 text-amber-300 animate-pulse' : 'bg-slate-800 text-slate-400'}`}>
+                        {r.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {logs.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Race Execution Telemetry</span>
+              <div className="font-mono text-xs space-y-1">
+                {logs.map((log, idx) => (
+                  <div key={idx} className={log.includes("DROPPED") ? "text-amber-400" : log.includes("CLOBBER") ? "text-rose-400 font-bold" : "text-emerald-400"}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 2: FINITE STATE MACHINE TRANSITION LAB
+    // ==========================================
+    const initialFsmState = {
+      status: "idle",
+      data: null,
+      error: null,
+    };
+
+    function exp2Reducer(state, action) {
+      switch (action.type) {
+        case "FETCH_START":
+          return { status: "loading", data: state.data, error: null };
+        case "FETCH_SUCCESS":
+          return { status: "success", data: action.payload, error: null };
+        case "FETCH_ERROR":
+          return { status: "error", data: state.data, error: action.payload };
+        case "RESET":
+          return { status: "idle", data: null, error: null };
+        default:
+          return state;
+      }
+    }
+
+    function Exp2FsmVisualizer() {
+      const [state, dispatch] = useReducer(exp2Reducer, initialFsmState);
+
+      const STATES = ["idle", "loading", "success", "error"];
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <h4 className="text-sm font-bold text-white">Finite State Machine Graph</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {STATES.map(s => {
+                const isActive = state.status === s;
+                let color = "border-slate-800 bg-slate-950 text-slate-400";
+                if (isActive) {
+                  if (s === "idle") color = "border-slate-500 bg-slate-800 text-white shadow-lg";
+                  if (s === "loading") color = "border-amber-500 bg-amber-950/40 text-amber-300 shadow-lg animate-pulse";
+                  if (s === "success") color = "border-emerald-500 bg-emerald-950/40 text-emerald-300 shadow-lg";
+                  if (s === "error") color = "border-rose-500 bg-rose-950/40 text-rose-300 shadow-lg";
+                }
+                return (
+                  <div key={s} className={`p-4 rounded-xl border text-center font-mono font-bold text-xs uppercase tracking-wider transition ${color}`}>
+                    {s}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+              <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Trigger State Transitions</h5>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => dispatch({ type: "FETCH_START" })}
+                  className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  FETCH_START
+                </button>
+                <button
+                  onClick={() => dispatch({ type: "FETCH_SUCCESS", payload: { id: "usr_77", name: "Commander Shepard", role: "Spectre" } })}
+                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  FETCH_SUCCESS
+                </button>
+                <button
+                  onClick={() => dispatch({ type: "FETCH_ERROR", payload: "HTTP 503: Service Unavailable" })}
+                  className="px-3 py-2 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  FETCH_ERROR
+                </button>
+                <button
+                  onClick={() => dispatch({ type: "RESET" })}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
+                >
+                  RESET
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+              <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Discriminated State Snapshot</h5>
+              <pre className="p-3 bg-slate-950 rounded-lg border border-slate-800 font-mono text-xs text-indigo-300 overflow-x-auto">
+                {JSON.stringify(state, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 3: ABORTCONTROLLER CLIENT CANCELLATION
+    // ==========================================
+    function Exp3AbortLab() {
+      const [isDownloading, setIsDownloading] = useState(false);
+      const [progress, setProgress] = useState(0);
+      const [statusText, setStatusText] = useState("Idle");
+      const activeController = useRef(null);
+
+      const startStream = () => {
+        if (activeController.current) activeController.current.abort();
+
+        const controller = new AbortController();
+        activeController.current = controller;
+        setIsDownloading(true);
+        setProgress(0);
+        setStatusText("Downloading 50MB telemetry package...");
+
+        let currentProgress = 0;
+        const interval = setInterval(() => {
+          if (controller.signal.aborted) {
+            clearInterval(interval);
+            return;
+          }
+          currentProgress += 10;
+          setProgress(currentProgress);
+          if (currentProgress >= 100) {
+            clearInterval(interval);
+            setIsDownloading(false);
+            setStatusText("Download complete (100%)");
+          }
+        }, 300);
+      };
+
+      const cancelStream = () => {
+        if (activeController.current) {
+          activeController.current.abort();
+          activeController.current = null;
+          setIsDownloading(false);
+          setStatusText("Cleanly aborted by client (Signal emitted).");
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-bold text-white">AbortController Stream Coordination</h4>
+                <p className="text-xs text-slate-400">Simulate canceling a long-running download mid-flight.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={isDownloading}
+                  onClick={startStream}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition"
+                >
+                  Start Stream
+                </button>
+                <button
+                  disabled={!isDownloading}
+                  onClick={cancelStream}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition"
+                >
+                  Cancel (controller.abort())
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-mono text-slate-400">
+                <span>Status: {statusText}</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 4: IN-FLIGHT REQUEST DEDUPLICATION
+    // ==========================================
+    const sharedInFlightMap = new Map();
+
+    function fetchSharedDeduplicated(endpoint, onSocketCall) {
+      if (sharedInFlightMap.has(endpoint)) {
+        return sharedInFlightMap.get(endpoint);
+      }
+
+      onSocketCall();
+      const promise = new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ endpoint, timestamp: new Date().toLocaleTimeString(), data: "Enterprise Pricing Tier: $4,999/mo" });
+        }, 1000);
+      }).finally(() => {
+        sharedInFlightMap.delete(endpoint);
+      });
+
+      sharedInFlightMap.set(endpoint, promise);
+      return promise;
+    }
+
+    function DeduplicatedConsumer({ id, triggerFetch, result }) {
+      return (
+        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">Widget #{id}</span>
+            <button
+              onClick={triggerFetch}
+              className="px-2.5 py-1 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded text-[11px] font-semibold transition"
+            >
+              Fetch Pricing
+            </button>
+          </div>
+          <p className="text-xs font-mono text-slate-400 truncate">
+            {result ? result.data : "No data requested yet."}
+          </p>
+        </div>
+      );
+    }
+
+    function Exp4DeduplicationLab() {
+      const [networkCalls, setNetworkCalls] = useState(0);
+      const [results, setResults] = useState({});
+
+      const handleFetch = (widgetId) => {
+        fetchSharedDeduplicated("/api/pricing", () => setNetworkCalls(c => c + 1)).then((data) => {
+          setResults(prev => ({ ...prev, [widgetId]: data }));
+        });
+      };
+
+      const fetchAllSimultaneously = () => {
+        [1, 2, 3].forEach(id => handleFetch(id));
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-white">In-Flight Deduplication Sandbox</h4>
+              <p className="text-xs text-slate-400">Clicking "Fetch All Simultaneously" triggers 3 components, but only 1 network socket call.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400 font-bold">
+                Actual Network Calls: {networkCalls}
+              </span>
+              <button
+                onClick={fetchAllSimultaneously}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+              >
+                Fetch All 3 (Simultaneous)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map(id => (
+              <DeduplicatedConsumer
+                key={id}
+                id={id}
+                triggerFetch={() => handleFetch(id)}
+                result={results[id]}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // EXPERIMENT 5: SENIOR CERTIFICATION EXAM
+    // ==========================================
+    const CERT_QUESTIONS = [
+      {
+        id: 1,
+        question: "Why does an async custom Hook require a monotonic Request ID ref?",
+        options: [
+          "To satisfy the React compiler's static analysis rules.",
+          "To ignore stale out-of-order responses when network latency causes older requests to settle after newer requests.",
+          "To encrypt the HTTP payload before transmission.",
+          "To automatically retry failed requests."
+        ],
+        correct: 1,
+        rationale: "Request ID refs provide mutable coordination tickets to ensure only the latest initiated request can update UI state upon settlement."
+      },
+      {
+        id: 2,
+        question: "Does calling controller.abort() guarantee that a server-side mutation (POST /checkout) is cancelled?",
+        options: [
+          "Yes, HTTP standards require the database to rollback automatically.",
+          "No, client cancellation only terminates the local network stream; server processing may have already finished.",
+          "Yes, if using GraphQL mutations.",
+          "No, but it refunds the user's credit card."
+        ],
+        correct: 1,
+        rationale: "Client aborts only terminate client-side socket reading. Mutations require server-side idempotency keys and transaction management."
+      },
+      {
+        id: 3,
+        question: "Why should AbortError be explicitly filtered out in async custom hook catch blocks?",
+        options: [
+          "Because AbortError crashes the JavaScript runtime.",
+          "Because AbortError is an intentional cancellation signal, not a failure that should show error banners to the user.",
+          "Because AbortError cannot be logged to Sentry.",
+          "Because TypeScript does not allow handling DOMExceptions."
+        ],
+        correct: 1,
+        rationale: "When a request is aborted on unmount or input change, treating it as an error would flash false error banners across the UI."
+      },
+      {
+        id: 4,
+        question: "What is the primary difference between Request Deduplication and Data Caching?",
+        options: [
+          "Deduplication shares an in-flight Promise across concurrent callers; Caching persists completed data for future renders.",
+          "Deduplication is for GET requests; Caching is for POST requests.",
+          "Deduplication requires Redis; Caching requires LocalStorage.",
+          "There is zero difference; they are exact synonyms."
+        ],
+        correct: 0,
+        rationale: "Deduplication prevents multiple simultaneous network calls for the same resource; caching stores settled responses over time."
+      },
+      {
+        id: 5,
+        question: "Which concurrency policy should be used for a critical financial transfer submit button?",
+        options: [
+          "Latest-Wins (Drop all prior payments)",
+          "First-Wins / Mutex Lock + Idempotency Key",
+          "Randomized Race Policy",
+          "Fire-and-Forget without state"
+        ],
+        correct: 1,
+        rationale: "Financial mutations must never use Latest-Wins. They require a First-Wins mutex lock to prevent double-clicks and an Idempotency Key."
+      }
+    ];
+
+    function Exp5CertExam() {
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, idx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: idx }));
+      };
+
+      const score = Object.keys(answers).filter(qId => answers[qId] === CERT_QUESTIONS.find(q => q.id === parseInt(qId)).correct).length;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h3 className="text-sm font-bold text-white">Senior Async Architecture Exam</h3>
+              <p className="text-xs text-slate-400">Validate your mastery of Race Conditions, Abort Mechanics, and State Machines.</p>
+            </div>
+            {submitted && (
+              <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                Score: {score} / {CERT_QUESTIONS.length} ({Math.round((score / CERT_QUESTIONS.length) * 100)}%)
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {CERT_QUESTIONS.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+              return (
+                <div key={q.id} className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-200">{q.question}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 pl-9">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700";
+                      if (selected === optIdx) btnStyle = "bg-indigo-950/60 border-indigo-500 text-indigo-200";
+                      if (submitted) {
+                        if (optIdx === q.correct) btnStyle = "bg-emerald-950/60 border-emerald-500 text-emerald-200 font-semibold";
+                        else if (selected === optIdx && !isCorrect) btnStyle = "bg-rose-950/60 border-rose-500 text-rose-200";
+                      }
+                      return (
+                        <button
+                          key={optIdx}
+                          disabled={submitted}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition ${btnStyle}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="pl-9 pt-2">
+                      <p className="text-xs text-slate-400 font-mono bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <span className="font-bold text-indigo-400">Architect Rationale:</span> {q.rationale}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            {!submitted ? (
+              <button
+                disabled={Object.keys(answers).length < CERT_QUESTIONS.length}
+                onClick={() => setSubmitted(true)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/20 transition"
+              >
+                Submit Certification Answers
+              </button>
+            ) : (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition"
+              >
+                Retake Exam
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN LAB HARNESS
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState(0);
+
+      const TABS = [
+        { title: "Exp 1: Out-of-Order Races", component: <Exp1RaceSimulator /> },
+        { title: "Exp 2: Finite State Machine", component: <Exp2FsmVisualizer /> },
+        { title: "Exp 3: AbortController Lab", component: <Exp3AbortLab /> },
+        { title: "Exp 4: Request Deduplication", component: <Exp4DeduplicationLab /> },
+        { title: "Exp 5: Senior Certification Exam", component: <Exp5CertExam /> },
+      ];
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+          {/* Header */}
+          <header className="space-y-3 border-b border-slate-800 pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-600/30">
+                  09
+                </div>
+                <div>
+                  <h1 className="text-xl font-extrabold text-white tracking-tight">Async Operations, Data Fetching & State Machines</h1>
+                  <p className="text-xs text-slate-400 font-mono">KPI 12 • PART 09 • Interactive Architectural Diagnostic Lab</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-indigo-950/60 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold">
+                React 18 Fiber Async Certified
+              </span>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <nav className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            {TABS.map((tab, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveTab(idx)}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${activeTab === idx ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+              >
+                {tab.title}
+              </button>
+            ))}
+          </nav>
+
+          {/* Tab Content */}
+          <main className="min-h-[500px]">
+            {TABS[activeTab].component}
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-800 pt-6 text-center text-xs text-slate-500 space-y-1">
+            <p>Engineering Design Vault • Level 06 — React Fundamentals • Author: Srikar Kudurmalla | Co-Author: Prasenjeet</p>
+            <p className="font-mono text-[11px] text-slate-600">Race Condition Guards, AbortController & Discriminated State Machines</p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
