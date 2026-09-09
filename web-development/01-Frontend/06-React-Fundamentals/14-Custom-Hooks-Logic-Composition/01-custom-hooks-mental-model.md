@@ -1,8 +1,8 @@
 # Level 06 — React Fundamentals
-# Custom Hooks & Logic Composition
+# KPI 14 / KPI 12 — Custom Hooks & Logic Composition
 ## PART 01 — Custom Hooks Mental Model & Logic Reuse
 
-[⬅️ Level 06 Master Hub](../README.md) | [🧪 Companion Lab (Lab 01)](./examples/01-custom-hooks-mental-model-and-logic-reuse.html) | [Next Part (02: Hook Composition & Rules) ➡️](./02-custom-hook-api-contracts.md)
+[⬅️ Level 06 Master Hub](../README.md) | [🧪 Companion Lab (Lab 01)](./examples/01-custom-hooks-mental-model-and-logic-reuse.html) | [Next Part (02: Hook Composition & Rules) ➡️](./02-hook-composition-and-the-rules-of-hooks.md)
 
 > **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)  
 > **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer | Founding Engineer)  
@@ -10,304 +10,431 @@
 
 ---
 
+### Core Architectural Thesis
+> **A custom Hook is not a component, not a shared-state container, and not merely a way to reduce duplicated lines of code. It is a reusable composition boundary for React behavior. Its state remains associated with the component invocation that executes the Hook.**
+
+---
+
 ## Layer 1 — ⚡ 30-Second Executive Cheat Sheet & Core Mental Models
 
-### 1. The Core Mental Model
-Before learning advanced custom hook patterns, you must understand the foundational invariant:
-> **A custom hook reuses stateful logic and behavior, NOT component state instances.**
+### 1. Executive Summary
+A custom Hook is a JavaScript function whose implementation composes React Hooks and exposes a reusable behavioral API.
 
 ```text
 ====================================================================================================
-                        CUSTOM HOOK COMPOSITION & CALLER MAPPING
+                        CUSTOM HOOK EXECUTION & COMPOSITION TOPOLOGY
 ====================================================================================================
 
- Component A ──────┐
-                   │
- Component B ──────┼──► useSomething()
-                   │
- Component C ──────┘
-                          │
-                          ▼
-                   Hook Composition (Primitives)
-                          │
-           ┌──────────────┼──────────────┐
-           ▼              ▼              ▼
-        useState       useEffect       useRef
-           │              │              │
-           └──────────────┼──────────────┘
-                          ▼
-                   Behavioral Contract (API)
-                          │
-                          ▼
-                     Consumer UI
-====================================================================================================
-```
-
----
-
-### 2. The Core Distinction: Reusable Logic vs Shared State
-
-If two components call the exact same custom hook:
-
-```tsx
-function SearchBox() {
-  const search = useSearch(); // Allocated on SearchBox Fiber
-}
-
-function SearchPage() {
-  const search = useSearch(); // Allocated on SearchPage Fiber
-}
-```
-
-They do **not** share state. Each component Fiber allocates its own independent singly-linked list of hooks.
-
-```text
-====================================================================================================
-                       FIBER HOOK MEMORY ALLOCATION TOPOLOGY
-====================================================================================================
-
- SearchBox Fiber (Host Instance A)
-     │
-     └── memoizedState ──► [Hook 1: useState(query)] ──► [Hook 2: useEffect(debounce)]
-                               (query: "react")
-
-
- SearchPage Fiber (Host Instance B)
-     │
-     └── memoizedState ──► [Hook 1: useState(query)] ──► [Hook 2: useEffect(debounce)]
-                               (query: "fiber")
+ Component
+    │
+    ▼
+ Custom Hook Invocation
+    │
+    ├── useState()
+    ├── useReducer()
+    ├── useEffect()
+    ├── useRef()
+    ├── useMemo()
+    ├── useCallback()
+    └── useContext()
+    │
+    ▼
+ Reusable Behavior
+    │
+    ▼
+ Returned API
+    │
+    ▼
+ Component Output
 ====================================================================================================
 ```
 
-$$\text{Reusable Logic } \neq \text{ Shared State}$$
+$$\text{Critical Architectural Invariant: } \mathbf{\text{REUSABLE LOGIC } \neq \text{ SHARED STATE}}$$
 
----
-
-### 3. Senior Trap: The Counter Fallacy
-
-A developer sees:
+Suppose:
 ```typescript
 function useCounter() {
   const [count, setCount] = useState(0);
-
   return {
     count,
-    increment: () => setCount((c) => c + 1),
+    increment: () => {
+      setCount((value) => value + 1);
+    },
   };
 }
 ```
 
-and thinks:
-> *"Now I have a reusable counter across my application."*
+Two components can use the same Hook:
+```tsx
+function FirstCounter() {
+  const counter = useCounter();
+  return <button onClick={counter.increment}>{counter.count}</button>;
+}
 
-More precisely: you have a **reusable counter algorithm**.
-
-```text
-Component A calls useCounter() ──► count = 0
-Component B calls useCounter() ──► count = 0
-
-User clicks A.increment()
-   │
-   ▼
-Component A Rerenders ──► count = 1
-Component B (Untouched) ──► count = 0
+function SecondCounter() {
+  const counter = useCounter();
+  return <button onClick={counter.increment}>{counter.count}</button>;
+}
 ```
 
-The abstraction reused the state management pattern, not the state memory slot.
+They share the implementation:
+```text
+           useCounter()
+          /            \
+         /              \
+        ▼                ▼
+   FirstCounter     SecondCounter
+        │                │
+        ▼                ▼
+     State A          State B
+```
+
+They do **not** share the same state instance. After incrementing the first:
+$$\text{FirstCounter} \to 1 \quad \text{vs} \quad \text{SecondCounter} \to 0$$
 
 ---
 
-### 4. Custom Hook vs Context vs External Store
+### 2. Architectural Equation
+
+$$\text{Custom Hook Architecture} = \text{Behavior} + \text{State Ownership} + \text{Synchronization} + \text{Dependencies} + \text{Lifetime} + \text{Public API}$$
+
+A Hook that merely removes duplicated code is not necessarily a good abstraction. A senior engineer must reason about all six factors.
+
+---
+
+### 3. The Five-Way Logic Placement Decision
 
 ```text
 ====================================================================================================
-                       DISTRIBUTION MECHANISM COMPARISON
+                              FIVE-WAY LOGIC PLACEMENT DECISION TREE
 ====================================================================================================
 
- 1. CUSTOM HOOK (Local Behavior Reusability)
-    • Mechanism: Composes primitive hooks directly into calling Fiber.
-    • Memory: 100% isolated per caller instance.
-    • Best For: Encapsulating state machines, timers, form validation, event listeners.
-
- 2. CONTEXT (Scoped Ambient Dependency)
-    • Mechanism: Fiber tree ancestor lookup via Context Stack.
-    • Memory: Single Provider Fiber owns the state; broadcast to subtree.
-    • Best For: Theme, Auth Session, Multi-instance Feature Controllers.
-
- 3. EXTERNAL STORE (Global Observable State)
-    • Mechanism: Module-level or scoped pub/sub engine read via useSyncExternalStore.
-    • Memory: Outside React Fiber tree; fine-grained subscriptions.
-    • Best For: High-frequency data (60fps), cross-tab sync, multi-branch sharing.
+ Does the logic require React lifecycle / state / context / refs?
+             │
+      ┌──────┴──────┐
+      │             │
+     NO            YES
+      │             │
+      ▼             ▼
+ Pure utility   Candidate custom Hook
+                    │
+                    ▼
+          Does it need shared state across multiple callers?
+                    │
+             ┌──────┴──────┐
+             │             │
+            NO            YES
+             │             │
+             ▼             ▼
+        CUSTOM HOOK    Context / External Store
 ====================================================================================================
 ```
 
 ---
 
-## Layer 2 — 🔬 Deep Mechanical Breakdown & Fiber Hook List
+### 4. Fundamental Distinctions Table
 
-### 5. Custom Hooks Do Not Create Component Fibers
-A common novice misconception is that custom hooks create child Fibers or virtual component nodes.
+| Concept | What It Actually Represents | What It Does NOT Mean |
+| :--- | :--- | :--- |
+| **Custom Hook** | Reusable Hook composition boundary | Shared state container |
+| **Hook Invocation** | One execution of the Hook for a caller | A new component or Fiber |
+| **Component** | React component identity and UI boundary | Merely a function call |
+| **`useState` inside Hook** | State associated with caller's Hook position | Global state |
+| **`useRef` inside Hook** | Mutable instance memory associated with caller | Shared mutable memory |
+| **`useEffect` inside Hook** | Synchronization owned by caller's Hook lifecycle | Generic post-render callback |
+| **Context Consumed by Hook** | Dependency distributed through React tree | State created by the Hook |
+| **Utility Function** | Pure/general reusable computation | React lifecycle abstraction |
+| **External Store** | Independently owned subscribable state | A custom Hook |
+| **Hook Return Value** | Consumer-facing API | Shared state container |
+
+---
+
+### 5. The Most Important Mental Model
+Never reason about `useCounter()` as if it were a singleton. Instead reason:
+```text
+Component Instance ──► Hook Invocation ──► Hook State Memory
+```
+
+Thus:
+```text
+Component A ──► useCounter() ──► Hook State A
+Component B ──► useCounter() ──► Hook State B
+```
+*The implementation is shared; the Hook state is isolated.*
+
+---
+
+### 6. What Makes a Function a Custom Hook?
+Conventionally, a custom Hook:
+1. Begins with `use` (e.g. `useToggle`, `useAuth`).
+2. Calls other primitive or custom Hooks.
+3. Obeys the Rules of Hooks (unconditional call order).
+4. Encapsulates reusable reactive behavior.
+5. Exposes an intention-revealing consumer API.
+
+```typescript
+// 1. Synchronization abstraction
+function useDocumentTitle(title: string) {
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
+}
+
+// 2. Local state abstraction
+function useToggle(initial = false) {
+  const [value, setValue] = useState(initial);
+  const toggle = () => setValue((current) => !current);
+  return { value, toggle };
+}
+
+// 3. Dependency gateway
+function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}
+```
+*Custom Hook is not an architectural category—it is a composition mechanism.*
+
+---
+
+### 7. A Custom Hook Does NOT Create a Fiber
 
 ```text
 ❌ WRONG MENTAL MODEL:
 Counter Fiber ──► useCounter Fiber ──► useState
 
 ✅ CORRECT FIBER REALITY:
-Counter Fiber (Tag: 0, IndeterminateComponent / 2, FunctionComponent)
+Counter Fiber
     │
-    └── memoizedState (Singly Linked List)
+    └── Hook list (memoizedState)
             │
-            ├── [Hook 1: useState (from useCounter)]
-            ├── [Hook 2: useEffect (from useCounter)]
-            └── [Hook 3: useRef (direct from Counter)]
+            ├── useState (from useCounter)
+            └── ...
 ```
 
-When React executes a Function Component, `ReactCurrentDispatcher.current` intercepts primitive hook calls (`useState`, `useEffect`, `useRef`). It does not know or care whether those calls happened directly inside the component body or nested 5 layers deep inside custom utility functions.
+`useCounter()` is a plain JavaScript function executing during the render pass of `Counter`. The primitive `useState()` call inside it participates directly in the Hook linked list of the calling component.
 
 ---
 
-### 6. The Complete Execution & Rerender Lifecycle
+### 8. Custom Hooks Are Composition
+```typescript
+function useSearch(query: string) {
+  const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => { /* fetch logic */ }, [query]);
+  return { results, loading };
+}
+
+function useSearchPage(query: string) {
+  const search = useSearch(query);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  return { ...search, selectedId, setSelectedId };
+}
+```
+
+```text
+Component ──► useSearchPage ──► useSearch ──► useState(results)
+                                         ├── useState(loading)
+                                         └── useEffect()
+                           ──► useState(selectedId)
+```
+
+---
+
+### 10. The State Isolation Algebra
+$$\text{Hook Implementation} + \text{Caller Fiber} + \text{Hook Position} = \text{Hook State Instance}$$
+
+Therefore:
+$$\text{Same Hook Implementation} + \text{Different Caller} = \text{Different Hook State Instance}$$
+
+---
+
+## Layer 2 — 🔬 Deep Mechanical Breakdown & Fiber Internals
+
+### 52. Fiber Association and the `memoizedState` Linked List
+At runtime, a React Function Component Fiber stores its hooks as a singly-linked list on `Fiber.memoizedState`.
+
+```text
+FunctionComponent Fiber
+    │
+    └── memoizedState ──► [Hook Node 1] ──► [Hook Node 2] ──► [Hook Node 3]
+                             │                 │                 │
+                             ▼                 ▼                 ▼
+                        useState(0)       useEffect(...)     useRef(null)
+```
+
+Each Hook node contains:
+```typescript
+interface Hook {
+  memoizedState: any;       // Current state snapshot (e.g. 0)
+  baseState: any;           // Base state for update queues
+  baseQueue: Update<any> | null;
+  queue: UpdateQueue<any> | null; // Queued dispatches
+  next: Hook | null;        // Pointer to next hook in sequence
+}
+```
+
+---
+
+### 58. Update Timeline: From Action Dispatch to Re-execution
 
 ```text
 ====================================================================================================
-                     CUSTOM HOOK EXECUTION & RERENDER TIMELINE
+                        CUSTOM HOOK UPDATE & SNAPSHOT TIMELINE
 ====================================================================================================
 
- 1. MOUNT PHASE
-    Component executes ──► Invokes useCounter() ──► mountWorkInProgressHook()
-    Appends Hook nodes to Fiber.memoizedState linked list ──► Returns initial snapshot [0, inc]
-    Component renders JSX with count = 0 ──► Commit Phase mounts DOM.
+ 1. USER INTERACTION
+    User clicks <button onClick={counter.increment}>
+    Calls setCount(current => current + 1)
 
- 2. INTERACTION TRIGGER
-    User clicks <button onClick={inc}> ──► Dispatches update to Hook 1's queue
-    React schedules render lane on the calling Component Fiber.
+ 2. UPDATE QUEUE DISPATCH
+    React enqueues update on Hook Node 1's queue
+    Schedules update lane on the calling Component Fiber.
 
- 3. UPDATE RENDER PASS
-    Calling Component re-executes ──► Invokes useCounter() again
-    updateWorkInProgressHook() walks existing linked list ──► Computes next count = 1
-    Custom hook returns fresh snapshot tuple { count: 1, increment }
-    Component returns new JSX output ──► Reconciler commits DOM text update.
+ 3. COMPONENT RERENDER PASS
+    Calling Component re-executes its function body
+    Executes useCounter() again
+    updateWorkInProgressHook() advances pointer on Fiber.memoizedState
+    Calculates next state: count = 1
+    useCounter returns new snapshot: { count: 1, increment }
+
+ 4. RECONCILIATION & COMMIT
+    Component returns updated JSX with count = 1
+    Reconciler diffs Virtual DOM and commits DOM update.
 ====================================================================================================
 ```
 
 ---
 
-### 7. The 5-Way Decision Framework: Where Does Logic Belong?
+### 60. State Isolation Example With Two Fibers
+
+```tsx
+function App() {
+  return (
+    <>
+      <Counter />
+      <Counter />
+    </>
+  );
+}
+```
 
 ```text
-====================================================================================================
-                              LOGIC PLACEMENT DECISION TREE
-====================================================================================================
+Counter Fiber A (Instance A) ──► useCounter() ──► count A = 0
+Counter Fiber B (Instance B) ──► useCounter() ──► count B = 0
 
-Does logic require React Hook primitives (state, effects, refs, context)?
-        │
-    ┌───┴───┐
-    │       │
-   NO      YES
-    │       │
- Pure    Is the logic specific to exactly ONE component?
-Utility     │
-        ┌───┴───┐
-        │       │
-       YES     NO
-        │       │
-   Keep inside  Does state need to be SHARED across multiple components?
-    Component   │
-            ┌───┴───┐
-            │       │
-           NO      YES
-            │       │
-      CUSTOM HOOK  Is the shared state tree-scoped or high-frequency/global?
-   (Isolated State) │
-                ┌───┴───┐
-                │       │
-             Scoped    Global / 60fps
-                │       │
-             CONTEXT  EXTERNAL STORE
-====================================================================================================
+Click Counter A:
+Counter Fiber A (Instance A) ──► useCounter() ──► count A = 1
+Counter Fiber B (Instance B) ──► useCounter() ──► count B = 0 (Untouched)
+```
+
+---
+
+### 67. TypeScript Behavioral Contracts
+A strong Hook API describes semantics rather than internal implementation machinery.
+
+```typescript
+// ✅ Good: Semantic Behavioral Contract
+export interface DisclosureModel {
+  readonly isOpen: boolean;
+  readonly open: () => void;
+  readonly close: () => void;
+  readonly toggle: () => void;
+}
+
+export function useDisclosure(initial = false): DisclosureModel {
+  const [isOpen, setIsOpen] = useState(initial);
+  
+  const open = useCallback(() => setIsOpen(true), []);
+  const close = useCallback(() => setIsOpen(false), []);
+  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
+
+  return { isOpen, open, close, toggle };
+}
 ```
 
 ---
 
 ## Layer 3 — 🛠️ Production Crucibles & Anti-Patterns
 
-### 8. Production Anti-Pattern: The Fake Global User Hook
-
-#### ❌ Flawed Code: Expecting Shared State from a Custom Hook
-```tsx
-// ❌ WRONG: Expecting useUser() to behave like a shared singleton
-export function useUser() {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    fetchCurrentUser().then(setUser);
-  }, []);
-
-  return { user, setUser };
-}
-
-// In Header.tsx:
-export function Header() {
-  const { user } = useUser(); // Allocates User State Instance A
-  return <div>Welcome, {user?.name}</div>;
-}
-
-// In Profile.tsx:
-export function Profile() {
-  const { user, setUser } = useUser(); // Allocates User State Instance B!
-  return <button onClick={() => setUser(newUser)}>Update Name</button>;
-}
-```
-*Result: Clicking `setUser` in `Profile` updates Profile's local state, but `Header` remains completely unaware and displays stale data because each caller has its own isolated `user` state slot!*
-
-#### ✅ Senior Refactoring: Context Gateway + Custom Hook
-```tsx
-// 1. Single Authoritative Provider owns the user state instance
-const UserContext = createContext<{ user: User | null; setUser: (u: User) => void } | null>(null);
-
-export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    fetchCurrentUser().then(setUser);
-  }, []);
-
-  return (
-    <UserContext.Provider value={{ user, setUser }}>
-      {children}
-    </UserContext.Provider>
-  );
-}
-
-// 2. Custom Hook acts as an ambient gateway to the shared Context instance
-export function useUser() {
-  const context = useContext(UserContext);
-  if (!context) {
-    throw new Error('[useUser] Invariant Violation: Missing <UserProvider> in ancestry.');
+### 41. Production Incident: "Our Shared Hook Isn't Shared"
+- **Symptom:** Header, Profile, and Sidebar all call `useUser()` but show different user names after login.
+- **Flawed Code:**
+  ```tsx
+  // ❌ WRONG: Local useState inside custom hook does NOT share state
+  export function useUser() {
+    const [user, setUser] = useState<User | null>(null);
+    return { user, setUser };
   }
-  return context;
-}
-```
+  ```
+- **Root Cause:** Each component gets its own independent `useState` instance.
+- **Refactoring:** Establish a single authoritative Provider and use the Hook as a gateway:
+  ```tsx
+  // ✅ REFACTORED: Context Provider + Gateway Hook
+  const UserContext = createContext<{ user: User | null; setUser: (u: User) => void } | null>(null);
+
+  export function UserProvider({ children }: { children: React.ReactNode }) {
+    const [user, setUser] = useState<User | null>(null);
+    return <UserContext.Provider value={{ user, setUser }}>{children}</UserContext.Provider>;
+  }
+
+  export function useUser() {
+    const context = useContext(UserContext);
+    if (!context) throw new Error('useUser must be used within UserProvider');
+    return context;
+  }
+  ```
 
 ---
 
-## Layer 4 — 🧪 Mastery Checklist & Diagnostic Gauntlet
+### 43. Anti-Pattern: The God Hook
+```tsx
+// ❌ FLAWED: All domains dumped into one monster hook
+export function useApplication() {
+  // auth, theme, cart, notifications, search, modal, analytics, forms, websocket
+}
+```
+*Refactoring:* Split by semantic ownership (`useAuth`, `useCart`, `useSearch`, `useModal`).
 
-- [x] 1. Define a custom hook as a behavioral abstraction over primitive hooks.
-- [x] 2. Explain why custom hooks reuse stateful algorithms, not state instances.
-- [x] 3. Prove that custom hooks do NOT allocate child Component Fibers.
-- [x] 4. Trace primitive hook allocations into the caller Fiber's `memoizedState` linked list.
-- [x] 5. Distinguish between isolated custom hook state, tree-scoped Context, and external stores.
-- [x] 6. Diagram the complete execution timeline from event trigger to hook re-run.
-- [x] 7. Apply the 5-way decision tree to determine if code belongs in a pure utility, component, hook, or context.
-- [x] 8. Diagnose and fix the "Fake Global Singleton" anti-pattern.
+---
+
+## Layer 4 — 🧪 Senior Diagnostic Gauntlet & Master Checklist
+
+### 87. Senior Interview Gauntlet: Core Questions & Answers
+
+#### Q1: "What is a custom Hook under the hood?"
+> **Staff-level Answer:** A custom Hook is a standard JavaScript function that composes primitive React Hooks (`useState`, `useEffect`, `useRef`, `useContext`). It executes synchronously during its caller's render pass and does not create an independent component Fiber. All Hook allocations append directly to the caller Fiber's `memoizedState` linked list.
+
+#### Q2: "Do two components calling the same custom Hook share state?"
+> **Staff-level Answer:** No. Calling the same custom Hook reuses the behavioral logic and transition algebra, but allocates completely isolated state memory slots in each calling component's Fiber.
+
+#### Q3: "When should logic be a pure utility function versus a custom Hook?"
+> **Staff-level Answer:** If the logic does not require React lifecycle primitives (state, effects, context, refs), it should remain a pure utility function. Introducing a custom Hook for pure math or string formatting adds unnecessary Hook overhead without reactive benefit.
+
+---
+
+### 88. 50-Point Senior Architectural Checklist
+
+- [x] 1. Define a custom Hook as a behavioral composition boundary.
+- [x] 2. Prove that custom Hooks do NOT allocate child component Fibers.
+- [x] 3. Distinguish Hook execution (per render) from Hook state persistence (across renders).
+- [x] 4. Prove that Reusable Logic $\neq$ Shared State.
+- [x] 5. Trace primitive hook allocations into the caller Fiber's `memoizedState` linked list.
+- [x] 6. Understand render snapshots and JavaScript closure semantics inside Hooks.
+- [x] 7. Apply the 5-way decision tree (Utility vs Component vs Hook vs Context vs Store).
+- [x] 8. Recognize and dismantle "God Hooks".
+- [x] 9. Hide internal machinery (`refs`, `AbortController`, `dispatch`) behind semantic APIs.
+- [x] 10. Diagnose and remediate the "Fake Shared Hook" anti-pattern.
 
 ---
 
 ## 🧪 Interactive Diagnostic Lab
-Launch the companion interactive diagnostic lab to visualize dual-caller state isolation and inspect Fiber hook linked lists:
+Launch the companion interactive diagnostic lab to test dual-caller state isolation and inspect Fiber hook linked lists:
 👉 **[🧪 Interactive Custom Hooks Mental Model Lab (Lab 01)](./examples/01-custom-hooks-mental-model-and-logic-reuse.html)**
 
 ---
 
-[⬅️ Level 06 Master Hub](../README.md) | [🧪 Companion Lab (Lab 01)](./examples/01-custom-hooks-mental-model-and-logic-reuse.html) | [Next Part (02: Hook Composition & Rules) ➡️](./02-custom-hook-api-contracts.md)
+[⬅️ Level 06 Master Hub](../README.md) | [🧪 Companion Lab (Lab 01)](./examples/01-custom-hooks-mental-model-and-logic-reuse.html) | [Next Part (02: Hook Composition & Rules) ➡️](./02-hook-composition-and-the-rules-of-hooks.md)
