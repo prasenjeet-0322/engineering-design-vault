@@ -18,7 +18,7 @@ Derived data, useMemo, useCallback, React.memo, referential equality, memoizatio
 | Part & File | Status | Key Focus & Mechanics |
 | :--- | :---: | :--- |
 | [Derived State & In-Render Computation](./01-derived-state-during-render.md) | ✅ Completed | Why calculating values during render is 10x faster and bug-free compared to state syncing. | [🧪 Lab 01](./examples/01-derived-state-during-render.html) |
-| [Referential Equality & Memoization Mechanics](./02-referential-equality-memoization.md) | ⏳ Pending | Object.is comparisons, shallow equality, when referential instability breaks memoized children. |
+| [Referential Equality & Memoization Mechanics](./02-referential-equality-memoization.md) | ✅ Completed | Object.is comparisons, shallow equality, when referential instability breaks memoized children. | [🧪 Lab 02](./examples/02-referential-equality-memoization.html) |
 | [useMemo & useCallback Deep Dive](./03-usememo-usecallback-deep-dive.md) | ⏳ Pending | Caching expensive computations, stabilizing callback references, dependency array traps. |
 | [React.memo & Pure Component Optimization](./04-react-memo-component-caching.md) | ⏳ Pending | Wrapping components with React.memo, custom arePropsEqual comparators, bailout limits. |
 | [Memoization Crucible & Cost of Over-Optimization](./05-memoization-crucible-premature-optimization.md) | ⏳ Pending | When memoization hurts performance, profiling before memoizing, compiler-driven future. |

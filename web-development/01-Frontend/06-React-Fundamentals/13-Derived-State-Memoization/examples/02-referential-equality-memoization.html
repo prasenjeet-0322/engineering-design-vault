@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 13 Part 02 — Referential Equality, Object.is & Memoization Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+    .animate-pulse-fast { animation: pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) 2; }
+    @keyframes flashGreen {
+      0%, 100% { background-color: transparent; }
+      50% { background-color: rgba(34, 197, 94, 0.2); }
+    }
+    @keyframes flashRed {
+      0%, 100% { background-color: transparent; }
+      50% { background-color: rgba(239, 68, 68, 0.2); }
+    }
+    .flash-green { animation: flashGreen 0.6s ease-in-out; }
+    .flash-red { animation: flashRed 0.6s ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo } = React;
+
+    // --- UTILITIES ---
+    let heapIdCounter = 1000;
+    const heapRegistry = new WeakMap();
+    function getHeapId(obj) {
+      if (typeof obj !== 'object' && typeof obj !== 'function') return null;
+      if (obj === null) return null;
+      if (!heapRegistry.has(obj)) {
+        heapRegistry.set(obj, `0x${(++heapIdCounter).toString(16).toUpperCase()}`);
+      }
+      return heapRegistry.get(obj);
+    }
+
+    // --- COMPONENT: HEADER ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'visualizer', label: '1. Object.is & Heap Memory' },
+        { id: 'structural', label: '2. Structural Sharing Explorer' },
+        { id: 'memo-child', label: '3. Memoized Child Sandbox' },
+        { id: 'closures', label: '4. Function Identity & Closures' },
+        { id: 'benchmark', label: '5. Deep vs Shallow Benchmark' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    KPI 13 · Part 02
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">React 18.3 Internals</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  Referential Equality, Object.is & Memoization Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Interactive Exploration of Heap Pointers, Structural Sharing, Bailouts, and Shallow Comparisons
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../02-referential-equality-memoization.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // --- TAB 1: OBJECT.IS & HEAP MEMORY VISUALIZER ---
+    function ObjectIsVisualizer() {
+      const [typeA, setTypeA] = useState('literal');
+      const [typeB, setTypeB] = useState('literal');
+      const [customValA, setCustomValA] = useState('Alice');
+      const [customValB, setCustomValB] = useState('Alice');
+
+      // Generate items based on selection
+      const { itemA, itemB, descA, descB } = useMemo(() => {
+        let a, b, da, db;
+        if (typeA === 'literal') {
+          a = { name: customValA };
+          da = `{ name: "${customValA}" } (New Literal)`;
+        } else if (typeA === 'primitive_num') {
+          a = 42;
+          da = `42 (Primitive Number)`;
+        } else if (typeA === 'nan') {
+          a = NaN;
+          da = `NaN (Not-a-Number)`;
+        } else if (typeA === 'neg_zero') {
+          a = -0;
+          da = `-0 (Negative Zero)`;
+        } else if (typeA === 'pos_zero') {
+          a = +0;
+          da = `+0 (Positive Zero)`;
+        }
+
+        if (typeB === 'alias_a') {
+          b = a;
+          db = `Reference alias: b = a`;
+        } else if (typeB === 'literal') {
+          b = { name: customValB };
+          db = `{ name: "${customValB}" } (New Literal)`;
+        } else if (typeB === 'primitive_num') {
+          b = 42;
+          db = `42 (Primitive Number)`;
+        } else if (typeB === 'nan') {
+          b = NaN;
+          db = `NaN (Not-a-Number)`;
+        } else if (typeB === 'neg_zero') {
+          b = -0;
+          db = `-0 (Negative Zero)`;
+        } else if (typeB === 'pos_zero') {
+          b = +0;
+          db = `+0 (Positive Zero)`;
+        }
+
+        return { itemA: a, itemB: b, descA: da, descB: db };
+      }, [typeA, typeB, customValA, customValB]);
+
+      const isStrictEqual = itemA === itemB;
+      const isObjectIsEqual = Object.is(itemA, itemB);
+      const ptrA = getHeapId(itemA);
+      const ptrB = getHeapId(itemB);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">V8 Heap Memory & Equality Engine</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Configure two operands (A and B) to observe memory allocation addresses, compare strict equality (<code className="text-indigo-400">===</code>) vs React's <code className="text-indigo-400">Object.is</code>, and see why identical object literals fail bailout checks.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Variable A Config */}
+              <div className="bg-slate-950 border border-slate-800 rounded-lg p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-bold text-indigo-400">Operand A</span>
+                  {ptrA && <span className="text-xs font-mono bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">Heap: {ptrA}</span>}
+                </div>
+                <div className="space-y-3">
+                  <label className="block text-xs text-slate-400">Data Type / Construction</label>
+                  <select 
+                    value={typeA} 
+                    onChange={e => setTypeA(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="literal">Object Literal: &#123; name: string &#125;</option>
+                    <option value="primitive_num">Primitive Number: 42</option>
+                    <option value="nan">Special: NaN</option>
+                    <option value="neg_zero">Special: -0 (Negative Zero)</option>
+                    <option value="pos_zero">Special: +0 (Positive Zero)</option>
+                  </select>
+
+                  {typeA === 'literal' && (
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Property `name`</label>
+                      <input 
+                        type="text" 
+                        value={customValA} 
+                        onChange={e => setCustomValA(e.target.value)} 
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <div className="mt-4 p-3 bg-slate-900/60 rounded border border-slate-800 text-xs font-mono text-slate-300">
+                    {descA}
+                  </div>
+                </div>
+              </div>
+
+              {/* Variable B Config */}
+              <div className="bg-slate-950 border border-slate-800 rounded-lg p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-bold text-emerald-400">Operand B</span>
+                  {ptrB && <span className="text-xs font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-800">Heap: {ptrB}</span>}
+                </div>
+                <div className="space-y-3">
+                  <label className="block text-xs text-slate-400">Data Type / Construction</label>
+                  <select 
+                    value={typeB} 
+                    onChange={e => setTypeB(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="literal">Object Literal: &#123; name: string &#125;</option>
+                    <option value="alias_a">Direct Alias (b = a)</option>
+                    <option value="primitive_num">Primitive Number: 42</option>
+                    <option value="nan">Special: NaN</option>
+                    <option value="neg_zero">Special: -0 (Negative Zero)</option>
+                    <option value="pos_zero">Special: +0 (Positive Zero)</option>
+                  </select>
+
+                  {typeB === 'literal' && (
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Property `name`</label>
+                      <input 
+                        type="text" 
+                        value={customValB} 
+                        onChange={e => setCustomValB(e.target.value)} 
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <div className="mt-4 p-3 bg-slate-900/60 rounded border border-slate-800 text-xs font-mono text-slate-300">
+                    {descB}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Comparison Results Card */}
+            <div className="mt-6 bg-slate-950 border border-slate-800 rounded-xl p-5">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider mb-4">Comparison Matrix & React Bailout Analysis</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-400 mb-1 font-mono">Strict Equality (A === B)</div>
+                  <div className={`text-xl font-bold font-mono ${isStrictEqual ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {isStrictEqual ? 'TRUE' : 'FALSE'}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">Standard JS operator</div>
+                </div>
+
+                <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-400 mb-1 font-mono">Object.is(A, B)</div>
+                  <div className={`text-xl font-bold font-mono ${isObjectIsEqual ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {isObjectIsEqual ? 'TRUE' : 'FALSE'}
+                  </div>
+                  <div className="text-xs text-indigo-400/80 mt-1">Used by React useState / useEffect</div>
+                </div>
+
+                <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                  <div className="text-xs text-slate-400 mb-1 font-mono">React State Bailout?</div>
+                  <div className={`text-xl font-bold font-mono ${isObjectIsEqual ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {isObjectIsEqual ? 'BAILOUT ✅' : 'RE-RENDER 💥'}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {isObjectIsEqual ? 'Skips downstream work' : 'Triggers fiber reconciliation'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Edge Case Warning Banner */}
+              {typeA === 'nan' && typeB === 'nan' && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+                  ⚠️ <strong>Special Case 1: NaN Equality</strong> — While <code className="font-mono font-bold">NaN === NaN</code> is <span className="text-rose-400 font-bold">false</span> in JS IEEE-754, <code className="font-mono font-bold">Object.is(NaN, NaN)</code> is <span className="text-emerald-400 font-bold">true</span>. React will safely bail out when setting state from NaN to NaN.
+                </div>
+              )}
+
+              {((typeA === 'neg_zero' && typeB === 'pos_zero') || (typeA === 'pos_zero' && typeB === 'neg_zero')) && (
+                <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+                  ⚠️ <strong>Special Case 2: Signed Zero</strong> — While <code className="font-mono font-bold">-0 === +0</code> is <span className="text-emerald-400 font-bold">true</span> in JS, <code className="font-mono font-bold">Object.is(-0, +0)</code> is <span className="text-rose-400 font-bold">false</span>. React treats transitioning from +0 to -0 as a state change and re-renders!
+                </div>
+              )}
+
+              {typeA === 'literal' && typeB === 'literal' && customValA === customValB && (
+                <div className="mt-4 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-xs text-indigo-300">
+                  💡 <strong>Referential Trap:</strong> Even though both objects have identical semantic values (<code className="font-mono">&#123; name: "{customValA}" &#125;</code>), they reside at distinct heap addresses ({ptrA} vs {ptrB}). Therefore <code className="font-mono">Object.is</code> returns <span className="text-rose-400 font-bold">false</span>, defeating state bailouts and memoization!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 2: STRUCTURAL SHARING EXPLORER ---
+    function StructuralSharingExplorer() {
+      const [stateHistory, setStateHistory] = useState(() => {
+        const initial = {
+          user: { name: 'Alice', role: 'Architect' },
+          settings: { theme: 'dark', notifications: true },
+          products: [{ id: 'p1', name: 'MacBook Pro' }, { id: 'p2', name: 'Keychron Q1' }],
+          orders: [{ id: 'o1', total: 2499 }]
+        };
+        return [initial];
+      });
+
+      const [lastAction, setLastAction] = useState('Initial State Created');
+      const currentState = stateHistory[stateHistory.length - 1];
+      const prevState = stateHistory.length > 1 ? stateHistory[stateHistory.length - 2] : null;
+
+      // Operations
+      const handleUpdateUserName = () => {
+        const names = ['Bob', 'Charlie', 'Diana', 'Evan', 'Alice'];
+        const nextName = names[Math.floor(Math.random() * names.length)];
+        
+        setStateHistory(prev => {
+          const current = prev[prev.length - 1];
+          // ✅ Structural sharing
+          const next = {
+            ...current,
+            user: { ...current.user, name: nextName }
+          };
+          return [...prev, next];
+        });
+        setLastAction(`Updated user.name to "${nextName}" (Structural Sharing)`);
+      };
+
+      const handleDeepCloneUpdate = () => {
+        setStateHistory(prev => {
+          const current = prev[prev.length - 1];
+          // 💥 Deep clone anti-pattern
+          const cloned = JSON.parse(JSON.stringify(current));
+          cloned.user.name = 'Cloned Bob';
+          return [...prev, cloned];
+        });
+        setLastAction('Deep Cloned entire state tree (Destroyed all pointer stability!)');
+      };
+
+      const handleReset = () => {
+        setStateHistory([stateHistory[0]]);
+        setLastAction('Reset to initial state');
+      };
+
+      // Pointer checks
+      const rootChanged = prevState ? currentState !== prevState : false;
+      const userChanged = prevState ? currentState.user !== prevState.user : false;
+      const settingsChanged = prevState ? currentState.settings !== prevState.settings : false;
+      const productsChanged = prevState ? currentState.products !== prevState.products : false;
+      const ordersChanged = prevState ? currentState.orders !== prevState.orders : false;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Structural Sharing vs Deep Clone Explorer</h2>
+                <p className="text-sm text-slate-400">
+                  Observe how immutable updates preserve references for untouched subtrees while deep cloning invalidates every branch.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleUpdateUserName}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-indigo-600/30 transition"
+                >
+                  ⚡ Update user.name (Structural Sharing)
+                </button>
+                <button
+                  onClick={handleDeepCloneUpdate}
+                  className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  💥 Deep Clone Entire Tree
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg mb-6 font-mono text-xs text-indigo-300">
+              Last Action: <span className="text-white font-bold">{lastAction}</span>
+            </div>
+
+            {/* State Graph Visualizer */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* User Branch */}
+              <div className={`p-4 rounded-xl border transition-all ${
+                userChanged ? 'bg-indigo-950/40 border-indigo-500/80 ring-2 ring-indigo-500/20' : 'bg-slate-950 border-slate-800'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-300 font-mono">state.user</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    userChanged ? 'bg-indigo-500 text-white font-bold' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {userChanged ? 'NEW POINTER ⚡' : 'REUSED POINTER 🔒'}
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-slate-400 mb-1">Heap: {getHeapId(currentState.user)}</div>
+                <pre className="text-xs text-slate-200 bg-slate-900 p-2.5 rounded overflow-x-auto">
+                  {JSON.stringify(currentState.user, null, 2)}
+                </pre>
+                <div className="mt-2 text-[11px] text-slate-500">
+                  {userChanged ? 'Consumer re-renders needed' : 'Downstream consumers skip render'}
+                </div>
+              </div>
+
+              {/* Settings Branch */}
+              <div className={`p-4 rounded-xl border transition-all ${
+                settingsChanged ? 'bg-rose-950/40 border-rose-500/80' : 'bg-emerald-950/20 border-emerald-500/40'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-300 font-mono">state.settings</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    settingsChanged ? 'bg-rose-500 text-white font-bold' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {settingsChanged ? 'NEW POINTER 💥' : 'REUSED POINTER 🔒'}
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-slate-400 mb-1">Heap: {getHeapId(currentState.settings)}</div>
+                <pre className="text-xs text-slate-200 bg-slate-900 p-2.5 rounded overflow-x-auto">
+                  {JSON.stringify(currentState.settings, null, 2)}
+                </pre>
+                <div className="mt-2 text-[11px] text-slate-400">
+                  {settingsChanged ? 'Unnecessary re-render caused by deep clone!' : '100% Skipped by React.memo / selector!'}
+                </div>
+              </div>
+
+              {/* Products Branch */}
+              <div className={`p-4 rounded-xl border transition-all ${
+                productsChanged ? 'bg-rose-950/40 border-rose-500/80' : 'bg-emerald-950/20 border-emerald-500/40'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-300 font-mono">state.products</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    productsChanged ? 'bg-rose-500 text-white font-bold' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {productsChanged ? 'NEW POINTER 💥' : 'REUSED POINTER 🔒'}
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-slate-400 mb-1">Heap: {getHeapId(currentState.products)}</div>
+                <pre className="text-xs text-slate-200 bg-slate-900 p-2.5 rounded overflow-x-auto">
+                  {JSON.stringify(currentState.products, null, 2)}
+                </pre>
+                <div className="mt-2 text-[11px] text-slate-400">
+                  {productsChanged ? 'Unnecessary re-render caused by deep clone!' : '100% Skipped by React.memo / selector!'}
+                </div>
+              </div>
+
+              {/* Orders Branch */}
+              <div className={`p-4 rounded-xl border transition-all ${
+                ordersChanged ? 'bg-rose-950/40 border-rose-500/80' : 'bg-emerald-950/20 border-emerald-500/40'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-300 font-mono">state.orders</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    ordersChanged ? 'bg-rose-500 text-white font-bold' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {ordersChanged ? 'NEW POINTER 💥' : 'REUSED POINTER 🔒'}
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-slate-400 mb-1">Heap: {getHeapId(currentState.orders)}</div>
+                <pre className="text-xs text-slate-200 bg-slate-900 p-2.5 rounded overflow-x-auto">
+                  {JSON.stringify(currentState.orders, null, 2)}
+                </pre>
+                <div className="mt-2 text-[11px] text-slate-400">
+                  {ordersChanged ? 'Unnecessary re-render caused by deep clone!' : '100% Skipped by React.memo / selector!'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 3: MEMOIZED CHILD SANDBOX ---
+    const MemoizedChild = memo(function MemoizedChild({ user, onSelect, passMode }) {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-indigo-400 font-mono">&lt;MemoizedChild /&gt;</span>
+            <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              Renders: {renderCount.current}
+            </span>
+          </div>
+
+          <div className="space-y-2 text-xs font-mono text-slate-300">
+            <div>User Prop Heap: <span className="text-emerald-400">{getHeapId(user)}</span></div>
+            <div>User Data: <span className="text-white">{user.name} ({user.role})</span></div>
+            <div>Pass Mode: <span className="text-amber-300">{passMode}</span></div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center">
+            <button
+              onClick={() => onSelect(user.name)}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-semibold transition"
+            >
+              Trigger Callback
+            </button>
+            <span className="text-[11px] text-slate-500">Wrapped in React.memo()</span>
+          </div>
+        </div>
+      );
+    });
+
+    function MemoizedChildSandbox() {
+      const [parentCount, setParentCount] = useState(0);
+      const [passMode, setPassMode] = useState('spread'); // 'spread', 'stable_ref', 'inline_fn', 'use_callback'
+      const [userState] = useState({ name: 'Alice Smith', role: 'Principal Architect' });
+      const [log, setLog] = useState([]);
+
+      const handleSelectCallback = useCallback((name) => {
+        setLog(prev => [`[${new Date().toLocaleTimeString()}] Selected user: ${name}`, ...prev.slice(0, 4)]);
+      }, []);
+
+      const inlineSelect = (name) => {
+        setLog(prev => [`[${new Date().toLocaleTimeString()}] Selected user: ${name}`, ...prev.slice(0, 4)]);
+      };
+
+      // Determine props passed to child
+      const childProps = useMemo(() => {
+        if (passMode === 'spread') {
+          return {
+            user: { ...userState }, // 💥 New object literal every parent render
+            onSelect: handleSelectCallback,
+            label: 'user={{ ...user }} (New Object Literal)'
+          };
+        } else if (passMode === 'stable_ref') {
+          return {
+            user: userState, // ✅ Stable object pointer
+            onSelect: handleSelectCallback,
+            label: 'user={user} (Stable Heap Reference)'
+          };
+        } else if (passMode === 'inline_fn') {
+          return {
+            user: userState,
+            onSelect: (name) => inlineSelect(name), // 💥 Inline closure every parent render
+            label: 'onSelect={() => ...} (Inline Arrow Closure)'
+          };
+        } else {
+          return {
+            user: userState,
+            onSelect: handleSelectCallback, // ✅ Stable callback pointer
+            label: 'user={user} + onSelect={useCallback} (Fully Stabilized)'
+          };
+        }
+      }, [passMode, parentCount, userState, handleSelectCallback]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">React.memo Prop Stability Sandbox</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Trigger parent re-renders and switch between prop-passing strategies to observe when <code className="text-indigo-400">React.memo</code> successfully bails out vs when referential instability breaks memoization.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Parent Component Control */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-amber-400 font-mono">&lt;ParentComponent /&gt;</span>
+                  <span className="text-xs font-mono font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                    Parent Renders: {parentCount}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-2">Prop Passing Strategy:</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input 
+                        type="radio" 
+                        name="passMode" 
+                        value="spread" 
+                        checked={passMode === 'spread'} 
+                        onChange={() => setPassMode('spread')}
+                        className="text-indigo-600 focus:ring-0" 
+                      />
+                      <div>
+                        <div className="font-mono text-rose-300">user=&#123;&#123; ...user &#125;&#125;</div>
+                        <div className="text-[11px] text-slate-500">Unstable: Spreads object into new literal every render</div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input 
+                        type="radio" 
+                        name="passMode" 
+                        value="inline_fn" 
+                        checked={passMode === 'inline_fn'} 
+                        onChange={() => setPassMode('inline_fn')}
+                        className="text-indigo-600 focus:ring-0" 
+                      />
+                      <div>
+                        <div className="font-mono text-rose-300">onSelect=&#123;(id) =&gt; ...&#125;</div>
+                        <div className="text-[11px] text-slate-500">Unstable: Recreates inline arrow callback every render</div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-850 cursor-pointer text-xs">
+                      <input 
+                        type="radio" 
+                        name="passMode" 
+                        value="use_callback" 
+                        checked={passMode === 'use_callback'} 
+                        onChange={() => setPassMode('use_callback')}
+                        className="text-indigo-600 focus:ring-0" 
+                      />
+                      <div>
+                        <div className="font-mono text-emerald-300">user=&#123;user&#125; + onSelect=&#123;useCallback&#125;</div>
+                        <div className="text-[11px] text-slate-500">Optimal: Stable object pointer + stable callback reference</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setParentCount(c => c + 1)}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-amber-600/20"
+                >
+                  ⚡ Trigger Parent Re-render (Unrelated State)
+                </button>
+              </div>
+
+              {/* Child Component Display */}
+              <div className="space-y-4">
+                <MemoizedChild 
+                  user={childProps.user} 
+                  onSelect={childProps.onSelect} 
+                  passMode={childProps.label} 
+                />
+
+                {/* Event Log */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                  <div className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Callback Execution Log</div>
+                  {log.length === 0 ? (
+                    <div className="text-xs text-slate-600 font-mono">No callback events recorded yet.</div>
+                  ) : (
+                    <div className="space-y-1 font-mono text-xs text-slate-300">
+                      {log.map((entry, idx) => (
+                        <div key={idx} className="truncate">{entry}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 4: FUNCTION IDENTITY & CLOSURE FRESHNESS ---
+    function FunctionClosureDemo() {
+      const [count, setCount] = useState(0);
+      const [staleLog, setStaleLog] = useState([]);
+
+      // 💥 Stale closure: useCallback with empty dependency array
+      const staleCallback = useCallback(() => {
+        setStaleLog(prev => [`[Stale Closure] Captured count at instantiation: ${count}`, ...prev.slice(0, 4)]);
+      }, []); // Empty deps captures initial count (0) forever!
+
+      // ✅ Fresh callback: includes dependency
+      const freshCallback = useCallback(() => {
+        setStaleLog(prev => [`[Fresh Closure] Current count: ${count}`, ...prev.slice(0, 4)]);
+      }, [count]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Function Identity vs Closure Freshness</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              A stable function pointer is worthless if it captures stale closure values. Compare an over-stabilized callback with a correctly synchronized dependency array.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-white">Component Reactive State</span>
+                  <span className="text-lg font-bold font-mono text-indigo-400">count: {count}</span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCount(c => c + 1)}
+                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition"
+                  >
+                    Increment Count (+1)
+                  </button>
+                  <button
+                    onClick={() => setCount(0)}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition"
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800 space-y-3">
+                  <button
+                    onClick={staleCallback}
+                    className="w-full py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-mono font-bold transition"
+                  >
+                    Invoke staleCallback() [deps: []]
+                  </button>
+
+                  <button
+                    onClick={freshCallback}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono font-bold transition"
+                  >
+                    Invoke freshCallback() [deps: [count]]
+                  </button>
+                </div>
+              </div>
+
+              {/* Closure Inspection Log */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Closure Snapshot Log</h3>
+                {staleLog.length === 0 ? (
+                  <div className="text-xs text-slate-600 font-mono">Increment count and click the buttons to test closure behavior.</div>
+                ) : (
+                  <div className="space-y-2 font-mono text-xs">
+                    {staleLog.map((logItem, idx) => {
+                      const isStale = logItem.includes('Stale');
+                      return (
+                        <div key={idx} className={`p-2.5 rounded border ${
+                          isStale ? 'bg-rose-950/30 border-rose-800/60 text-rose-300' : 'bg-emerald-950/30 border-emerald-800/60 text-emerald-300'
+                        }`}>
+                          {logItem}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 5: DEEP VS SHALLOW BENCHMARK ---
+    function BenchmarkSimulator() {
+      const [itemCount, setItemCount] = useState(5000);
+      const [benchmarkResult, setBenchmarkResult] = useState(null);
+      const [isRunning, setIsRunning] = useState(false);
+
+      // Recursive deep equal implementation
+      function deepEqual(a, b) {
+        if (Object.is(a, b)) return true;
+        if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        for (let k of keysA) {
+          if (!Object.prototype.hasOwnProperty.call(b, k) || !deepEqual(a[k], b[k])) return false;
+        }
+        return true;
+      }
+
+      function shallowEqual(a, b) {
+        if (Object.is(a, b)) return true;
+        if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        for (let i = 0; i < keysA.length; i++) {
+          const k = keysA[i];
+          if (!Object.prototype.hasOwnProperty.call(b, k) || !Object.is(a[k], b[k])) return false;
+        }
+        return true;
+      }
+
+      const runBenchmark = () => {
+        setIsRunning(true);
+        setTimeout(() => {
+          // Generate complex objects
+          const treeA = {
+            id: 'root',
+            meta: { timestamp: 1234567, tags: ['frontend', 'react', 'memo'] },
+            data: Array.from({ length: itemCount }, (_, i) => ({
+              id: `item-${i}`,
+              title: `Item Title ${i}`,
+              metrics: { views: i * 10, clicks: i * 2 }
+            }))
+          };
+
+          // Structural copy with 1 tiny modification at the end
+          const treeB = {
+            ...treeA,
+            data: treeA.data.map((item, idx) => idx === itemCount - 1 ? { ...item, metrics: { ...item.metrics, views: item.metrics.views + 1 } } : item)
+          };
+
+          // Benchmark Shallow Equal
+          const t0 = performance.now();
+          for (let i = 0; i < 50; i++) {
+            shallowEqual(treeA, treeB);
+          }
+          const t1 = performance.now();
+          const shallowDuration = ((t1 - t0) / 50).toFixed(4);
+
+          // Benchmark Deep Equal
+          const t2 = performance.now();
+          for (let i = 0; i < 10; i++) {
+            deepEqual(treeA, treeB);
+          }
+          const t3 = performance.now();
+          const deepDuration = ((t3 - t2) / 10).toFixed(4);
+
+          setBenchmarkResult({
+            shallow: parseFloat(shallowDuration),
+            deep: parseFloat(deepDuration),
+            ratio: (parseFloat(deepDuration) / (parseFloat(shallowDuration) || 0.0001)).toFixed(1)
+          });
+          setIsRunning(false);
+        }, 50);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Deep Equal vs Shallow Equal Performance Inversion</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Benchmark the raw CPU comparison latency of recursive <code className="text-rose-400">deepEqual()</code> against React's <code className="text-emerald-400">shallowEqual()</code> across large nested data structures.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Nested Node Count</label>
+                <select 
+                  value={itemCount} 
+                  onChange={e => setItemCount(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                >
+                  <option value={1000}>1,000 Nested Items</option>
+                  <option value={5000}>5,000 Nested Items</option>
+                  <option value={15000}>15,000 Nested Items</option>
+                </select>
+              </div>
+
+              <button
+                onClick={runBenchmark}
+                disabled={isRunning}
+                className="mt-5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+              >
+                {isRunning ? 'Running Benchmark...' : '🚀 Execute Live CPU Benchmark'}
+              </button>
+            </div>
+
+            {benchmarkResult && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 mb-1 font-mono">Shallow Equal Time</div>
+                    <div className="text-2xl font-bold font-mono text-emerald-400">{benchmarkResult.shallow} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">O(keys) top-level pointer check</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 mb-1 font-mono">Deep Equal Time</div>
+                    <div className="text-2xl font-bold font-mono text-rose-400">{benchmarkResult.deep} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">O(N) recursive tree traversal</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 mb-1 font-mono">Cost Ratio</div>
+                    <div className="text-2xl font-bold font-mono text-amber-400">{benchmarkResult.ratio}x SLOWER</div>
+                    <div className="text-xs text-slate-500 mt-1">Deep check overhead vs shallow</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+                  ⚠️ <strong>Architectural Takeaway:</strong> Spending {benchmarkResult.deep}ms running deep comparison on every frame to avoid a 1.2ms component render creates a massive <strong>performance regression</strong>. Always prefer shallow comparisons with immutable structural sharing!
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 6: SENIOR CERTIFICATION EXAM ---
+    function SeniorExam() {
+      const questions = [
+        {
+          id: 1,
+          q: 'Why does Object.is({}, {}) return false?',
+          options: [
+            'Because the objects have no keys defined',
+            'Because each object literal allocates a separate heap address in memory',
+            'Because React overrides Object.is to prevent memory leaks',
+            'Because empty objects evaluate to falsy values'
+          ],
+          answer: 1,
+          explanation: 'Every `{}` literal creates a brand new JavaScript object in the heap memory with a unique memory pointer address.'
+        },
+        {
+          id: 2,
+          q: 'How does Object.is differ from strict equality (===) regarding NaN?',
+          options: [
+            'Object.is(NaN, NaN) is false, while NaN === NaN is true',
+            'Object.is(NaN, NaN) is true, while NaN === NaN is false',
+            'Both return false according to IEEE-754 rules',
+            'Both return true in ECMAScript 2024'
+          ],
+          answer: 1,
+          explanation: 'In standard JS, `NaN === NaN` is false. However, `Object.is(NaN, NaN)` evaluates to true, allowing React to bail out of state updates when setting NaN to NaN.'
+        },
+        {
+          id: 3,
+          q: 'What is the primary architectural benefit of structural sharing in React state management?',
+          options: [
+            'It enables automatic deep cloning of all nested arrays',
+            'It reuses references for unmodified branches, allowing memoized consumers to bail out in O(1) time',
+            'It converts all objects into immutable WebAssembly structs',
+            'It prevents the Garbage Collector from freeing unreferenced memory'
+          ],
+          answer: 1,
+          explanation: 'Structural sharing generates new references only for modified paths while reusing pointers for untouched branches, giving shallow comparators an instant signal to skip rendering.'
+        },
+        {
+          id: 4,
+          q: 'Why does passing `user={{ ...user }}` to a React.memo child cause it to re-render on every parent render?',
+          options: [
+            'Because the spread operator deletes internal Fiber metadata',
+            'Because object spread allocates a new object literal with a new pointer every time JSX is evaluated',
+            'Because React.memo only supports primitive props',
+            'Because child components cannot receive spread objects'
+          ],
+          answer: 1,
+          explanation: 'Object spread `{ ...user }` inside JSX allocates a new object reference on every parent execution, causing React.memo shallowEqual to return false.'
+        },
+        {
+          id: 5,
+          q: 'When does a custom deep comparator inside React.memo cause a performance regression?',
+          options: [
+            'When the comparison CPU duration exceeds the component render CPU duration',
+            'Whenever the component contains CSS modules',
+            'Only when used with TypeScript strict mode',
+            'Never; deep comparison is always faster than Virtual DOM diffing'
+          ],
+          answer: 0,
+          explanation: 'If deep comparison takes 5ms on a complex graph but rendering takes 1ms, running the comparison on every frame wastes 4ms of CPU time.'
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const score = useMemo(() => {
+        return Object.keys(selectedAnswers).reduce((acc, qId) => {
+          const q = questions.find(item => item.id === Number(qId));
+          return q && selectedAnswers[qId] === q.answer ? acc + 1 : acc;
+        }, 0);
+      }, [selectedAnswers, questions]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Senior Referential Equality Certification</h2>
+                <p className="text-sm text-slate-400">Test your mastery of Object.is, heap pointers, and memoization mechanics.</p>
+              </div>
+              {submitted && (
+                <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                  score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  Score: {score} / {questions.length} ({Math.round((score / questions.length) * 100)}%)
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {questions.map((q, idx) => (
+                <div key={q.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                  <div className="text-sm font-bold text-slate-200 mb-3 font-mono">
+                    {idx + 1}. {q.q}
+                  </div>
+
+                  <div className="space-y-2">
+                    {q.options.map((opt, oIdx) => {
+                      const isSelected = selectedAnswers[q.id] === oIdx;
+                      const isCorrect = q.answer === oIdx;
+
+                      let btnStyle = 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850';
+                      if (submitted) {
+                        if (isCorrect) btnStyle = 'bg-emerald-950/60 border-emerald-500 text-emerald-300';
+                        else if (isSelected) btnStyle = 'bg-rose-950/60 border-rose-500 text-rose-300';
+                      } else if (isSelected) {
+                        btnStyle = 'bg-indigo-950/60 border-indigo-500 text-indigo-300';
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          disabled={submitted}
+                          onClick={() => setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }))}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span>{opt}</span>
+                          {submitted && isCorrect && <span className="font-bold text-emerald-400">✓ Correct</span>}
+                          {submitted && isSelected && !isCorrect && <span className="font-bold text-rose-400">✗ Wrong</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="mt-3 p-3 bg-slate-900 rounded border border-slate-800 text-xs text-slate-400">
+                      💡 <strong>Explanation:</strong> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {!submitted ? (
+                <button
+                  onClick={() => setSubmitted(true)}
+                  disabled={Object.keys(selectedAnswers).length < questions.length}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+                >
+                  Submit Certification Exam
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSubmitted(false);
+                    setSelectedAnswers({});
+                  }}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition"
+                >
+                  Retake Exam
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('visualizer');
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            {activeTab === 'visualizer' && <ObjectIsVisualizer />}
+            {activeTab === 'structural' && <StructuralSharingExplorer />}
+            {activeTab === 'memo-child' && <MemoizedChildSandbox />}
+            {activeTab === 'closures' && <FunctionClosureDemo />}
+            {activeTab === 'benchmark' && <BenchmarkSimulator />}
+            {activeTab === 'exam' && <SeniorExam />}
+          </main>
+
+          <footer className="border-t border-slate-800 bg-slate-900/40 py-6 text-center text-xs text-slate-500">
+            <p>React 18 Architecture Masterclass · Level 06 — KPI 13 · Engineering Design Vault</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
