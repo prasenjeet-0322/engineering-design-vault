@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 13 Part 05 — Memoization Crucible & React Compiler Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo } = React;
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'state-colocation', label: '1. State Colocation' },
+        { id: 'memo-tax', label: '2. The Memoization Tax' },
+        { id: 'react-compiler', label: '3. React Compiler (Forget)' },
+        { id: 'roi-calculator', label: '4. Optimization ROI Calculator' },
+        { id: 'profiling-protocol', label: '5. Profiling Protocol Tool' },
+        { id: 'exam', label: '6. KPI 13 Master Exam' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    KPI 13 · Part 05 (Final Synthesis)
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">React 18.3 & React 19 Compiler</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  Memoization Crucible & React Compiler Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  State Colocation Architecture, Over-Optimization Taxes, Compiler useMemoCache & Master Certification
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../05-memoization-crucible-premature-optimization.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // --- TAB 1: STATE COLOCATION VS HIGH-LEVEL INVALIDATION ---
+    function MonolithicDashboardSimulator({ onRenderCount }) {
+      const [theme, setTheme] = useState('dark');
+      const [search, setSearch] = useState('');
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+
+      return (
+        <div className="bg-slate-950 border border-rose-900/40 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-rose-400 font-mono">💥 Monolithic Architecture</span>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
+              Total Tree Renders: {renderCount.current}
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div>
+              <label className="block text-slate-400 mb-1">High-Level Theme Selector:</label>
+              <button
+                onClick={() => setTheme(t => t === 'dark' ? 'navy' : 'dark')}
+                className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded font-semibold transition"
+              >
+                Toggle Theme ({theme}) ⚡ (Rerenders Entire Dashboard!)
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-slate-400 mb-1">Search Query (Causes Heavy Subtree Recalculation):</label>
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Type search..."
+                className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-900 rounded border border-slate-800 text-[11px] text-rose-300 font-mono">
+            Status: Any theme toggle invalidates search input and chart subtrees simultaneously!
+          </div>
+        </div>
+      );
+    }
+
+    // Colocated components
+    function ThemeSection() {
+      const [theme, setTheme] = useState('dark');
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      return (
+        <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
+          <span className="text-xs text-slate-300">Colocated Theme: <strong className="text-emerald-400">{theme}</strong></span>
+          <button
+            onClick={() => setTheme(t => t === 'dark' ? 'emerald' : 'dark')}
+            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold"
+          >
+            Toggle (Renders only ThemeSection #{renderCount.current})
+          </button>
+        </div>
+      );
+    }
+
+    function SearchSection() {
+      const [search, setSearch] = useState('');
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      return (
+        <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-300">Colocated Search Section</span>
+            <span className="text-emerald-400 font-mono">Renders: #{renderCount.current}</span>
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search here..."
+            className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono"
+          />
+        </div>
+      );
+    }
+
+    function ColocatedDashboardSimulator() {
+      return (
+        <div className="bg-slate-950 border border-emerald-900/40 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-emerald-400 font-mono">✅ Colocated Architecture</span>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+              ZERO MONOLITHIC CHURN
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <ThemeSection />
+            <SearchSection />
+          </div>
+
+          <div className="p-3 bg-slate-900 rounded border border-slate-800 text-[11px] text-emerald-300 font-mono">
+            Status: Theme updates never invalidate SearchSection; Search keystrokes never invalidate ThemeSection!
+          </div>
+        </div>
+      );
+    }
+
+    function StateColocationTab() {
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">State Colocation vs High-Level State Invalidation</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Compare how placing state high in the component tree forces entire subtrees to re-render vs how <strong>colocating state</strong> to the lowest common consumer eliminates the need for manual Hook memoization entirely.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <MonolithicDashboardSimulator />
+              <ColocatedDashboardSimulator />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 2: THE MEMOIZATION TAX SIMULATOR ---
+    function MemoTaxSimulator() {
+      const [count, setCount] = useState(0);
+      const [itemTotal, setItemTotal] = useState(2000);
+      const [benchmark, setBenchmark] = useState(null);
+      const [isRunning, setIsRunning] = useState(false);
+
+      const runComparison = () => {
+        setIsRunning(true);
+        setTimeout(() => {
+          // 1. Unmemoized Pure Render (Simple VDOM creation of 2000 spans)
+          const t0 = performance.now();
+          for (let i = 0; i < itemTotal; i++) {
+            const vnode = { type: 'span', props: { className: 'badge', children: `Item #${i}` } };
+          }
+          const t1 = performance.now();
+          const unmemoizedDuration = (t1 - t0).toFixed(4);
+
+          // 2. Over-Memoized Tax (Running shallowEqual across 4 props per item on 2000 items)
+          const prev = { id: 1, name: 'Badge', flag: true, color: 'indigo' };
+          const next = { id: 1, name: 'Badge', flag: true, color: 'indigo' };
+          const t2 = performance.now();
+          for (let i = 0; i < itemTotal; i++) {
+            // Simulated shallow comparison
+            Object.is(prev.id, next.id) &&
+            Object.is(prev.name, next.name) &&
+            Object.is(prev.flag, next.flag) &&
+            Object.is(prev.color, next.color);
+          }
+          const t3 = performance.now();
+          const memoTaxDuration = (t3 - t2).toFixed(4);
+
+          setBenchmark({
+            unmemoized: parseFloat(unmemoizedDuration),
+            tax: parseFloat(memoTaxDuration),
+            totalWithFailures: (parseFloat(memoTaxDuration) + parseFloat(unmemoizedDuration)).toFixed(4)
+          });
+          setIsRunning(false);
+        }, 50);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">The "Memoization Tax" Micro-Benchmark</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Simulate the cumulative CPU comparison tax of wrapping thousands of tiny leaf components in <code className="text-rose-400">React.memo</code> vs rendering raw, unmemoized Virtual DOM elements.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Leaf Component Count</label>
+                <select
+                  value={itemTotal}
+                  onChange={e => setItemTotal(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                >
+                  <option value={1000}>1,000 Leaf Components</option>
+                  <option value={5000}>5,000 Leaf Components</option>
+                  <option value={15000}>15,000 Leaf Components</option>
+                </select>
+              </div>
+
+              <button
+                onClick={runComparison}
+                disabled={isRunning}
+                className="mt-5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+              >
+                {isRunning ? 'Calculating...' : '🚀 Benchmark Comparison Overhead'}
+              </button>
+            </div>
+
+            {benchmark && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Raw VDOM Execution</div>
+                    <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">{benchmark.unmemoized} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">Zero comparison overhead</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Shallow Equal Tax</div>
+                    <div className="text-2xl font-bold font-mono text-amber-400 mt-1">{benchmark.tax} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">Pure comparison latency paid</div>
+                  </div>
+
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-800">
+                    <div className="text-xs text-slate-400 font-mono">Worst-Case (When Bailout Fails)</div>
+                    <div className="text-2xl font-bold font-mono text-rose-400 mt-1">{benchmark.totalWithFailures} ms</div>
+                    <div className="text-xs text-slate-500 mt-1">Comparison Cost + Render Cost</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+                  ⚠️ <strong>The Memoization Tax Reality:</strong> If a component takes $0.005\text{ms}$ to render and you pay $0.004\text{ms}$ comparing its props, any render where props change takes $0.009\text{ms}$ (nearly <strong>2x slower</strong>).
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 3: REACT COMPILER (FORGET) VISUALIZER ---
+    function ReactCompilerVisualizer() {
+      const [viewMode, setViewMode] = useState('source'); // 'source' vs 'compiled'
+
+      const sourceCode = `// 🧑‍💻 Idiomatic Source Code (Developer Writes This)
+function ProductCard({ product, onSelect }) {
+  const formattedPrice = formatCurrency(product.price);
+  
+  return (
+    <div onClick={() => onSelect(product.id)}>
+      <h3>{product.title}</h3>
+      <p>{formattedPrice}</p>
+    </div>
+  );
+}`;
+
+      const compiledCode = `// ⚙️ Compiled Output (React Compiler Generates This)
+function ProductCard(t0) {
+  const $ = useMemoCache(4); // Fixed-size slot array
+  const { product, onSelect } = t0;
+
+  let t1;
+  if ($[0] !== product.price) {
+    t1 = formatCurrency(product.price);
+    $[0] = product.price;
+    $[1] = t1;
+  } else {
+    t1 = $[1]; // Cache hit for formatted price!
+  }
+
+  let t2;
+  if ($[2] !== product.id || $[3] !== onSelect) {
+    t2 = () => onSelect(product.id);
+    $[2] = product.id;
+    $[3] = onSelect;
+  } else {
+    t2 = $[3]; // Cache hit for inline callback!
+  }
+
+  return (
+    <div onClick={t2}>
+      <h3>{product.title}</h3>
+      <p>{t1}</p>
+    </div>
+  );
+}`;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">React Compiler (React Forget) SSA IR Visualizer</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Inspect how the React Compiler automatically transforms plain, idiomatic JavaScript into fine-grained <code className="text-indigo-400">useMemoCache</code> slot evaluations without manual <code className="text-indigo-400">useMemo</code> or <code className="text-indigo-400">useCallback</code> syntax.
+            </p>
+
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setViewMode('source')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
+                  viewMode === 'source' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                1. Developer Source Code
+              </button>
+              <button
+                onClick={() => setViewMode('compiled')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
+                  viewMode === 'compiled' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                2. Auto-Memoized Compiler Output
+              </button>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+              <pre className="text-xs font-mono text-indigo-300 leading-relaxed overflow-x-auto">
+                {viewMode === 'source' ? sourceCode : compiledCode}
+              </pre>
+            </div>
+
+            <div className="mt-4 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-xs text-indigo-300">
+              💡 <strong>Key Architectural Shift:</strong> The React Compiler automates caching at the sub-expression level. However, <strong>purity</strong> (no mutations during render) and <strong>state architecture</strong> remain non-negotiable requirements for developers!
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 4: OPTIMIZATION ROI CALCULATOR ---
+    function RoiCalculator() {
+      const [renderCost, setRenderCost] = useState(2.5); // ms
+      const [bailoutRate, setBailoutRate] = useState(70); // %
+      const [compareCost, setCompareCost] = useState(0.05); // ms
+      const [parentRenders, setParentRenders] = useState(100);
+
+      const avoidedRenders = (parentRenders * (bailoutRate / 100));
+      const totalAvoidedWork = (avoidedRenders * renderCost);
+      const totalCompareCost = (parentRenders * compareCost);
+      const netSavings = (totalAvoidedWork - totalCompareCost).toFixed(2);
+      const isPositive = parseFloat(netSavings) > 0;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Optimization ROI & Net Performance Calculator</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              Calculate whether an optimization provides positive return on investment using the master performance equation: <code className="text-indigo-400 font-mono">Net = (Avoided Work * Bailout Rate) - Comparison Cost</code>.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Inputs */}
+              <div className="space-y-4 bg-slate-950 p-5 rounded-xl border border-slate-800">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Parameters</h3>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Component Render Cost (ms):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={renderCost}
+                    onChange={e => setRenderCost(Number(e.target.value))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Bailout Success Rate (%): {bailoutRate}%</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={bailoutRate}
+                    onChange={e => setBailoutRate(Number(e.target.value))}
+                    className="w-full accent-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Comparison Cost (ms):</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={compareCost}
+                    onChange={e => setCompareCost(Number(e.target.value))}
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Output Cards */}
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs text-slate-400 font-mono">Total Avoided CPU Work</div>
+                    <div className="text-3xl font-bold font-mono text-emerald-400 mt-2">{totalAvoidedWork.toFixed(2)} ms</div>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-4">Across {parentRenders} parent renders</div>
+                </div>
+
+                <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs text-slate-400 font-mono">Total Comparison Overhead</div>
+                    <div className="text-3xl font-bold font-mono text-rose-400 mt-2">{totalCompareCost.toFixed(2)} ms</div>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-4">Paid on EVERY parent render</div>
+                </div>
+
+                <div className={`sm:col-span-2 p-5 rounded-xl border flex items-center justify-between ${
+                  isPositive ? 'bg-emerald-950/30 border-emerald-500/50' : 'bg-rose-950/30 border-rose-500/50'
+                }`}>
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Net Performance ROI</div>
+                    <div className={`text-4xl font-bold font-mono mt-1 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isPositive ? `+${netSavings} ms` : `${netSavings} ms`}
+                    </div>
+                  </div>
+                  <span className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono ${
+                    isPositive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  }`}>
+                    {isPositive ? 'PROVEN WIN ✅' : 'REGRESSION 💥'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 5: PROFILING PROTOCOL TOOL ---
+    function ProfilingProtocol() {
+      const steps = [
+        { id: 1, title: 'Step 1 — Establish Baseline Profile', desc: 'Record a Chrome DevTools performance trace. Note Long Tasks (>50ms) and Total Blocking Time.' },
+        { id: 2, title: 'Step 2 — Isolate Root Cause', desc: 'Determine whether delays are caused by JavaScript calculations, React Fiber work, or layout thrashing.' },
+        { id: 3, title: 'Step 3 — Architectural Elimination', desc: 'Attempt to eliminate work entirely via state colocation or pure synchronous derivation before writing hooks.' },
+        { id: 4, title: 'Step 4 — Targeted Memoization', desc: 'Apply useMemo / React.memo strictly to proven bottlenecks with stable primitive dependencies.' },
+        { id: 5, title: 'Step 5 — Re-Profile & Validate Correctness', desc: 'Re-record profiler trace to confirm measurable millisecond speedups and verify zero stale closures.' },
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <h2 className="text-lg font-bold text-white mb-2">Senior Performance Profiling Protocol</h2>
+            <p className="text-sm text-slate-400 mb-6">
+              A standard 5-step engineering runbook to diagnose, eliminate, and verify React performance bottlenecks in production.
+            </p>
+
+            <div className="space-y-3">
+              {steps.map(s => (
+                <div key={s.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-start gap-4">
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-mono font-bold text-sm">
+                    {s.id}
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-200">{s.title}</h3>
+                    <p className="text-xs text-slate-400 mt-1">{s.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TAB 6: MASTER CERTIFICATION EXAM ---
+    function MasterExam() {
+      const questions = [
+        {
+          id: 1,
+          q: 'What is the highest priority optimization in the React Performance Hierarchy?',
+          options: [
+            'Wrapping all components in React.memo',
+            'Eliminating unnecessary work entirely (e.g. state colocation, removing sync effects)',
+            'Adding custom arePropsEqual comparators',
+            'Using useCallback on all handlers'
+          ],
+          answer: 1,
+          explanation: 'Eliminating work at the architectural level (Layer 1 & 2) always outperforms local Hook memoization (Layer 3).'
+        },
+        {
+          id: 2,
+          q: 'How does the React Compiler optimize component execution?',
+          options: [
+            'By converting all JavaScript into WebAssembly binaries at runtime',
+            'By performing static single assignment (SSA) analysis at compile-time to insert automatic useMemoCache slots',
+            'By replacing React with raw DOM mutations',
+            'By disabling all re-renders across the application'
+          ],
+          answer: 1,
+          explanation: 'The React Compiler analyzes code at build time and automatically emits fine-grained useMemoCache slots for derived values and JSX elements.'
+        },
+        {
+          id: 3,
+          q: 'What prerequisite is mandatory for code to work correctly under the React Compiler?',
+          options: [
+            'All state must be stored in global Redux stores',
+            'Components must be mathematically pure during render (no side-effects or argument mutations)',
+            'All components must use TypeScript classes',
+            'No props can be strings'
+          ],
+          answer: 1,
+          explanation: 'The compiler assumes strict compliance with the Rules of React. Impure mutations during render will cause rendering bugs.'
+        },
+        {
+          id: 4,
+          q: 'Why can blanket memoization ("wrapping everything in React.memo") degrade performance?',
+          options: [
+            'Because React throws errors when more than 10 components are memoized',
+            'Because the cumulative CPU cost of shallowEqual on thousands of trivial leaf nodes exceeds the render time saved',
+            'Because memoization deletes browser cookies',
+            'Because custom hooks stop working'
+          ],
+          answer: 1,
+          explanation: 'Trivial components render in sub-microseconds; paying comparison overhead plus memory retention for all leaf nodes slows down the main thread.'
+        },
+        {
+          id: 5,
+          q: 'What should a senior engineer do before writing any memoization code in a pull request?',
+          options: [
+            'Disable ESLint exhaustive-deps',
+            'Measure baseline performance using Chrome DevTools Profiler and prove a real CPU bottleneck exists',
+            'Write custom deep comparators immediately',
+            'Convert the component to use synchronous localStorage'
+          ],
+          answer: 1,
+          explanation: 'Senior performance engineering requires empirical profiling to identify bottlenecks before introducing caching complexity.'
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const score = useMemo(() => {
+        return Object.keys(selectedAnswers).reduce((acc, qId) => {
+          const q = questions.find(item => item.id === Number(qId));
+          return q && selectedAnswers[qId] === q.answer ? acc + 1 : acc;
+        }, 0);
+      }, [selectedAnswers, questions]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">KPI 13 Senior Master Certification</h2>
+                <p className="text-sm text-slate-400">Final graduation exam covering Derived State, Referential Equality, useMemo, React.memo & React Compiler.</p>
+              </div>
+              {submitted && (
+                <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                  score >= 4 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}>
+                  Score: {score} / {questions.length} ({Math.round((score / questions.length) * 100)}%)
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {questions.map((q, idx) => (
+                <div key={q.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                  <div className="text-sm font-bold text-slate-200 mb-3 font-mono">
+                    {idx + 1}. {q.q}
+                  </div>
+
+                  <div className="space-y-2">
+                    {q.options.map((opt, oIdx) => {
+                      const isSelected = selectedAnswers[q.id] === oIdx;
+                      const isCorrect = q.answer === oIdx;
+
+                      let btnStyle = 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850';
+                      if (submitted) {
+                        if (isCorrect) btnStyle = 'bg-emerald-950/60 border-emerald-500 text-emerald-300';
+                        else if (isSelected) btnStyle = 'bg-rose-950/60 border-rose-500 text-rose-300';
+                      } else if (isSelected) {
+                        btnStyle = 'bg-indigo-950/60 border-indigo-500 text-indigo-300';
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          disabled={submitted}
+                          onClick={() => setSelectedAnswers(prev => ({ ...prev, [q.id]: oIdx }))}
+                          className={`w-full text-left p-3 rounded-lg border text-xs transition flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span>{opt}</span>
+                          {submitted && isCorrect && <span className="font-bold text-emerald-400">✓ Correct</span>}
+                          {submitted && isSelected && !isCorrect && <span className="font-bold text-rose-400">✗ Wrong</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div className="mt-3 p-3 bg-slate-900 rounded border border-slate-800 text-xs text-slate-400">
+                      💡 <strong>Explanation:</strong> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              {!submitted ? (
+                <button
+                  onClick={() => setSubmitted(true)}
+                  disabled={Object.keys(selectedAnswers).length < questions.length}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-indigo-600/30"
+                >
+                  Submit Master Certification Exam
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSubmitted(false);
+                    setSelectedAnswers({});
+                  }}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition"
+                >
+                  Retake Exam
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('state-colocation');
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            {activeTab === 'state-colocation' && <StateColocationTab />}
+            {activeTab === 'memo-tax' && <MemoTaxSimulator />}
+            {activeTab === 'react-compiler' && <ReactCompilerVisualizer />}
+            {activeTab === 'roi-calculator' && <RoiCalculator />}
+            {activeTab === 'profiling-protocol' && <ProfilingProtocol />}
+            {activeTab === 'exam' && <MasterExam />}
+          </main>
+
+          <footer className="border-t border-slate-800 bg-slate-900/40 py-6 text-center text-xs text-slate-500">
+            <p>React 18 & React 19 Architecture Masterclass · Level 06 — KPI 13 · Engineering Design Vault</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
