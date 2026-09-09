@@ -19,8 +19,9 @@ Idle/Loading/Success/Error state machines, optimistic UI, cancellation, race con
 | :--- | :---: | :--- |
 | [Async UI State Machines (Idle/Load/Success/Error)](./01-async-state-machines-ui.md) | ✅ Completed | Modeling explicit UI states vs boolean flags (isLoading, isError boolean explosions). | [🧪 Lab 01](./examples/01-async-state-machines-ui.html) |
 | [Request Cancellation & Race Condition Guards](./02-request-cancellation-race-guards.md) | ✅ Completed | AbortController integration, latest-request-id guards, discarding stale responses. | [🧪 Lab 02](./examples/02-request-cancellation-race-guards.html) |
-| [Optimistic UI Updates & Rollbacks](./03-optimistic-ui-updates.md) | ⏳ Pending | Immediate local UI updates, background server synchronization, error rollback handling. |
-| [Async Crucible & Production Data Race Incidents](./04-async-crucible-data-lifecycle-bugs.md) | ⏳ Pending | Debugging search-as-you-type race conditions, pagination stale data leaks. |
+| [Loading, Stale Data, Error Recovery & Revalidation](./03-loading-stale-error-revalidation.md) | ✅ Completed | Stale-while-revalidate, non-blocking refresh, stale-error recovery, TTL timestamps. | [🧪 Lab 03](./examples/03-loading-stale-error-revalidation.html) |
+| [Optimistic UI & Mutation Lifecycle](./04-optimistic-ui-and-mutation-lifecycle.md) | ⏳ Pending | Immediate 0ms local updates, rollback strategies, server ID reconciliation. |
+| [Async Crucible & Production Data Lifecycle Incidents](./05-async-crucible-data-lifecycle-bugs.md) | ⏳ Pending | Data race post-mortems, pagination leaks, master decision matrices. |
 
 
 ---

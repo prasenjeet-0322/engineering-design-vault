@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 15 Part 03 — Loading, Stale Data & Revalidation Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, useReducer } = React;
+
+    // --- MOCK USERS GENERATOR ---
+    function generateMockUsers(version = 1) {
+      return [
+        { id: 'usr-1', name: 'Alice Walker', role: 'Staff Systems Architect', status: 'Online', ver: version },
+        { id: 'usr-2', name: 'Bob Chen', role: 'Principal Security Lead', status: 'Active', ver: version },
+        { id: 'usr-3', name: 'Charlie Vance', role: 'Senior Platform Engineer', status: 'In Meeting', ver: version },
+        { id: 'usr-4', name: 'Dana Scully', role: 'Infrastructure Specialist', status: 'Online', ver: version },
+      ];
+    }
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'swr-engine', label: '1. SWR Resource Visualizer' },
+        { id: 'flash-vs-swr', label: '2. Flash vs SWR Comparison' },
+        { id: 'freshness-ttl', label: '3. Freshness & TTL Engine' },
+        { id: 'stale-error', label: '4. Stale-Error Recovery' },
+        { id: 'concurrent-refresh', label: '5. Concurrent Revalidations' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    KPI 15 · Part 03
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">Async UI State & Data Lifecycle</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  Loading, Stale Data, Error Recovery & Revalidation Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Stale-While-Revalidate Lifecycle, Stale-Error Invariants, TTL Timestamps & Flash Eradication
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../03-loading-stale-error-revalidation.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // =========================================================================
+    // TAB 1: SWR RESOURCE VISUALIZER
+    // =========================================================================
+    function TabSwrEngine() {
+      const [state, setState] = useState({
+        status: 'idle', // 'idle' | 'loading' | 'success' | 'refreshing' | 'stale-error' | 'error'
+        data: null,
+        error: null,
+        fetchedAt: null,
+        version: 0
+      });
+      const [log, setLog] = useState([]);
+
+      const handleInitialFetch = (shouldFail = false) => {
+        setState({ status: 'loading', data: null, error: null, fetchedAt: null, version: 0 });
+        setLog(prev => [{ time: new Date().toLocaleTimeString(), action: 'FETCH_STARTED (Initial)' }, ...prev]);
+
+        setTimeout(() => {
+          if (shouldFail) {
+            setState({ status: 'error', data: null, error: new Error('Initial Connection Refused (503)'), fetchedAt: null, version: 0 });
+            setLog(prev => [{ time: new Date().toLocaleTimeString(), action: 'FETCH_FAILED ──► status: error' }, ...prev]);
+          } else {
+            setState({ status: 'success', data: generateMockUsers(1), error: null, fetchedAt: Date.now(), version: 1 });
+            setLog(prev => [{ time: new Date().toLocaleTimeString(), action: 'FETCH_SUCCEEDED ──► status: success (v1)' }, ...prev]);
+          }
+        }, 1000);
+      };
+
+      const handleRefresh = (shouldFail = false) => {
+        if (!state.data) return;
+        const nextVer = state.version + 1;
+        setState(s => ({ ...s, status: 'refreshing', error: null }));
+        setLog(prev => [{ time: new Date().toLocaleTimeString(), action: `REFRESH_STARTED (v${nextVer})` }, ...prev]);
+
+        setTimeout(() => {
+          if (shouldFail) {
+            setState(s => ({
+              ...s,
+              status: 'stale-error',
+              error: new Error('Gateway Timeout on Refresh (504)')
+            }));
+            setLog(prev => [{ time: new Date().toLocaleTimeString(), action: 'REFRESH_FAILED ──► status: stale-error (DATA PRESERVED)' }, ...prev]);
+          } else {
+            setState({
+              status: 'success',
+              data: generateMockUsers(nextVer),
+              error: null,
+              fetchedAt: Date.now(),
+              version: nextVer
+            });
+            setLog(prev => [{ time: new Date().toLocaleTimeString(), action: `REFRESH_SUCCEEDED ──► status: success (v${nextVer})` }, ...prev]);
+          }
+        }, 1200);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
+            <h2 className="text-lg font-bold text-white">Full SWR Lifecycle State Machine</h2>
+            <p className="text-xs text-slate-400">
+              Observe how data snapshots are preserved across background refreshes and refresh failures.
+            </p>
+
+            <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-800 font-mono text-xs">
+              <button onClick={() => handleInitialFetch(false)} className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition">
+                1. Initial Fetch (Success)
+              </button>
+              <button onClick={() => handleInitialFetch(true)} className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition">
+                1b. Initial Fetch (Fail)
+              </button>
+              <button disabled={!state.data} onClick={() => handleRefresh(false)} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold rounded-lg transition">
+                2. Background Refresh (Success)
+              </button>
+              <button disabled={!state.data} onClick={() => handleRefresh(true)} className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-bold rounded-lg transition">
+                3. Background Refresh (Fail ──► Stale-Error)
+              </button>
+              <button onClick={() => setState({ status: 'idle', data: null, error: null, fetchedAt: null, version: 0 })} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition">
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Viewport UI Projection */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase">Rendered Viewport</span>
+                <span className={`px-2.5 py-1 rounded text-xs font-mono font-bold ${
+                  state.status === 'idle' ? 'bg-slate-800 text-slate-400' :
+                  state.status === 'loading' ? 'bg-cyan-500/20 text-cyan-300' :
+                  state.status === 'success' ? 'bg-emerald-500/20 text-emerald-300' :
+                  state.status === 'refreshing' ? 'bg-amber-500/20 text-amber-300 animate-pulse' :
+                  state.status === 'stale-error' ? 'bg-amber-500/30 text-amber-200 border border-amber-500/40' :
+                  'bg-rose-500/20 text-rose-300'
+                }`}>
+                  status: "{state.status}"
+                </span>
+              </div>
+
+              <div className="min-h-[220px] bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+                {state.status === 'idle' && (
+                  <div className="text-center text-xs font-mono text-slate-500">
+                    Awaiting initial fetch trigger.
+                  </div>
+                )}
+                {state.status === 'loading' && (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-4 bg-slate-800 rounded w-3/4"></div>
+                    <div className="h-4 bg-slate-800 rounded w-full"></div>
+                    <div className="h-4 bg-slate-800 rounded w-5/6"></div>
+                  </div>
+                )}
+                {state.status === 'error' && (
+                  <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-xs font-mono text-rose-300">
+                    ❌ Fatal Load Failure: {state.error.message}
+                  </div>
+                )}
+                {state.data && (
+                  <div className="space-y-3">
+                    {state.status === 'refreshing' && (
+                      <div className="flex items-center gap-2 text-xs font-mono text-amber-400 bg-amber-950/40 p-2 rounded border border-amber-500/30">
+                        <span className="w-2.5 h-2.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+                        Revalidating in background (Version {state.version + 1})...
+                      </div>
+                    )}
+                    {state.status === 'stale-error' && (
+                      <div className="flex items-center justify-between text-xs font-mono text-amber-300 bg-amber-950/50 p-2.5 rounded border border-amber-500/40">
+                        <span>⚠ Refresh failed! Showing cached snapshot (v{state.version}).</span>
+                        <button onClick={() => handleRefresh(false)} className="px-2 py-0.5 bg-amber-600 text-white rounded font-bold">
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                      {state.data.map(u => (
+                        <div key={u.id} className="p-2 bg-slate-900 rounded border border-slate-800">
+                          <div className="font-bold text-white">{u.name} <span className="text-[10px] text-cyan-400">(v{u.ver})</span></div>
+                          <div className="text-[11px] text-slate-400">{u.role}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Audit Log */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase font-mono">Transition History</h3>
+              <div className="space-y-2 font-mono text-xs max-h-[220px] overflow-y-auto">
+                {log.map((item, i) => (
+                  <div key={i} className="p-2 bg-slate-950 rounded border border-slate-800 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">{item.time}</span>
+                    <span className="text-cyan-300">{item.action}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: FLASH VS SWR ARENA
+    // =========================================================================
+    function TabFlashVsSwr() {
+      const [naiveLoading, setNaiveLoading] = useState(false);
+      const [naiveData, setNaiveData] = useState(generateMockUsers(1));
+
+      const [swrState, setSwrState] = useState({ status: 'success', data: generateMockUsers(1) });
+
+      const triggerNaiveRefresh = () => {
+        setNaiveLoading(true);
+        setTimeout(() => {
+          setNaiveData(generateMockUsers(Math.floor(Math.random() * 50)));
+          setNaiveLoading(false);
+        }, 1000);
+      };
+
+      const triggerSwrRefresh = () => {
+        setSwrState(s => ({ ...s, status: 'refreshing' }));
+        setTimeout(() => {
+          setSwrState({ status: 'success', data: generateMockUsers(Math.floor(Math.random() * 50)) });
+        }, 1000);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-1">Side-by-Side UX: Flash vs Non-Blocking SWR</h2>
+            <p className="text-xs text-slate-400">
+              Click "Trigger Refresh" on both sides to compare perceived latency and layout thrashing.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Junior Naive Pattern */}
+            <div className="p-5 rounded-xl bg-slate-900 border border-rose-500/40 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-400 font-mono">❌ JUNIOR NAIVE (Flashing Loader)</span>
+                <button onClick={triggerNaiveRefresh} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs rounded font-bold">
+                  Trigger Refresh
+                </button>
+              </div>
+              <div className="min-h-[160px] bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-center font-mono text-xs">
+                {naiveLoading ? (
+                  <div className="flex items-center gap-2 text-rose-400 font-bold animate-pulse">
+                    <span className="w-4 h-4 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></span>
+                    Full Page Spinner (Data Destroyed!)
+                  </div>
+                ) : (
+                  <div className="space-y-1 w-full text-slate-300">
+                    <div className="font-bold text-white">4 Users Loaded</div>
+                    <div className="text-xs text-slate-500">Unmounted on every background refresh.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Senior SWR Pattern */}
+            <div className="p-5 rounded-xl bg-slate-900 border border-emerald-500/40 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400 font-mono">✅ SENIOR SWR (Continuous View)</span>
+                <button onClick={triggerSwrRefresh} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs rounded font-bold">
+                  Trigger Refresh
+                </button>
+              </div>
+              <div className="min-h-[160px] bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center font-mono text-xs space-y-2">
+                {swrState.status === 'refreshing' && (
+                  <div className="flex items-center gap-2 text-amber-300 bg-amber-950/40 p-1.5 rounded text-[11px]">
+                    <span className="w-3 h-3 border-2 border-amber-300 border-t-transparent rounded-full animate-spin"></span>
+                    Non-blocking refresh in progress...
+                  </div>
+                )}
+                <div className="space-y-1 w-full text-slate-300">
+                  <div className="font-bold text-white">4 Users Displayed (Interactive)</div>
+                  <div className="text-xs text-emerald-400">Zero layout shifts or unmounted DOM nodes.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: FRESHNESS & TTL ENGINE
+    // =========================================================================
+    function TabFreshnessTtl() {
+      const [fetchedAt, setFetchedAt] = useState(Date.now());
+      const [ttlSec, setTtlSec] = useState(10);
+      const [currentTime, setCurrentTime] = useState(Date.now());
+
+      useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(Date.now()), 250);
+        return () => clearInterval(timer);
+      }, []);
+
+      const staleAt = fetchedAt + (ttlSec * 1000);
+      const isStale = currentTime >= staleAt;
+      const secondsLeft = Math.max(0, Math.ceil((staleAt - currentTime) / 1000));
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-bold text-white">Authoritative Timestamps & Derived Freshness</h2>
+            <p className="text-xs text-slate-400">
+              Freshness is derived via <code className="text-cyan-400">Date.now() &gt;= staleAt</code>. Store timestamps, never manual booleans!
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
+              <div>
+                <label className="text-xs font-mono text-slate-400 block mb-1">Time To Live (TTL): {ttlSec}s</label>
+                <input 
+                  type="range" 
+                  min={3} 
+                  max={30} 
+                  value={ttlSec} 
+                  onChange={e => setTtlSec(Number(e.target.value))} 
+                  className="w-full accent-cyan-500"
+                />
+              </div>
+              <div className="flex items-end">
+                <button 
+                  onClick={() => setFetchedAt(Date.now())}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs font-mono rounded-lg transition"
+                >
+                  ⚡ Reset Fetched Timestamp (Now)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">FETCHED TIMESTAMP</span>
+              <span className="text-white font-bold text-sm mt-1 block">{new Date(fetchedAt).toLocaleTimeString()}</span>
+            </div>
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">STALE AT THRESHOLD</span>
+              <span className="text-amber-400 font-bold text-sm mt-1 block">{new Date(staleAt).toLocaleTimeString()}</span>
+            </div>
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">FRESHNESS STATUS</span>
+              <span className={`font-bold text-sm mt-1 block ${isStale ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {isStale ? 'STALE (Revalidation Needed)' : `FRESH (${secondsLeft}s left)`}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: STALE-ERROR RECOVERY
+    // =========================================================================
+    function TabStaleError() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">The Stale-Error Invariant Contract</h2>
+            <p className="text-sm text-slate-400">
+              Why an error during revalidation must transition to <code className="text-amber-400">stale-error</code> instead of destructive <code className="text-rose-400">error</code>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-amber-300 space-y-2 overflow-x-auto">
+            <pre>{`case 'REFRESH_FAILED':
+  // Invariant: Preserve existing data snapshot in stale-error state
+  if (state.data !== null) {
+    return {
+      status: 'stale-error',
+      data: state.data,         // 🛡️ Data is KEPT safe!
+      error: action.error,       // ⚠️ Error attached for user banner
+      fetchedAt: state.fetchedAt,
+      staleAt: state.staleAt
+    };
+  }
+  return { status: 'error', data: null, error: action.error };`}</pre>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 5: CONCURRENT REVALIDATIONS
+    // =========================================================================
+    function TabConcurrentRefresh() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <h2 className="text-lg font-bold text-white">Concurrent Revalidations & Stale Failure Discarding</h2>
+          <p className="text-sm text-slate-400">
+            If Request 1 (slow refresh) fails after Request 2 (fast refresh) succeeds, the currentness guard ignores the failure of Request 1.
+          </p>
+          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-cyan-300">
+            t0: req 1 starts (refresh)<br/>
+            t1: req 2 starts (manual refresh)<br/>
+            t2: req 2 succeeds (v2 committed) ✅<br/>
+            t3: req 1 fails (stale generation 1 !== current 2 ──► IGNORED 🗑️)
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 6: SENIOR CERTIFICATION EXAM
+    // =========================================================================
+    function TabExam() {
+      const questions = [
+        {
+          id: 1,
+          question: "Why should an application NOT replace an existing data view with a full-screen spinner on background refresh?",
+          options: [
+            "Because React forbids re-rendering when data is present.",
+            "Because the user already has valid usable data; destroying it causes visual flicker, loss of interaction context, and severe UX degradation.",
+            "Because spinners consume too much GPU memory.",
+            "Because SWR is only permitted on server components."
+          ],
+          correct: 1,
+          explanation: "Initial loading (data: null) requires a placeholder, but background revalidation (data: T) should preserve the existing view with a non-blocking indicator."
+        },
+        {
+          id: 2,
+          question: "What is the primary difference between 'stale' data and 'invalid' data?",
+          options: [
+            "Stale data is in JSON, invalid data is in XML.",
+            "Stale means newer data may exist on the server; invalid means the data is semantically obsolete or corrupt and must not be rendered.",
+            "They are completely identical concepts.",
+            "Invalid data triggers a 404 HTTP code."
+          ],
+          correct: 1,
+          explanation: "Stale data remains usable during revalidation; invalid data (e.g. changing search terms) must be discarded."
+        },
+        {
+          id: 3,
+          question: "Why should freshness (isStale) be derived from timestamps rather than stored as a boolean?",
+          options: [
+            "Because booleans cannot be stored in useState.",
+            "Because time passes continuously without React re-renders, causing stored boolean flags to suffer synchronization drift.",
+            "Because Date.now() runs on a Web Worker.",
+            "Because timestamps prevent memory leaks."
+          ],
+          correct: 1,
+          explanation: "Storing authoritative timestamps (fetchedAt, staleAt) allows deterministic in-render derivation without state drift."
+        },
+        {
+          id: 4,
+          question: "What state should a revalidation failure transition to when previous data exists?",
+          options: [
+            "status: 'idle'",
+            "status: 'loading'",
+            "status: 'stale-error' (preserving data: T alongside error: Error)",
+            "status: 'fatal'"
+          ],
+          correct: 2,
+          explanation: "A refresh failure should not wipe out the last known good snapshot; stale-error displays the data with a non-destructive retry banner."
+        },
+        {
+          id: 5,
+          question: "What is the role of jitter in an exponential backoff retry algorithm?",
+          options: [
+            "To speed up the network TCP handshake.",
+            "To randomize retry delays across clients, preventing the 'thundering herd' problem from overwhelming recovering backend servers.",
+            "To compress JSON payloads.",
+            "To clear browser cache."
+          ],
+          correct: 1,
+          explanation: "Jitter decorrelates client retry attempts so thousands of devices don't hit the server at the exact same synchronized second."
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const score = Object.keys(selectedAnswers).reduce((acc, qId) => {
+        const q = questions.find(item => item.id === Number(qId));
+        return selectedAnswers[qId] === q.correct ? acc + 1 : acc;
+      }, 0);
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">SWR & Revalidation Architecture Certification</h2>
+              <p className="text-xs text-slate-400 mt-1">Validate your expertise in Stale-While-Revalidate, freshness derivation, and error recovery.</p>
+            </div>
+            {submitted && (
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                score === 5 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              }`}>
+                Score: {score} / 5 ({((score / 5) * 100).toFixed(0)}%)
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="font-semibold text-sm text-slate-200">
+                  <span className="text-amber-400 font-mono mr-2">Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correct === optIdx;
+                    let optionStyle = 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700';
+
+                    if (submitted) {
+                      if (isCorrect) {
+                        optionStyle = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                      } else if (isSelected && !isCorrect) {
+                        optionStyle = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                      }
+                    } else if (isSelected) {
+                      optionStyle = 'bg-amber-600/20 border-amber-500 text-amber-200';
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => handleSelect(q.id, optIdx)}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition ${optionStyle}`}
+                      >
+                        <span className="font-mono font-semibold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {submitted && (
+                  <div className="p-3 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-800 font-mono">
+                    💡 <strong className="text-slate-200">Explanation:</strong> {q.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            {submitted ? (
+              <button
+                onClick={() => { setSelectedAnswers({}); setSubmitted(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition"
+              >
+                Retake Exam
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(selectedAnswers).length < questions.length}
+                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-xs font-bold text-white rounded-lg transition shadow-lg shadow-amber-600/20"
+              >
+                Submit Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- ROOT APP CONTAINER ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('swr-engine');
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            {activeTab === 'swr-engine' && <TabSwrEngine />}
+            {activeTab === 'flash-vs-swr' && <TabFlashVsSwr />}
+            {activeTab === 'freshness-ttl' && <TabFreshnessTtl />}
+            {activeTab === 'stale-error' && <TabStaleError />}
+            {activeTab === 'concurrent-refresh' && <TabConcurrentRefresh />}
+            {activeTab === 'exam' && <TabExam />}
+          </main>
+          <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+            KPI 15 · Part 03 — Loading, Stale Data & Revalidation Lab · React 18 Architecture
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
