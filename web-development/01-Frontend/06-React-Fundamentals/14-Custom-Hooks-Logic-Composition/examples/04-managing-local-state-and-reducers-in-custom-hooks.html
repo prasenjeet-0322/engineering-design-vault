@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 — Part 04: Managing Local State & Reducers in Custom Hooks</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useReducer, useCallback, useMemo, useRef } = React;
+
+    // --- REUSABLE CUSTOM HOOK DEFINITIONS ---
+    function useCounter(initialValue = 0) {
+      const [count, setCount] = useState(initialValue);
+      const increment = useCallback(() => setCount(c => c + 1), []);
+      const decrement = useCallback(() => setCount(c => c - 1), []);
+      const reset = useCallback(() => setCount(initialValue), [initialValue]);
+      return { count, increment, decrement, reset };
+    }
+
+    // --- EXPERIMENT 1: STATE ISOLATION ACROSS FIBER INSTANCES ---
+    function ComponentInstanceCard({ title, badgeColor, fiberId }) {
+      const { count, increment, decrement, reset } = useCounter(0);
+      const renderCountRef = useRef(0);
+      renderCountRef.current += 1;
+
+      return (
+        <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4 shadow-lg relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class={`w-3 h-3 rounded-full ${badgeColor}`}></span>
+              <span class="font-bold text-sm text-slate-200">{title}</span>
+            </div>
+            <span class="text-[10px] font-mono bg-slate-900 text-slate-400 border border-slate-800 px-2 py-0.5 rounded">
+              Fiber ID: {fiberId}
+            </span>
+          </div>
+
+          <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-center">
+            <div class="text-[11px] text-slate-500 uppercase font-mono">Fiber.memoizedState[0]</div>
+            <div class="text-3xl font-black text-indigo-400 my-1">{count}</div>
+            <div class="text-[10px] text-slate-400">Renders: {renderCountRef.current}</div>
+          </div>
+
+          <div class="flex gap-2">
+            <button
+              onClick={decrement}
+              class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 rounded-lg font-semibold transition border border-slate-700"
+            >
+              - 1
+            </button>
+            <button
+              onClick={increment}
+              class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2 rounded-lg font-semibold transition shadow"
+            >
+              + 1
+            </button>
+            <button
+              onClick={reset}
+              class="px-3 bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 text-xs py-2 rounded-lg transition border border-slate-700"
+            >
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function StateIsolationExplorer() {
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+              <i class="fa-solid fa-microchip"></i>
+              Experiment 1: State Isolation Between Calling Fiber Instances
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Both components invoke the identical <code class="text-pink-400 font-mono">useCounter()</code> Hook. Observe that state is completely isolated per Fiber node.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ComponentInstanceCard title="Component Instance A" badgeColor="bg-emerald-500" fiberId="Fiber#402" />
+            <ComponentInstanceCard title="Component Instance B" badgeColor="bg-cyan-500" fiberId="Fiber#819" />
+          </div>
+
+          <div class="p-3.5 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 flex items-start gap-3">
+            <i class="fa-solid fa-circle-info text-indigo-400 text-sm mt-0.5"></i>
+            <div class="leading-relaxed">
+              <strong class="text-slate-100">Senior Mental Model:</strong> <code class="text-pink-300 font-mono">useCounter</code> is a shared function in JavaScript heap memory, but state storage is dynamically created on each component's distinct Fiber record (<code class="text-cyan-300 font-mono">Fiber.memoizedState</code>). Custom Hooks reuse stateful logic, <em>not</em> shared state values.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 2: USESTATE DESYNCHRONIZATION VS USEREDUCER ATOMICITY ---
+    function ReducerAtomicitySimulator() {
+      const [approach, setApproach] = useState('reducer'); // 'multi-state' | 'reducer'
+      const [isPending, setIsPending] = useState(false);
+      const [auditLog, setAuditLog] = useState([]);
+
+      // Approach 1: Multi-useState State Machine
+      const [msStatus, setMsStatus] = useState('idle');
+      const [msData, setMsData] = useState(null);
+      const [msError, setMsError] = useState(null);
+
+      // Approach 2: useReducer Atomic Machine
+      const [redState, dispatch] = useReducer((state, action) => {
+        switch (action.type) {
+          case 'FETCH_START':
+            return { status: 'loading', data: null, error: null };
+          case 'FETCH_SUCCESS':
+            return { status: 'success', data: action.payload, error: null };
+          case 'FETCH_FAILURE':
+            return { status: 'error', data: null, error: action.error };
+          case 'RESET':
+            return { status: 'idle', data: null, error: null };
+          default:
+            return state;
+        }
+      }, { status: 'idle', data: null, error: null });
+
+      const addLog = (msg, level = 'info') => {
+        setAuditLog(prev => [{ id: Date.now() + Math.random(), msg, level, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 6)]);
+      };
+
+      const handleSimulateAsync = (shouldFail = false) => {
+        setIsPending(true);
+        if (approach === 'multi-state') {
+          // Staggered multi-setter updates with intentional desynchronization window
+          setMsStatus('loading');
+          addLog('Step 1: setMsStatus("loading")', 'warn');
+          
+          setTimeout(() => {
+            setMsData(null);
+            addLog('Step 2: setMsData(null) (Intermediate render window)', 'warn');
+          }, 300);
+
+          setTimeout(() => {
+            if (shouldFail) {
+              setMsError('500 Internal Server Timeout');
+              setMsStatus('error');
+              addLog('Step 3: setMsError() & setMsStatus("error")', 'error');
+            } else {
+              setMsData({ id: 'ORD-9821', amount: '$420.00' });
+              setMsStatus('success');
+              addLog('Step 3: setMsData() & setMsStatus("success")', 'success');
+            }
+            setIsPending(false);
+          }, 800);
+        } else {
+          // Atomic useReducer transaction
+          dispatch({ type: 'FETCH_START' });
+          addLog('Atomic dispatch({ type: "FETCH_START" }) — all fields reset in 1 tick', 'info');
+
+          setTimeout(() => {
+            if (shouldFail) {
+              dispatch({ type: 'FETCH_FAILURE', error: '500 Internal Server Timeout' });
+              addLog('Atomic dispatch({ type: "FETCH_FAILURE" })', 'error');
+            } else {
+              dispatch({ type: 'FETCH_SUCCESS', payload: { id: 'ORD-9821', amount: '$420.00' } });
+              addLog('Atomic dispatch({ type: "FETCH_SUCCESS" })', 'success');
+            }
+            setIsPending(false);
+          }, 800);
+        }
+      };
+
+      const currentDisplay = approach === 'multi-state' 
+        ? { status: msStatus, data: msData, error: msError }
+        : redState;
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                Experiment 2: Multi-`useState` Desync vs. `useReducer` Atomic Transactions
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Compare multi-field asynchronous updates between fragmented setters and atomic reducers.
+              </p>
+            </div>
+            <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setApproach('multi-state')}
+                class={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${approach === 'multi-state' ? 'bg-amber-600 text-slate-950 shadow font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Fragmented Multiple `useState`
+              </button>
+              <button
+                onClick={() => setApproach('reducer')}
+                class={`px-4 py-1.5 rounded-lg text-xs font-semibold transition ${approach === 'reducer' ? 'bg-emerald-600 text-white shadow font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Atomic `useReducer`
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Pipeline State</span>
+                  <span class={`text-xs px-2.5 py-0.5 rounded-full font-mono font-bold border ${
+                    currentDisplay.status === 'success' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' :
+                    currentDisplay.status === 'error' ? 'bg-rose-950 text-rose-300 border-rose-800' :
+                    currentDisplay.status === 'loading' ? 'bg-amber-950 text-amber-300 border-amber-800 animate-pulse' :
+                    'bg-slate-900 text-slate-400 border-slate-800'
+                  }`}>
+                    {currentDisplay.status.toUpperCase()}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <div class="text-slate-500 text-[10px]">data</div>
+                    <div class="text-slate-200 truncate mt-0.5">{currentDisplay.data ? JSON.stringify(currentDisplay.data) : 'null'}</div>
+                  </div>
+                  <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                    <div class="text-slate-500 text-[10px]">error</div>
+                    <div class="text-rose-400 truncate mt-0.5">{currentDisplay.error || 'null'}</div>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                  <button
+                    disabled={isPending}
+                    onClick={() => handleSimulateAsync(false)}
+                    class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-2 rounded-lg text-xs font-semibold transition shadow flex items-center justify-center gap-1.5"
+                  >
+                    <i class="fa-solid fa-play"></i> Trigger Success
+                  </button>
+                  <button
+                    disabled={isPending}
+                    onClick={() => handleSimulateAsync(true)}
+                    class="bg-rose-900/80 hover:bg-rose-800 disabled:opacity-50 text-rose-200 py-2 rounded-lg text-xs font-semibold transition border border-rose-700/80 flex items-center justify-center gap-1.5"
+                  >
+                    <i class="fa-solid fa-bolt"></i> Trigger Failure
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Audit Log */}
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>State Transition Step Trace</span>
+                  <button onClick={() => setAuditLog([])} class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div class="space-y-1.5 font-mono text-xs max-h-40 overflow-y-auto custom-scrollbar">
+                  {auditLog.length === 0 ? (
+                    <div class="text-slate-600 text-xs italic py-6 text-center">Trigger a transaction to inspect transition steps...</div>
+                  ) : (
+                    auditLog.map(item => (
+                      <div
+                        key={item.id}
+                        class={`p-2 rounded border text-[11px] flex items-start gap-2 ${
+                          item.level === 'error' ? 'bg-rose-950/60 border-rose-800 text-rose-300' :
+                          item.level === 'warn' ? 'bg-amber-950/60 border-amber-800 text-amber-300' :
+                          item.level === 'success' ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' :
+                          'bg-slate-900 border-slate-800 text-slate-300'
+                        }`}
+                      >
+                        <span class="text-slate-500 text-[9px]">{item.time}</span>
+                        <span>{item.msg}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                <span class="font-bold text-slate-200">Architectural Rule:</span> When state transitions require multiple fields to change together (<code class="text-amber-300 font-mono">status + data + error</code>), <span class="text-emerald-400 font-bold">useReducer guarantees atomic consistency</span> and eliminates intermediate broken UI renders.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 3: LEAKED DISPATCH VS ENCAPSULATED COMMANDS (KYC WIZARD) ---
+    function KYCStateMachineLab() {
+      const [step, setStep] = useState(1);
+      const [history, setHistory] = useState([]);
+      const [status, setStatus] = useState('editing');
+      const [name, setName] = useState('Alex Rivera');
+      const [ssn, setSsn] = useState('***-**-4912');
+      const [error, setError] = useState(null);
+
+      const nextStep = () => {
+        if (step < 3) {
+          setHistory(prev => [...prev, { step, name, ssn }]);
+          setStep(s => s + 1);
+          setError(null);
+        }
+      };
+
+      const prevStep = () => {
+        if (step > 1) {
+          setStep(s => s - 1);
+          setError(null);
+        }
+      };
+
+      const rollback = () => {
+        if (history.length > 0) {
+          const lastSnapshot = history[history.length - 1];
+          setStep(lastSnapshot.step);
+          setName(lastSnapshot.name);
+          setSsn(lastSnapshot.ssn);
+          setHistory(prev => prev.slice(0, -1));
+          setError('Rollback applied to previous checkpoint.');
+        }
+      };
+
+      const submitKYC = () => {
+        setStatus('submitting');
+        setTimeout(() => {
+          setStatus('verified');
+        }, 1000);
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-bold text-cyan-400 flex items-center gap-2">
+                <i class="fa-solid fa-id-card"></i>
+                Experiment 3: Encapsulated Domain Controller (KYC Verification Wizard)
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                A domain Hook manages multi-step transitions, history stacks for rollbacks, and invariant validation.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono">
+              <span class="text-slate-400">Step:</span>
+              <span class="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 font-bold">{step} / 3</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
+              <div class="flex items-center justify-between text-xs font-mono">
+                <span class="text-slate-400 uppercase font-bold">Wizard Stage</span>
+                <span class={`px-2 py-0.5 rounded-full font-bold ${
+                  status === 'verified' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                  status === 'submitting' ? 'bg-amber-950 text-amber-300 border border-amber-800 animate-pulse' :
+                  'bg-slate-900 text-slate-300 border border-slate-800'
+                }`}>
+                  {status.toUpperCase()}
+                </span>
+              </div>
+
+              {/* Step Card View */}
+              <div class="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-3">
+                {step === 1 && (
+                  <div class="space-y-2">
+                    <div class="text-xs font-bold text-slate-200">Step 1: Legal Identity Confirmation</div>
+                    <div class="text-xs text-slate-400">Legal Full Name:</div>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono"
+                    />
+                  </div>
+                )}
+                {step === 2 && (
+                  <div class="space-y-2">
+                    <div class="text-xs font-bold text-slate-200">Step 2: Social Security & Tax ID</div>
+                    <div class="text-xs text-slate-400">SSN / TIN:</div>
+                    <input
+                      type="text"
+                      value={ssn}
+                      onChange={e => setSsn(e.target.value)}
+                      class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono"
+                    />
+                  </div>
+                )}
+                {step === 3 && (
+                  <div class="space-y-2">
+                    <div class="text-xs font-bold text-slate-200">Step 3: Review & Cryptographic Sign-Off</div>
+                    <div class="text-[11px] font-mono text-slate-300 bg-slate-950 p-2.5 rounded-lg border border-slate-800 space-y-1">
+                      <div>Name: <span class="text-indigo-300">{name}</span></div>
+                      <div>SSN: <span class="text-indigo-300">{ssn}</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div class="p-2.5 bg-amber-950/60 border border-amber-800 text-amber-300 text-xs rounded-lg flex items-center gap-2">
+                  <i class="fa-solid fa-circle-exclamation"></i>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Semantic Commands */}
+              <div class="flex gap-2 pt-2">
+                <button
+                  disabled={step <= 1}
+                  onClick={prevStep}
+                  class="flex-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs py-2 rounded-lg font-semibold border border-slate-700 transition"
+                >
+                  ← Back
+                </button>
+                {step < 3 ? (
+                  <button
+                    onClick={nextStep}
+                    class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs py-2 rounded-lg font-bold transition shadow"
+                  >
+                    Next Step →
+                  </button>
+                ) : (
+                  <button
+                    disabled={status === 'submitting' || status === 'verified'}
+                    onClick={submitKYC}
+                    class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs py-2 rounded-lg font-bold transition shadow"
+                  >
+                    Submit Verification
+                  </button>
+                )}
+                <button
+                  disabled={history.length === 0}
+                  onClick={rollback}
+                  title="Rollback to previous checkpoint"
+                  class="px-3 bg-slate-800 hover:bg-amber-950 disabled:opacity-40 text-slate-300 hover:text-amber-400 text-xs py-2 rounded-lg border border-slate-700 transition"
+                >
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                </button>
+              </div>
+            </div>
+
+            {/* Architecture Explainer */}
+            <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Public Hook Contract vs Private State Machine
+                </div>
+                <pre class="bg-slate-900 p-3 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto leading-relaxed">
+{`const {
+  currentStep,
+  status,
+  nextStep,
+  prevStep,
+  rollback,
+  submitKYC
+} = useKYCWizard();`}
+                </pre>
+                <div class="mt-3 text-[11px] text-slate-400 space-y-2">
+                  <div class="flex items-start gap-2">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span>Zero leaked <code class="text-cyan-300">dispatch</code> functions or raw string action types.</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span>The Hook internally manages the checkpoint rollback history stack (<code class="text-indigo-300">history: KYCFormData[]</code>).</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <span class="text-emerald-400 font-bold">✓</span>
+                    <span>Invalid transitions (e.g. jumping from step 1 to 3) are rejected by state machine guards.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-800 text-[11px] text-slate-500 font-mono">
+                Encapsulation Status: 100% Hermetic
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 4: TEMPORAL CLOSURE CAPTURE PROBE ---
+    function TemporalClosureProbe() {
+      const [countA, setCountA] = useState(0);
+      const [countB, setCountB] = useState(0);
+
+      // Snapshot closure (Flawed)
+      const handleFlawedDoubleIncrement = () => {
+        setCountA(countA + 1);
+        setCountA(countA + 1); // Uses captured render snapshot 'countA'
+      };
+
+      // Functional update (Correct)
+      const handleFunctionalDoubleIncrement = () => {
+        setCountB(prev => prev + 1);
+        setCountB(prev => prev + 1); // Enqueues updater onto Fiber queue
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-lg font-bold text-pink-400 flex items-center gap-2">
+              <i class="fa-solid fa-camera"></i>
+              Experiment 4: Render Snapshot Closures vs. Fiber Functional Updaters
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Observe why executing double updates with captured state snapshots fails, while functional updates evaluate sequentially.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Flawed Snapshot */}
+            <div class="bg-slate-950 p-4 rounded-xl border border-rose-900/60 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-rose-300">❌ Snapshot Capture (`count + 1`)</span>
+                <span class="text-lg font-mono font-black text-rose-400">{countA}</span>
+              </div>
+              <pre class="bg-slate-900 p-2.5 rounded text-[11px] font-mono text-slate-300">
+{`setCount(count + 1);
+setCount(count + 1);`}
+              </pre>
+              <button
+                onClick={handleFlawedDoubleIncrement}
+                class="w-full bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs py-2 rounded-lg font-bold border border-rose-700 transition"
+              >
+                Execute Double Update (Increments only by 1!)
+              </button>
+            </div>
+
+            {/* Functional Update */}
+            <div class="bg-slate-950 p-4 rounded-xl border border-emerald-900/60 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-emerald-300">✅ Functional Update (`prev =&gt; prev + 1`)</span>
+                <span class="text-lg font-mono font-black text-emerald-400">{countB}</span>
+              </div>
+              <pre class="bg-slate-900 p-2.5 rounded text-[11px] font-mono text-slate-300">
+{`setCount(c => c + 1);
+setCount(c => c + 1);`}
+              </pre>
+              <button
+                onClick={handleFunctionalDoubleIncrement}
+                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg font-bold transition shadow"
+              >
+                Execute Double Update (Increments by 2!)
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- EXPERIMENT 5: CERTIFICATION ASSESSMENT ---
+    function InteractiveAssessment() {
+      const questions = [
+        {
+          id: 1,
+          question: "If Component A and Component B both invoke `const { count } = useCounter()`, what is their runtime state relationship?",
+          options: [
+            "They share the exact same count value globally.",
+            "They maintain completely isolated count values stored on their respective component Fiber records.",
+            "They only share state if wrapped inside a React Fragment.",
+            "State is shared if useCounter is declared outside the component file."
+          ],
+          correct: 1,
+          explanation: "Custom Hooks reuse logic, not state instances. Each invocation allocates separate Hook nodes on the calling component's Fiber.memoizedState."
+        },
+        {
+          id: 2,
+          question: "What is the primary architectural benefit of wrapping `useReducer` behind semantic domain commands rather than exporting `dispatch`?",
+          options: [
+            "It guarantees that React 18 Concurrent Mode renders faster.",
+            "It prevents action string leakage and protects the abstraction boundary so reducer internals can evolve without breaking callers.",
+            "Dispatch cannot be invoked inside asynchronous callbacks.",
+            "TypeScript cannot infer types if dispatch is exported."
+          ],
+          correct: 1,
+          explanation: "Exposing dispatch leaks the reducer's internal action types and state machine mechanics. Semantic commands encapsulate transitions cleanly."
+        },
+        {
+          id: 3,
+          question: "When is `useReducer` strictly superior to multiple `useState` declarations?",
+          options: [
+            "For every single boolean UI toggle.",
+            "When state transitions involve multiple coupled fields that must update together atomically in response to domain events.",
+            "Whenever a component file has more than 50 lines.",
+            "When storing simple immutable strings."
+          ],
+          correct: 1,
+          explanation: "useReducer shines when managing coupled multi-field transitions and invariant enforcement where multiple useState calls risk desynchronization."
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optIdx) => {
+        if (submitted) return;
+        setAnswers(prev => ({ ...prev, [qId]: optIdx }));
+      };
+
+      const calculateScore = () => {
+        let score = 0;
+        questions.forEach(q => {
+          if (answers[q.id] === q.correct) score += 1;
+        });
+        return score;
+      };
+
+      return (
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-purple-400 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap"></i>
+                Senior Architect Certification Challenge
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">Test your mastery of custom Hook state ownership and reducer encapsulation.</p>
+            </div>
+            {submitted && (
+              <div class="text-xs font-bold px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-800 text-purple-300">
+                Score: {calculateScore()} / {questions.length} ({Math.round((calculateScore() / questions.length) * 100)}%)
+              </div>
+            )}
+          </div>
+
+          <div class="space-y-4">
+            {questions.map((q, idx) => {
+              const selected = answers[q.id];
+              const isCorrect = selected === q.correct;
+
+              return (
+                <div key={q.id} class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div class="text-xs font-bold text-slate-200">
+                    <span class="text-purple-400 font-mono mr-2">Q{idx + 1}.</span>
+                    {q.question}
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-2">
+                    {q.options.map((opt, optIdx) => {
+                      let btnStyle = "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800";
+                      if (selected === optIdx) {
+                        btnStyle = "bg-indigo-950 border-indigo-600 text-indigo-200 font-semibold";
+                      }
+                      if (submitted) {
+                        if (optIdx === q.correct) {
+                          btnStyle = "bg-emerald-950 border-emerald-600 text-emerald-200 font-semibold";
+                        } else if (selected === optIdx && !isCorrect) {
+                          btnStyle = "bg-rose-950 border-rose-600 text-rose-200";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={optIdx}
+                          onClick={() => handleSelect(q.id, optIdx)}
+                          class={`p-3 rounded-lg text-xs text-left border transition flex items-start gap-2.5 ${btnStyle}`}
+                        >
+                          <span class="font-mono text-[10px] text-slate-500 mt-0.5">[{String.fromCharCode(65 + optIdx)}]</span>
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && (
+                    <div class={`p-3 rounded-lg text-[11px] leading-relaxed border ${isCorrect ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300' : 'bg-rose-950/40 border-rose-800/60 text-rose-300'}`}>
+                      <span class="font-bold">{isCorrect ? '✓ Correct:' : '❌ Incorrect:'}</span> {q.explanation}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+            {submitted ? (
+              <button
+                onClick={() => { setSubmitted(false); setAnswers({}); }}
+                class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition"
+              >
+                Reset Assessment
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(answers).length < questions.length}
+                class="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-lg shadow-purple-900/30"
+              >
+                Submit & Grade Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      return (
+        <div class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+          {/* Header Navigation */}
+          <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl backdrop-blur">
+            <div>
+              <div class="flex items-center gap-2 text-xs font-mono text-indigo-400">
+                <span>KPI 14</span>
+                <span>•</span>
+                <span>CUSTOM HOOKS & LOGIC COMPOSITION</span>
+                <span>•</span>
+                <span class="text-pink-400">PART 04</span>
+              </div>
+              <h1 class="text-xl md:text-2xl font-black text-slate-100 tracking-tight mt-1">
+                Managing Local State & Reducers in Custom Hooks
+              </h1>
+            </div>
+            <div class="flex items-center gap-2">
+              <a
+                href="../04-local-state-and-reducers-in-custom-hooks.md"
+                class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-book"></i> Read Guide
+              </a>
+              <a
+                href="../../README.md"
+                class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition shadow flex items-center gap-1.5"
+              >
+                <i class="fa-solid fa-house"></i> Curriculum
+              </a>
+            </div>
+          </div>
+
+          <StateIsolationExplorer />
+          <ReducerAtomicitySimulator />
+          <KYCStateMachineLab />
+          <TemporalClosureProbe />
+          <InteractiveAssessment />
+
+          <footer class="text-center py-6 border-t border-slate-800/80 text-xs text-slate-500 font-mono">
+            Engineering Design Vault • Level 06 React Fundamentals • Lead Architect: Srikar Kudurmalla • Co-Author: Prasenjeet
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
