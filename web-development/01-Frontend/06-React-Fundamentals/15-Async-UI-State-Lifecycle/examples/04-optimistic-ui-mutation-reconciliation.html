@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 15 Part 04 — Optimistic UI & Mutation Reconciliation Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, useReducer } = React;
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'optimistic-sandbox', label: '1. Optimistic Mutation Engine' },
+        { id: 'layered-queue', label: '2. Layered Rollback Queue' },
+        { id: 'temp-id-migration', label: '3. Temp ID Reconciliation' },
+        { id: 'server-normalization', label: '4. Server Normalization' },
+        { id: 'decision-matrix', label: '5. Optimistic vs Pessimistic' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                    KPI 15 · Part 04
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">Async UI State & Data Lifecycle</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  Optimistic UI, Mutations & Server Reconciliation Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Speculative Projections, Layered Mutation Queues, Temporary ID Migration & Idempotency
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../04-optimistic-ui-mutation-reconciliation.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // =========================================================================
+    // TAB 1: OPTIMISTIC MUTATION ENGINE (Like / Star Toggles)
+    // =========================================================================
+    function TabOptimisticEngine() {
+      const [serverState, setServerState] = useState({ liked: false, likeCount: 42 });
+      const [pendingMutations, setPendingMutations] = useState([]);
+      const [log, setLog] = useState([]);
+
+      const mutationCountRef = useRef(0);
+
+      // Computed Visible State = Server State + Pending Mutations
+      const visibleState = useMemo(() => {
+        if (pendingMutations.length === 0) return serverState;
+        const last = pendingMutations[pendingMutations.length - 1];
+        return {
+          liked: last.desired,
+          likeCount: serverState.likeCount + (last.desired ? (serverState.liked ? 0 : 1) : (serverState.liked ? -1 : 0))
+        };
+      }, [serverState, pendingMutations]);
+
+      const triggerToggleLike = (shouldFail = false) => {
+        const nextDesired = !visibleState.liked;
+        const mutationId = ++mutationCountRef.current;
+
+        const newMutation = { id: mutationId, desired: nextDesired, status: 'In-Flight', shouldFail };
+        setPendingMutations(prev => [...prev, newMutation]);
+
+        setLog(prev => [{
+          time: new Date().toLocaleTimeString(),
+          text: `M#${mutationId}: Optimistically applied liked=${String(nextDesired)} (0ms)`
+        }, ...prev]);
+
+        setTimeout(() => {
+          if (shouldFail) {
+            // Rollback: Remove this mutation from pending list
+            setPendingMutations(prev => prev.filter(m => m.id !== mutationId));
+            setLog(prev => [{
+              time: new Date().toLocaleTimeString(),
+              text: `M#${mutationId}: ❌ Server REJECTED! Rolled back mutation #${mutationId}`
+            }, ...prev]);
+          } else {
+            // Confirm: Update server state and remove mutation
+            setServerState(s => ({
+              liked: nextDesired,
+              likeCount: s.likeCount + (nextDesired ? (s.liked ? 0 : 1) : (s.liked ? -1 : 0))
+            }));
+            setPendingMutations(prev => prev.filter(m => m.id !== mutationId));
+            setLog(prev => [{
+              time: new Date().toLocaleTimeString(),
+              text: `M#${mutationId}: ✅ Server CONFIRMED! Authoritative state updated.`
+            }, ...prev]);
+          }
+        }, 1200);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
+            <h2 className="text-lg font-bold text-white">Live Optimistic Mutation Engine</h2>
+            <p className="text-xs text-slate-400">
+              Trigger instant optimistic updates. Notice 0ms UI responsiveness while network requests process in background.
+            </p>
+
+            <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-800 font-mono text-xs">
+              <button
+                onClick={() => triggerToggleLike(false)}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition shadow-lg shadow-purple-600/20"
+              >
+                Toggle Like (Server Success)
+              </button>
+              <button
+                onClick={() => triggerToggleLike(true)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition shadow-lg shadow-rose-600/20"
+              >
+                Toggle Like (Server Failure ──► Rollback)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Rendered Viewport */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase">Interactive Component</span>
+                {pendingMutations.length > 0 && (
+                  <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 animate-pulse">
+                    {pendingMutations.length} Pending Mutation(s)...
+                  </span>
+                )}
+              </div>
+
+              <div className="p-6 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center justify-center space-y-4">
+                <button
+                  onClick={() => triggerToggleLike(false)}
+                  className={`flex items-center gap-3 px-6 py-3 rounded-xl font-mono font-bold text-sm transition-all transform active:scale-95 ${
+                    visibleState.liked 
+                      ? 'bg-rose-600/30 border border-rose-500 text-rose-300 shadow-lg shadow-rose-600/20' 
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className="text-xl">{visibleState.liked ? '❤️' : '🤍'}</span>
+                  <span>{visibleState.liked ? 'Liked' : 'Like'}</span>
+                  <span className="px-2 py-0.5 rounded bg-slate-950 text-xs font-mono">{visibleState.likeCount}</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-4 w-full text-xs font-mono pt-2 border-t border-slate-800/80">
+                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
+                    <span className="text-slate-500 block text-[10px]">SERVER TRUTH</span>
+                    <span className="text-white font-bold">{String(serverState.liked)} ({serverState.likeCount} likes)</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800">
+                    <span className="text-slate-500 block text-[10px]">OPTIMISTIC UI</span>
+                    <span className="text-purple-400 font-bold">{String(visibleState.liked)} ({visibleState.likeCount} likes)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Audit Log */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase font-mono">Mutation & Reconciliation Log</h3>
+              <div className="space-y-2 font-mono text-xs max-h-[220px] overflow-y-auto">
+                {log.map((entry, i) => (
+                  <div key={i} className="p-2 bg-slate-950 rounded border border-slate-800 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">{entry.time}</span>
+                    <span className="text-purple-300 truncate max-w-[280px]">{entry.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: LAYERED ROLLBACK QUEUE
+    // =========================================================================
+    function TabLayeredQueue() {
+      const [count, setCount] = useState(10);
+      const [queue, setQueue] = useState([]);
+
+      const computedCount = queue.reduce((acc, m) => acc + m.delta, count);
+
+      const addMutation = (delta, shouldFail = false) => {
+        const id = Date.now() % 10000;
+        const m = { id, delta, shouldFail };
+        setQueue(prev => [...prev, m]);
+
+        setTimeout(() => {
+          if (shouldFail) {
+            // Atomic rollback of ONLY this mutation
+            setQueue(prev => prev.filter(item => item.id !== id));
+          } else {
+            // Server confirms: update base and remove from queue
+            setCount(c => c + delta);
+            setQueue(prev => prev.filter(item => item.id !== id));
+          }
+        }, 1500);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-bold text-white">Layered Mutation Queue (No Stale Rollbacks)</h2>
+            <p className="text-xs text-slate-400">
+              Fire multiple increment/decrement mutations rapidly. Notice that failing $M_1$ does NOT wipe out $M_2$!
+            </p>
+
+            <div className="flex flex-wrap gap-3 pt-3 border-t border-slate-800 font-mono text-xs">
+              <button onClick={() => addMutation(+1, false)} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition">
+                +1 (Success)
+              </button>
+              <button onClick={() => addMutation(+5, true)} className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition">
+                +5 (Fail ──► Rollback)
+              </button>
+              <button onClick={() => addMutation(-1, false)} className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition">
+                -1 (Success)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">BASE SERVER COUNT</span>
+              <span className="text-white font-bold text-2xl mt-1 block">{count}</span>
+            </div>
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">VISIBLE COMPUTED PROJECTION</span>
+              <span className="text-purple-400 font-bold text-2xl mt-1 block">{computedCount}</span>
+            </div>
+          </div>
+
+          {/* Pending Queue List */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 font-mono text-xs">
+            <h3 className="text-xs font-bold text-slate-400 uppercase">Active Mutation Queue ({queue.length})</h3>
+            <div className="space-y-2">
+              {queue.map(m => (
+                <div key={m.id} className="p-2.5 bg-slate-950 rounded border border-slate-800 flex items-center justify-between">
+                  <span className="text-cyan-400 font-bold">M#{m.id} (Delta: {m.delta > 0 ? `+${m.delta}` : m.delta})</span>
+                  <span className={m.shouldFail ? 'text-rose-400' : 'text-emerald-400'}>
+                    {m.shouldFail ? 'Will Reject & Rollback' : 'Will Confirm'}
+                  </span>
+                </div>
+              ))}
+              {queue.length === 0 && (
+                <div className="text-slate-600 text-center py-4">Queue is empty. State is synchronized.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: TEMPORARY ID RECONCILIATION
+    // =========================================================================
+    function TabTempIdMigration() {
+      const [comments, setComments] = useState([
+        { id: '8401', text: 'First persistent comment', isTemp: false },
+        { id: '8402', text: 'Second persistent comment', isTemp: false },
+      ]);
+      const [input, setInput] = useState('');
+
+      const handleAddComment = (e) => {
+        e.preventDefault();
+        if (!input.trim()) return;
+
+        const tempId = `temp-${Date.now()}`;
+        const text = input.trim();
+        setInput('');
+
+        // 1. Optimistic Insertion with Temporary ID
+        setComments(prev => [...prev, { id: tempId, text, isTemp: true }]);
+
+        // 2. Server Response & Identity Migration
+        setTimeout(() => {
+          const serverId = `${Math.floor(Math.random() * 90000 + 10000)}`;
+          setComments(prev => prev.map(c => 
+            c.id === tempId ? { id: serverId, text: c.text, isTemp: false } : c
+          ));
+        }, 1200);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-bold text-white">Temporary Client ID Migration (Ghost Item Prevention)</h2>
+            <p className="text-xs text-slate-400">
+              Type a comment. Observe how <code className="text-purple-400">temp-xxx</code> is seamlessly replaced with database primary key <code className="text-emerald-400">84920</code> without duplicating the card.
+            </p>
+
+            <form onSubmit={handleAddComment} className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="Add an optimistic comment..."
+                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:border-purple-500 focus:outline-none"
+              />
+              <button type="submit" className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold rounded-lg transition">
+                Submit
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 font-mono text-xs">
+            <h3 className="text-xs font-bold text-slate-400 uppercase">Comment Stream</h3>
+            <div className="space-y-2">
+              {comments.map(c => (
+                <div key={c.id} className={`p-3 rounded-lg border flex items-center justify-between ${
+                  c.isTemp ? 'bg-purple-950/30 border-purple-500/50 text-purple-200' : 'bg-slate-950 border-slate-800 text-slate-300'
+                }`}>
+                  <div>
+                    <span className="font-bold text-white block">{c.text}</span>
+                    <span className="text-[10px] text-slate-500">ID: {c.id}</span>
+                  </div>
+                  {c.isTemp && (
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 animate-pulse">
+                      Saving (Temp ID)...
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: SERVER NORMALIZATION
+    // =========================================================================
+    function TabServerNormalization() {
+      const [title, setTitle] = useState('react architecture');
+      const [authoritative, setAuthoritative] = useState('React Architecture');
+      const [isPending, setIsPending] = useState(false);
+
+      const triggerSave = () => {
+        setIsPending(true);
+        setTimeout(() => {
+          // Server sanitizes and capitalizes
+          const normalized = title.trim().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          setAuthoritative(normalized);
+          setIsPending(false);
+        }, 1000);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-lg font-bold text-white">Server Normalization Reconciliation</h2>
+            <p className="text-xs text-slate-400">
+              The server may transform, trim, or sanitize optimistic inputs. The client must replace optimistic state with the server's normalized truth.
+            </p>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none"
+              />
+              <button onClick={triggerSave} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold rounded-lg transition">
+                {isPending ? 'Syncing...' : 'Save Title'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">OPTIMISTIC CLIENT INPUT</span>
+              <span className="text-cyan-400 font-bold text-sm mt-1 block">"{title}"</span>
+            </div>
+            <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+              <span className="text-slate-500 block text-[10px]">SERVER AUTHORITATIVE VALUE</span>
+              <span className="text-emerald-400 font-bold text-sm mt-1 block">"{authoritative}"</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 5: OPTIMISTIC VS PESSIMISTIC DECISION MATRIX
+    // =========================================================================
+    function TabDecisionMatrix() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Optimistic vs Pessimistic Strategy Matrix</h2>
+            <p className="text-sm text-slate-400">
+              When to predict with 0ms optimistic UI vs when to block with pessimistic locking.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-5 bg-slate-950 border border-purple-500/40 rounded-xl space-y-3">
+              <span className="text-xs font-bold text-purple-400 font-mono uppercase">1. Optimistic UI (Speculative)</span>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Likes, Stars, Toggles, Simple local reorders, Typing comments, Archiving emails.
+              </p>
+              <div className="text-[11px] text-purple-300 font-mono bg-slate-900 p-2.5 rounded border border-slate-800">
+                Rule: High success rate (&gt;95%), trivial rollback cost, non-destructive.
+              </div>
+            </div>
+
+            <div className="p-5 bg-slate-950 border border-rose-500/40 rounded-xl space-y-3">
+              <span className="text-xs font-bold text-rose-400 font-mono uppercase">2. Pessimistic UI (Blocking Lock)</span>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Wire transfers, Checkout payments, Stock trading execution, Role permission escalation.
+              </p>
+              <div className="text-[11px] text-rose-300 font-mono bg-slate-900 p-2.5 rounded border border-slate-800">
+                Rule: High failure cost, irreversible side effects, requires Idempotency-Key.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 6: SENIOR CERTIFICATION EXAM
+    // =========================================================================
+    function TabExam() {
+      const questions = [
+        {
+          id: 1,
+          question: "Why is `catch (err) { setState(previousState) }` an anti-pattern for concurrent optimistic mutations?",
+          options: [
+            "Because React forbids catching asynchronous errors.",
+            "Because if another mutation started while the first was in-flight, restoring previousState will accidentally overwrite and wipe out the newer valid mutation.",
+            "Because previousState is not garbage collected.",
+            "Because try/catch blocks slow down V8 execution."
+          ],
+          correct: 1,
+          explanation: "In concurrent scenarios (M1 -> M2), rolling back M1 to previousState wipes out M2's valid local prediction. Layered mutation queues solve this."
+        },
+        {
+          id: 2,
+          question: "Why should you NEVER treat a client-side network timeout as a definitive server failure for payment mutations?",
+          options: [
+            "Because HTTP timeouts are deprecated.",
+            "Because the request may have reached the server and committed to the database before the client TCP connection timed out. Blindly retrying causes double charges.",
+            "Because timeouts automatically refund credit cards.",
+            "Because payment gateways ignore timeouts."
+          ],
+          correct: 1,
+          explanation: "Client timeouts represent unknown status, not definitive failure. Idempotency keys protect against duplicate charges."
+        },
+        {
+          id: 3,
+          question: "What is the primary role of a temporary client ID (`temp-uuid`) in optimistic creation?",
+          options: [
+            "To speed up CSS rendering.",
+            "To allow the client to render and track the item immediately, which is later migrated/reconciled with the server's permanent database ID without duplicating items.",
+            "To encrypt the payload.",
+            "To bypass React keys."
+          ],
+          correct: 1,
+          explanation: "Temporary IDs provide client-side entity identity until the authoritative server primary key is returned and reconciled."
+        },
+        {
+          id: 4,
+          question: "When should optimistic UI be strictly avoided?",
+          options: [
+            "When rendering lists of comments.",
+            "For irreversible, high-consequence operations (e.g. bank wire transfers, trading orders) where failure costs are severe and rollback is ambiguous.",
+            "When using TypeScript.",
+            "When building responsive layouts."
+          ],
+          correct: 1,
+          explanation: "Optimistic UI is dangerous when failure is consequential and cannot be cleanly rolled back without harming the user."
+        },
+        {
+          id: 5,
+          question: "How does React 19's `useOptimistic` hook manage speculative state during transitions?",
+          options: [
+            "It permanently modifies the parent component state.",
+            "It layers an optimistic transformation on top of base state during `startTransition`, automatically discarding it when the transition ends or fails.",
+            "It converts React components into WebSockets.",
+            "It disables React reconciliation."
+          ],
+          correct: 1,
+          explanation: "useOptimistic maintains temporary speculative state linked to transition lifecycles, guaranteeing clean automatic rollbacks upon transition failure."
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const score = Object.keys(selectedAnswers).reduce((acc, qId) => {
+        const q = questions.find(item => item.id === Number(qId));
+        return selectedAnswers[qId] === q.correct ? acc + 1 : acc;
+      }, 0);
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">Optimistic UI & Mutation Certification</h2>
+              <p className="text-xs text-slate-400 mt-1">Validate your expertise in optimistic projections, layered queues, and server reconciliation.</p>
+            </div>
+            {submitted && (
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                score === 5 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              }`}>
+                Score: {score} / 5 ({((score / 5) * 100).toFixed(0)}%)
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="font-semibold text-sm text-slate-200">
+                  <span className="text-purple-400 font-mono mr-2">Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correct === optIdx;
+                    let optionStyle = 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700';
+
+                    if (submitted) {
+                      if (isCorrect) {
+                        optionStyle = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                      } else if (isSelected && !isCorrect) {
+                        optionStyle = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                      }
+                    } else if (isSelected) {
+                      optionStyle = 'bg-purple-600/20 border-purple-500 text-purple-200';
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => handleSelect(q.id, optIdx)}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition ${optionStyle}`}
+                      >
+                        <span className="font-mono font-semibold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {submitted && (
+                  <div className="p-3 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-800 font-mono">
+                    💡 <strong className="text-slate-200">Explanation:</strong> {q.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            {submitted ? (
+              <button
+                onClick={() => { setSelectedAnswers({}); setSubmitted(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition"
+              >
+                Retake Exam
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(selectedAnswers).length < questions.length}
+                className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-xs font-bold text-white rounded-lg transition shadow-lg shadow-purple-600/20"
+              >
+                Submit Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- ROOT APP CONTAINER ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('optimistic-sandbox');
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            {activeTab === 'optimistic-sandbox' && <TabOptimisticEngine />}
+            {activeTab === 'layered-queue' && <TabLayeredQueue />}
+            {activeTab === 'temp-id-migration' && <TabTempIdMigration />}
+            {activeTab === 'server-normalization' && <TabServerNormalization />}
+            {activeTab === 'decision-matrix' && <TabDecisionMatrix />}
+            {activeTab === 'exam' && <TabExam />}
+          </main>
+          <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+            KPI 15 · Part 04 — Optimistic UI & Mutation Reconciliation Lab · React 18 & 19 Architecture
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
