@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 Part 03 — useDeferredValue & Deferred Subtree Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-pulse-slow {
+      animation: pulse-slow 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo, useDeferredValue } = React;
+
+    // --- MOCK DATASET GENERATOR ---
+    const CATEGORIES = ['Security', 'Cloud', 'DevOps', 'Architecture', 'Performance', 'Database', 'Frontend', 'AI/ML'];
+    const TAGS = ['React18', 'Fiber', 'Concurrency', 'Scheduler', 'Optimization', 'V8', 'Memory', 'Bailout', 'TypeScript', 'DOM'];
+
+    function generateDataset(size) {
+      const items = [];
+      for (let i = 1; i <= size; i++) {
+        const cat = CATEGORIES[i % CATEGORIES.length];
+        const tag = TAGS[i % TAGS.length];
+        items.push({
+          id: i,
+          title: `System Record #${i} — ${cat} Micro-Service`,
+          category: cat,
+          tag: tag,
+          cost: (Math.sin(i) * 50 + 50).toFixed(2),
+          loadFactor: ((i * 17) % 100) + '%',
+          description: `Telemetry node ${i} reporting continuous concurrent diagnostics for ${tag} optimization module.`
+        });
+      }
+      return items;
+    }
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'search-lab', label: '1. Search Performance Lab' },
+        { id: 'memo-sandbox', label: '2. React.memo Bailout Sandbox' },
+        { id: 'stale-patterns', label: '3. Stale UI Continuity' },
+        { id: 'debounce-vs-deferred', label: '4. Deferred vs Debounce' },
+        { id: 'invalidation-tree', label: '5. Invalidation Topology' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    KPI 14 · Part 03
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">React 18.3 Concurrency Primitives</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  useDeferredValue & Deferred Subtree Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Freshness Boundaries, Dual-Pass Bailouts, Stale Visual Cues & Debounce Comparisons
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../03-usedeferredvalue-and-deferred-props.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // =========================================================================
+    // TAB 1: SEARCH PERFORMANCE LAB (10k to 100k items)
+    // =========================================================================
+    // Memoized Results Component
+    const MemoizedResultList = memo(function MemoizedResultList({ 
+      items, 
+      query, 
+      enableUseMemo, 
+      artificialDelay, 
+      onRenderNotify 
+    }) {
+      const renderStartTime = performance.now();
+
+      // Filter operation with optional useMemo
+      const filtered = enableUseMemo
+        ? useMemo(() => {
+            const start = performance.now();
+            const q = query.toLowerCase().trim();
+            const res = items.filter(item => 
+              !q || item.title.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.tag.toLowerCase().includes(q)
+            );
+            // Artificial CPU slowdown if enabled
+            if (artificialDelay > 0) {
+              const endTime = performance.now() + artificialDelay;
+              while (performance.now() < endTime) { /* simulate heavy JS computation */ }
+            }
+            return { list: res, duration: performance.now() - start };
+          }, [items, query, artificialDelay])
+        : (() => {
+            const start = performance.now();
+            const q = query.toLowerCase().trim();
+            const res = items.filter(item => 
+              !q || item.title.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.tag.toLowerCase().includes(q)
+            );
+            if (artificialDelay > 0) {
+              const endTime = performance.now() + artificialDelay;
+              while (performance.now() < endTime) {}
+            }
+            return { list: res, duration: performance.now() - start };
+          })();
+
+      useEffect(() => {
+        onRenderNotify(performance.now() - renderStartTime, filtered.duration, filtered.list.length);
+      });
+
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[480px] overflow-y-auto p-2 bg-slate-900/50 rounded-lg border border-slate-800">
+          {filtered.list.slice(0, 60).map(item => (
+            <div key={item.id} className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 hover:border-slate-600 transition">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-mono text-emerald-400 font-semibold">{item.category}</span>
+                <span className="text-slate-400 font-mono">Cost: ${item.cost}</span>
+              </div>
+              <div className="font-semibold text-sm text-slate-100">{item.title}</div>
+              <p className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</p>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="bg-slate-700/60 px-2 py-0.5 rounded text-slate-300 font-mono">{item.tag}</span>
+                <span>Load: {item.loadFactor}</span>
+              </div>
+            </div>
+          ))}
+          {filtered.list.length === 0 && (
+            <div className="col-span-full py-12 text-center text-slate-400">
+              No matching telemetry records found for "{query}"
+            </div>
+          )}
+        </div>
+      );
+    });
+
+    // Non-memoized Fallback Component
+    function UnmemoizedResultList(props) {
+      return <MemoizedResultList {...props} />;
+    }
+
+    function TabSearchLab() {
+      const [datasetSize, setDatasetSize] = useState(25000);
+      const [query, setQuery] = useState('');
+      const [useDeferred, setUseDeferred] = useState(true);
+      const [enableMemo, setEnableMemo] = useState(true);
+      const [enableUseMemo, setEnableUseMemo] = useState(true);
+      const [showStaleIndicator, setShowStaleIndicator] = useState(true);
+      const [artificialDelay, setArtificialDelay] = useState(20); // ms CPU delay
+
+      const dataset = useMemo(() => generateDataset(datasetSize), [datasetSize]);
+      const deferredQuery = useDeferredValue(query);
+
+      // Active query supplied to child
+      const effectiveChildQuery = useDeferred ? deferredQuery : query;
+      const isStale = useDeferred && (query !== deferredQuery);
+
+      // Telemetry metrics
+      const [metrics, setMetrics] = useState({
+        parentRenders: 0,
+        childRenders: 0,
+        lastRenderTime: 0,
+        lastFilterTime: 0,
+        resultCount: datasetSize,
+      });
+
+      const handleChildNotify = useCallback((renderDur, filterDur, count) => {
+        setMetrics(m => ({
+          ...m,
+          childRenders: m.childRenders + 1,
+          lastRenderTime: renderDur,
+          lastFilterTime: filterDur,
+          resultCount: count,
+        }));
+      }, []);
+
+      const handleInputChange = (e) => {
+        setMetrics(m => ({ ...m, parentRenders: m.parentRenders + 1 }));
+        setQuery(e.target.value);
+      };
+
+      const handleResetMetrics = () => {
+        setMetrics({
+          parentRenders: 0,
+          childRenders: 0,
+          lastRenderTime: 0,
+          lastFilterTime: 0,
+          resultCount: dataset.length,
+        });
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Top Control Bar */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Interactive Concurrency Crucible</h2>
+                <p className="text-xs text-slate-400">Toggle hooks and examine how freshness boundaries prevent input freezing.</p>
+              </div>
+              <button 
+                onClick={handleResetMetrics}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 rounded border border-slate-700 transition"
+              >
+                Reset Counters
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-800/80">
+              {/* Dataset Size */}
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Dataset Volume</label>
+                <select 
+                  value={datasetSize}
+                  onChange={e => setDatasetSize(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value={5000}>5,000 records</option>
+                  <option value={10000}>10,000 records</option>
+                  <option value={25000}>25,000 records</option>
+                  <option value={50000}>50,000 records (Standard)</option>
+                  <option value={100000}>100,000 records (Stress)</option>
+                </select>
+              </div>
+
+              {/* Artificial CPU Delay */}
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">
+                  CPU Workload Simulation: <span className="text-emerald-400 font-mono">{artificialDelay}ms</span>
+                </label>
+                <input 
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={artificialDelay}
+                  onChange={e => setArtificialDelay(Number(e.target.value))}
+                  className="w-full accent-emerald-500 mt-2"
+                />
+              </div>
+
+              {/* Feature Toggles */}
+              <div className="col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950/60 p-2 rounded border border-slate-800 hover:border-slate-700">
+                  <input 
+                    type="checkbox"
+                    checked={useDeferred}
+                    onChange={e => setUseDeferred(e.target.checked)}
+                    className="accent-emerald-500 rounded"
+                  />
+                  <span>useDeferredValue</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950/60 p-2 rounded border border-slate-800 hover:border-slate-700">
+                  <input 
+                    type="checkbox"
+                    checked={enableMemo}
+                    onChange={e => setEnableMemo(e.target.checked)}
+                    className="accent-emerald-500 rounded"
+                  />
+                  <span>React.memo</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950/60 p-2 rounded border border-slate-800 hover:border-slate-700">
+                  <input 
+                    type="checkbox"
+                    checked={enableUseMemo}
+                    onChange={e => setEnableUseMemo(e.target.checked)}
+                    className="accent-emerald-500 rounded"
+                  />
+                  <span>useMemo Cache</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950/60 p-2 rounded border border-slate-800 hover:border-slate-700">
+                  <input 
+                    type="checkbox"
+                    checked={showStaleIndicator}
+                    onChange={e => setShowStaleIndicator(e.target.checked)}
+                    className="accent-emerald-500 rounded"
+                  />
+                  <span>Stale Indicator</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Urgent Input Section */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-sm font-semibold text-white flex items-center gap-2">
+                <span>⚡ Urgent Input Stream (SyncLane)</span>
+                {isStale && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse-slow">
+                    Deferred Render Pending...
+                  </span>
+                )}
+              </label>
+              <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
+                <span>Query: <strong className="text-emerald-400">"{query}"</strong></span>
+                <span>Deferred: <strong className="text-cyan-400">"{deferredQuery}"</strong></span>
+              </div>
+            </div>
+
+            <div className="relative">
+              <input 
+                type="text"
+                value={query}
+                onChange={handleInputChange}
+                placeholder="Type rapidly: 'Security', 'React', 'AI', 'Cloud', 'Optimization'..."
+                className="w-full bg-slate-950 border-2 border-slate-700 focus:border-emerald-500 rounded-xl px-4 py-3 text-base text-white placeholder-slate-500 focus:outline-none transition shadow-inner font-mono"
+              />
+              <button 
+                onClick={() => setQuery('')}
+                className="absolute right-3 top-3.5 text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800"
+              >
+                Clear
+              </button>
+            </div>
+
+            {/* Telemetry Dashboard */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-[10px] uppercase font-mono text-slate-400">Parent Renders</div>
+                <div className="text-lg font-bold text-white font-mono mt-0.5">{metrics.parentRenders}</div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-[10px] uppercase font-mono text-slate-400">Child Renders</div>
+                <div className="text-lg font-bold text-cyan-400 font-mono mt-0.5">{metrics.childRenders}</div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-[10px] uppercase font-mono text-slate-400">Filter Execution</div>
+                <div className="text-lg font-bold text-amber-400 font-mono mt-0.5">{metrics.lastFilterTime.toFixed(1)}ms</div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-[10px] uppercase font-mono text-slate-400">Total Matched</div>
+                <div className="text-lg font-bold text-emerald-400 font-mono mt-0.5">{metrics.resultCount.toLocaleString()}</div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                <div className="text-[10px] uppercase font-mono text-slate-400">Freshness Status</div>
+                <div className={`text-xs font-bold font-mono mt-1 ${isStale ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {isStale ? '⏳ Stale (Deferred)' : '✅ Synchronized'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Results Subtree with Stale Boundary */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+              <span>Showing preview of matched results (capped at 60 cards for DOM stability)</span>
+              <span>Subtree memoization: <strong className={enableMemo ? 'text-emerald-400' : 'text-rose-400'}>{enableMemo ? 'React.memo Active' : 'Unmemoized'}</strong></span>
+            </div>
+
+            <section 
+              aria-busy={isStale}
+              style={{
+                opacity: (showStaleIndicator && isStale) ? 0.55 : 1,
+                filter: (showStaleIndicator && isStale) ? 'grayscale(35%)' : 'none',
+                transition: 'opacity 0.2s ease-in-out, filter 0.2s ease-in-out'
+              }}
+              className="relative"
+            >
+              {showStaleIndicator && isStale && (
+                <div className="absolute top-4 right-4 z-20 bg-slate-900/90 text-amber-400 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-xl backdrop-blur">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                  Catching up with latest query...
+                </div>
+              )}
+
+              {enableMemo ? (
+                <MemoizedResultList 
+                  items={dataset}
+                  query={effectiveChildQuery}
+                  enableUseMemo={enableUseMemo}
+                  artificialDelay={artificialDelay}
+                  onRenderNotify={handleChildNotify}
+                />
+              ) : (
+                <UnmemoizedResultList 
+                  items={dataset}
+                  query={effectiveChildQuery}
+                  enableUseMemo={enableUseMemo}
+                  artificialDelay={artificialDelay}
+                  onRenderNotify={handleChildNotify}
+                />
+              )}
+            </section>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: REACT.MEMO BAILOUT SANDBOX
+    // =========================================================================
+    const MemoChild = memo(function MemoChild({ label, count, query }) {
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      return (
+        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-400 font-mono">{label}</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+              Renders: {renderCount.current}
+            </span>
+          </div>
+          <div className="text-xs text-slate-400">Received Query: <span className="text-white font-mono font-semibold">"{query}"</span></div>
+          <div className="text-[11px] text-slate-500">Parent Count Prop: {count}</div>
+          <div className="text-[11px] text-emerald-400/80 mt-2 bg-slate-950 p-2 rounded">
+            ✅ Bailedup during Pass 1 if query and count did not change referentially!
+          </div>
+        </div>
+      );
+    });
+
+    function NonMemoChild({ label, count, query }) {
+      const renderCount = useRef(0);
+      renderCount.current++;
+
+      return (
+        <div className="p-4 rounded-xl bg-slate-900 border border-rose-900/60 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-rose-400 font-mono">{label}</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-rose-500/20 text-rose-300 font-mono border border-rose-500/30">
+              Renders: {renderCount.current}
+            </span>
+          </div>
+          <div className="text-xs text-slate-400">Received Query: <span className="text-white font-mono font-semibold">"{query}"</span></div>
+          <div className="text-[11px] text-slate-500">Parent Count Prop: {count}</div>
+          <div className="text-[11px] text-rose-400/80 mt-2 bg-slate-950 p-2 rounded">
+            ❌ Rerenders unconditionally on every parent render!
+          </div>
+        </div>
+      );
+    }
+
+    function TabMemoSandbox() {
+      const [text, setText] = useState('');
+      const [parentCounter, setParentCounter] = useState(0);
+      const deferredText = useDeferredValue(text);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-2">The Dual-Pass Bailout Simulator</h2>
+            <p className="text-sm text-slate-400">
+              Observe render counts when typing into the input. Notice that <code className="text-rose-400">NonMemoChild</code> executes synchronously on every keystroke even when given <code className="text-cyan-400">deferredText</code>, while <code className="text-emerald-400">MemoChild</code> bails out during Pass 1!
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Type Rapidly in Input:</label>
+                <input 
+                  type="text"
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  placeholder="Type anything here..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Unrelated Parent State:</label>
+                <button 
+                  onClick={() => setParentCounter(c => c + 1)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  Increment Parent Counter: {parentCounter}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider font-mono">Protected with React.memo</h3>
+              <MemoChild label="MemoChild (Deferred Prop)" count={0} query={deferredText} />
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-rose-400 uppercase tracking-wider font-mono">Unprotected (Standard Component)</h3>
+              <NonMemoChild label="NonMemoChild (Deferred Prop)" count={0} query={deferredText} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: STALE UI CONTINUITY VS FLASHING LOADERS
+    // =========================================================================
+    function TabStalePatterns() {
+      const [input, setInput] = useState('React');
+      const deferred = useDeferredValue(input);
+      const isStale = input !== deferred;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-1">Stale UI Continuity vs Destructive Loading States</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Compare the senior design pattern (smooth visual staleness) with the junior anti-pattern (flashing empty spinners).
+            </p>
+
+            <label className="text-xs font-medium text-slate-300 block mb-1">Type in the Box:</label>
+            <input 
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Senior Pattern */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400 font-mono">✅ Senior Pattern: Visual Staleness</span>
+                <span className={`text-[11px] px-2 py-0.5 rounded font-mono ${isStale ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                  {isStale ? 'Stale Rendering' : 'Fresh'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Maintains existing view with opacity transition & aria-busy attribute.</p>
+              
+              <div 
+                aria-busy={isStale}
+                style={{ opacity: isStale ? 0.5 : 1, transition: 'opacity 0.2s' }}
+                className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2"
+              >
+                <div className="text-sm font-semibold text-white">Analytics for "{deferred}"</div>
+                <div className="text-xs text-slate-400">Total Transactions: 1,420,890</div>
+                <div className="text-xs text-slate-400">Throughput: 8,400 req/sec</div>
+                <div className="text-xs text-emerald-400 mt-2">Zero visual jumping or DOM unmounting.</div>
+              </div>
+            </div>
+
+            {/* Anti-Pattern */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-400 font-mono">❌ Anti-Pattern: Flashing Empty Spinner</span>
+                <span className={`text-[11px] px-2 py-0.5 rounded font-mono ${isStale ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-700 text-slate-300'}`}>
+                  {isStale ? 'Unmounted' : 'Mounted'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Destroys visible DOM tree on every keystroke, causing severe layout thrashing.</p>
+
+              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 min-h-[110px] flex items-center justify-center">
+                {isStale ? (
+                  <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
+                    <span className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+                    Flashing Spinner Destroying Content...
+                  </div>
+                ) : (
+                  <div className="w-full space-y-2">
+                    <div className="text-sm font-semibold text-white">Analytics for "{deferred}"</div>
+                    <div className="text-xs text-slate-400">Total Transactions: 1,420,890</div>
+                    <div className="text-xs text-rose-400 mt-2">Flickers on every keypress.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: DEFERRED VS DEBOUNCE LATENCY COMPARISON
+    // =========================================================================
+    function TabDebounceComparison() {
+      const [rawInput, setRawInput] = useState('');
+      const [debouncedInput, setDebouncedInput] = useState('');
+      const [debounceDelay, setDebounceDelay] = useState(300);
+      const deferredInput = useDeferredValue(rawInput);
+
+      useEffect(() => {
+        const handler = setTimeout(() => {
+          setDebouncedInput(rawInput);
+        }, debounceDelay);
+        return () => clearTimeout(handler);
+      }, [rawInput, debounceDelay]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-1">useDeferredValue vs Timer Debouncing (setTimeout)</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Debouncing introduces an artificial fixed timer delay. `useDeferredValue` adapts to client hardware dynamically.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">Type in Input:</label>
+                <input 
+                  type="text"
+                  value={rawInput}
+                  onChange={e => setRawInput(e.target.value)}
+                  placeholder="Type continuously to observe delays..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-300 block mb-1">
+                  Debounce Delay: <span className="text-cyan-400 font-mono">{debounceDelay}ms</span>
+                </label>
+                <input 
+                  type="range"
+                  min={100}
+                  max={800}
+                  step={50}
+                  value={debounceDelay}
+                  onChange={e => setDebounceDelay(Number(e.target.value))}
+                  className="w-full accent-cyan-500 mt-2"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* useDeferredValue Panel */}
+            <div className="p-5 rounded-xl bg-slate-900 border border-emerald-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-emerald-400 font-mono">1. useDeferredValue (Adaptive)</span>
+                <span className="px-2 py-0.5 text-xs rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                  React Scheduler
+                </span>
+              </div>
+              <div className="text-xs text-slate-400">Current Value:</div>
+              <div className="p-3 bg-slate-950 rounded-lg font-mono text-emerald-300 text-sm border border-slate-800">
+                "{deferredInput}"
+              </div>
+              <ul className="text-xs text-slate-400 space-y-1.5 pt-2 border-t border-slate-800">
+                <li>• 0ms artificial delay on idle CPU.</li>
+                <li>• Yields adaptively to user keystrokes.</li>
+                <li>• Ideal for in-memory searching & heavy subtrees.</li>
+              </ul>
+            </div>
+
+            {/* Debounce Panel */}
+            <div className="p-5 rounded-xl bg-slate-900 border border-cyan-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-cyan-400 font-mono">2. Timer Debounce ({debounceDelay}ms)</span>
+                <span className="px-2 py-0.5 text-xs rounded bg-cyan-500/20 text-cyan-300 font-mono">
+                  Timer API
+                </span>
+              </div>
+              <div className="text-xs text-slate-400">Current Value:</div>
+              <div className="p-3 bg-slate-950 rounded-lg font-mono text-cyan-300 text-sm border border-slate-800">
+                "{debouncedInput}"
+              </div>
+              <ul className="text-xs text-slate-400 space-y-1.5 pt-2 border-t border-slate-800">
+                <li>• Fixed {debounceDelay}ms delay even on fast M3 Max / Core i9 CPUs.</li>
+                <li>• Does not participate in React Fiber interruptibility.</li>
+                <li>• Mandatory for rate-limiting backend HTTP APIs.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 5: INVALIDATION TOPOLOGY INSPECTOR
+    // =========================================================================
+    function TabInvalidationTree() {
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Architecture Invalidation Topology</h2>
+            <p className="text-sm text-slate-400">
+              Understanding which identity changes invalidate which subtrees during the 4-layer optimization pipeline.
+            </p>
+          </div>
+
+          <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 overflow-x-auto">
+            <pre className="text-xs text-emerald-400 leading-relaxed font-mono">
+{`
+                         USER KEYSTROKE: 'r'
+                                │
+                                ▼
+                 ┌──────────────────────────────┐
+                 │  SearchPage State: query     │ (Urgent SyncLane)
+                 └──────────────┬───────────────┘
+                                │
+         ┌──────────────────────┴──────────────────────┐
+         ▼                                             ▼
+┌──────────────────┐                         ┌──────────────────┐
+│  <SearchInput /> │                         │ useDeferredValue │
+│  (Urgent Pass 1) │                         └────────┬─────────┘
+│  0ms Input Lag   │                                  │
+└──────────────────┘                                  ▼ deferredQuery
+                                             ┌──────────────────┐
+                                             │ React.memo Guard │
+                                             └────────┬─────────┘
+                                                      │
+                       ┌──────────────────────────────┴──────────────────────────────┐
+                       ▼ Pass 1: query === ""                                        ▼ Pass 2: query === "r"
+              ┌──────────────────┐                                          ┌──────────────────┐
+              │ BAILOUT!         │                                          │ useMemo Filter   │
+              │ Subtree Skipped! │                                          │ Virtualized List │
+              └──────────────────┘                                          └──────────────────┘
+`}
+            </pre>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg">
+              <span className="text-xs font-bold text-indigo-400 font-mono block">Level 1: Colocation</span>
+              <p className="text-xs text-slate-400 mt-1">Keep high-frequency query state local, avoiding global Context churn.</p>
+            </div>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg">
+              <span className="text-xs font-bold text-emerald-400 font-mono block">Level 2: Bailout</span>
+              <p className="text-xs text-slate-400 mt-1">Pair with React.memo so urgent parent passes don't render children.</p>
+            </div>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg">
+              <span className="text-xs font-bold text-cyan-400 font-mono block">Level 3: Concurrency</span>
+              <p className="text-xs text-slate-400 mt-1">useDeferredValue yields to incoming keystrokes without dropped frames.</p>
+            </div>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg">
+              <span className="text-xs font-bold text-amber-400 font-mono block">Level 4: Virtualization</span>
+              <p className="text-xs text-slate-400 mt-1">Cap active DOM nodes to viewport size regardless of dataset volume.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 6: SENIOR CERTIFICATION EXAM
+    // =========================================================================
+    function TabExam() {
+      const questions = [
+        {
+          id: 1,
+          question: "What is the primary architectural difference between useTransition and useDeferredValue?",
+          options: [
+            "useTransition runs in Web Workers, useDeferredValue runs on the main thread.",
+            "useTransition defers an update function (you own the setter), while useDeferredValue defers consumption of a value (e.g., props).",
+            "useDeferredValue has a built-in 300ms setTimeout timer, whereas useTransition is synchronous.",
+            "useTransition works only with class components."
+          ],
+          correct: 1,
+          explanation: "useTransition wraps state setters to lower their update priority, whereas useDeferredValue wraps a received value to create a freshness lag boundary."
+        },
+        {
+          id: 2,
+          question: "Why is wrapping an expensive child in React.memo essential when passing a deferred value?",
+          options: [
+            "Because useDeferredValue will throw a runtime error without React.memo.",
+            "Because React.memo automatically converts the computation to WebAssembly.",
+            "Without React.memo, the parent's urgent render will synchronously invoke the child regardless of whether the deferred prop changed.",
+            "React.memo prevents network requests from firing."
+          ],
+          correct: 2,
+          explanation: "During Pass 1, deferredValue is unchanged. If the child is not memoized, React renders it synchronously anyway, defeating the concurrency optimization."
+        },
+        {
+          id: 3,
+          question: "Does useDeferredValue eliminate the need for AbortController or server-side pagination?",
+          options: [
+            "Yes, useDeferredValue automatically cancels obsolete HTTP fetch requests.",
+            "No. useDeferredValue is a local UI rendering priority scheduler; network race conditions and algorithmic costs remain domain responsibilities.",
+            "Yes, it converts O(n) algorithmic filters into O(1) lookups.",
+            "Yes, React 18 manages network TCP sockets internally."
+          ],
+          correct: 1,
+          explanation: "useDeferredValue alters render scheduling, not algorithmic complexity or external HTTP network lifecycles."
+        },
+        {
+          id: 4,
+          question: "How should an accessible, senior-level UI handle the period when query !== deferredQuery?",
+          options: [
+            "Unmount the entire result tree and render a full-screen spinner.",
+            "Clear the input field immediately.",
+            "Keep the stale UI visible, set aria-busy='true', and apply a subtle visual indicator like reduced opacity.",
+            "Throw a JavaScript error to halt the thread."
+          ],
+          correct: 2,
+          explanation: "Visual continuity prevents layout shifts. aria-busy informs assistive technologies that results are updating without flashing empty states."
+        },
+        {
+          id: 5,
+          question: "What happens if a parent component passes an inline object like `{ query: deferredQuery }` to a React.memo child?",
+          options: [
+            "React automatically memoizes the object reference.",
+            "Object.is shallow comparison fails on every parent render, completely destroying the React.memo bailout.",
+            "The browser crashes due to memory overflow.",
+            "useDeferredValue ignores the object and extracts the string."
+          ],
+          correct: 1,
+          explanation: "New object literals produce new memory references on every parent render, causing Object.is(prev, next) to return false and forcing child rerenders."
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const score = Object.keys(selectedAnswers).reduce((acc, qId) => {
+        const q = questions.find(item => item.id === Number(qId));
+        return selectedAnswers[qId] === q.correct ? acc + 1 : acc;
+      }, 0);
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">Senior Concurrency & Deferred Value Certification</h2>
+              <p className="text-xs text-slate-400 mt-1">Test your mastery of Fiber priority lanes, dual-pass bailouts, and freshness contracts.</p>
+            </div>
+            {submitted && (
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                score === 5 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
+                Score: {score} / 5 ({((score / 5) * 100).toFixed(0)}%)
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="font-semibold text-sm text-slate-200">
+                  <span className="text-emerald-400 font-mono mr-2">Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correct === optIdx;
+                    let optionStyle = 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700';
+
+                    if (submitted) {
+                      if (isCorrect) {
+                        optionStyle = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                      } else if (isSelected && !isCorrect) {
+                        optionStyle = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                      }
+                    } else if (isSelected) {
+                      optionStyle = 'bg-emerald-600/20 border-emerald-500 text-emerald-200';
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => handleSelect(q.id, optIdx)}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition ${optionStyle}`}
+                      >
+                        <span className="font-mono font-semibold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {submitted && (
+                  <div className="p-3 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-800 font-mono">
+                    💡 <strong className="text-slate-200">Explanation:</strong> {q.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            {submitted ? (
+              <button
+                onClick={() => { setSelectedAnswers({}); setSubmitted(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition"
+              >
+                Retake Exam
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(selectedAnswers).length < questions.length}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-xs font-bold text-white rounded-lg transition shadow-lg shadow-emerald-600/20"
+              >
+                Submit Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- ROOT APP CONTAINER ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('search-lab');
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            {activeTab === 'search-lab' && <TabSearchLab />}
+            {activeTab === 'memo-sandbox' && <TabMemoSandbox />}
+            {activeTab === 'stale-patterns' && <TabStalePatterns />}
+            {activeTab === 'debounce-vs-deferred' && <TabDebounceComparison />}
+            {activeTab === 'invalidation-tree' && <TabInvalidationTree />}
+            {activeTab === 'exam' && <TabExam />}
+          </main>
+          <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+            KPI 14 · Part 03 — useDeferredValue & Deferred Subtree Optimization Lab · React 18 Concurrency Architecture
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
