@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 11 - Part 15: Context Architecture Advanced Synthesis & Scaled Patterns</title>
+  <!-- React 18 & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    :root {
+      --bg-main: #0B0F19;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --card-border: rgba(75, 85, 99, 0.4);
+      --accent-cyan: #06B6D4;
+      --accent-indigo: #6366F1;
+      --accent-emerald: #10B981;
+      --accent-rose: #F43F5E;
+      --accent-amber: #F59E0B;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: #F3F4F6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4B5563;
+    }
+
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+    }
+  </style>
+</head>
+<body class="custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useRef, memo, useCallback, useSyncExternalStore } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('lab1');
+
+      const tabs = [
+        { id: 'lab1', label: '1. Gateway & Migration', icon: '🔌' },
+        { id: 'lab2', label: '2. Multi-Instance Isolation', icon: '🪟' },
+        { id: 'lab3', label: '3. Scope & Lifetimes', icon: '⏳' },
+        { id: 'lab4', label: '4. High-Freq Store vs Context', icon: '⚡' },
+        { id: 'lab5', label: '5. DI & Testing Adapters', icon: '🧪' },
+        { id: 'lab6', label: '6. Architecture Scorecard', icon: '📊' },
+      ];
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="border-b border-gray-800 bg-gray-950/80 sticky top-0 z-50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-800">KPI 11 • PART 15</span>
+                <span className="text-gray-400 text-sm">React Fundamentals</span>
+              </div>
+              <h1 className="text-xl font-extrabold text-white mt-1">Context Architecture: Advanced Synthesis & Scaled Patterns</h1>
+            </div>
+            <div className="text-xs text-gray-400 text-right hidden sm:block">
+              <div>Author: <span className="text-cyan-400 font-semibold">Srikar Kudurmalla</span></div>
+              <div>Co-Author: <span className="text-gray-300 font-semibold">Prasenjeet</span></div>
+            </div>
+          </header>
+
+          {/* Navigation Bar */}
+          <nav className="bg-gray-900/60 border-b border-gray-800 px-6 py-2.5 flex items-center gap-2 overflow-x-auto custom-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm shadow-cyan-900/30'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 border border-transparent'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Main Content */}
+          <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+            {activeTab === 'lab1' && <Lab1GatewayMigration />}
+            {activeTab === 'lab2' && <Lab2MultiInstanceIsolation />}
+            {activeTab === 'lab3' && <Lab3ScopeLifetimes />}
+            {activeTab === 'lab4' && <Lab4HighFreqStore />}
+            {activeTab === 'lab5' && <Lab5DITestingAdapters />}
+            {activeTab === 'lab6' && <Lab6ArchitectureScorecard />}
+          </main>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB 1: GATEWAY & MIGRATION LAB
+    // ==========================================
+    function Lab1GatewayMigration() {
+      const [implType, setImplType] = useState('useReducer'); // 'useReducer' or 'useSyncExternalStore'
+      const [count, setCount] = useState(10);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🔌 Lab 1:</span> The Gateway Pattern & Implementation Migration
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Consumers should depend on domain-specific gateway hooks like <code className="text-cyan-300">useCounter()</code> rather than raw <code className="text-cyan-300">useContext</code>. Switch the underlying storage implementation below to verify that the consumer component contract remains 100% decoupled.
+            </p>
+          </div>
+
+          <div className="flex gap-3 items-center">
+            <span className="text-xs font-bold text-gray-400">Underlying Implementation:</span>
+            <button
+              onClick={() => setImplType('useReducer')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                implType === 'useReducer' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              1. React Context + useReducer
+            </button>
+            <button
+              onClick={() => setImplType('useSyncExternalStore')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                implType === 'useSyncExternalStore' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              2. Scoped External Store (useSyncExternalStore)
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Consumer Component View */}
+            <div className="glass-panel p-5 rounded-xl space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Consumer Component (Untouched)</h3>
+              
+              <div className="p-4 bg-gray-950 rounded-lg space-y-3 font-mono text-xs">
+                <div className="text-gray-400">// Consumer uses pure domain contract</div>
+                <div className="text-cyan-300">
+                  {`function CounterWidget() {`}
+                  <br />
+                  &nbsp;&nbsp;{`const { value, increment, decrement } = useCounter();`}
+                  <br />
+                  &nbsp;&nbsp;{`return <div>{value}</div>;`}
+                  <br />
+                  {`}`}
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-900 rounded-lg flex items-center justify-between border border-gray-800">
+                <span className="text-xs text-gray-400 font-semibold">Active Counter Value:</span>
+                <span className="text-2xl font-extrabold text-cyan-400 font-mono">{count}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCount(c => c - 1)}
+                    className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded font-mono text-xs font-bold text-white"
+                  >
+                    -
+                  </button>
+                  <button
+                    onClick={() => setCount(c => c + 1)}
+                    className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 rounded font-mono text-xs font-bold text-white"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Architecture Seam Inspection */}
+            <div className="glass-panel p-5 rounded-xl space-y-3 font-mono text-xs">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Behind the Architectural Seam</h3>
+              
+              <div className="p-3 bg-gray-950 rounded-lg text-gray-300 space-y-2 border border-gray-800">
+                <div className="text-emerald-400 font-bold">Active Engine: {implType}</div>
+                <p className="text-[11px] text-gray-400">
+                  {implType === 'useReducer'
+                    ? 'State is owned by React Fiber state queue inside Provider. Updates dispatch actions through Context.'
+                    : 'Provider instantiates a vanilla TypeScript store on mount. Consumers subscribe via useSyncExternalStore for micro-task accuracy.'}
+                </p>
+                <div className="text-[10px] text-gray-500 pt-2 border-t border-gray-800">
+                  Benefit: Zero code changes required in 100+ UI components when swapping architectures.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB 2: MULTI-INSTANCE ISOLATION
+    // ==========================================
+    function Lab2MultiInstanceIsolation() {
+      const [editorA, setEditorA] = useState({ tool: 'select', dirty: false, text: 'Document Alpha' });
+      const [editorB, setEditorB] = useState({ tool: 'draw', dirty: true, text: 'Document Beta' });
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🪟 Lab 2:</span> Multi-Instance Isolation & Feature Providers
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              When a feature can be instantiated multiple times concurrently (e.g., side-by-side tabs, split-screen editors), each instance must mount its own <code className="text-cyan-300">EditorProvider</code> to keep state completely isolated.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Instance A */}
+            <div className="glass-panel p-5 rounded-xl space-y-4 border-cyan-800/60">
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <h3 className="text-sm font-bold text-cyan-400 font-mono">&lt;EditorProvider instance="Alpha"&gt;</h3>
+                <span className="text-[10px] px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-800 rounded">Scope: Instance A</span>
+              </div>
+
+              <div className="space-y-3 text-xs font-mono">
+                <div>
+                  <label className="text-gray-400 block mb-1">Document Content:</label>
+                  <input
+                    type="text"
+                    value={editorA.text}
+                    onChange={(e) => setEditorA(prev => ({ ...prev, text: e.target.value, dirty: true }))}
+                    className="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditorA(prev => ({ ...prev, tool: 'select' }))}
+                    className={`px-3 py-1.5 rounded text-xs font-bold ${editorA.tool === 'select' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                  >
+                    Tool: Select
+                  </button>
+                  <button
+                    onClick={() => setEditorA(prev => ({ ...prev, tool: 'draw' }))}
+                    className={`px-3 py-1.5 rounded text-xs font-bold ${editorA.tool === 'draw' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                  >
+                    Tool: Draw
+                  </button>
+                </div>
+                <div className="p-2 bg-gray-950 rounded text-gray-400 flex justify-between">
+                  <span>Dirty Status:</span>
+                  <span className={editorA.dirty ? 'text-amber-400 font-bold' : 'text-emerald-400'}>{editorA.dirty ? 'Modified' : 'Clean'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Instance B */}
+            <div className="glass-panel p-5 rounded-xl space-y-4 border-indigo-800/60">
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <h3 className="text-sm font-bold text-indigo-400 font-mono">&lt;EditorProvider instance="Beta"&gt;</h3>
+                <span className="text-[10px] px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800 rounded">Scope: Instance B</span>
+              </div>
+
+              <div className="space-y-3 text-xs font-mono">
+                <div>
+                  <label className="text-gray-400 block mb-1">Document Content:</label>
+                  <input
+                    type="text"
+                    value={editorB.text}
+                    onChange={(e) => setEditorB(prev => ({ ...prev, text: e.target.value, dirty: true }))}
+                    className="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditorB(prev => ({ ...prev, tool: 'select' }))}
+                    className={`px-3 py-1.5 rounded text-xs font-bold ${editorB.tool === 'select' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                  >
+                    Tool: Select
+                  </button>
+                  <button
+                    onClick={() => setEditorB(prev => ({ ...prev, tool: 'draw' }))}
+                    className={`px-3 py-1.5 rounded text-xs font-bold ${editorB.tool === 'draw' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                  >
+                    Tool: Draw
+                  </button>
+                </div>
+                <div className="p-2 bg-gray-950 rounded text-gray-400 flex justify-between">
+                  <span>Dirty Status:</span>
+                  <span className={editorB.dirty ? 'text-amber-400 font-bold' : 'text-emerald-400'}>{editorB.dirty ? 'Modified' : 'Clean'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB 3: SCOPE & LIFETIMES
+    // ==========================================
+    function Lab3ScopeLifetimes() {
+      const [activeScope, setActiveScope] = useState('Workspace');
+      const [sessionTime, setSessionTime] = useState(0);
+
+      useEffect(() => {
+        const timer = setInterval(() => setSessionTime(t => t + 1), 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">⏳ Lab 3:</span> Provider Lifetime & Resource Unmount Simulator
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Resources owned by a Provider (WebSockets, caches, workers) should strictly bind their lifecycle to the Provider Fiber's mount & unmount boundaries.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono text-xs">
+            <div className="glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Scope Lifetime Bounds</h3>
+              <div className="space-y-2">
+                {[
+                  { name: 'App Root', desc: 'Lives for entire session (e.g. Auth, Theme)' },
+                  { name: 'Workspace', desc: 'Lives until workspace closes (e.g. DocCache)' },
+                  { name: 'Editor Tab', desc: 'Lives while tab is active (e.g. WebGL Canvas)' }
+                ].map((s) => (
+                  <button
+                    key={s.name}
+                    onClick={() => setActiveScope(s.name)}
+                    className={`w-full text-left p-3 rounded-lg transition-all ${
+                      activeScope === s.name ? 'bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold' : 'bg-gray-900 text-gray-400 hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="text-white">{s.name}</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">{s.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="md:col-span-2 glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Active Resource Telemetry</h3>
+              
+              <div className="p-4 bg-gray-950 rounded-xl space-y-3 border border-gray-800">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Selected Boundary:</span>
+                  <span className="text-cyan-400 font-bold">{activeScope} Scope</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">App Session Duration:</span>
+                  <span className="text-emerald-400 font-bold">{sessionTime}s</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Resource Acquisition Contract:</span>
+                  <span className="text-indigo-400">
+                    {activeScope === 'App Root' && 'Mounted on Window Load ──► Disposed on Tab Close'}
+                    {activeScope === 'Workspace' && 'Acquired on Route Enter ──► WebSocket Disconnected on Exit'}
+                    {activeScope === 'Editor Tab' && 'Acquired on Tab Focus ──► WebGL Buffers Destroyed on Tab Close'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB 4: HIGH-FREQ STORE VS CONTEXT
+    // ==========================================
+    function Lab4HighFreqStore() {
+      const [freqMode, setFreqMode] = useState('ExternalStore'); // 'Context' or 'ExternalStore'
+      const [renderCount, setRenderCount] = useState(0);
+      const [pos, setPos] = useState({ x: 0, y: 0 });
+
+      const handleMouseMove = (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.round(e.clientX - rect.left);
+        const y = Math.round(e.clientY - rect.top);
+        setPos({ x, y });
+        if (freqMode === 'Context') {
+          setRenderCount(c => c + 1);
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">⚡ Lab 4:</span> High-Frequency State: Context vs External Store
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Move your mouse inside the pad below. In <code className="text-rose-400">Context Mode</code>, rapid cursor ticks trigger full React reconciliation passes. In <code className="text-emerald-400">External Store Mode</code>, subscriptions are isolated.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setFreqMode('Context'); setRenderCount(0); }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                freqMode === 'Context' ? 'bg-rose-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              Mode: Naive React Context (Broad Re-renders)
+            </button>
+            <button
+              onClick={() => { setFreqMode('ExternalStore'); setRenderCount(0); }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                freqMode === 'ExternalStore' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              Mode: External Store (Zero Render Storms)
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+            <div
+              onMouseMove={handleMouseMove}
+              className="h-56 bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col items-center justify-center cursor-crosshair relative select-none"
+            >
+              <div className="text-gray-600 text-center">
+                Move Mouse Here
+                <div className="text-xs text-gray-400 mt-1">X: {pos.x}px | Y: {pos.y}px</div>
+              </div>
+            </div>
+
+            <div className="glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Profiler Telemetry</h3>
+              <div className="p-3 bg-gray-950 rounded-lg space-y-2 border border-gray-800">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Reconciliation Passes:</span>
+                  <span className={`text-xl font-bold ${freqMode === 'Context' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {freqMode === 'Context' ? `${renderCount} Renders` : '0 Renders (Direct Mutation)'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-400">
+                  {freqMode === 'Context'
+                    ? '⚠️ Every cursor movement cascades through all Context consumers in the tree.'
+                    : '✅ State bypasses React virtual DOM reconciler, targeting specific subscribers directly.'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB 5: DI & TESTING ADAPTERS
+    // ==========================================
+    function Lab5DITestingAdapters() {
+      const [adapterMode, setAdapterMode] = useState('Production');
+      const [response, setResponse] = useState(null);
+
+      const handleFetch = () => {
+        if (adapterMode === 'Production') {
+          setResponse({ status: 200, source: 'AWS API Gateway', payload: { user: 'srikar@enterprise.internal', tier: 'Founding Engineer' } });
+        } else {
+          setResponse({ status: 200, source: 'Vitest Mock Adapter', payload: { user: 'mock-test-user@test.local', tier: 'Tester' } });
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🧪 Lab 5:</span> Context as Dependency Injection & Testing Adapters
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Inject production services vs mock testing adapters into subtrees without altering consumer component source code.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setAdapterMode('Production'); setResponse(null); }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                adapterMode === 'Production' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              Production Provider (&lt;HttpApiClient&gt;)
+            </button>
+            <button
+              onClick={() => { setAdapterMode('Test'); setResponse(null); }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                adapterMode === 'Test' ? 'bg-amber-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              Test Harness (&lt;MockTestApiClient&gt;)
+            </button>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl space-y-4 font-mono text-xs">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+              <span className="text-gray-400">Active Injected Client:</span>
+              <span className="text-cyan-300 font-bold">{adapterMode === 'Production' ? 'HttpApiClient(baseURL: "/api")' : 'MockApiClient(fixtures: {...})'}</span>
+            </div>
+
+            <button
+              onClick={handleFetch}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-bold text-white transition-all"
+            >
+              Execute Injected api.getUser()
+            </button>
+
+            {response && (
+              <pre className="p-3 bg-gray-950 rounded-lg text-emerald-400 border border-gray-800 overflow-x-auto">
+                {JSON.stringify(response, null, 2)}
+              </pre>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // LAB 6: ARCHITECTURE SCORECARD
+    // ==========================================
+    function Lab6ArchitectureScorecard() {
+      const dimensions = [
+        { name: 'Ownership', q: 'Is single component owner explicit?' },
+        { name: 'Scope', q: 'Is Provider mounted at exact semantic subtree?' },
+        { name: 'Lifetime', q: 'Are resources cleaned up on unmount?' },
+        { name: 'Frequency', q: 'Is high-frequency state decoupled?' },
+        { name: 'Public API', q: 'Are domain gateway hooks exported instead of raw Context?' },
+        { name: 'Testing', q: 'Can mock adapters be injected without mounting App root?' },
+      ];
+
+      const [scores, setScores] = useState({});
+
+      const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
+      const maxScore = dimensions.length * 2;
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">📊 Lab 6:</span> Senior Architecture Scorecard Evaluator
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Audit any feature Context architecture from 0 (Anti-Pattern) to 2 (Mastery) across key dimensions.
+            </p>
+          </div>
+
+          <div className="space-y-3 font-mono text-xs">
+            {dimensions.map((dim, idx) => (
+              <div key={dim.name} className="glass-panel p-4 rounded-xl flex flex-wrap justify-between items-center gap-3">
+                <div>
+                  <div className="text-white font-bold">{dim.name}</div>
+                  <div className="text-gray-400 text-[11px]">{dim.q}</div>
+                </div>
+                <div className="flex gap-2">
+                  {[0, 1, 2].map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setScores(prev => ({ ...prev, [dim.name]: val }))}
+                      className={`px-3 py-1.5 rounded font-bold transition-all ${
+                        scores[dim.name] === val
+                          ? val === 2 ? 'bg-emerald-600 text-white' : val === 1 ? 'bg-amber-600 text-white' : 'bg-rose-600 text-white'
+                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      {val === 2 ? '2 (Mastery)' : val === 1 ? '1 (Acceptable)' : '0 (Smell)'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl flex justify-between items-center">
+            <span className="text-sm font-bold text-white">Overall Architectural Maturity:</span>
+            <div className="text-right">
+              <span className="text-2xl font-extrabold text-cyan-400 font-mono">{totalScore} / {maxScore}</span>
+              <div className="text-xs text-gray-400 font-mono">
+                {totalScore >= 10 ? '🏆 Level 5: Adaptive Scaled Architecture' : totalScore >= 6 ? '⚡ Level 3: Encapsulated Gateway' : '⚠️ Level 1: Convenient Monolith'}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
