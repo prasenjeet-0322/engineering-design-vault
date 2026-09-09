@@ -45,7 +45,7 @@ A custom Hook is a reusable composition boundary for React-aware behavior. It co
 | [13. Testing Custom Hooks & Isolation Contracts](./13-testing-custom-hooks-and-isolation-contracts.md) | ✅ Completed | Vitest, @testing-library/react-hooks, act() semantics, mocking browser APIs, race condition harnesses. | [🧪 Lab 13](./examples/13-testing-custom-hooks-and-vitest-harnesses.html) |
 | [14. Custom Hooks Crucible & Production Traps](./14-custom-hooks-crucible-and-production-traps.md) | ✅ Completed | Refactoring God Hooks, eliminating leaky abstractions, fixing closure bugs, triage runbooks. | [🧪 Lab 14](./examples/14-custom-hooks-crucible-and-senior-diagnostic-gauntlet.html) |
 | [15. Enterprise Synthesis & Scaled Custom Hook Architecture](./15-enterprise-synthesis-and-scaled-hook-architecture.md) | ✅ Completed | Layered hook hierarchies, micro-frontend DI gateways, shared library design, migration firewalls. | [🧪 Lab 15](./examples/15-advanced-synthesis-and-enterprise-scaled-patterns.html) |
-| [16. Custom Hooks: Final Review & Senior Mastery](./16-custom-hooks-final-review-and-senior-mastery.md) | ⏳ Pending | Terminal review, 20 interview gauntlets, 5-level senior graduation rubric. | 🧪 Lab 16 |
+| [16. Custom Hooks: Final Review & Senior Mastery](./16-custom-hooks-final-review-and-senior-mastery.md) | ✅ Completed | Terminal review, 15 prediction challenges, 5-level senior graduation rubric, master synthesis. | [🧪 Lab 16](./examples/16-custom-hooks-and-logic-composition-final-review-and-mastery.html) |
 
 ---
 
