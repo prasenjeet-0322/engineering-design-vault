@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Hooks Part 01: Mental Model & Logic Reuse Interactive Lab</title>
+  <!-- React 18 & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    :root {
+      --bg-main: #0B0F19;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --card-border: rgba(75, 85, 99, 0.4);
+      --accent-cyan: #06B6D4;
+      --accent-indigo: #6366F1;
+      --accent-emerald: #10B981;
+      --accent-rose: #F43F5E;
+      --accent-amber: #F59E0B;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: #F3F4F6;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #4B5563;
+    }
+
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+    }
+  </style>
+</head>
+<body class="custom-scrollbar">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useContext, createContext, useMemo, useRef, memo, useCallback } = React;
+
+    // =========================================================================
+    // ROOT APP SHELL
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('lab1');
+
+      const tabs = [
+        { id: 'lab1', label: '1. Dual-Caller Isolation', icon: '⚡' },
+        { id: 'lab2', label: '2. Fiber Hook Memory', icon: '🔬' },
+        { id: 'lab3', label: '3. Logic vs Shared State', icon: '🔄' },
+        { id: 'lab4', label: '4. 5-Way Decision Tree', icon: '🌲' },
+        { id: 'lab5', label: '5. Prediction Gauntlet', icon: '🎯' },
+      ];
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Top Bar */}
+          <header className="border-b border-gray-800 bg-gray-950/80 sticky top-0 z-50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-cyan-950 text-cyan-400 border border-cyan-800">
+                  KPI 14 • PART 01
+                </span>
+                <span className="text-gray-400 text-sm">Custom Hooks & Logic Composition</span>
+              </div>
+              <h1 className="text-xl font-extrabold text-white mt-1">
+                Custom Hooks Mental Model & Logic Reuse Interactive Lab
+              </h1>
+            </div>
+            <div className="text-xs text-gray-400 text-right hidden sm:block">
+              <div>Lead System Architect: <span className="text-cyan-400 font-semibold">Srikar Kudurmalla</span></div>
+              <div>Co-Author: <span className="text-gray-300 font-semibold">Prasenjeet</span></div>
+            </div>
+          </header>
+
+          {/* Navigation Bar */}
+          <nav className="bg-gray-900/60 border-b border-gray-800 px-6 py-2.5 flex items-center gap-2 overflow-x-auto custom-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${
+                  activeTab === tab.id
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm shadow-cyan-900/30'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 border border-transparent'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Main Workspace */}
+          <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+            {activeTab === 'lab1' && <Lab1DualCallerIsolation />}
+            {activeTab === 'lab2' && <Lab2FiberHookMemory />}
+            {activeTab === 'lab3' && <Lab3LogicVsSharedState />}
+            {activeTab === 'lab4' && <Lab4DecisionTree />}
+            {activeTab === 'lab5' && <Lab5PredictionGauntlet />}
+          </main>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // LAB 1: DUAL-CALLER STATE ISOLATION VISUALIZER
+    // =========================================================================
+    function Lab1DualCallerIsolation() {
+      const [countA, setCountA] = useState(0);
+      const [countB, setCountB] = useState(0);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">⚡ Lab 1:</span> Dual-Caller State Isolation
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Observe how calling <code className="text-cyan-300">useCounter()</code> from two separate components reuses the counter logic, but creates completely independent state memory slots.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+            {/* Component A */}
+            <div className="glass-panel p-5 rounded-xl space-y-3 border-emerald-900/50">
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span className="text-emerald-400 font-bold text-sm">Component A (&lt;CounterWidgetA /&gt;)</span>
+                <span className="text-gray-500 text-[10px]">Fiber ID: #0xA18</span>
+              </div>
+              <div className="p-3 bg-gray-950 rounded-lg flex justify-between items-center border border-gray-800">
+                <span className="text-gray-400">Local Count:</span>
+                <span className="text-xl font-bold text-emerald-400">{countA}</span>
+              </div>
+              <button
+                onClick={() => setCountA(prev => prev + 1)}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all"
+              >
+                Increment A (+1)
+              </button>
+            </div>
+
+            {/* Component B */}
+            <div className="glass-panel p-5 rounded-xl space-y-3 border-indigo-900/50">
+              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+                <span className="text-indigo-400 font-bold text-sm">Component B (&lt;CounterWidgetB /&gt;)</span>
+                <span className="text-gray-500 text-[10px]">Fiber ID: #0xB92</span>
+              </div>
+              <div className="p-3 bg-gray-950 rounded-lg flex justify-between items-center border border-gray-800">
+                <span className="text-gray-400">Local Count:</span>
+                <span className="text-xl font-bold text-indigo-400">{countB}</span>
+              </div>
+              <button
+                onClick={() => setCountB(prev => prev + 1)}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold transition-all"
+              >
+                Increment B (+1)
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // LAB 2: FIBER HOOK LINKED-LIST MEMORY INSPECTOR
+    // =========================================================================
+    function Lab2FiberHookMemory() {
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🔬 Lab 2:</span> Fiber Hook Singly Linked-List Topology
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Custom hooks do NOT create virtual child Fibers. They append their primitive hooks directly to the calling component Fiber's <code className="text-cyan-300">memoizedState</code> linked list.
+            </p>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl font-mono text-xs space-y-4">
+            <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Caller Fiber: &lt;SearchPage /&gt;</h3>
+
+            <div className="p-4 bg-gray-950 rounded-xl space-y-3 border border-gray-800">
+              <div className="text-cyan-400 font-bold">Fiber.memoizedState ──►</div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-gray-900 rounded-lg border border-cyan-800/80 space-y-1">
+                  <div className="text-cyan-400 font-bold text-[11px]">Hook Node 0: useState</div>
+                  <div className="text-gray-400 text-[10px]">Origin: useSearch()</div>
+                  <div className="text-emerald-400 text-[10px] font-bold">value: "react hooks"</div>
+                </div>
+
+                <div className="p-3 bg-gray-900 rounded-lg border border-indigo-800/80 space-y-1">
+                  <div className="text-indigo-400 font-bold text-[11px]">Hook Node 1: useEffect</div>
+                  <div className="text-gray-400 text-[10px]">Origin: useSearch()</div>
+                  <div className="text-indigo-300 text-[10px]">Debounced Fetch Trigger</div>
+                </div>
+
+                <div className="p-3 bg-gray-900 rounded-lg border border-amber-800/80 space-y-1">
+                  <div className="text-amber-400 font-bold text-[11px]">Hook Node 2: useRef</div>
+                  <div className="text-gray-400 text-[10px]">Origin: Direct in Caller</div>
+                  <div className="text-amber-300 text-[10px]">inputElementRef</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // LAB 3: LOGIC REUSE VS SHARED STATE COMPARISON
+    // =========================================================================
+    function Lab3LogicVsSharedState() {
+      const [mode, setMode] = useState('hook'); // 'hook' | 'context'
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🔄 Lab 3:</span> Logic Reuse vs Shared State Comparison
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Compare a local Custom Hook (isolated instance) with a Context-backed Custom Hook (shared instance).
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMode('hook')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all ${
+                mode === 'hook' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400'
+              }`}
+            >
+              1. Local Custom Hook (Isolated Logic)
+            </button>
+            <button
+              onClick={() => setMode('context')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all ${
+                mode === 'context' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'
+              }`}
+            >
+              2. Context-Backed Hook (Shared State)
+            </button>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl font-mono text-xs space-y-3">
+            <div className="p-4 bg-gray-950 rounded-xl border border-gray-800">
+              {mode === 'hook' ? (
+                <div className="space-y-2">
+                  <div className="text-cyan-400 font-bold">Mode: Local Custom Hook (useCounter)</div>
+                  <p className="text-gray-300">
+                    Each caller instantiates its own state slot. Updating Component A leaves Component B untouched.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-indigo-400 font-bold">Mode: Context-Backed Hook (useSharedCounter)</div>
+                  <p className="text-gray-300">
+                    The custom hook calls <code className="text-cyan-300">useContext(CounterContext)</code>. All consumers resolve the same single Provider state slot.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // LAB 4: 5-WAY DECISION TREE
+    // =========================================================================
+    function Lab4DecisionTree() {
+      const scenarios = [
+        { id: 1, title: 'Formatting currency strings', correct: 'Pure Utility', reason: 'No React hook primitives or state required.' },
+        { id: 2, title: 'Window resize width listener', correct: 'Custom Hook', reason: 'Uses useState + useEffect, state is local to each caller.' },
+        { id: 3, title: 'Global logged-in user profile', correct: 'Context / Gateway', reason: 'Shared state across deep component tree.' },
+        { id: 4, title: '60fps canvas coordinates', correct: 'External Store', reason: 'High-frequency updates avoid React re-render thrash.' },
+      ];
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🌲 Lab 4:</span> 5-Way Logic Placement Decision Engine
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Classify where reusable logic belongs based on state ownership and React primitive requirements.
+            </p>
+          </div>
+
+          <div className="space-y-3 font-mono text-xs">
+            {scenarios.map((sc) => (
+              <div key={sc.id} className="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-white font-bold">{sc.title}</h4>
+                  <p className="text-gray-400 text-[11px] mt-0.5">{sc.reason}</p>
+                </div>
+                <span className="px-3 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold">
+                  {sc.correct}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // LAB 5: PREDICTION GAUNTLET
+    // =========================================================================
+    function Lab5PredictionGauntlet() {
+      const [revealed, setRevealed] = useState(false);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🎯 Lab 5:</span> Prediction Gauntlet
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Predict the execution outcome when two components call the same custom hook.
+            </p>
+          </div>
+
+          <div className="glass-panel p-5 rounded-xl font-mono text-xs space-y-4">
+            <pre className="p-3 bg-gray-950 rounded-lg text-cyan-300 border border-gray-800 overflow-x-auto">
+{`function useCounter() {
+  const [count, setCount] = useState(0);
+  return { count, increment: () => setCount(c => c + 1) };
+}
+
+// Component A and Component B both call useCounter()
+// User clicks Increment in Component A.`}
+            </pre>
+
+            <div className="text-sm font-bold text-white">What are the counts in Component A and Component B?</div>
+
+            {revealed ? (
+              <div className="p-4 bg-emerald-950/80 border border-emerald-800 rounded-xl text-emerald-300 space-y-1">
+                <div className="font-bold">✓ Answer: Component A = 1, Component B = 0</div>
+                <p className="text-gray-300 text-[11px]">
+                  Custom hooks reuse behavioral logic, but allocate separate state slots on each calling component's Fiber!
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => setRevealed(true)}
+                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-all"
+              >
+                Reveal Architectural Explanation
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Mount Root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
