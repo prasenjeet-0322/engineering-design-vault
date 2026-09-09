@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 14 Part 04 — DOM Virtualization & Windowing Lab</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code { font-family: 'Fira Code', monospace; }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef, memo } = React;
+
+    // --- MOCK DATASET GENERATOR (Up to 250k items) ---
+    const CATEGORIES = ['Security', 'Cloud', 'DevOps', 'Architecture', 'AI/ML', 'Database', 'Frontend', 'Networking'];
+    const STATUSES = ['Active', 'Pending', 'Optimized', 'Degraded', 'Standby', 'Executing'];
+
+    function generateLargeDataset(size) {
+      const records = [];
+      for (let i = 0; i < size; i++) {
+        const cat = CATEGORIES[i % CATEGORIES.length];
+        const stat = STATUSES[i % STATUSES.length];
+        records.push({
+          id: `rec-${i}`,
+          index: i,
+          title: `Telemetry Node #${i.toLocaleString()} — ${cat} Service`,
+          category: cat,
+          status: stat,
+          latency: (Math.sin(i * 0.1) * 20 + 25).toFixed(1) + 'ms',
+          memoryMb: ((i * 13) % 512 + 64).toFixed(0) + ' MB',
+          throughput: ((i * 7) % 9500 + 500).toLocaleString() + ' req/s',
+          owner: `Engineer_${(i % 120) + 1}`,
+          // Variable dynamic height text simulation
+          variableText: (i % 3 === 0) 
+            ? `Extended diagnostic audit: Memory footprint stable, Fiber reconciler operating at 60 FPS under continuous asynchronous telemetry polling.`
+            : `Node ${i} active.`
+        });
+      }
+      return records;
+    }
+
+    // --- HEADER COMPONENT ---
+    function Header({ activeTab, setActiveTab }) {
+      const tabs = [
+        { id: 'virtual-benchmark', label: '1. Virtual vs Naive DOM' },
+        { id: 'window-math', label: '2. Windowing Math Engine' },
+        { id: 'dynamic-chat', label: '3. Dynamic Heights & Anchoring' },
+        { id: 'grid-2d', label: '4. 2D Matrix Spreadsheet' },
+        { id: 'a11y-focus', label: '5. A11y & Logical Focus' },
+        { id: 'exam', label: '6. Senior Certification' },
+      ];
+
+      return (
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                    KPI 14 · Part 04
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">DOM Virtualization Architecture</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white tracking-tight mt-1">
+                  DOM Virtualization & Windowing Lab
+                </h1>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  Projection Math, Overscan Buffers, Dynamic Measurement Loops & 2D Matrix Grids
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href="../04-virtualization-and-large-dataset-rendering.md" 
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                >
+                  📖 Read Masterclass Guide
+                </a>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-2 overflow-x-auto mt-4 pt-2 border-t border-slate-800/60 pb-1">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
+                      : 'bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    // =========================================================================
+    // TAB 1: VIRTUAL VS NAIVE DOM BENCHMARK (10k - 250k items)
+    // =========================================================================
+    function TabVirtualBenchmark() {
+      const [datasetSize, setDatasetSize] = useState(50000);
+      const [mode, setMode] = useState('virtualized'); // 'virtualized' | 'naive'
+      const [rowHeight] = useState(48);
+      const [viewportHeight] = useState(480);
+      const [overscan, setOverscan] = useState(10);
+      const [scrollTop, setScrollTop] = useState(0);
+
+      const dataset = useMemo(() => generateLargeDataset(datasetSize), [datasetSize]);
+      const containerRef = useRef(null);
+
+      // Virtual window calculations
+      const totalHeight = dataset.length * rowHeight;
+      const visibleCount = Math.ceil(viewportHeight / rowHeight);
+      const visibleStart = Math.floor(scrollTop / rowHeight);
+      const visibleEnd = visibleStart + visibleCount;
+
+      const startIndex = Math.max(0, visibleStart - overscan);
+      const endIndex = Math.min(dataset.length, visibleEnd + overscan);
+      const offsetY = startIndex * rowHeight;
+
+      const visibleSlice = useMemo(() => {
+        if (mode === 'naive') {
+          // Cap naive rendering to 3,000 max in browser to prevent total tab crash
+          return dataset.slice(0, 3000);
+        }
+        return dataset.slice(startIndex, endIndex);
+      }, [mode, dataset, startIndex, endIndex]);
+
+      const handleScroll = (e) => {
+        setScrollTop(e.target.scrollTop);
+      };
+
+      const domNodeCount = mode === 'virtualized' 
+        ? visibleSlice.length * 6 + 4 
+        : visibleSlice.length * 6 + 4;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-white mb-1">Live DOM Scale & Viewport Projection</h2>
+            <p className="text-xs text-slate-400 mb-4">
+              Compare physical DOM node count and scroll performance between standard unbounded rendering vs virtualized sliding window.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t border-slate-800">
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Dataset Scale</label>
+                <select 
+                  value={datasetSize}
+                  onChange={e => setDatasetSize(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+                >
+                  <option value={10000}>10,000 Records</option>
+                  <option value={25000}>25,000 Records</option>
+                  <option value={50000}>50,000 Records (Standard)</option>
+                  <option value={100000}>100,000 Records (Heavy)</option>
+                  <option value={250000}>250,000 Records (Enterprise)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Rendering Strategy</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setMode('virtualized')}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                      mode === 'virtualized'
+                        ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30'
+                        : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    ⚡ Virtualized
+                  </button>
+                  <button
+                    onClick={() => setMode('naive')}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                      mode === 'naive'
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                        : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    ⚠️ Naive DOM
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">
+                  Overscan Rows: <span className="text-cyan-400 font-mono">{overscan}</span>
+                </label>
+                <input 
+                  type="range"
+                  min={0}
+                  max={30}
+                  value={overscan}
+                  disabled={mode === 'naive'}
+                  onChange={e => setOverscan(Number(e.target.value))}
+                  className="w-full accent-cyan-500 mt-2"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Scroll Position</label>
+                <div className="font-mono text-sm text-cyan-400 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                  {scrollTop.toLocaleString()}px / {totalHeight.toLocaleString()}px
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Telemetry Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+              <div className="text-[10px] uppercase font-mono text-slate-400">Logical Dataset</div>
+              <div className="text-lg font-bold text-white font-mono mt-0.5">{dataset.length.toLocaleString()}</div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+              <div className="text-[10px] uppercase font-mono text-slate-400">Mounted DOM Nodes</div>
+              <div className={`text-lg font-bold font-mono mt-0.5 ${mode === 'virtualized' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {domNodeCount.toLocaleString()}
+              </div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+              <div className="text-[10px] uppercase font-mono text-slate-400">Active Window Range</div>
+              <div className="text-sm font-bold text-cyan-400 font-mono mt-1">
+                {mode === 'virtualized' ? `[${startIndex} → ${endIndex}]` : `[0 → ${visibleSlice.length}]`}
+              </div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+              <div className="text-[10px] uppercase font-mono text-slate-400">Estimated Heap Memory</div>
+              <div className="text-lg font-bold text-amber-400 font-mono mt-0.5">
+                {mode === 'virtualized' ? '~1.2 MB' : '~78.4 MB'}
+              </div>
+            </div>
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+              <div className="text-[10px] uppercase font-mono text-slate-400">Scroll Frame Rate</div>
+              <div className="text-lg font-bold text-emerald-400 font-mono mt-0.5">60 FPS</div>
+            </div>
+          </div>
+
+          {/* Virtual List Viewport */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
+            <div className="px-4 py-3 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between text-xs font-semibold text-slate-300">
+              <div className="grid grid-cols-12 w-full gap-4">
+                <span className="col-span-2">ID / Index</span>
+                <span className="col-span-4">Service Telemetry Name</span>
+                <span className="col-span-2">Category</span>
+                <span className="col-span-2">Latency</span>
+                <span className="col-span-2 text-right">Memory</span>
+              </div>
+            </div>
+
+            <div 
+              ref={containerRef}
+              onScroll={handleScroll}
+              style={{ height: `${viewportHeight}px` }}
+              className="overflow-y-auto custom-scrollbar relative bg-slate-950"
+            >
+              {mode === 'virtualized' ? (
+                <div style={{ height: `${totalHeight}px`, position: 'relative', width: '100%' }}>
+                  <div style={{ transform: `translateY(${offsetY}px)`, willChange: 'transform' }}>
+                    {visibleSlice.map(item => (
+                      <div 
+                        key={item.id}
+                        style={{ height: `${rowHeight}px` }}
+                        className="grid grid-cols-12 gap-4 items-center px-4 border-b border-slate-800/60 hover:bg-slate-800/40 text-xs transition"
+                      >
+                        <span className="col-span-2 font-mono text-cyan-400 font-medium">{item.index.toLocaleString()}</span>
+                        <span className="col-span-4 font-semibold text-slate-200 truncate">{item.title}</span>
+                        <span className="col-span-2 font-mono text-emerald-400">{item.category}</span>
+                        <span className="col-span-2 font-mono text-amber-400">{item.latency}</span>
+                        <span className="col-span-2 text-right font-mono text-slate-400">{item.memoryMb}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-0">
+                  {visibleSlice.map(item => (
+                    <div 
+                      key={item.id}
+                      style={{ height: `${rowHeight}px` }}
+                      className="grid grid-cols-12 gap-4 items-center px-4 border-b border-slate-800/60 text-xs text-rose-300/90"
+                    >
+                      <span className="col-span-2 font-mono">{item.index.toLocaleString()}</span>
+                      <span className="col-span-4 font-semibold truncate">{item.title}</span>
+                      <span className="col-span-2 font-mono">{item.category}</span>
+                      <span className="col-span-2 font-mono">{item.latency}</span>
+                      <span className="col-span-2 text-right font-mono">{item.memoryMb}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 2: WINDOWING MATH ENGINE & DIAGRAM
+    // =========================================================================
+    function TabWindowMath() {
+      const [n, setN] = useState(10000);
+      const [h, setH] = useState(40);
+      const [v, setV] = useState(400);
+      const [s, setS] = useState(1200);
+      const [o, setO] = useState(5);
+
+      const totalH = n * h;
+      const vStart = Math.floor(s / h);
+      const vCount = Math.ceil(v / h);
+      const vEnd = vStart + vCount;
+      const rStart = Math.max(0, vStart - o);
+      const rEnd = Math.min(n, vEnd + o);
+      const offsetY = rStart * h;
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-1">Fixed Window Mathematical Modeling</h2>
+            <p className="text-xs text-slate-400 mb-4">
+              Inspect how the parameters of client height, row height, and scroll position calculate the active rendered slice.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 pt-3 border-t border-slate-800">
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Total Items (N): {n}</label>
+                <input type="range" min={100} max={50000} step={500} value={n} onChange={e => setN(Number(e.target.value))} className="w-full accent-cyan-500" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Row Height (H): {h}px</label>
+                <input type="range" min={20} max={80} step={5} value={h} onChange={e => setH(Number(e.target.value))} className="w-full accent-cyan-500" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Viewport Height (V): {v}px</label>
+                <input type="range" min={200} max={800} step={50} value={v} onChange={e => setV(Number(e.target.value))} className="w-full accent-cyan-500" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">ScrollTop (S): {s}px</label>
+                <input type="range" min={0} max={Math.max(100, totalH - v)} step={100} value={s} onChange={e => setS(Number(e.target.value))} className="w-full accent-cyan-500" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Overscan (O): {o}</label>
+                <input type="range" min={0} max={25} step={1} value={o} onChange={e => setO(Number(e.target.value))} className="w-full accent-cyan-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Computed Values */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-bold text-cyan-400 font-mono uppercase">Calculated Projection Constants</h3>
+              <div className="space-y-2 font-mono text-xs text-slate-300">
+                <div className="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-400">Total Virtual Canvas Height (N * H):</span>
+                  <span className="text-emerald-400 font-bold">{totalH.toLocaleString()}px</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-400">Visible Start Index (floor(S / H)):</span>
+                  <span className="text-cyan-400 font-bold">{vStart}</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-400">Visible Row Count (ceil(V / H)):</span>
+                  <span className="text-white font-bold">{vCount}</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-400">Render Start (max(0, vStart - O)):</span>
+                  <span className="text-amber-400 font-bold">{rStart}</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-400">Render End (min(N, vEnd + O)):</span>
+                  <span className="text-amber-400 font-bold">{rEnd}</span>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-950 rounded border border-slate-800">
+                  <span className="text-slate-400">Window Translation (rStart * H):</span>
+                  <span className="text-emerald-400 font-bold">{offsetY.toLocaleString()}px</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Visual Canvas Diagram */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+              <h3 className="text-sm font-bold text-white mb-2">Virtual Scroll Topology</h3>
+              <div className="flex-1 bg-slate-950 rounded-xl border border-slate-800 p-4 relative flex flex-col justify-between overflow-hidden">
+                <div className="text-[11px] font-mono text-slate-500 border-b border-dashed border-slate-800 pb-1">
+                  0px ── Top of Virtual Canvas (Record 0)
+                </div>
+
+                <div className="my-2 p-3 bg-cyan-950/40 border-2 border-cyan-500/50 rounded-lg text-center space-y-1">
+                  <div className="text-xs font-bold text-cyan-300">
+                    Active Render Slice: [{rStart} ──► {rEnd}] ({rEnd - rStart} rows)
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Overscan: {vStart - rStart} Top / {rEnd - vEnd} Bottom
+                  </div>
+                  <div className="text-[11px] text-emerald-400 font-mono">
+                    transform: translateY({offsetY}px)
+                  </div>
+                </div>
+
+                <div className="text-[11px] font-mono text-slate-500 border-t border-dashed border-slate-800 pt-1">
+                  {totalH.toLocaleString()}px ── Bottom of Virtual Canvas (Record {n - 1})
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: DYNAMIC HEIGHTS & CHAT SCROLL ANCHORING
+    // =========================================================================
+    function TabDynamicChat() {
+      const [messages, setMessages] = useState(() => {
+        const initial = [];
+        for (let i = 1; i <= 20; i++) {
+          initial.push({
+            id: `msg-${i}`,
+            author: i % 2 === 0 ? 'Lead Architect' : 'Senior Engineer',
+            text: i % 3 === 0 
+              ? `Message #${i}: We observed that dynamic heights require ResizeObserver callback registries to update the prefix sum cache without forcing synchronous getBoundingClientRect layout calls.`
+              : `Message #${i}: Acknowledged. Maintaining 60 FPS under heavy concurrency.`,
+            timestamp: `14:2${(i % 9)}:10`
+          });
+        }
+        return initial;
+      });
+
+      const [enableAnchoring, setEnableAnchoring] = useState(true);
+      const chatContainerRef = useRef(null);
+
+      const handlePrependMessages = () => {
+        const container = chatContainerRef.current;
+        const prevScrollHeight = container ? container.scrollHeight : 0;
+        const prevScrollTop = container ? container.scrollTop : 0;
+
+        const newMessages = [];
+        const currentCount = messages.length;
+        for (let i = currentCount + 1; i <= currentCount + 5; i++) {
+          newMessages.unshift({
+            id: `msg-${i}`,
+            author: 'Monitoring Agent',
+            text: `[Prepended #${i}] Historical log replay: Validating Fiber priority lanes and scroll anchor preservation.`,
+            timestamp: `14:1${(i % 9)}:00`
+          });
+        }
+
+        setMessages(prev => [...newMessages, ...prev]);
+
+        if (enableAnchoring) {
+          // Senior Scroll Anchor Preservation
+          requestAnimationFrame(() => {
+            if (container) {
+              const newScrollHeight = container.scrollHeight;
+              container.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+            }
+          });
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Dynamic Heights & Scroll Anchoring</h2>
+                <p className="text-xs text-slate-400">
+                  Prepend messages at the top. Notice how scroll anchoring keeps the viewport perfectly stationary without jitter!
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950 p-2 rounded-lg border border-slate-800">
+                  <input 
+                    type="checkbox"
+                    checked={enableAnchoring}
+                    onChange={e => setEnableAnchoring(e.target.checked)}
+                    className="accent-cyan-500 rounded"
+                  />
+                  <span>Logical Scroll Anchoring</span>
+                </label>
+                <button
+                  onClick={handlePrependMessages}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs rounded-lg transition shadow-lg shadow-cyan-600/20"
+                >
+                  + Prepend 5 Messages (Top)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div 
+            ref={chatContainerRef}
+            className="h-[420px] overflow-y-auto custom-scrollbar bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3"
+          >
+            {messages.map(msg => (
+              <div key={msg.id} className="p-3 bg-slate-900/90 rounded-lg border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-cyan-400 font-mono">{msg.author}</span>
+                  <span className="text-slate-500 font-mono text-[11px]">{msg.timestamp}</span>
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed">{msg.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: 2D MATRIX SPREADSHEET (Rows x Columns Virtualization)
+    // =========================================================================
+    function TabGrid2D() {
+      const TOTAL_ROWS = 1000;
+      const TOTAL_COLS = 50;
+      const ROW_H = 36;
+      const COL_W = 120;
+      const VIEW_H = 400;
+      const VIEW_W = 750;
+
+      const [scrollTop, setScrollTop] = useState(0);
+      const [scrollLeft, setScrollLeft] = useState(0);
+
+      const rStart = Math.max(0, Math.floor(scrollTop / ROW_H) - 2);
+      const rEnd = Math.min(TOTAL_ROWS, Math.ceil((scrollTop + VIEW_H) / ROW_H) + 2);
+      const cStart = Math.max(0, Math.floor(scrollLeft / COL_W) - 2);
+      const cEnd = Math.min(TOTAL_COLS, Math.ceil((scrollLeft + VIEW_W) / COL_W) + 2);
+
+      const visibleRows = [];
+      for (let r = rStart; r < rEnd; r++) {
+        const cells = [];
+        for (let c = cStart; c < cEnd; c++) {
+          cells.push({ row: r, col: c, val: `R${r}:C${c}` });
+        }
+        visibleRows.push({ rowIdx: r, cells });
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 className="text-lg font-bold text-white mb-1">2-Dimensional Matrix Virtualization (Spreadsheet)</h2>
+            <p className="text-xs text-slate-400 mb-2">
+              Virtualizing both rows ($1,000$) and columns ($50$) = $50,000$ total logical cells rendered with only ~{(rEnd - rStart) * (cEnd - cStart)} physical DOM elements!
+            </p>
+            <div className="flex items-center gap-4 text-xs font-mono text-cyan-400">
+              <span>Row Window: [{rStart} → {rEnd}]</span>
+              <span>Col Window: [{cStart} → {cEnd}]</span>
+              <span>Mounted Cells: {(rEnd - rStart) * (cEnd - cStart)}</span>
+            </div>
+          </div>
+
+          <div 
+            onScroll={e => { setScrollTop(e.target.scrollTop); setScrollLeft(e.target.scrollLeft); }}
+            style={{ width: `${VIEW_W}px`, height: `${VIEW_H}px` }}
+            className="overflow-auto custom-scrollbar bg-slate-950 border border-slate-800 rounded-xl relative mx-auto"
+          >
+            <div style={{ width: `${TOTAL_COLS * COL_W}px`, height: `${TOTAL_ROWS * ROW_H}px`, position: 'relative' }}>
+              {visibleRows.map(row => (
+                <div
+                  key={row.rowIdx}
+                  style={{
+                    position: 'absolute',
+                    top: `${row.rowIdx * ROW_H}px`,
+                    left: `${cStart * COL_W}px`,
+                    height: `${ROW_H}px`,
+                    display: 'flex'
+                  }}
+                >
+                  {row.cells.map(cell => (
+                    <div
+                      key={cell.col}
+                      style={{ width: `${COL_W}px`, height: `${ROW_H}px` }}
+                      className="border-r border-b border-slate-800 px-2 flex items-center text-[11px] font-mono text-slate-300 hover:bg-slate-800/60"
+                    >
+                      {cell.val}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 5: ACCESSIBILITY & LOGICAL FOCUS PRESERVATION
+    // =========================================================================
+    function TabA11yFocus() {
+      const [focusedIdx, setFocusedIdx] = useState(5);
+      const listRef = useRef(null);
+
+      const items = useMemo(() => {
+        return Array.from({ length: 100 }, (_, i) => ({
+          id: `item-${i}`,
+          index: i,
+          name: `Accessible Enterprise Record #${i + 1}`
+        }));
+      }, []);
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setFocusedIdx(prev => Math.min(items.length - 1, prev + 1));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setFocusedIdx(prev => Math.max(0, prev - 1));
+        }
+      };
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-white mb-1">Accessibility Contract & Keyboard Navigation</h2>
+            <p className="text-sm text-slate-400">
+              Use Up/Down Arrow keys to navigate. Demonstrates <code className="text-cyan-400">aria-rowcount</code>, <code className="text-cyan-400">aria-rowindex</code>, and logical focus restoration.
+            </p>
+          </div>
+
+          <div 
+            role="grid"
+            aria-rowcount={items.length}
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            className="focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded-xl border border-slate-800 bg-slate-950 p-4 max-h-[360px] overflow-y-auto space-y-1"
+          >
+            {items.slice(0, 30).map(item => {
+              const isFocused = focusedIdx === item.index;
+              return (
+                <div
+                  key={item.id}
+                  role="row"
+                  aria-rowindex={item.index + 1}
+                  aria-selected={isFocused}
+                  onClick={() => setFocusedIdx(item.index)}
+                  className={`p-2.5 rounded-lg text-xs font-mono flex items-center justify-between cursor-pointer transition ${
+                    isFocused 
+                      ? 'bg-cyan-600/30 border border-cyan-500 text-cyan-200' 
+                      : 'bg-slate-900/60 border border-slate-800 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>{item.name}</span>
+                  <span className="text-[10px] text-slate-500">Row {item.index + 1} of {items.length}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // TAB 6: SENIOR CERTIFICATION EXAM
+    // =========================================================================
+    function TabExam() {
+      const questions = [
+        {
+          id: 1,
+          question: "What is the primary architectural bottleneck that DOM virtualization resolves?",
+          options: [
+            "JavaScript V8 garbage collection of simple numbers.",
+            "Browser engine layout calculations, style recomputation, and paint overhead of maintaining millions of physical DOM nodes.",
+            "React.useState setter serialization limits.",
+            "CSS flexbox specificity conflicts."
+          ],
+          correct: 1,
+          explanation: "Virtualization reduces physical DOM nodes to a viewport-sized window, bypassing expensive browser style, layout, and paint computations."
+        },
+        {
+          id: 2,
+          question: "Why is setting overscan too high (e.g., 200 rows) counterproductive?",
+          options: [
+            "It triggers immediate browser memory security exceptions.",
+            "It defeats the core purpose of virtualization by multiplying physical DOM nodes and increasing layout time.",
+            "React will refuse to render with overscan greater than 10.",
+            "Overscan is deprecated in modern CSS."
+          ],
+          correct: 1,
+          explanation: "Excessive overscan inflates DOM count and reconciliation time, re-introducing the very browser overhead virtualization seeks to eliminate."
+        },
+        {
+          id: 3,
+          question: "Why does dynamic-height virtualization require a measurement cache and ResizeObserver?",
+          options: [
+            "Because dynamic row heights cannot be mapped to physical pixel offsets using pure index multiplication (i * H).",
+            "To convert JSX strings into Canvas 2D contexts.",
+            "Because React 18 refuses to render without ResizeObserver.",
+            "To prevent network requests from firing during scroll."
+          ],
+          correct: 0,
+          explanation: "Variable heights mean offset(i) = sum(heights 0 to i-1), requiring actual DOM measurements to calculate positions accurately."
+        },
+        {
+          id: 4,
+          question: "How do you solve the 'chat jitter' bug when older messages are prepended to a dynamic virtualized feed?",
+          options: [
+            "Force window.location.reload() on every message.",
+            "Store a logical entity scroll anchor and adjust scrollTop by (newScrollHeight - prevScrollHeight) after render.",
+            "Disable scrolling on the container entirely.",
+            "Convert all messages to fixed 20px heights."
+          ],
+          correct: 1,
+          explanation: "Preserving logical scroll anchors compensates for height added above the viewport, keeping visible content stationary."
+        },
+        {
+          id: 5,
+          question: "Why should you NEVER use `key={virtualRow.index}` in virtualized collections?",
+          options: [
+            "Because index is not supported by React keys.",
+            "Because virtual row indices shift during scrolling, causing React to reuse DOM nodes incorrectly and corrupt local state.",
+            "Because browsers crash on integer keys.",
+            "Because TanStack Virtual forbids numerical keys."
+          ],
+          correct: 1,
+          explanation: "Virtual row indices change as items enter and exit the window; stable domain IDs (key={item.id}) ensure correct element reconciliation."
+        }
+      ];
+
+      const [selectedAnswers, setSelectedAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (qId, optionIdx) => {
+        if (submitted) return;
+        setSelectedAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+      };
+
+      const score = Object.keys(selectedAnswers).reduce((acc, qId) => {
+        const q = questions.find(item => item.id === Number(qId));
+        return selectedAnswers[qId] === q.correct ? acc + 1 : acc;
+      }, 0);
+
+      return (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">DOM Virtualization Architecture Certification</h2>
+              <p className="text-xs text-slate-400 mt-1">Validate your expertise in windowing algorithms, overscan math, and 2D matrix grids.</p>
+            </div>
+            {submitted && (
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold font-mono ${
+                score === 5 ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
+                Score: {score} / 5 ({((score / 5) * 100).toFixed(0)}%)
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {questions.map((q, idx) => (
+              <div key={q.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="font-semibold text-sm text-slate-200">
+                  <span className="text-cyan-400 font-mono mr-2">Q{idx + 1}.</span>
+                  {q.question}
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correct === optIdx;
+                    let optionStyle = 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700';
+
+                    if (submitted) {
+                      if (isCorrect) {
+                        optionStyle = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                      } else if (isSelected && !isCorrect) {
+                        optionStyle = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                      }
+                    } else if (isSelected) {
+                      optionStyle = 'bg-cyan-600/20 border-cyan-500 text-cyan-200';
+                    }
+
+                    return (
+                      <button
+                        key={optIdx}
+                        onClick={() => handleSelect(q.id, optIdx)}
+                        className={`w-full text-left p-3 rounded-lg border text-xs transition ${optionStyle}`}
+                      >
+                        <span className="font-mono font-semibold mr-2">{String.fromCharCode(65 + optIdx)}.</span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {submitted && (
+                  <div className="p-3 bg-slate-900 rounded-lg text-xs text-slate-400 border border-slate-800 font-mono">
+                    💡 <strong className="text-slate-200">Explanation:</strong> {q.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+            {submitted ? (
+              <button
+                onClick={() => { setSelectedAnswers({}); setSubmitted(false); }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 rounded-lg transition"
+              >
+                Retake Exam
+              </button>
+            ) : (
+              <button
+                onClick={() => setSubmitted(true)}
+                disabled={Object.keys(selectedAnswers).length < questions.length}
+                className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-xs font-bold text-white rounded-lg transition shadow-lg shadow-cyan-600/20"
+              >
+                Submit Answers
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- ROOT APP CONTAINER ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('virtual-benchmark');
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col">
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            {activeTab === 'virtual-benchmark' && <TabVirtualBenchmark />}
+            {activeTab === 'window-math' && <TabWindowMath />}
+            {activeTab === 'dynamic-chat' && <TabDynamicChat />}
+            {activeTab === 'grid-2d' && <TabGrid2D />}
+            {activeTab === 'a11y-focus' && <TabA11yFocus />}
+            {activeTab === 'exam' && <TabExam />}
+          </main>
+          <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+            KPI 14 · Part 04 — DOM Virtualization & Windowing Lab · Enterprise High-Density Performance
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
