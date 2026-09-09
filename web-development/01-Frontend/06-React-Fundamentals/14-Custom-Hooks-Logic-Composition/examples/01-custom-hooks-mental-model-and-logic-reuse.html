@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Custom Hooks Part 01: Mental Model & Logic Reuse Interactive Lab</title>
+  <title>KPI 14 - Part 01: Custom Hooks Mental Model & Logic Reuse Interactive Lab</title>
   <!-- React 18 & Babel CDN -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -61,25 +61,59 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useContext, createContext, useMemo, useRef, memo, useCallback } = React;
+    const { useState, useEffect, useContext, createContext, useMemo, useRef, useCallback } = React;
+
+    // =========================================================================
+    // CUSTOM HOOKS DEFINED FOR THE LAB
+    // =========================================================================
+
+    // 1. Local State Abstraction Hook
+    function useCounter(initial = 0) {
+      const [count, setCount] = useState(initial);
+      const executionCount = useRef(0);
+      executionCount.current += 1;
+
+      const increment = useCallback(() => setCount(c => c + 1), []);
+      const decrement = useCallback(() => setCount(c => c - 1), []);
+      const reset = useCallback(() => setCount(initial), [initial]);
+
+      return { count, increment, decrement, reset, executions: executionCount.current };
+    }
+
+    // 2. Shared Context Example
+    const SharedCounterContext = createContext(null);
+
+    function SharedCounterProvider({ children }) {
+      const [count, setCount] = useState(0);
+      const increment = () => setCount(c => c + 1);
+      const reset = () => setCount(0);
+      const value = useMemo(() => ({ count, increment, reset }), [count]);
+      return <SharedCounterContext.Provider value={value}>{children}</SharedCounterContext.Provider>;
+    }
+
+    function useSharedCounter() {
+      const ctx = useContext(SharedCounterContext);
+      if (!ctx) throw new Error('Must be inside SharedCounterProvider');
+      return ctx;
+    }
 
     // =========================================================================
     // ROOT APP SHELL
     // =========================================================================
     function App() {
-      const [activeTab, setActiveTab] = useState('lab1');
+      const [activeTab, setActiveTab] = useState('expA');
 
       const tabs = [
-        { id: 'lab1', label: '1. Dual-Caller Isolation', icon: '⚡' },
-        { id: 'lab2', label: '2. Fiber Hook Memory', icon: '🔬' },
-        { id: 'lab3', label: '3. Logic vs Shared State', icon: '🔄' },
-        { id: 'lab4', label: '4. 5-Way Decision Tree', icon: '🌲' },
-        { id: 'lab5', label: '5. Prediction Gauntlet', icon: '🎯' },
+        { id: 'expA', label: '1. State Isolation (A vs B)', icon: '📦' },
+        { id: 'expB', label: '2. Execution vs Persistence', icon: '⚡' },
+        { id: 'expC', label: '3. Shared State Illusion', icon: '🪄' },
+        { id: 'expD', label: '4. Logic Placement Matrix', icon: '📊' },
+        { id: 'expE', label: '5. Diagnostic Gauntlet', icon: '🏆' },
       ];
 
       return (
         <div className="min-h-screen flex flex-col">
-          {/* Top Bar */}
+          {/* Header */}
           <header className="border-b border-gray-800 bg-gray-950/80 sticky top-0 z-50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -93,12 +127,12 @@
               </h1>
             </div>
             <div className="text-xs text-gray-400 text-right hidden sm:block">
-              <div>Lead System Architect: <span className="text-cyan-400 font-semibold">Srikar Kudurmalla</span></div>
+              <div>Author: <span className="text-cyan-400 font-semibold">Srikar Kudurmalla</span></div>
               <div>Co-Author: <span className="text-gray-300 font-semibold">Prasenjeet</span></div>
             </div>
           </header>
 
-          {/* Navigation Bar */}
+          {/* Tab Navigation */}
           <nav className="bg-gray-900/60 border-b border-gray-800 px-6 py-2.5 flex items-center gap-2 overflow-x-auto custom-scrollbar">
             {tabs.map((tab) => (
               <button
@@ -116,176 +150,147 @@
             ))}
           </nav>
 
-          {/* Main Workspace */}
+          {/* Active Lab Content */}
           <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-            {activeTab === 'lab1' && <Lab1DualCallerIsolation />}
-            {activeTab === 'lab2' && <Lab2FiberHookMemory />}
-            {activeTab === 'lab3' && <Lab3LogicVsSharedState />}
-            {activeTab === 'lab4' && <Lab4DecisionTree />}
-            {activeTab === 'lab5' && <Lab5PredictionGauntlet />}
+            {activeTab === 'expA' && <ExperimentStateIsolation />}
+            {activeTab === 'expB' && <ExperimentExecutionTimeline />}
+            {activeTab === 'expC' && <ExperimentSharedStateIllusion />}
+            {activeTab === 'expD' && <ExperimentLogicPlacementMatrix />}
+            {activeTab === 'expE' && <ExperimentDiagnosticGauntlet />}
           </main>
         </div>
       );
     }
 
     // =========================================================================
-    // LAB 1: DUAL-CALLER STATE ISOLATION VISUALIZER
+    // EXPERIMENT 1: STATE ISOLATION (A vs B)
     // =========================================================================
-    function Lab1DualCallerIsolation() {
-      const [countA, setCountA] = useState(0);
-      const [countB, setCountB] = useState(0);
-
+    function ExperimentStateIsolation() {
       return (
         <div className="space-y-6">
           <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-cyan-400">⚡ Lab 1:</span> Dual-Caller State Isolation
+              <span className="text-cyan-400">📦 Experiment 1:</span> Hook State Isolation: Same Code, Independent Memory
             </h2>
             <p className="text-gray-400 text-sm mt-1">
-              Observe how calling <code className="text-cyan-300">useCounter()</code> from two separate components reuses the counter logic, but creates completely independent state memory slots.
+              Both components invoke the same <code className="text-cyan-300">useCounter()</code> Hook. Notice how incrementing Instance A does NOT affect Instance B.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
-            {/* Component A */}
-            <div className="glass-panel p-5 rounded-xl space-y-3 border-emerald-900/50">
-              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                <span className="text-emerald-400 font-bold text-sm">Component A (&lt;CounterWidgetA /&gt;)</span>
-                <span className="text-gray-500 text-[10px]">Fiber ID: #0xA18</span>
-              </div>
-              <div className="p-3 bg-gray-950 rounded-lg flex justify-between items-center border border-gray-800">
-                <span className="text-gray-400">Local Count:</span>
-                <span className="text-xl font-bold text-emerald-400">{countA}</span>
-              </div>
-              <button
-                onClick={() => setCountA(prev => prev + 1)}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all"
-              >
-                Increment A (+1)
-              </button>
-            </div>
+            <CounterWidget title="Component Instance Alpha (Fiber A)" accent="emerald" />
+            <CounterWidget title="Component Instance Beta (Fiber B)" accent="indigo" />
+          </div>
 
-            {/* Component B */}
-            <div className="glass-panel p-5 rounded-xl space-y-3 border-indigo-900/50">
-              <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                <span className="text-indigo-400 font-bold text-sm">Component B (&lt;CounterWidgetB /&gt;)</span>
-                <span className="text-gray-500 text-[10px]">Fiber ID: #0xB92</span>
-              </div>
-              <div className="p-3 bg-gray-950 rounded-lg flex justify-between items-center border border-gray-800">
-                <span className="text-gray-400">Local Count:</span>
-                <span className="text-xl font-bold text-indigo-400">{countB}</span>
-              </div>
-              <button
-                onClick={() => setCountB(prev => prev + 1)}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold transition-all"
-              >
-                Increment B (+1)
-              </button>
-            </div>
+          <div className="p-4 bg-gray-950 rounded-xl border border-gray-800 font-mono text-xs space-y-2">
+            <div className="text-cyan-400 font-bold">Mechanical Invariant:</div>
+            <p className="text-gray-300">
+              $$\text{State Instance} = \text{Caller Fiber Identity} \times \text{Hook Position}$$
+              Each component Fiber maintains its own distinct <code className="text-cyan-300">memoizedState</code> linked list. The custom Hook function is shared logic, not shared memory.
+            </p>
           </div>
         </div>
       );
     }
 
-    // =========================================================================
-    // LAB 2: FIBER HOOK LINKED-LIST MEMORY INSPECTOR
-    // =========================================================================
-    function Lab2FiberHookMemory() {
-      return (
-        <div className="space-y-6">
-          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-cyan-400">🔬 Lab 2:</span> Fiber Hook Singly Linked-List Topology
-            </h2>
-            <p className="text-gray-400 text-sm mt-1">
-              Custom hooks do NOT create virtual child Fibers. They append their primitive hooks directly to the calling component Fiber's <code className="text-cyan-300">memoizedState</code> linked list.
-            </p>
-          </div>
-
-          <div className="glass-panel p-5 rounded-xl font-mono text-xs space-y-4">
-            <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Caller Fiber: &lt;SearchPage /&gt;</h3>
-
-            <div className="p-4 bg-gray-950 rounded-xl space-y-3 border border-gray-800">
-              <div className="text-cyan-400 font-bold">Fiber.memoizedState ──►</div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3 bg-gray-900 rounded-lg border border-cyan-800/80 space-y-1">
-                  <div className="text-cyan-400 font-bold text-[11px]">Hook Node 0: useState</div>
-                  <div className="text-gray-400 text-[10px]">Origin: useSearch()</div>
-                  <div className="text-emerald-400 text-[10px] font-bold">value: "react hooks"</div>
-                </div>
-
-                <div className="p-3 bg-gray-900 rounded-lg border border-indigo-800/80 space-y-1">
-                  <div className="text-indigo-400 font-bold text-[11px]">Hook Node 1: useEffect</div>
-                  <div className="text-gray-400 text-[10px]">Origin: useSearch()</div>
-                  <div className="text-indigo-300 text-[10px]">Debounced Fetch Trigger</div>
-                </div>
-
-                <div className="p-3 bg-gray-900 rounded-lg border border-amber-800/80 space-y-1">
-                  <div className="text-amber-400 font-bold text-[11px]">Hook Node 2: useRef</div>
-                  <div className="text-gray-400 text-[10px]">Origin: Direct in Caller</div>
-                  <div className="text-amber-300 text-[10px]">inputElementRef</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // =========================================================================
-    // LAB 3: LOGIC REUSE VS SHARED STATE COMPARISON
-    // =========================================================================
-    function Lab3LogicVsSharedState() {
-      const [mode, setMode] = useState('hook'); // 'hook' | 'context'
+    function CounterWidget({ title, accent }) {
+      const { count, increment, decrement, reset, executions } = useCounter(0);
+      const isEmerald = accent === 'emerald';
 
       return (
-        <div className="space-y-6">
-          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-cyan-400">🔄 Lab 3:</span> Logic Reuse vs Shared State Comparison
-            </h2>
-            <p className="text-gray-400 text-sm mt-1">
-              Compare a local Custom Hook (isolated instance) with a Context-backed Custom Hook (shared instance).
-            </p>
+        <div className={`glass-panel p-5 rounded-xl space-y-4 border-${isEmerald ? 'emerald' : 'indigo'}-900/50`}>
+          <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+            <span className={`font-bold ${isEmerald ? 'text-emerald-400' : 'text-indigo-400'}`}>{title}</span>
+            <span className="text-[10px] text-gray-500">Hook Executions: {executions}</span>
+          </div>
+
+          <div className="p-4 bg-gray-950 rounded-xl text-center space-y-1 border border-gray-800">
+            <span className="text-gray-500 text-[10px] uppercase tracking-wider block">Isolated State Snapshot</span>
+            <span className={`text-4xl font-extrabold ${isEmerald ? 'text-emerald-300' : 'text-indigo-300'}`}>
+              {count}
+            </span>
           </div>
 
           <div className="flex gap-2">
             <button
-              onClick={() => setMode('hook')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all ${
-                mode === 'hook' ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400'
-              }`}
+              onClick={increment}
+              className={`flex-1 py-2 ${isEmerald ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'} text-white font-bold rounded-lg transition-all`}
             >
-              1. Local Custom Hook (Isolated Logic)
+              + Increment
             </button>
             <button
-              onClick={() => setMode('context')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all ${
-                mode === 'context' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'
-              }`}
+              onClick={decrement}
+              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-lg transition-all"
             >
-              2. Context-Backed Hook (Shared State)
+              - Decrement
+            </button>
+            <button
+              onClick={reset}
+              className="px-3 py-2 bg-gray-900 hover:bg-gray-800 text-gray-400 font-bold rounded-lg transition-all"
+            >
+              Reset
             </button>
           </div>
+        </div>
+      );
+    }
 
-          <div className="glass-panel p-5 rounded-xl font-mono text-xs space-y-3">
-            <div className="p-4 bg-gray-950 rounded-xl border border-gray-800">
-              {mode === 'hook' ? (
-                <div className="space-y-2">
-                  <div className="text-cyan-400 font-bold">Mode: Local Custom Hook (useCounter)</div>
-                  <p className="text-gray-300">
-                    Each caller instantiates its own state slot. Updating Component A leaves Component B untouched.
-                  </p>
+    // =========================================================================
+    // EXPERIMENT 2: EXECUTION VS PERSISTENCE
+    // =========================================================================
+    function ExperimentExecutionTimeline() {
+      const [renderTrigger, setRenderTrigger] = useState(0);
+      const { count, increment, executions } = useCounter(0);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">⚡ Experiment 2:</span> Function Execution vs Persistent State
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              A custom Hook function executes on <strong>every render pass</strong>. The function body runs repeatedly, but React preserves its state between renders.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+            <div className="glass-panel p-5 rounded-xl space-y-4">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Render Controls</h3>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={increment}
+                  className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-all"
+                >
+                  Increment State (Triggers State Update + Render)
+                </button>
+                <button
+                  onClick={() => setRenderTrigger(t => t + 1)}
+                  className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg transition-all"
+                >
+                  Force Parent Re-render (Unrelated State Update)
+                </button>
+              </div>
+
+              <div className="p-3 bg-gray-950 rounded-lg border border-gray-800 space-y-1">
+                <div className="text-gray-400">Persistent State Value: <span className="text-emerald-400 font-bold">{count}</span></div>
+                <div className="text-gray-400">Hook Function Calls: <span className="text-cyan-400 font-bold">{executions}</span></div>
+                <div className="text-gray-400">Parent Re-renders: <span className="text-amber-400 font-bold">{renderTrigger}</span></div>
+              </div>
+            </div>
+
+            <div className="glass-panel p-5 rounded-xl space-y-3">
+              <h3 className="text-sm font-bold text-white border-b border-gray-800 pb-2">Temporal Concept Inspector</h3>
+              <div className="space-y-2 text-[11px] text-gray-300">
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800">
+                  <strong className="text-cyan-400 block mb-1">1. Hook Execution Lifetime:</strong>
+                  Runs synchronously inside the render function of the caller. Dies as soon as the render finishes.
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="text-indigo-400 font-bold">Mode: Context-Backed Hook (useSharedCounter)</div>
-                  <p className="text-gray-300">
-                    The custom hook calls <code className="text-cyan-300">useContext(CounterContext)</code>. All consumers resolve the same single Provider state slot.
-                  </p>
+                <div className="p-2.5 bg-gray-950 rounded border border-gray-800">
+                  <strong className="text-emerald-400 block mb-1">2. Hook State Lifetime:</strong>
+                  Persists on the Fiber node across thousands of renders as long as the component remains mounted in the tree.
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -293,88 +298,222 @@
     }
 
     // =========================================================================
-    // LAB 4: 5-WAY DECISION TREE
+    // EXPERIMENT 3: SHARED STATE ILLUSION
     // =========================================================================
-    function Lab4DecisionTree() {
-      const scenarios = [
-        { id: 1, title: 'Formatting currency strings', correct: 'Pure Utility', reason: 'No React hook primitives or state required.' },
-        { id: 2, title: 'Window resize width listener', correct: 'Custom Hook', reason: 'Uses useState + useEffect, state is local to each caller.' },
-        { id: 3, title: 'Global logged-in user profile', correct: 'Context / Gateway', reason: 'Shared state across deep component tree.' },
-        { id: 4, title: '60fps canvas coordinates', correct: 'External Store', reason: 'High-frequency updates avoid React re-render thrash.' },
+    function ExperimentSharedStateIllusion() {
+      const [useSharedMode, setUseSharedMode] = useState(false);
+
+      return (
+        <div className="space-y-6">
+          <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span className="text-cyan-400">🪄 Experiment 3:</span> The "Shared State Illusion" & Context Gateways
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Compare isolated Hook state against a shared Context Provider gateway. Notice how only Context establishes true single-source-of-truth sharing.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setUseSharedMode(false)}
+              className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${
+                !useSharedMode ? 'bg-rose-600 text-white shadow-md' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              ❌ Standard Hook (Isolated State Illusion)
+            </button>
+            <button
+              onClick={() => setUseSharedMode(true)}
+              className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${
+                useSharedMode ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              ✅ Context Provider + Gateway Hook (True Shared State)
+            </button>
+          </div>
+
+          {!useSharedMode ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+              <CounterWidget title="Header Component (useCounter)" accent="emerald" />
+              <CounterWidget title="Profile Component (useCounter)" accent="indigo" />
+            </div>
+          ) : (
+            <SharedCounterProvider>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-mono text-xs">
+                <SharedConsumer title="Header Component (useSharedCounter)" />
+                <SharedConsumer title="Profile Component (useSharedCounter)" />
+              </div>
+            </SharedCounterProvider>
+          )}
+        </div>
+      );
+    }
+
+    function SharedConsumer({ title }) {
+      const { count, increment, reset } = useSharedCounter();
+
+      return (
+        <div className="glass-panel p-5 rounded-xl space-y-4 border-cyan-800/60">
+          <div className="flex justify-between items-center border-b border-gray-800 pb-2">
+            <span className="font-bold text-cyan-400">{title}</span>
+            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+              Shared Gateway Connected
+            </span>
+          </div>
+
+          <div className="p-4 bg-gray-950 rounded-xl text-center space-y-1 border border-gray-800">
+            <span className="text-gray-500 text-[10px] uppercase tracking-wider block">Shared Context Value</span>
+            <span className="text-4xl font-extrabold text-cyan-300">{count}</span>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={increment}
+              className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-all"
+            >
+              + Increment Shared State
+            </button>
+            <button
+              onClick={reset}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-lg transition-all"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT 4: LOGIC PLACEMENT MATRIX
+    // =========================================================================
+    function ExperimentLogicPlacementMatrix() {
+      const rows = [
+        { code: "formatCurrency(price, 'USD')", needsReact: false, best: "Pure Utility", reason: "Pure deterministic calculation; zero lifecycle or state." },
+        { code: "useToggle(initial)", needsReact: true, best: "Custom Hook", reason: "Encapsulates useState with memoized open/close/toggle handlers." },
+        { code: "useOnlineStatus()", needsReact: true, best: "Custom Hook", reason: "Subscribes to window 'online'/'offline' events via useEffect." },
+        { code: "useCurrentUser()", needsReact: true, best: "Context Gateway", reason: "Global shared session identity required across disparate components." },
+        { code: "calculateCartTax(items, rate)", needsReact: false, best: "Pure Utility", reason: "Framework-independent math; effortlessly unit-testable." }
       ];
 
       return (
         <div className="space-y-6">
           <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-cyan-400">🌲 Lab 4:</span> 5-Way Logic Placement Decision Engine
+              <span className="text-cyan-400">📊 Experiment 4:</span> 5-Way Logic Placement Matrix
             </h2>
             <p className="text-gray-400 text-sm mt-1">
-              Classify where reusable logic belongs based on state ownership and React primitive requirements.
+              Apply the "Would this exist without React?" test to choose the cleanest abstraction mechanism.
             </p>
           </div>
 
-          <div className="space-y-3 font-mono text-xs">
-            {scenarios.map((sc) => (
-              <div key={sc.id} className="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-white font-bold">{sc.title}</h4>
-                  <p className="text-gray-400 text-[11px] mt-0.5">{sc.reason}</p>
-                </div>
-                <span className="px-3 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold">
-                  {sc.correct}
-                </span>
-              </div>
-            ))}
+          <div className="glass-panel p-5 rounded-xl overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-400">
+                  <th className="pb-3">Candidate Logic Signature</th>
+                  <th className="pb-3">Requires React?</th>
+                  <th className="pb-3">Optimal Abstraction</th>
+                  <th className="pb-3">Architectural Rationale</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60">
+                {rows.map((r, idx) => (
+                  <tr key={idx} className="hover:bg-gray-800/30 transition-colors">
+                    <td className="py-3 text-cyan-300 font-bold">{r.code}</td>
+                    <td className="py-3">{r.needsReact ? <span className="text-emerald-400 font-bold">YES</span> : <span className="text-gray-500">NO</span>}</td>
+                    <td className="py-3">
+                      <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 text-white font-bold">
+                        {r.best}
+                      </span>
+                    </td>
+                    <td className="py-3 text-gray-300">{r.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       );
     }
 
     // =========================================================================
-    // LAB 5: PREDICTION GAUNTLET
+    // EXPERIMENT 5: DIAGNOSTIC GAUNTLET
     // =========================================================================
-    function Lab5PredictionGauntlet() {
-      const [revealed, setRevealed] = useState(false);
+    function ExperimentDiagnosticGauntlet() {
+      const questions = [
+        {
+          id: 1,
+          q: "Do two components invoking the same custom Hook share the same state instance?",
+          options: ["Yes, hooks are singletons", "No, each caller gets isolated Hook state"],
+          correct: "No, each caller gets isolated Hook state"
+        },
+        {
+          id: 2,
+          q: "Does a custom Hook create a new Fiber node in the reconciliation tree?",
+          options: ["No, it executes inline during the caller's render", "Yes, every hook is a sub-fiber"],
+          correct: "No, it executes inline during the caller's render"
+        },
+        {
+          id: 3,
+          q: "When should logic be written as a pure utility function rather than a custom Hook?",
+          options: ["When it doesn't need React state, effects, or refs", "When it is called more than 5 times"],
+          correct: "When it doesn't need React state, effects, or refs"
+        }
+      ];
+
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const score = questions.filter(q => answers[q.id] === q.correct).length;
 
       return (
         <div className="space-y-6">
           <div className="glass-panel p-5 rounded-xl border-cyan-900/50">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="text-cyan-400">🎯 Lab 5:</span> Prediction Gauntlet
+              <span className="text-cyan-400">🏆 Experiment 5:</span> KPI 14 Part 01 Diagnostic Gauntlet
             </h2>
             <p className="text-gray-400 text-sm mt-1">
-              Predict the execution outcome when two components call the same custom hook.
+              Verify your mental model of custom hook composition, state isolation, and execution lifecycles.
             </p>
           </div>
 
-          <div className="glass-panel p-5 rounded-xl font-mono text-xs space-y-4">
-            <pre className="p-3 bg-gray-950 rounded-lg text-cyan-300 border border-gray-800 overflow-x-auto">
-{`function useCounter() {
-  const [count, setCount] = useState(0);
-  return { count, increment: () => setCount(c => c + 1) };
-}
+          <div className="space-y-4">
+            {questions.map((q) => {
+              const selected = answers[q.id];
+              return (
+                <div key={q.id} className="glass-panel p-4 rounded-xl space-y-2.5 font-mono text-xs">
+                  <div className="text-white font-bold text-sm">{q.q}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {q.options.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${
+                          selected === opt ? 'bg-cyan-600 text-white font-bold' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-// Component A and Component B both call useCounter()
-// User clicks Increment in Component A.`}
-            </pre>
-
-            <div className="text-sm font-bold text-white">What are the counts in Component A and Component B?</div>
-
-            {revealed ? (
-              <div className="p-4 bg-emerald-950/80 border border-emerald-800 rounded-xl text-emerald-300 space-y-1">
-                <div className="font-bold">✓ Answer: Component A = 1, Component B = 0</div>
-                <p className="text-gray-300 text-[11px]">
-                  Custom hooks reuse behavioral logic, but allocate separate state slots on each calling component's Fiber!
-                </p>
+          <div className="flex justify-between items-center glass-panel p-4 rounded-xl font-mono">
+            <button
+              onClick={() => setSubmitted(true)}
+              className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-all"
+            >
+              Submit Diagnostic Evaluation
+            </button>
+            {submitted && (
+              <div className="text-sm font-bold text-white">
+                Score: <span className={score === questions.length ? 'text-emerald-400' : 'text-amber-400'}>{score} / {questions.length}</span> — {score === questions.length ? '✅ Part 01 Mastered!' : 'Review Recommended'}
               </div>
-            ) : (
-              <button
-                onClick={() => setRevealed(true)}
-                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-all"
-              >
-                Reveal Architectural Explanation
-              </button>
             )}
           </div>
         </div>
