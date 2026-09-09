@@ -58,8 +58,8 @@
 | **KPI 07** | `07-Events-User-Interaction` | ⏳ Pending | SyntheticEvent abstraction, event delegation, closures in handlers, React vs browser events. |
 | **KPI 08** | `08-Hooks-Mental-Model` | ⏳ Pending | Rules of Hooks, call order invariants, hook singly linked list on Fiber, stateful logic sharing. |
 | **KPI 09** | [useEffect & External Synchronization](./09-useEffect-Synchronization/README.md) | ✅ Completed | Synchronization with external systems, dependency arrays, cleanups, race conditions, and avoidance of fake Effects. |
-| **KPI 10** | [useRef & Mutable Values](./10-useRef-Mutable-Values/README.md) | ✅ Completed | Ref identity, mutable `.current`, DOM refs, imperative handles vs state, measurement. |
-| **KPI 11** | [Context & Dependency Distribution](./11-Context-Dependency-Distribution/README.md) | ✅ Completed | Dependency distribution, Provider nesting, context propagation, performance pitfalls. |
+| **KPI 10** | `10-useRef-Mutable-Values` | ⏳ Pending | Ref identity, mutable `.current`, DOM refs, imperative handles vs state, measurement. |
+| **KPI 11** | `11-Context-Dependency-Distribution` | ⏳ Pending | Dependency distribution, Provider nesting, context propagation, performance pitfalls. |
 | **KPI 12** | [Forms & Controlled Inputs](./12-Forms-Controlled-Uncontrolled/README.md) | ✅ Completed | Controlled vs uncontrolled inputs, multi-timeline state machines, validation DAGs, baseline reconciliation. |
 | **KPI 13** | `13-Derived-State-Memoization` | ⏳ Pending | Derived data, `useMemo`, `useCallback`, `React.memo`, referential equality, memoization cost. |
 | **KPI 14** | `14-Custom-Hooks-Logic-Composition` | ⏳ Pending | Extracting stateful logic, hook composition, contract boundaries, avoiding over-abstraction. |
