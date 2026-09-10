@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 15 — Enterprise Resilience Architecture &amp; Failure Governance</title>
+  <style>
+    :root {
+      --bg-dark: #0a0c10;
+      --panel-bg: #12161f;
+      --card-bg: #1a202c;
+      --border-color: #2d3748;
+      --accent-cyan: #00f0ff;
+      --accent-green: #00e676;
+      --accent-red: #ff5370;
+      --accent-yellow: #ffd600;
+      --accent-purple: #bd93f9;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --font-mono: 'Fira Code', 'Cascadia Code', Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 1.5rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title h1 {
+      font-size: 1.5rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .header-title p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      background: rgba(0, 240, 255, 0.1);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: bold;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .controls-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .scenario-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.65rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+
+    .scenario-btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 240, 255, 0.05);
+      transform: translateX(3px);
+    }
+
+    .scenario-btn.active {
+      border-color: var(--accent-green);
+      background: rgba(0, 230, 118, 0.1);
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #4a5568;
+      transition: .3s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-red);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px);
+    }
+
+    /* Interactive Simulation Canvas */
+    .sim-canvas {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: #0f131a;
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      position: relative;
+      min-height: 480px;
+    }
+
+    .boundary-box {
+      border: 2px solid;
+      border-radius: 6px;
+      padding: 0.85rem;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .boundary-app {
+      border-color: #4a5568;
+      background: rgba(26, 32, 44, 0.4);
+    }
+
+    .boundary-route {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.05);
+      margin-top: 0.5rem;
+    }
+
+    .boundary-feature {
+      border-color: var(--accent-purple);
+      background: rgba(189, 147, 249, 0.05);
+      margin-top: 0.5rem;
+    }
+
+    .boundary-widget {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 240, 255, 0.05);
+      margin-top: 0.5rem;
+    }
+
+    .boundary-label {
+      position: absolute;
+      top: -10px;
+      left: 10px;
+      background: var(--panel-bg);
+      padding: 0 0.4rem;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      border-radius: 3px;
+    }
+
+    .app-label { color: #cbd5e1; }
+    .route-label { color: #60a5fa; }
+    .feature-label { color: var(--accent-purple); }
+    .widget-label { color: var(--accent-cyan); }
+
+    .component-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
+    .comp-card {
+      background: #1e2533;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .comp-header {
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-pill {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-weight: bold;
+      font-family: var(--font-mono);
+    }
+
+    .status-healthy { background: rgba(0, 230, 118, 0.2); color: var(--accent-green); }
+    .status-crashed { background: rgba(255, 83, 112, 0.2); color: var(--accent-red); }
+    .status-degraded { background: rgba(255, 214, 0, 0.2); color: var(--accent-yellow); }
+
+    .draft-input {
+      background: #0a0c10;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      width: 100%;
+      margin-top: 0.25rem;
+    }
+
+    .fallback-card {
+      background: #2a1215;
+      border: 1px solid var(--accent-red);
+      color: #ffb8b8;
+      border-radius: 6px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { border-color: #ff5370; }
+      to { border-color: #ff8a9e; }
+    }
+
+    .fallback-btn {
+      background: var(--accent-green);
+      color: #0a0c10;
+      border: none;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    .timeline-entry {
+      background: var(--card-bg);
+      border-left: 3px solid #4a5568;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0 4px 4px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .timeline-entry.t-crash { border-left-color: var(--accent-red); background: rgba(255, 83, 112, 0.05); }
+    .timeline-entry.t-recover { border-left-color: var(--accent-green); background: rgba(0, 230, 118, 0.05); }
+    .timeline-entry.t-retry { border-left-color: var(--accent-yellow); background: rgba(255, 214, 0, 0.05); }
+    .timeline-entry.t-loop { border-left-color: var(--accent-red); font-weight: bold; background: rgba(255, 83, 112, 0.15); }
+
+    .invariants-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .inv-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.5rem;
+      background: var(--card-bg);
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+    }
+
+    .inv-pass { color: var(--accent-green); }
+    .inv-fail { color: var(--accent-red); font-weight: bold; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      text-align: center;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem;
+      border-radius: 6px;
+    }
+
+    .metric-val {
+      font-size: 1.2rem;
+      font-weight: bold;
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+    }
+
+    .metric-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <h1>⚡ Lab 15 — Enterprise Resilience Architecture &amp; Failure Governance</h1>
+      <p>Multi-Tier Bulkheads, Blast Radius Containment, Loop Detection &amp; Invariant Verification</p>
+    </div>
+    <div class="badge-bar">
+      <span class="badge">KPI 16 SYNTHESIS</span>
+      <span class="badge">TIER 🔴 MUST KNOW</span>
+      <span class="badge">STAFF LEVEL</span>
+    </div>
+  </header>
+
+  <div class="grid-container">
+
+    <!-- PANEL 1: ARCHITECTURAL SCENARIOS & FAULT INJECTION -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>🎮 Architectural Scenarios</span>
+        <button id="btnResetAll" class="fallback-btn" style="background: #3b82f6; color: white;">Reset All</button>
+      </div>
+
+      <div class="controls-grid">
+        <button class="scenario-btn active" data-scenario="B">
+          <span>Scenario B: Granular Widget Bulkhead</span>
+          <span style="color: var(--accent-green); font-size: 0.75rem;">(Optimal)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="A">
+          <span>Scenario A: Monolithic Root Boundary</span>
+          <span style="color: var(--accent-red); font-size: 0.75rem;">(Blast Catastrophe)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="C">
+          <span>Scenario C: Nested Multi-Tier Escalation</span>
+          <span style="color: var(--accent-purple); font-size: 0.75rem;">(Tier 1-4)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="D">
+          <span>Scenario D: Broken Fallback Escalation</span>
+          <span style="color: var(--accent-yellow); font-size: 0.75rem;">(Ancestor Catch)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="E">
+          <span>Scenario E: Bounded Exponential Retry</span>
+          <span style="color: var(--accent-cyan); font-size: 0.75rem;">(Max 3)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="F">
+          <span>Scenario F: Infinite Retry Loop Storm</span>
+          <span style="color: var(--accent-red); font-size: 0.75rem;">(DDoS Attack)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="G">
+          <span>Scenario G: Fiber Remount vs Reset Probe</span>
+          <span style="color: #60a5fa; font-size: 0.75rem;">(Identity)</span>
+        </button>
+      </div>
+
+      <div class="panel-title" style="margin-top: 0.5rem;">
+        <span>🔥 Fault Injection Vectors</span>
+      </div>
+
+      <div class="controls-grid">
+        <div class="toggle-row">
+          <span>Crash Vendor Chart (Render)</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleChartCrash" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Crash Secondary Fallback</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleFallbackCrash" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Simulate Network Timeout (504)</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleNetwork504" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="metrics-row" style="margin-top: 0.5rem;">
+        <div class="metric-card">
+          <div class="metric-val" id="valMounts">1</div>
+          <div class="metric-label">Fiber Mounts</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="valRetries">0</div>
+          <div class="metric-label">Retry Attempts</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="valListeners">2</div>
+          <div class="metric-label">Active Listeners</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 2: LIVE SIMULATION CANVAS -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>🏗️ Live Architecture Execution Tree</span>
+        <span id="txtTopologyMode" style="font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-mono);">TOPOLOGY: GRANULAR_BULKHEAD</span>
+      </div>
+
+      <div class="sim-canvas" id="simCanvas">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- PANEL 3: DIAGNOSTIC AUDIT LOG & INVARIANTS -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>📜 Diagnostic Incident Timeline</span>
+        <button id="btnClearLogs" class="fallback-btn" style="background: #4a5568; color: white;">Clear</button>
+      </div>
+
+      <div class="timeline-list" id="timelineList">
+        <!-- Logs populated dynamically -->
+      </div>
+
+      <div class="panel-title" style="margin-top: 0.5rem;">
+        <span>🛡️ Enterprise Invariant Verification</span>
+      </div>
+
+      <div class="invariants-panel">
+        <div class="inv-row">
+          <span>I1: Draft State Preserved</span>
+          <span class="inv-pass" id="invDraft">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I2: Blast Radius Confined</span>
+          <span class="inv-pass" id="invBlast">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I3: Retries Bounded (≤ 3)</span>
+          <span class="inv-pass" id="invRetry">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I4: Zero Resource Leakage</span>
+          <span class="inv-pass" id="invLeaks">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I5: Loop Storm Suppressed</span>
+          <span class="inv-pass" id="invLoop">PASS</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // System State
+    const state = {
+      scenario: 'B', // 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
+      chartCrashed: false,
+      fallbackCrashed: false,
+      network504: false,
+      retryCount: 0,
+      mountCount: 1,
+      unmountCount: 0,
+      activeListeners: 2,
+      draftText: 'Confidential Client Proposal #8921-A',
+      loopDetected: false,
+      loopInterval: null
+    };
+
+    const simCanvas = document.getElementById('simCanvas');
+    const timelineList = document.getElementById('timelineList');
+    const txtTopologyMode = document.getElementById('txtTopologyMode');
+
+    // UI Elements
+    const toggleChartCrash = document.getElementById('toggleChartCrash');
+    const toggleFallbackCrash = document.getElementById('toggleFallbackCrash');
+    const toggleNetwork504 = document.getElementById('toggleNetwork504');
+    const btnResetAll = document.getElementById('btnResetAll');
+    const btnClearLogs = document.getElementById('btnClearLogs');
+
+    const valMounts = document.getElementById('valMounts');
+    const valRetries = document.getElementById('valRetries');
+    const valListeners = document.getElementById('valListeners');
+
+    const invDraft = document.getElementById('invDraft');
+    const invBlast = document.getElementById('invBlast');
+    const invRetry = document.getElementById('invRetry');
+    const invLeaks = document.getElementById('invLeaks');
+    const invLoop = document.getElementById('invLoop');
+
+    function logEvent(type, text) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+      const entry = document.createElement('div');
+      entry.className = `timeline-entry t-${type}`;
+      entry.innerHTML = `
+        <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
+          <span>[${timeStr}]</span>
+          <span>${type.toUpperCase()}</span>
+        </div>
+        <div>${text}</div>
+      `;
+      timelineList.insertBefore(entry, timelineList.firstChild);
+    }
+
+    function updateInvariants() {
+      // I1: Draft preserved
+      const draftSurviving = state.scenario !== 'A' || !state.chartCrashed;
+      invDraft.textContent = draftSurviving ? 'PASS' : 'FAIL';
+      invDraft.className = draftSurviving ? 'inv-pass' : 'inv-fail';
+
+      // I2: Blast Radius
+      const blastContained = state.scenario !== 'A';
+      invBlast.textContent = blastContained || !state.chartCrashed ? 'PASS' : 'VIOLATED';
+      invBlast.className = (blastContained || !state.chartCrashed) ? 'inv-pass' : 'inv-fail';
+
+      // I3: Retries Bounded
+      const retrySafe = state.scenario !== 'F' && state.retryCount <= 3;
+      invRetry.textContent = retrySafe ? 'PASS' : 'VIOLATED';
+      invRetry.className = retrySafe ? 'inv-pass' : 'inv-fail';
+
+      // I4: Zero Resource Leakage
+      const leaksSafe = state.activeListeners <= 4;
+      invLeaks.textContent = leaksSafe ? 'PASS' : 'LEAK_DETECTED';
+      invLeaks.className = leaksSafe ? 'inv-pass' : 'inv-fail';
+
+      // I5: Loop Storm
+      invLoop.textContent = state.loopDetected ? 'CRITICAL_LOOP_STORM' : 'PASS';
+      invLoop.className = state.loopDetected ? 'inv-fail' : 'inv-pass';
+
+      // Metrics
+      valMounts.textContent = state.mountCount;
+      valRetries.textContent = state.retryCount;
+      valListeners.textContent = state.activeListeners;
+    }
+
+    function renderTree() {
+      simCanvas.innerHTML = '';
+
+      if (state.scenario === 'A') {
+        // MONOLITHIC ROOT WRAP
+        txtTopologyMode.textContent = 'TOPOLOGY: MONOLITHIC_ROOT_BOUNDARY (ANTI-PATTERN)';
+        if (state.chartCrashed) {
+          simCanvas.innerHTML = `
+            <div class="boundary-box boundary-app" style="border-color: var(--accent-red); height: 100%;">
+              <span class="boundary-label app-label" style="color: var(--accent-red);">AppErrorBoundary (ROOT)</span>
+              <div class="fallback-card" style="margin-top: 1.5rem; text-align: center; padding: 2rem;">
+                <h2 style="color: var(--accent-red);">🚨 Application Catastrophe Fallback</h2>
+                <p>Monolithic Root Boundary caught unhandled crash from VendorChart.</p>
+                <p style="color: var(--text-muted); font-size: 0.75rem;">Blast Radius: ENTIRE APPLICATION (Editor &amp; Checkout WIP destroyed).</p>
+                <button class="fallback-btn" style="margin: 1rem auto 0 auto;" onclick="resetFailure()">Recover App</button>
+              </div>
+            </div>
+          `;
+        } else {
+          simCanvas.innerHTML = `
+            <div class="boundary-box boundary-app">
+              <span class="boundary-label app-label">AppErrorBoundary (ROOT)</span>
+              <div class="component-row">
+                <div class="comp-card">
+                  <div class="comp-header">
+                    <span>Draft Note Editor</span>
+                    <span class="status-pill status-healthy">LIVE</span>
+                  </div>
+                  <input class="draft-input" value="${state.draftText}" oninput="state.draftText = this.value" />
+                </div>
+                <div class="comp-card">
+                  <div class="comp-header">
+                    <span>Vendor Revenue Chart</span>
+                    <span class="status-pill status-healthy">LIVE</span>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--accent-cyan);">$4,289,100.00 ARR</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      } else {
+        // GRANULAR BULKHEAD / MULTI-TIER
+        txtTopologyMode.textContent = `TOPOLOGY: ${state.scenario === 'C' ? 'MULTI_TIER_HIERARCHY' : 'GRANULAR_BULKHEAD'}`;
+        
+        let chartAreaHtml = '';
+        if (state.chartCrashed) {
+          if (state.scenario === 'D' && state.fallbackCrashed) {
+            chartAreaHtml = `
+              <div class="fallback-card" style="border-color: var(--accent-yellow);">
+                <span style="font-weight: bold; color: var(--accent-yellow);">⚠️ RouteBoundary Escalation Fallback</span>
+                <p>Child fallback failed. Ancestor Route boundary caught escalated failure.</p>
+                <button class="fallback-btn" onclick="resetFailure()">Reset Route</button>
+              </div>
+            `;
+          } else {
+            chartAreaHtml = `
+              <div class="fallback-card">
+                <span style="font-weight: bold;">Vendor Chart Failed</span>
+                <p>Isolated fallback rendered. Unrelated editor state is 100% safe.</p>
+                <button class="fallback-btn" onclick="triggerRetry()">Retry Chart (${state.retryCount}/3)</button>
+              </div>
+            `;
+          }
+        } else {
+          chartAreaHtml = `
+            <div class="comp-card">
+              <div class="comp-header">
+                <span>Vendor Revenue Chart</span>
+                <span class="status-pill status-healthy">LIVE</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--accent-cyan);">$4,289,100.00 ARR</div>
+            </div>
+          `;
+        }
+
+        simCanvas.innerHTML = `
+          <div class="boundary-box boundary-app">
+            <span class="boundary-label app-label">AppErrorBoundary (ROOT: Tier 4)</span>
+            <div class="boundary-box boundary-route">
+              <span class="boundary-label route-label">RouteBoundary (Dashboard: Tier 3)</span>
+              <div class="component-row">
+                <div class="comp-card">
+                  <div class="comp-header">
+                    <span>Draft Note Editor</span>
+                    <span class="status-pill status-healthy">LIVE</span>
+                  </div>
+                  <input class="draft-input" value="${state.draftText}" oninput="state.draftText = this.value" />
+                </div>
+                <div class="boundary-box boundary-widget">
+                  <span class="boundary-label widget-label">WidgetBoundary (Chart Bulkhead: Tier 1)</span>
+                  ${chartAreaHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      updateInvariants();
+    }
+
+    function triggerCrash() {
+      state.chartCrashed = true;
+      state.activeListeners = Math.max(0, state.activeListeners - 1);
+      logEvent('crash', `VendorChart threw render exception: Cannot read properties of undefined (reading 'dimensions')`);
+      
+      if (state.scenario === 'A') {
+        logEvent('crash', `MONOLITHIC ESCALATION: Root AppErrorBoundary caught crash. Sibling Draft destroyed.`);
+      } else {
+        logEvent('recover', `BULKHEAD CONTAINMENT: WidgetBoundary caught crash. Editor Draft preserved.`);
+      }
+
+      if (state.scenario === 'F') {
+        startInfiniteLoop();
+      }
+
+      renderTree();
+    }
+
+    function resetFailure() {
+      stopInfiniteLoop();
+      state.chartCrashed = false;
+      state.fallbackCrashed = false;
+      toggleChartCrash.checked = false;
+      toggleFallbackCrash.checked = false;
+      state.retryCount = 0;
+      state.mountCount++;
+      state.activeListeners = 2;
+      logEvent('recover', `Manual Reset executed. Fiber node remounted with clean state.`);
+      renderTree();
+    }
+
+    function triggerRetry() {
+      state.retryCount++;
+      logEvent('retry', `Retry attempt #${state.retryCount} initiated with Exponential Backoff.`);
+      if (state.retryCount > 3) {
+        logEvent('crash', `Invariant I3 Enforced: Retry exhausted at attempt 3. Automatic retries stopped.`);
+      } else {
+        if (!state.chartCrashed) {
+          logEvent('recover', `Retry succeeded! VendorChart operational.`);
+        }
+      }
+      renderTree();
+    }
+
+    function startInfiniteLoop() {
+      if (state.loopInterval) return;
+      state.loopDetected = true;
+      logEvent('loop', `🚨 CRITICAL RECOVERY STORM DETECTED! Unbounded reload loop firing every 200ms.`);
+      state.loopInterval = setInterval(() => {
+        state.retryCount++;
+        state.mountCount++;
+        logEvent('loop', `[LOOP STORM] Attempt #${state.retryCount} - Self-inflicted client DDoS in progress...`);
+        updateInvariants();
+      }, 350);
+    }
+
+    function stopInfiniteLoop() {
+      if (state.loopInterval) {
+        clearInterval(state.loopInterval);
+        state.loopInterval = null;
+      }
+      state.loopDetected = false;
+    }
+
+    // Event Listeners
+    toggleChartCrash.addEventListener('change', (e) => {
+      if (e.target.checked) triggerCrash();
+      else resetFailure();
+    });
+
+    toggleFallbackCrash.addEventListener('change', (e) => {
+      state.fallbackCrashed = e.target.checked;
+      if (state.fallbackCrashed) {
+        logEvent('crash', `Secondary Fallback crashed during render! Escalating to RouteBoundary.`);
+      }
+      renderTree();
+    });
+
+    toggleNetwork504.addEventListener('change', (e) => {
+      state.network504 = e.target.checked;
+      if (state.network504) {
+        logEvent('retry', `Network 504 Gateway Timeout simulated. Routing to domain async state.`);
+      }
+    });
+
+    btnResetAll.addEventListener('click', () => {
+      stopInfiniteLoop();
+      state.chartCrashed = false;
+      state.fallbackCrashed = false;
+      state.network504 = false;
+      state.retryCount = 0;
+      state.mountCount = 1;
+      state.activeListeners = 2;
+      toggleChartCrash.checked = false;
+      toggleFallbackCrash.checked = false;
+      toggleNetwork504.checked = false;
+      logEvent('recover', `System reset to baseline state.`);
+      renderTree();
+    });
+
+    btnClearLogs.addEventListener('click', () => {
+      timelineList.innerHTML = '';
+    });
+
+    document.querySelectorAll('.scenario-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+        const target = e.currentTarget;
+        target.classList.add('active');
+        state.scenario = target.dataset.scenario;
+        stopInfiniteLoop();
+
+        if (state.scenario === 'F' && state.chartCrashed) {
+          startInfiniteLoop();
+        }
+
+        logEvent('recover', `Switched to ${target.querySelector('span').textContent}.`);
+        renderTree();
+      });
+    });
+
+    // Initial render
+    logEvent('recover', 'Diagnostic Lab 15 Initialized. Granular Bulkhead Topology Active.');
+    renderTree();
+  </script>
+</body>
+</html>
