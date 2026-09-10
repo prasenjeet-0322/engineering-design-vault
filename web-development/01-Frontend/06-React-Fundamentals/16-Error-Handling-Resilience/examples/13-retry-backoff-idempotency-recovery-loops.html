@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 16 — Part 13: Retry, Backoff, Idempotency & Recovery Loops Lab</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel Standalone -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    .pulse-glow {
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <div id="root" class="flex-1 flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useReducer, Component } = React;
+
+    // ============================================================================
+    // Mock Telemetry & Logging Bus
+    // ============================================================================
+    const logsEmitter = {
+      listeners: [],
+      subscribe(fn) {
+        this.listeners.push(fn);
+        return () => { this.listeners = this.listeners.filter(l => l !== fn); };
+      },
+      emit(entry) {
+        this.listeners.forEach(fn => fn(entry));
+      }
+    };
+
+    // ============================================================================
+    // Main Interactive Application
+    // ============================================================================
+    const App = () => {
+      const [activeTab, setActiveTab] = useState('scenarios');
+      const [selectedScenario, setSelectedScenario] = useState('B'); // Default to Backoff
+      const [logs, setLogs] = useState([]);
+
+      // Simulation States
+      const [isRunning, setIsRunning] = useState(false);
+      const [simulationData, setSimulationData] = useState({
+        attempts: [],
+        clients: [],
+        currentOperationId: null,
+        serverOrdersCreated: 0,
+        idempotentKeysSeen: new Set(),
+        status: 'IDLE',
+        activeTimerMs: 0
+      });
+
+      // Active references for cancellation
+      const activeTimerRef = useRef(null);
+      const abortControllerRef = useRef(null);
+      const operationCounterRef = useRef(1);
+
+      useEffect(() => {
+        const unsubscribe = logsEmitter.subscribe((newLog) => {
+          setLogs(prev => [{ id: Date.now() + Math.random(), ...newLog }, ...prev.slice(0, 30)]);
+        });
+        return unsubscribe;
+      }, []);
+
+      const logEvent = (type, message, metadata = {}) => {
+        logsEmitter.emit({
+          timestamp: new Date().toISOString().substring(11, 23),
+          type,
+          message,
+          metadata
+        });
+      };
+
+      // Reset Simulation State
+      const resetSimulation = () => {
+        if (activeTimerRef.current) clearTimeout(activeTimerRef.current);
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        setIsRunning(false);
+        setSimulationData({
+          attempts: [],
+          clients: [],
+          currentOperationId: null,
+          serverOrdersCreated: 0,
+          idempotentKeysSeen: new Set(),
+          status: 'IDLE',
+          activeTimerMs: 0
+        });
+        logEvent('SYSTEM', 'Simulation reset. Timers cleared and controllers aborted.');
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario A: Naive Immediate Retry (Recovery Loop Trap)
+      // --------------------------------------------------------------------------
+      const runScenarioA = () => {
+        resetSimulation();
+        setIsRunning(true);
+        const opId = `OP-NAIVE-${Date.now().toString().slice(-4)}`;
+        logEvent('SCENARIO_A', `Starting Naive Immediate Retry Loop for ${opId}`);
+        
+        let count = 0;
+        const attemptsLog = [];
+
+        const fireImmediate = () => {
+          count += 1;
+          const attemptId = `ATTEMPT-${count}`;
+          const timestamp = Date.now();
+          attemptsLog.push({ attempt: count, delay: 0, time: new Date().toLocaleTimeString(), status: 'FAILED' });
+          setSimulationData(prev => ({ ...prev, attempts: [...attemptsLog], status: `ATTEMPTING (#${count})` }));
+          logEvent('HTTP_FAIL', `[Immediate Loop] Attempt #${count} failed immediately (0ms delay).`, { opId, attemptId });
+
+          if (count < 5) {
+            activeTimerRef.current = setTimeout(fireImmediate, 50); // Uncontrolled immediate loop
+          } else {
+            setIsRunning(false);
+            setSimulationData(prev => ({ ...prev, status: 'BLOWN_UP (High Server Load)' }));
+            logEvent('CRITICAL', `[Storm Alert] 5 rapid requests within 250ms! Uncontrolled retry storm.`, { opId });
+          }
+        };
+
+        fireImmediate();
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario B: Exponential Backoff (Bounded)
+      // --------------------------------------------------------------------------
+      const runScenarioB = () => {
+        resetSimulation();
+        setIsRunning(true);
+        const opId = `OP-BACKOFF-${Date.now().toString().slice(-4)}`;
+        const baseDelay = 500;
+        const maxAttempts = 4;
+        let attempt = 0;
+        const attemptsLog = [];
+
+        logEvent('SCENARIO_B', `Initiating Exponential Backoff (Base: 500ms, Max: 4 attempts) for ${opId}`);
+
+        const executeAttempt = () => {
+          attempt += 1;
+          const isSuccess = attempt === 4; // Succeeds on final attempt
+          const currentDelay = attempt === 1 ? 0 : baseDelay * Math.pow(2, attempt - 2);
+
+          attemptsLog.push({
+            attempt,
+            delay: currentDelay,
+            time: new Date().toLocaleTimeString(),
+            status: isSuccess ? 'SUCCESS' : 'FAILED'
+          });
+
+          setSimulationData(prev => ({ ...prev, attempts: [...attemptsLog], status: isSuccess ? 'RESOLVED' : `WAITING_BACKOFF (${currentDelay}ms)` }));
+          logEvent(isSuccess ? 'HTTP_200' : 'HTTP_FAIL', `Attempt #${attempt}: ${isSuccess ? 'SUCCESS (200 OK)' : `Failed -> Next Delay: ${baseDelay * Math.pow(2, attempt - 1)}ms`}`, { opId, delay: currentDelay });
+
+          if (!isSuccess && attempt < maxAttempts) {
+            const nextDelay = baseDelay * Math.pow(2, attempt - 1);
+            activeTimerRef.current = setTimeout(executeAttempt, nextDelay);
+          } else {
+            setIsRunning(false);
+          }
+        };
+
+        executeAttempt();
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario C: Full Jitter Multi-Client Thundering Herd Visualizer
+      // --------------------------------------------------------------------------
+      const runScenarioC = () => {
+        resetSimulation();
+        setIsRunning(true);
+        logEvent('SCENARIO_C', 'Simulating 10 concurrent clients with Full Jitter vs No Jitter.');
+
+        const numClients = 10;
+        const baseDelay = 1000;
+        const clientsData = [];
+
+        for (let i = 1; i <= numClients; i++) {
+          const rawBackoff = baseDelay * 2; // 2000ms
+          // Full Jitter: random(0, rawBackoff)
+          const jitterDelay = Math.floor(Math.random() * rawBackoff);
+          clientsData.push({
+            clientId: `Client-${i}`,
+            noJitterTime: rawBackoff,
+            jitterTime: jitterDelay,
+            status: 'SCHEDULED'
+          });
+        }
+
+        setSimulationData(prev => ({ ...prev, clients: clientsData, status: 'JITTER_SIMULATION_ACTIVE' }));
+        logEvent('INFO', `Dispersed 10 clients across [0ms - 2000ms] jitter spectrum to eliminate spike.`);
+        setIsRunning(false);
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario D: Retry Exhaustion & Terminal State
+      // --------------------------------------------------------------------------
+      const runScenarioD = () => {
+        resetSimulation();
+        setIsRunning(true);
+        const opId = `OP-EXHAUST-${Date.now().toString().slice(-4)}`;
+        const maxAttempts = 3;
+        let attempt = 0;
+        const attemptsLog = [];
+
+        logEvent('SCENARIO_D', `Starting bounded 3-attempt execution with guaranteed exhaustion.`);
+
+        const step = () => {
+          attempt += 1;
+          const delay = attempt === 1 ? 0 : 400 * Math.pow(2, attempt - 2);
+
+          attemptsLog.push({ attempt, delay, time: new Date().toLocaleTimeString(), status: 'FAILED' });
+          setSimulationData(prev => ({ ...prev, attempts: [...attemptsLog], status: `ATTEMPT_${attempt}_FAILED` }));
+
+          if (attempt < maxAttempts) {
+            activeTimerRef.current = setTimeout(step, 600);
+          } else {
+            setIsRunning(false);
+            setSimulationData(prev => ({ ...prev, status: 'TERMINAL_EXHAUSTION (Escalated to User)' }));
+            logEvent('EXHAUSTION', `Max retries (3/3) reached for ${opId}. Terminal state reached. Fallback rendered.`, { opId });
+          }
+        };
+
+        step();
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario E: Cancellation & Timer Teardown Guard
+      // --------------------------------------------------------------------------
+      const runScenarioE = () => {
+        resetSimulation();
+        setIsRunning(true);
+        const opId = `OP-SEARCH-${Date.now().toString().slice(-4)}`;
+        abortControllerRef.current = new AbortController();
+
+        logEvent('SCENARIO_E', `User initiated search query for "React 19" (${opId}). Scheduling retry in 3000ms.`);
+        setSimulationData(prev => ({
+          ...prev,
+          currentOperationId: opId,
+          status: 'SCHEDULED_RETRY_IN_3000MS',
+          attempts: [{ attempt: 1, delay: 0, time: new Date().toLocaleTimeString(), status: 'FAILED (Network Timeout)' }]
+        }));
+
+        activeTimerRef.current = setTimeout(() => {
+          if (!abortControllerRef.current?.signal.aborted) {
+            logEvent('HTTP_FAIL', `[STALE RESURRECTION ERROR] Scheduled retry executed after user cancelled!`);
+            setSimulationData(prev => ({ ...prev, status: 'ZOMBIE_RETRY_FIRED' }));
+          }
+          setIsRunning(false);
+        }, 3000);
+      };
+
+      const cancelActiveSearch = () => {
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        if (activeTimerRef.current) clearTimeout(activeTimerRef.current);
+        setIsRunning(false);
+        setSimulationData(prev => ({ ...prev, status: 'CANCELLED (Timer Purged, No Zombie Retries)' }));
+        logEvent('CANCEL', `User navigated away. AbortController triggered and active setTimeout cleared.`);
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario F: Stale Operation Currentness Guard
+      // --------------------------------------------------------------------------
+      const runScenarioF = () => {
+        resetSimulation();
+        setIsRunning(true);
+        logEvent('SCENARIO_F', 'Demonstrating Operation Currentness Guard. Starting Op-A ("rea"), then Op-B ("react").');
+
+        const opA = 'OP-101 (Query: "rea")';
+        const opB = 'OP-102 (Query: "react")';
+
+        // Op A triggers first
+        setSimulationData(prev => ({ ...prev, currentOperationId: opA, status: 'OP-A_IN_FLIGHT' }));
+        logEvent('OP_START', `User typed "rea". Dispatching ${opA}`);
+
+        setTimeout(() => {
+          // User types more -> Op B becomes current
+          setSimulationData(prev => ({ ...prev, currentOperationId: opB, status: 'OP-B_CURRENT (Op-A is Stale)' }));
+          logEvent('OP_START', `User typed "react". Current operation updated to ${opB}`);
+
+          // Stale Op A completes late with retry
+          setTimeout(() => {
+            logEvent('STALE_GUARD', `Op-A retry resolved with 10 results. REJECTED by Currentness Guard (Current is Op-B).`);
+            setSimulationData(prev => ({ ...prev, status: 'OP-A_DISCARDED_SAFELY' }));
+            setIsRunning(false);
+          }, 800);
+        }, 600);
+      };
+
+      // --------------------------------------------------------------------------
+      // Scenario G: Unknown Outcome & Idempotency Key Protection
+      // --------------------------------------------------------------------------
+      const runScenarioG = (useIdempotency) => {
+        resetSimulation();
+        setIsRunning(true);
+        const logicalOpId = `ORDER-TX-${Date.now().toString().slice(-4)}`;
+        const idempotencyKey = useIdempotency ? `IDEM-KEY-${logicalOpId}` : null;
+        let serverOrders = 0;
+        const seenKeys = new Set();
+
+        logEvent('SCENARIO_G', `Checkout Wire Transfer ($50,000). Mode: ${useIdempotency ? 'IDEMPOTENT (Stable Key)' : 'NON-IDEMPOTENT (Blind Retry)'}`);
+
+        // Attempt 1: Server processes order, but network response drops
+        serverOrders += 1;
+        if (idempotencyKey) seenKeys.add(idempotencyKey);
+        logEvent('SERVER_COMMIT', `[Server] Order #1 processed successfully in DB. (Response dropped by firewall).`);
+
+        setSimulationData(prev => ({
+          ...prev,
+          currentOperationId: logicalOpId,
+          serverOrdersCreated: serverOrders,
+          status: 'ATTEMPT_1_TIMEOUT (Client sees failure, Server committed success)'
+        }));
+
+        // Client encounters timeout and retries
+        setTimeout(() => {
+          logEvent('RETRY', `Client timeout. Initiating Attempt #2 for ${logicalOpId}...`);
+          
+          if (useIdempotency) {
+            // Server checks idempotency table
+            if (seenKeys.has(idempotencyKey)) {
+              logEvent('IDEMPOTENCY_HIT', `[Server] Matched Idempotency-Key "${idempotencyKey}". Returning cached 200 OK without re-billing!`);
+              setSimulationData(prev => ({ ...prev, status: 'SUCCESS (Single Charge: $50,000)' }));
+            }
+          } else {
+            // Unsafe blind retry duplicates charge!
+            serverOrders += 1;
+            logEvent('DUPLICATE_CHARGE', `[Server Error] No Idempotency Key! Created SECOND order #2 ($100,000 billed total!).`);
+            setSimulationData(prev => ({
+              ...prev,
+              serverOrdersCreated: serverOrders,
+              status: 'CRITICAL_DOUBLE_CHARGE ($100,000 Billed!)'
+            }));
+          }
+          setIsRunning(false);
+        }, 1200);
+      };
+
+      return (
+        <div className="flex-1 flex flex-col min-h-screen bg-slate-950 text-slate-100">
+          
+          {/* Header */}
+          <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 flex items-center justify-between sticky top-0 z-30">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20 text-sm">
+                13
+              </div>
+              <div>
+                <h1 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <span>Retry, Backoff, Idempotency & Recovery Loops Lab</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    Production Verified
+                  </span>
+                </h1>
+                <p className="text-[11px] text-slate-400">KPI 16 • Senior Error Handling Masterclass</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={resetSimulation}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition border border-slate-700"
+              >
+                ↻ Reset Simulator
+              </button>
+            </div>
+          </header>
+
+          {/* Main Layout: 2 Columns */}
+          <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-hidden">
+            
+            {/* Left 8 Cols: Interactive Scenarios & Circuit Visualizers */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+
+              {/* Scenario Selector Ribbon */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Select Interactive Resilience Experiment
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {[
+                    { key: 'A', name: 'A: Immediate Loop (Anti-pattern)', fn: runScenarioA },
+                    { key: 'B', name: 'B: Exponential Backoff', fn: runScenarioB },
+                    { key: 'C', name: 'C: Full Jitter Herd', fn: runScenarioC },
+                    { key: 'D', name: 'D: Retry Exhaustion (3 Max)', fn: runScenarioD },
+                    { key: 'E', name: 'E: Cancellation & Timer Teardown', fn: runScenarioE },
+                    { key: 'F', name: 'F: Stale Op Currentness Guard', fn: runScenarioF },
+                    { key: 'G1', name: 'G1: Safe Idempotency ($50k)', fn: () => runScenarioG(true) },
+                    { key: 'G2', name: 'G2: Blind Retry (Double Charge)', fn: () => runScenarioG(false) }
+                  ].map(sc => (
+                    <button
+                      key={sc.key}
+                      onClick={() => { setSelectedScenario(sc.key); sc.fn(); }}
+                      disabled={isRunning}
+                      className={`p-2.5 rounded-xl text-left font-medium transition flex flex-col justify-between border ${
+                        selectedScenario === sc.key
+                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow-md shadow-indigo-600/20'
+                          : 'bg-slate-900 hover:bg-slate-800/80 border-slate-800 text-slate-300'
+                      } ${isRunning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <span className="text-[11px] font-bold">{sc.name}</span>
+                      <span className="text-[10px] opacity-60 font-mono mt-1">Run Test ⚡</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Real-time State & Flow Visualizer */}
+              <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${isRunning ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`}></span>
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Execution Canvas: <span className="font-mono text-indigo-400">{simulationData.status}</span>
+                      </h3>
+                    </div>
+                    {selectedScenario === 'E' && isRunning && (
+                      <button
+                        onClick={cancelActiveSearch}
+                        className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold transition animate-pulse"
+                      >
+                        🛑 Cancel Search Now
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scenario A, B, D Visualizer: Retry Timeline Bar */}
+                  {simulationData.attempts.length > 0 && (
+                    <div className="space-y-3 mb-6">
+                      <h4 className="text-xs font-semibold text-slate-400">Attempt Sequence Timeline:</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        {simulationData.attempts.map((att, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border text-xs flex flex-col justify-between ${
+                              att.status === 'SUCCESS'
+                                ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-200'
+                                : 'bg-rose-950/20 border-rose-900/40 text-rose-300'
+                            }`}
+                          >
+                            <div className="flex justify-between font-mono text-[10px]">
+                              <span>Attempt #{att.attempt}</span>
+                              <span>+{att.delay}ms</span>
+                            </div>
+                            <div className="my-2 font-bold text-sm">
+                              {att.status === 'SUCCESS' ? '✓ 200 OK' : '✕ FAILURE'}
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-mono">{att.time}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Scenario C Visualizer: Jitter Comparison Spectrum */}
+                  {simulationData.clients.length > 0 && (
+                    <div className="space-y-3 mb-6">
+                      <h4 className="text-xs font-semibold text-slate-400">10 Clients Concurrent Wakeup Dispersion:</h4>
+                      <div className="space-y-2">
+                        {simulationData.clients.map((cli, idx) => (
+                          <div key={idx} className="flex items-center gap-3 text-xs">
+                            <span className="w-16 font-mono text-slate-400 text-[11px]">{cli.clientId}</span>
+                            {/* Bar representing jitter distribution */}
+                            <div className="flex-1 bg-slate-950 h-5 rounded-full overflow-hidden relative border border-slate-800">
+                              <div
+                                className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-700"
+                                style={{ width: `${(cli.jitterTime / 2000) * 100}%` }}
+                              ></div>
+                              <span className="absolute right-3 top-0.5 text-[10px] font-mono text-slate-300 font-bold">
+                                {cli.jitterTime}ms (Jittered)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-slate-400 italic pt-2">
+                        Notice how client requests are evenly scattered between 0ms and 2000ms rather than hitting the database simultaneously at 2000ms.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Scenario G Visualizer: Idempotency Server Ledger */}
+                  {simulationData.serverOrdersCreated > 0 && (
+                    <div className="p-4 rounded-xl border border-slate-800 bg-slate-950 my-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-300">🏦 PostgreSQL Database Ledger:</span>
+                        <span className="text-xs font-mono font-bold text-indigo-400">
+                          Total Billed: ${simulationData.serverOrdersCreated * 50000},000
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs">
+                          <span className="text-slate-500 block text-[10px]">Server Orders Created:</span>
+                          <strong className={simulationData.serverOrdersCreated > 1 ? 'text-rose-400 text-base' : 'text-emerald-400 text-base'}>
+                            {simulationData.serverOrdersCreated} Order{simulationData.serverOrdersCreated > 1 ? 's (DUPLICATE DETECTED!)' : ''}
+                          </strong>
+                        </div>
+                        <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs">
+                          <span className="text-slate-500 block text-[10px]">Idempotency Protection:</span>
+                          <strong className={selectedScenario === 'G1' ? 'text-emerald-400' : 'text-rose-400'}>
+                            {selectedScenario === 'G1' ? 'ENABLED (Stable Key Cached)' : 'DISABLED (Blind Retry)'}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Mathematical Backoff Reference Table */}
+                <div className="pt-4 border-t border-slate-800/80 text-[11px] text-slate-400 flex justify-between items-center">
+                  <span>Exponential Formula: <code className="text-indigo-400 font-mono">delay = min(base * 2^(attempt-1), maxDelay)</code></span>
+                  <span>Full Jitter: <code className="text-emerald-400 font-mono">random(0, delay)</code></span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right 4 Cols: Live Diagnostics, Event Stream & State Machine */}
+            <div className="lg:col-span-4 flex flex-col gap-6 overflow-hidden">
+              
+              {/* Telemetry & Event Stream */}
+              <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 flex-1 flex flex-col min-h-[350px]">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                  <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                    📡 Distributed Recovery Telemetry
+                  </h3>
+                  <span className="text-[10px] font-mono text-slate-500">{logs.length} events</span>
+                </div>
+                <div className="flex-1 overflow-auto space-y-2 max-h-[460px] pr-1 font-mono text-[10px]">
+                  {logs.length === 0 ? (
+                    <div className="text-xs text-slate-500 italic py-6 text-center font-sans">
+                      Select an experiment above to view telemetry traces.
+                    </div>
+                  ) : (
+                    logs.map(log => (
+                      <div key={log.id} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 leading-relaxed">
+                        <div className="flex justify-between text-slate-500 mb-1 text-[9px]">
+                          <span className={
+                            log.type.includes('FAIL') || log.type.includes('CRITICAL') || log.type.includes('DUPLICATE')
+                              ? 'text-rose-400 font-bold'
+                              : log.type.includes('200') || log.type.includes('IDEMPOTENCY')
+                              ? 'text-emerald-400 font-bold'
+                              : 'text-indigo-400'
+                          }>
+                            [{log.type}]
+                          </span>
+                          <span>{log.timestamp}</span>
+                        </div>
+                        <p className="text-slate-300">{log.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+          </main>
+
+          {/* Persistent Footer */}
+          <footer className="h-10 border-t border-slate-800 bg-slate-950 px-6 flex items-center justify-between text-[11px] text-slate-500">
+            <div>Level 06 • KPI 16: Error Handling, Boundaries & Resilience</div>
+            <div className="flex items-center gap-3">
+              <span>Section 13: Retry, Backoff & Idempotency</span>
+              <span>•</span>
+              <a 
+                href="https://www.linkedin.com/in/kudurmallasrikar/" 
+                target="_blank" 
+                rel="noreferrer"
+                className="text-indigo-400 hover:underline"
+              >
+                Lead Architect: Srikar Kudurmalla
+              </a>
+            </div>
+          </footer>
+
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
