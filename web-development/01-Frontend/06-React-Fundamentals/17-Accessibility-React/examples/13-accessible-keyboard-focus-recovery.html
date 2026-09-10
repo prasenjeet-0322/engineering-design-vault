@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 17 - Part 13: Keyboard Navigation, Focus Recovery & Roving Tabindex</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: #1e293b;
+      --panel-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #a855f7;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --focus-ring: #fbbf24;
+      --font-mono: 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 2rem;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 1rem;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .telemetry-bar {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-left: 4px solid var(--focus-ring);
+      padding: 0.75rem 1.25rem;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .telemetry-bar span b {
+      color: var(--focus-ring);
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      background: #334155;
+      color: #94a3b8;
+    }
+
+    .badge.active {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+
+    .sandbox-area {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 1.25rem;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    /* Roving Tabindex Toolbar */
+    .roving-toolbar {
+      display: inline-flex;
+      gap: 0.5rem;
+      background: #1e293b;
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+
+    .roving-btn {
+      background: #0f172a;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+
+    .roving-btn:focus {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+      background: #1e293b;
+      color: #fff;
+    }
+
+    .roving-btn.active-target {
+      border-color: var(--primary);
+    }
+
+    /* Active Descendant Combobox */
+    .combobox-container {
+      position: relative;
+      width: 100%;
+    }
+
+    .combobox-input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #fff;
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    .combobox-input:focus {
+      outline: 2px solid var(--primary);
+      border-color: transparent;
+    }
+
+    .combobox-listbox {
+      margin-top: 0.5rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      max-height: 140px;
+      overflow-y: auto;
+      list-style: none;
+    }
+
+    .listbox-option {
+      padding: 0.5rem 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .listbox-option:last-child {
+      border-bottom: none;
+    }
+
+    .listbox-option.visual-active {
+      background: #1e3a8a;
+      color: #93c5fd;
+    }
+
+    .del-btn {
+      background: transparent;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    .del-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Recovery List */
+    .recovery-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .recovery-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e293b;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      border: 1px solid #334155;
+    }
+
+    .recovery-row button:focus {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 1px;
+    }
+
+    /* Telemetry subpanel */
+    .telemetry-subpanel {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      background: #0b0f19;
+      padding: 0.6rem;
+      border-radius: 4px;
+      border: 1px solid #1e293b;
+      color: #94a3b8;
+    }
+
+    .telemetry-subpanel span {
+      color: #38bdf8;
+    }
+
+    /* Controls bar */
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      background: #334155;
+      color: #fff;
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .action-btn:hover {
+      background: #475569;
+    }
+
+    .action-btn.danger {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .action-btn.danger:hover {
+      background: #991b1b;
+    }
+
+    .log-panel {
+      background: #090d16;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .log-entry {
+      margin-bottom: 0.3rem;
+      color: #94a3b8;
+    }
+
+    .log-entry.focus {
+      color: #38bdf8;
+    }
+
+    .log-entry.warn {
+      color: #f59e0b;
+    }
+
+    .log-entry.error {
+      color: #ef4444;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🧪 KPI 17 - Part 13: Interactive Keyboard & Focus Recovery Sandbox</h1>
+    <p>Staff-Level A11y Laboratory: Roving Tabindex, Active Descendant, Dynamic Focus Recovery & Stale Async Guards</p>
+  </header>
+
+  <div class="telemetry-bar" id="globalTelemetry">
+    <span>Hardware Focus (<code>document.activeElement</code>): <b id="activeElementTag">BODY</b></span>
+    <span>Active Element ID: <b id="activeElementId">none</b></span>
+    <span>Tab Navigation Index: <b id="activeTabIndex">none</b></span>
+  </div>
+
+  <div class="grid-container">
+
+    <!-- MODE A: Roving Tabindex -->
+    <section class="card" id="modeA">
+      <h2>
+        Mode A: Roving Tabindex Widget
+        <span class="badge active">Composite Toolbar</span>
+      </h2>
+      <p style="font-size: 0.85rem; color: #94a3b8;">
+        Single tab stop. Internal navigation via <kbd>ArrowLeft</kbd>, <kbd>ArrowRight</kbd>, <kbd>Home</kbd>, <kbd>End</kbd>.
+      </p>
+
+      <div class="sandbox-area">
+        <div class="roving-toolbar" role="toolbar" aria-label="Text Formatting Controls" id="rovingToolbar">
+          <button type="button" class="roving-btn" id="btn-bold" tabIndex="0" data-id="bold">Bold (0)</button>
+          <button type="button" class="roving-btn" id="btn-italic" tabIndex="-1" data-id="italic">Italic (-1)</button>
+          <button type="button" class="roving-btn" id="btn-underline" tabIndex="-1" data-id="underline">Underline (-1)</button>
+          <button type="button" class="roving-btn" id="btn-strike" tabIndex="-1" data-id="strike">Strikethrough (-1)</button>
+        </div>
+      </div>
+
+      <div class="telemetry-subpanel" id="rovingTelemetry">
+        Active Entity ID: <span id="rovingActiveId">bold</span> | Total Tab Stops in Widget: <span>1</span>
+      </div>
+
+      <div class="btn-group">
+        <button class="action-btn danger" id="triggerRovingBug">Inject Duplicate tabIndex=0 Bug</button>
+        <button class="action-btn" id="fixRovingBug">Restore Roving Invariant</button>
+      </div>
+    </section>
+
+    <!-- MODE B: aria-activedescendant -->
+    <section class="card" id="modeB">
+      <h2>
+        Mode B: <code>aria-activedescendant</code>
+        <span class="badge">Virtual Focus Listbox</span>
+      </h2>
+      <p style="font-size: 0.85rem; color: #94a3b8;">
+        DOM focus stays on input. Logical focus mapped via <code>aria-activedescendant</code>.
+      </p>
+
+      <div class="sandbox-area">
+        <div class="combobox-container">
+          <label for="frameworkInput" style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.2rem;">Select Framework:</label>
+          <input
+            type="text"
+            id="frameworkInput"
+            class="combobox-input"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls="frameworkListbox"
+            aria-activedescendant="opt-react"
+            placeholder="Type or use ArrowUp/ArrowDown..."
+          />
+          <ul id="frameworkListbox" role="listbox" class="combobox-listbox" aria-label="JavaScript Frameworks">
+            <li id="opt-react" role="option" aria-selected="true" class="listbox-option visual-active">
+              <span>React</span>
+              <button class="del-btn" data-target="opt-react" aria-label="Delete React">✕</button>
+            </li>
+            <li id="opt-vue" role="option" aria-selected="false" class="listbox-option">
+              <span>Vue.js</span>
+              <button class="del-btn" data-target="opt-vue" aria-label="Delete Vue">✕</button>
+            </li>
+            <li id="opt-svelte" role="option" aria-selected="false" class="listbox-option">
+              <span>Svelte</span>
+              <button class="del-btn" data-target="opt-svelte" aria-label="Delete Svelte">✕</button>
+            </li>
+            <li id="opt-angular" role="option" aria-selected="false" class="listbox-option">
+              <span>Angular</span>
+              <button class="del-btn" data-target="opt-angular" aria-label="Delete Angular">✕</button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="telemetry-subpanel" id="activedescendantTelemetry">
+        <code>aria-activedescendant</code>: <span id="activeDescId">opt-react</span> | Target In DOM: <span id="targetExists">YES</span>
+      </div>
+
+      <div class="btn-group">
+        <button class="action-btn danger" id="deleteActiveOptionBtn">Delete Active Option (Simulate Crash)</button>
+        <button class="action-btn" id="resetListboxBtn">Reset Listbox</button>
+      </div>
+    </section>
+
+    <!-- MODE C: Dynamic Focus Recovery Policy -->
+    <section class="card" id="modeC">
+      <h2>
+        Mode C: Focus Recovery on Element Removal
+        <span class="badge">Deterministic Policy</span>
+      </h2>
+      <p style="font-size: 0.85rem; color: #94a3b8;">
+        When focused item is deleted, where does focus go? Avoid dropping to <code>document.body</code>.
+      </p>
+
+      <div class="sandbox-area">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <label style="font-size: 0.8rem; color: #94a3b8;">Recovery Policy:</label>
+          <select id="recoveryPolicySelect" style="background: #0f172a; color: #fff; border: 1px solid #334155; padding: 0.2rem 0.5rem; border-radius: 4px;">
+            <option value="next">1. Next Item (Fallback Prev)</option>
+            <option value="previous">2. Previous Item (Fallback Next)</option>
+            <option value="container">3. Container Heading</option>
+            <option value="none">4. None (Browser default: drops to body)</option>
+          </select>
+        </div>
+
+        <div class="recovery-list" id="recoveryContainer" tabIndex="-1" aria-label="Manage Deployments">
+          <div class="recovery-row" id="row-1">
+            <span>Cluster Alpha (US-East)</span>
+            <button class="action-btn danger row-del-btn" data-id="row-1">Delete Item</button>
+          </div>
+          <div class="recovery-row" id="row-2">
+            <span>Cluster Beta (EU-Central)</span>
+            <button class="action-btn danger row-del-btn" data-id="row-2">Delete Item</button>
+          </div>
+          <div class="recovery-row" id="row-3">
+            <span>Cluster Gamma (AP-South)</span>
+            <button class="action-btn danger row-del-btn" data-id="row-3">Delete Item</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="telemetry-subpanel" id="recoveryTelemetry">
+        Last Focus Transfer: <span id="recoveryMsg">Ready for deletion test</span>
+      </div>
+
+      <div class="btn-group">
+        <button class="action-btn" id="resetRecoveryListBtn">Restore Deployment Rows</button>
+      </div>
+    </section>
+
+    <!-- MODE D: Async Stale Focus Hazard -->
+    <section class="card" id="modeD">
+      <h2>
+        Mode D: Async Stale Focus Hazard
+        <span class="badge">Concurrency Guard</span>
+      </h2>
+      <p style="font-size: 0.85rem; color: #94a3b8;">
+        Demonstrates race condition where slow asynchronous operation steals focus from user's newer action.
+      </p>
+
+      <div class="sandbox-area">
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <button class="action-btn" id="startReqABtn">Trigger Search A (Slow - 2000ms)</button>
+          <button class="action-btn" id="startReqBBtn">Trigger Search B (Fast - 500ms)</button>
+        </div>
+
+        <div id="asyncResultsArea" style="background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 0.6rem; min-height: 50px;">
+          <span style="color: #64748b;">No active search results.</span>
+        </div>
+      </div>
+
+      <div class="telemetry-subpanel" id="asyncTelemetry">
+        Active Query ID: <span id="latestQueryId">none</span> | Focus Protected: <span id="asyncGuardStatus">ENABLED</span>
+      </div>
+
+      <div class="btn-group">
+        <button class="action-btn danger" id="toggleAsyncBugBtn">Disable Currentness Guard</button>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="card">
+    <h2>Real-Time Interaction & Focus Telemetry Log</h2>
+    <div class="log-panel" id="eventLog">
+      <div class="log-entry">[INIT] Laboratory initialized. Hardware focus tracking active.</div>
+    </div>
+  </div>
+
+  <script>
+    // Telemetry logger
+    const eventLog = document.getElementById('eventLog');
+    function log(msg, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      eventLog.prepend(entry);
+    }
+
+    // Global Focus Tracking
+    function updateGlobalFocus() {
+      const el = document.activeElement;
+      document.getElementById('activeElementTag').textContent = el.tagName;
+      document.getElementById('activeElementId').textContent = el.id || '(no id)';
+      document.getElementById('activeTabIndex').textContent = el.getAttribute('tabindex') ?? '(natural)';
+    }
+
+    document.addEventListener('focusin', () => {
+      updateGlobalFocus();
+      log(`Focus shifted to: <${document.activeElement.tagName.toLowerCase()} id="${document.activeElement.id || ''}">`, 'focus');
+    });
+
+    // -------------------------------------------------------------
+    // MODE A: Roving Tabindex Implementation
+    // -------------------------------------------------------------
+    const rovingToolbar = document.getElementById('rovingToolbar');
+    const rovingBtns = Array.from(rovingToolbar.querySelectorAll('.roving-btn'));
+    let activeRovingIndex = 0;
+
+    function setRovingActive(index, shouldFocus = true) {
+      activeRovingIndex = (index + rovingBtns.length) % rovingBtns.length;
+      rovingBtns.forEach((btn, i) => {
+        if (i === activeRovingIndex) {
+          btn.setAttribute('tabindex', '0');
+          btn.textContent = `${btn.dataset.id} (0)`;
+          btn.classList.add('active-target');
+          if (shouldFocus) btn.focus();
+        } else {
+          btn.setAttribute('tabindex', '-1');
+          btn.textContent = `${btn.dataset.id} (-1)`;
+          btn.classList.remove('active-target');
+        }
+      });
+      document.getElementById('rovingActiveId').textContent = rovingBtns[activeRovingIndex].dataset.id;
+    }
+
+    rovingToolbar.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault();
+          setRovingActive(activeRovingIndex + 1);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          setRovingActive(activeRovingIndex - 1);
+          break;
+        case 'Home':
+          e.preventDefault();
+          setRovingActive(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          setRovingActive(rovingBtns.length - 1);
+          break;
+      }
+    });
+
+    document.getElementById('triggerRovingBug').addEventListener('click', () => {
+      rovingBtns.forEach(btn => btn.setAttribute('tabindex', '0'));
+      log('⚠️ BUG INJECTED: Multiple buttons now have tabIndex=0. Roving invariant broken!', 'warn');
+    });
+
+    document.getElementById('fixRovingBug').addEventListener('click', () => {
+      setRovingActive(0, false);
+      log('✅ Roving invariant restored: Exactly one sequential tab entry point.', 'info');
+    });
+
+    // -------------------------------------------------------------
+    // MODE B: aria-activedescendant Implementation
+    // -------------------------------------------------------------
+    const frameworkInput = document.getElementById('frameworkInput');
+    const frameworkListbox = document.getElementById('frameworkListbox');
+    let listboxOptions = Array.from(frameworkListbox.querySelectorAll('.listbox-option'));
+    let activeOptionIndex = 0;
+
+    function setActiveDescendant(index) {
+      if (listboxOptions.length === 0) {
+        frameworkInput.removeAttribute('aria-activedescendant');
+        document.getElementById('activeDescId').textContent = 'none';
+        document.getElementById('targetExists').textContent = 'NO (Empty)';
+        return;
+      }
+
+      activeOptionIndex = (index + listboxOptions.length) % listboxOptions.length;
+      listboxOptions.forEach((opt, idx) => {
+        if (idx === activeOptionIndex) {
+          opt.classList.add('visual-active');
+          opt.setAttribute('aria-selected', 'true');
+          frameworkInput.setAttribute('aria-activedescendant', opt.id);
+          document.getElementById('activeDescId').textContent = opt.id;
+          document.getElementById('targetExists').textContent = 'YES';
+          opt.scrollIntoView({ block: 'nearest' });
+        } else {
+          opt.classList.remove('visual-active');
+          opt.setAttribute('aria-selected', 'false');
+        }
+      });
+    }
+
+    frameworkInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveDescendant(activeOptionIndex + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveDescendant(activeOptionIndex - 1);
+      }
+    });
+
+    document.getElementById('deleteActiveOptionBtn').addEventListener('click', () => {
+      if (listboxOptions.length === 0) return;
+      const target = listboxOptions[activeOptionIndex];
+      const targetId = target.id;
+      target.remove();
+      listboxOptions = Array.from(frameworkListbox.querySelectorAll('.listbox-option'));
+
+      log(`⚠️ Active option '${targetId}' deleted from DOM while referenced by aria-activedescendant!`, 'warn');
+      document.getElementById('targetExists').textContent = 'NO (Dangling Reference!)';
+
+      // Auto recover
+      setTimeout(() => {
+        setActiveDescendant(Math.min(activeOptionIndex, listboxOptions.length - 1));
+        log(`✅ Reconciled active descendant to: '${listboxOptions[activeOptionIndex]?.id || 'none'}'`, 'info');
+      }, 1000);
+    });
+
+    document.getElementById('resetListboxBtn').addEventListener('click', () => {
+      frameworkListbox.innerHTML = `
+        <li id="opt-react" role="option" aria-selected="true" class="listbox-option visual-active">
+          <span>React</span><button class="del-btn" data-target="opt-react">✕</button>
+        </li>
+        <li id="opt-vue" role="option" aria-selected="false" class="listbox-option">
+          <span>Vue.js</span><button class="del-btn" data-target="opt-vue">✕</button>
+        </li>
+        <li id="opt-svelte" role="option" aria-selected="false" class="listbox-option">
+          <span>Svelte</span><button class="del-btn" data-target="opt-svelte">✕</button>
+        </li>
+        <li id="opt-angular" role="option" aria-selected="false" class="listbox-option">
+          <span>Angular</span><button class="del-btn" data-target="opt-angular">✕</button>
+        </li>
+      `;
+      listboxOptions = Array.from(frameworkListbox.querySelectorAll('.listbox-option'));
+      setActiveDescendant(0);
+      log('Listbox reset to initial state.', 'info');
+    });
+
+    // -------------------------------------------------------------
+    // MODE C: Dynamic Focus Recovery Implementation
+    // -------------------------------------------------------------
+    const recoveryContainer = document.getElementById('recoveryContainer');
+    const policySelect = document.getElementById('recoveryPolicySelect');
+
+    recoveryContainer.addEventListener('click', (e) => {
+      if (e.target.classList.contains('row-del-btn')) {
+        const row = e.target.closest('.recovery-row');
+        const rows = Array.from(recoveryContainer.querySelectorAll('.recovery-row'));
+        const index = rows.indexOf(row);
+        const policy = policySelect.value;
+
+        row.remove();
+        const survivingRows = Array.from(recoveryContainer.querySelectorAll('.recovery-row'));
+
+        if (policy === 'none') {
+          log('❌ Policy NONE: Focused node removed. Focus lost to document.body!', 'error');
+          document.getElementById('recoveryMsg').textContent = 'Focus dropped to document.body';
+          return;
+        }
+
+        if (survivingRows.length === 0) {
+          recoveryContainer.focus();
+          log('Focus recovered to container wrapper (no surviving rows).', 'info');
+          document.getElementById('recoveryMsg').textContent = 'Recovered to container wrapper';
+          return;
+        }
+
+        let targetRow;
+        if (policy === 'next') {
+          targetRow = survivingRows[index] || survivingRows[survivingRows.length - 1];
+        } else if (policy === 'previous') {
+          targetRow = survivingRows[index - 1] || survivingRows[0];
+        } else if (policy === 'container') {
+          targetRow = null;
+          recoveryContainer.focus();
+          document.getElementById('recoveryMsg').textContent = 'Recovered to container';
+          return;
+        }
+
+        if (targetRow) {
+          const btn = targetRow.querySelector('.row-del-btn');
+          btn.focus();
+          document.getElementById('recoveryMsg').textContent = `Recovered to row: ${targetRow.id}`;
+          log(`✅ Deterministic Focus Recovery: Shifted focus to ${targetRow.id}`, 'focus');
+        }
+      }
+    });
+
+    document.getElementById('resetRecoveryListBtn').addEventListener('click', () => {
+      recoveryContainer.innerHTML = `
+        <div class="recovery-row" id="row-1">
+          <span>Cluster Alpha (US-East)</span>
+          <button class="action-btn danger row-del-btn" data-id="row-1">Delete Item</button>
+        </div>
+        <div class="recovery-row" id="row-2">
+          <span>Cluster Beta (EU-Central)</span>
+          <button class="action-btn danger row-del-btn" data-id="row-2">Delete Item</button>
+        </div>
+        <div class="recovery-row" id="row-3">
+          <span>Cluster Gamma (AP-South)</span>
+          <button class="action-btn danger row-del-btn" data-id="row-3">Delete Item</button>
+        </div>
+      `;
+      log('Deployment rows restored.', 'info');
+    });
+
+    // -------------------------------------------------------------
+    // MODE D: Async Stale Focus Hazard Implementation
+    // -------------------------------------------------------------
+    let latestOperationId = 0;
+    let guardEnabled = true;
+    const asyncResultsArea = document.getElementById('asyncResultsArea');
+
+    function performSearch(queryName, delayMs) {
+      const opId = ++latestOperationId;
+      document.getElementById('latestQueryId').textContent = `Query ${queryName} (op-${opId})`;
+      log(`Initiated Search ${queryName} [Op #${opId}, Delay: ${delayMs}ms]`, 'info');
+
+      setTimeout(() => {
+        if (guardEnabled && opId < latestOperationId) {
+          log(`🛡️ GUARD BLOCKED STALE FOCUS: Op #${opId} finished, but active query is Op #${latestOperationId}. Ignored focus!`, 'warn');
+          return;
+        }
+
+        asyncResultsArea.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Results for: <b>${queryName}</b></span>
+            <button id="res-btn-${opId}" class="action-btn" tabIndex="0">Select Top Match</button>
+          </div>
+        `;
+
+        const focusBtn = document.getElementById(`res-btn-${opId}`);
+        if (focusBtn) {
+          focusBtn.focus();
+          if (opId < latestOperationId) {
+            log(`❌ STALE FOCUS HAZARD! Op #${opId} arbitrarily stole user focus from newer Query!`, 'error');
+          } else {
+            log(`✅ Fresh focus established on result of Op #${opId}`, 'focus');
+          }
+        }
+      }, delayMs);
+    }
+
+    document.getElementById('startReqABtn').addEventListener('click', () => performSearch('Query A', 2000));
+    document.getElementById('startReqBBtn').addEventListener('click', () => performSearch('Query B', 500));
+
+    document.getElementById('toggleAsyncBugBtn').addEventListener('click', (e) => {
+      guardEnabled = !guardEnabled;
+      document.getElementById('asyncGuardStatus').textContent = guardEnabled ? 'ENABLED' : 'DISABLED (Vulnerable)';
+      e.target.textContent = guardEnabled ? 'Disable Currentness Guard' : 'Enable Currentness Guard';
+      log(`Async currentness guard is now: ${guardEnabled ? 'ENABLED' : 'DISABLED'}`, guardEnabled ? 'info' : 'warn');
+    });
+
+    // Initialize
+    updateGlobalFocus();
+  </script>
+</body>
+</html>

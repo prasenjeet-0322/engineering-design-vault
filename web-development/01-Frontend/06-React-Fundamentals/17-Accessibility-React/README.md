@@ -5,7 +5,7 @@
 > **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
 > **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
 > **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
-> **Status:** 🟡 In Progress (Part 12 of 16 Completed)
+> **Status:** 🟡 In Progress (Part 13 of 16 Completed)
 
 ---
 
@@ -34,7 +34,7 @@ $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tr
 | **Part 10** | [Accessible React Testing, Automated Accessibility Validation & Interaction Verification](./10-accessible-react-testing.md) | ✅ **Completed** | [`10-accessible-react-testing.html`](./examples/10-accessible-react-testing.html) |
 | **Part 11** | [Accessible Application Architecture: Route, Feature & Composite-Widget Accessibility Boundaries](./11-accessible-application-architecture.md) | ✅ **Completed** | [`11-accessible-application-architecture.html`](./examples/11-accessible-application-architecture.html) |
 | **Part 12** | [Fallback UX, Accessibility, Progressive Degradation & Resilient Interaction](./12-accessible-fallback-ux-progressive-degradation.md) | ✅ **Completed** | [`12-accessible-fallback-ux-progressive-degradation.html`](./examples/12-accessible-fallback-ux-progressive-degradation.html) |
-| **Part 13** | [Accessible Keyboard Focus Recovery & Dynamic Element Removal](./13-accessible-keyboard-focus-recovery.md) | ⏳ Planned | `13-focus-recovery-sandbox.html` |
+| **Part 13** | [Accessible Keyboard Focus Recovery & Dynamic Element Removal](./13-accessible-keyboard-focus-recovery.md) | ✅ **Completed** | [`13-accessible-keyboard-focus-recovery.html`](./examples/13-accessible-keyboard-focus-recovery.html) |
 | **Part 14** | [Manual A11y Auditing: Screen Reader Runbooks (NVDA, VoiceOver, JAWS)](./14-manual-screen-reader-auditing-runbooks.md) | ⏳ Planned | `14-screen-reader-sim.html` |
 | **Part 15** | [Enterprise Design System A11y Architecture & Polymorphic Primitives](./15-enterprise-design-system-a11y-primitives.md) | ⏳ Planned | `15-design-system-primitives.html` |
 | **Part 16** | [KPI 17 Final Review, Master Crucible & Staff-Level Certification](./16-kpi17-final-review-crucible-mastery.md) | ⏳ Planned | `16-a11y-master-crucible.html` |
