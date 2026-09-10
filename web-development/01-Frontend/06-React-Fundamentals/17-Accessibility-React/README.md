@@ -5,7 +5,7 @@
 > **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
 > **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
 > **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
-> **Status:** 🟡 In Progress (Part 11 of 16 Completed)
+> **Status:** 🟡 In Progress (Part 12 of 16 Completed)
 
 ---
 
@@ -33,8 +33,8 @@ $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tr
 | **Part 09** | [Focus Management, Keyboard Navigation & Focus Lifecycle](./09-focus-management-keyboard-navigation.md) | ✅ **Completed** | [`09-focus-management-keyboard-navigation.html`](./examples/09-focus-management-keyboard-navigation.html) |
 | **Part 10** | [Accessible React Testing, Automated Accessibility Validation & Interaction Verification](./10-accessible-react-testing.md) | ✅ **Completed** | [`10-accessible-react-testing.html`](./examples/10-accessible-react-testing.html) |
 | **Part 11** | [Accessible Application Architecture: Route, Feature & Composite-Widget Accessibility Boundaries](./11-accessible-application-architecture.md) | ✅ **Completed** | [`11-accessible-application-architecture.html`](./examples/11-accessible-application-architecture.html) |
-| **Part 12** | [Accessible Motion: `prefers-reduced-motion` & Safe Animations](./12-accessible-motion-reduced-motion-tokens.md) | ⏳ Planned | `12-reduced-motion-sandbox.html` |
-| **Part 13** | [Automated A11y Testing: `jest-axe`, `@testing-library/react`, Playwright Axe & CI](./13-automated-a11y-testing-ci-pipeline.md) | ⏳ Planned | `13-axe-ci-test-runner.html` |
+| **Part 12** | [Fallback UX, Accessibility, Progressive Degradation & Resilient Interaction](./12-accessible-fallback-ux-progressive-degradation.md) | ✅ **Completed** | [`12-accessible-fallback-ux-progressive-degradation.html`](./examples/12-accessible-fallback-ux-progressive-degradation.html) |
+| **Part 13** | [Accessible Keyboard Focus Recovery & Dynamic Element Removal](./13-accessible-keyboard-focus-recovery.md) | ⏳ Planned | `13-focus-recovery-sandbox.html` |
 | **Part 14** | [Manual A11y Auditing: Screen Reader Runbooks (NVDA, VoiceOver, JAWS)](./14-manual-screen-reader-auditing-runbooks.md) | ⏳ Planned | `14-screen-reader-sim.html` |
 | **Part 15** | [Enterprise Design System A11y Architecture & Polymorphic Primitives](./15-enterprise-design-system-a11y-primitives.md) | ⏳ Planned | `15-design-system-primitives.html` |
 | **Part 16** | [KPI 17 Final Review, Master Crucible & Staff-Level Certification](./16-kpi17-final-review-crucible-mastery.md) | ⏳ Planned | `16-a11y-master-crucible.html` |

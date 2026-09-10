@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 12 — Accessible Fallback UX, Progressive Degradation & Resilient Interaction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Testing HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Fault Injection Bar */
+    .fault-injection-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.6rem 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: #fca5a5;
+    }
+    .fault-checkbox { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .input-field {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      width: 100%;
+      outline: none;
+    }
+    .input-field:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+    }
+
+    .table-container {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 0.75rem;
+    }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+    th { background: #1e293b; padding: 0.6rem 0.85rem; color: #9ca3af; font-weight: 600; }
+    td { padding: 0.6rem 0.85rem; border-top: 1px solid #1f2937; }
+
+    .error-summary-box {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid #ef4444;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .error-summary-title { color: #f87171; font-weight: 700; margin-bottom: 0.4rem; font-size: 0.95rem; }
+    .error-summary-list { list-style: disc; margin-left: 1.25rem; font-size: 0.85rem; color: #fca5a5; }
+    .error-summary-list a { color: #38bdf8; text-decoration: underline; cursor: pointer; }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #38bdf8;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 12 — Accessible Fallback UX & Progressive Degradation</div>
+      <div class="header-subtitle">SWR Continuity, Focus Theft Prevention, Widget Degradation & Isolated Failure Domains</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Resilience</span>
+      <span class="badge badge-blue">SWR Accessibility</span>
+      <span class="badge badge-purple">Widget Fallback</span>
+      <span class="badge badge-green">Error Isolation</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Testing HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active DOM Focus</span>
+      <span class="telemetry-value" id="hud-dom-focus" style="color:#38bdf8;">body</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">SWR Table State</span>
+      <span class="telemetry-value" id="hud-swr-state" style="color:#34d399;">success (Content Preserved)</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Focus Theft Status</span>
+      <span class="telemetry-value" id="hud-theft-status" style="color:#34d399;">SAFE (No theft)</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Search Widget Mode</span>
+      <span class="telemetry-value" id="hud-widget-mode" style="color:#38bdf8;">ENHANCED (Autocomplete)</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Failure Containment</span>
+      <span class="telemetry-value" id="hud-containment-status" style="color:#34d399;">ISOLATED (Workflows Safe)</span>
+    </div>
+  </div>
+
+  <!-- Fault Injection Control Bar -->
+  <div class="fault-injection-bar">
+    <span style="font-weight:700; color:#fff;">⚠️ Architectural Fault Injection:</span>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-destructive-spinner" /> Destructive Refresh Spinner (Wipe DOM on Revalidate)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-steal-focus-bg" /> Unconditional Focus Steal on Background Error
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-kill-whole-widget" /> Catastrophic Widget Failure (Kill Search on Autocomplete Error)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-monolithic-crash" /> Monolithic Error Boundary (Destroy Entire Page on Chart Crash)
+    </label>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario A & B -->
+    <div class="grid-2">
+      <!-- Scenario A: Stale-While-Revalidate vs Blank Spinner -->
+      <div class="card" id="card-scen-a">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario A — SWR Table Continuity & aria-busy</span>
+          <span class="badge badge-blue">SWR Semantics</span>
+        </div>
+        <p class="card-desc">
+          Click "Trigger Background Revalidate". With resilient SWR architecture, existing table data remains visible and interactive while <code>aria-busy="true"</code> signals ongoing refresh.
+        </p>
+        <div style="display:flex; gap:0.6rem; margin-bottom:0.75rem;">
+          <button class="btn" id="btn-revalidate" onclick="triggerSWRRevalidate()">Trigger Background Revalidate</button>
+          <span id="revalidate-spinner" style="display:none; align-items:center; gap:0.4rem; font-size:0.8rem; color:#38bdf8;">
+            <span class="spinner"></span> Refreshing server metrics...
+          </span>
+        </div>
+        <div class="table-container" id="swr-table-viewport">
+          <table aria-label="High-Performance Server Fleet" id="server-table">
+            <thead>
+              <tr><th>Node ID</th><th>Region</th><th>Status</th><th>Latency</th></tr>
+            </thead>
+            <tbody id="server-table-body">
+              <tr><td>node-01</td><td>us-east-1</td><td><span style="color:#34d399;">Active</span></td><td>12ms</td></tr>
+              <tr><td>node-02</td><td>eu-central-1</td><td><span style="color:#34d399;">Active</span></td><td>24ms</td></tr>
+              <tr><td>node-03</td><td>ap-southeast-1</td><td><span style="color:#f59e0b;">Standby</span></td><td>78ms</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Scenario B: User-Initiated vs Background Error Focus Behavior -->
+      <div class="card" id="card-scen-b">
+        <div class="card-header">
+          <span class="card-title">🎯 Scenario B — Focus Policy: User vs Background Error</span>
+          <span class="badge badge-green">Focus Policy</span>
+        </div>
+        <p class="card-desc">
+          Focus the text input below and click "Simulate Background Failure". Background errors must NOT steal focus. Then click "Submit Form With Errors" to verify user-initiated focus recovery.
+        </p>
+        <div class="error-summary-box" id="form-error-summary" tabindex="-1" role="alert">
+          <div class="error-summary-title">⚠️ Please correct the following errors:</div>
+          <ul class="error-summary-list">
+            <li><a onclick="focusField('customer-email')">Email address is required.</a></li>
+            <li><a onclick="focusField('billing-zip')">Postal code must be 5 digits.</a></li>
+          </ul>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom:0.75rem;">
+          <div>
+            <label for="customer-email" style="font-size:0.75rem; color:#9ca3af; display:block; margin-bottom:0.2rem;">Customer Email</label>
+            <input id="customer-email" class="input-field" placeholder="user@company.com" />
+          </div>
+          <div>
+            <label for="billing-zip" style="font-size:0.75rem; color:#9ca3af; display:block; margin-bottom:0.2rem;">Billing ZIP Code</label>
+            <input id="billing-zip" class="input-field" placeholder="94107" />
+          </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button class="btn btn-danger" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="triggerBackgroundFailure()">Simulate Background Failure</button>
+          <button class="btn" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="submitFormWithError()">Submit Form With Errors</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="clearFormErrors()">Reset Form</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario C & D -->
+    <div class="grid-2">
+      <!-- Scenario C: Progressive Degradation of Custom Widget -->
+      <div class="card" id="card-scen-c">
+        <div class="card-header">
+          <span class="card-title">🔍 Scenario C — Progressive Degradation: Search Widget</span>
+          <span class="badge badge-purple">Widget Fallback</span>
+        </div>
+        <p class="card-desc">
+          When the fancy AI autocomplete suggestion backend fails, the widget degrades gracefully to a native search text input + submit button rather than disappearing completely.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <button class="btn btn-danger" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="killAutocompleteService()">Crash Autocomplete API</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="restoreAutocompleteService()">Restore Autocomplete</button>
+        </div>
+        <div id="search-widget-container" style="background:#0f172a; padding:1rem; border-radius:8px; border:1px solid var(--border-color);">
+          <div style="display:flex; gap:0.5rem;">
+            <input id="search-input" class="input-field" placeholder="Search documentation (e.g. hooks, aria)..." />
+            <button class="btn" onclick="executeSearch()">Search</button>
+          </div>
+          <div id="autocomplete-suggestions" style="margin-top:0.5rem; font-size:0.75rem; color:#38bdf8; display:flex; gap:0.5rem;">
+            <span style="color:#64748b;">Suggestions:</span>
+            <span style="background:#1e293b; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer;" onclick="fillSearch('useFocusTrap')">useFocusTrap</span>
+            <span style="background:#1e293b; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer;" onclick="fillSearch('aria-live')">aria-live</span>
+            <span style="background:#1e293b; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer;" onclick="fillSearch('roving tabIndex')">roving tabIndex</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario D: Isolated Error Boundaries & Minimal-Dependency Fallback -->
+      <div class="card" id="card-scen-d">
+        <div class="card-header">
+          <span class="card-title">🛡️ Scenario D — Minimal Dependency Fallback & Isolation</span>
+          <span class="badge badge-warn">Blast Radius</span>
+        </div>
+        <p class="card-desc">
+          Simulate a rendering failure in the secondary real-time latency chart. The scoped fallback renders with 0 external dependencies, preserving the primary orders table.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <button class="btn btn-danger" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="crashChartWidget()">Crash Latency Chart</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="recoverChartWidget()">Recover Chart</button>
+        </div>
+        <div id="dashboard-host-view" style="background:#030712; padding:1rem; border-radius:8px; border:1px solid var(--border-color);">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem; border-bottom:1px solid #374151; padding-bottom:0.5rem;">
+            <span style="font-weight:600; color:#38bdf8;">Production Fleet Overview</span>
+            <span style="font-size:0.75rem; color:#10b981;">[Primary Table Functional]</span>
+          </div>
+          <div id="chart-fallback-boundary" style="background:#1e293b; padding:0.75rem; border-radius:6px;">
+            <div id="chart-content" style="font-size:0.85rem; color:#9ca3af;">
+              📈 Real-Time Latency P99: <strong>14.2ms</strong> (Chart active)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Event Telemetry Trace -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Fallback UX & Telemetry Event Stream</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearTelemetry()">Clear Trace</button>
+      </div>
+      <div class="log-panel" id="telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Fallback UX architecture lab initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Global Focus Tracking
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      const desc = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`;
+      document.getElementById('hud-dom-focus').innerText = desc;
+      logEvent(`[FOCUSIN] ${desc}`);
+    });
+
+    function logEvent(msg) {
+      const panel = document.getElementById('telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearTelemetry() {
+      document.getElementById('telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Trace cleared.</div>';
+    }
+
+    // Scenario A: SWR Revalidate
+    function triggerSWRRevalidate() {
+      const destructive = document.getElementById('fault-destructive-spinner').checked;
+      const spinner = document.getElementById('revalidate-spinner');
+      const table = document.getElementById('server-table');
+      const viewport = document.getElementById('swr-table-viewport');
+      const hudState = document.getElementById('hud-swr-state');
+
+      spinner.style.display = 'inline-flex';
+
+      if (destructive) {
+        // Anti-pattern: Wipe out DOM and replace with blank spinner
+        viewport.innerHTML = '<div style="padding:2rem; text-align:center; color:#38bdf8;"><span class="spinner"></span> Loading entire fleet...</div>';
+        hudState.innerText = 'DESTRUCTIVE (DOM wiped!)';
+        hudState.style.color = '#ef4444';
+        logEvent('[SWR FAULT] Destructive refresh wiped existing table DOM!');
+
+        setTimeout(() => {
+          viewport.innerHTML = `
+            <table aria-label="High-Performance Server Fleet" id="server-table">
+              <thead><tr><th>Node ID</th><th>Region</th><th>Status</th><th>Latency</th></tr></thead>
+              <tbody>
+                <tr><td>node-01</td><td>us-east-1</td><td><span style="color:#34d399;">Active</span></td><td>11ms</td></tr>
+                <tr><td>node-02</td><td>eu-central-1</td><td><span style="color:#34d399;">Active</span></td><td>22ms</td></tr>
+                <tr><td>node-03</td><td>ap-southeast-1</td><td><span style="color:#34d399;">Active</span></td><td>74ms</td></tr>
+              </tbody>
+            </table>
+          `;
+          spinner.style.display = 'none';
+          hudState.innerText = 'success (Rebuilt DOM)';
+          hudState.style.color = '#34d399';
+          logEvent('[SWR] Table DOM remounted.');
+        }, 1200);
+      } else {
+        // Resilient SWR: Keep table visible, set aria-busy="true"
+        table.setAttribute('aria-busy', 'true');
+        hudState.innerText = 'refreshing (Data Preserved)';
+        hudState.style.color = '#f59e0b';
+        logEvent('[SWR RESILIENT] Existing table data preserved; aria-busy="true" set.');
+
+        setTimeout(() => {
+          document.getElementById('server-table-body').innerHTML = `
+            <tr><td>node-01</td><td>us-east-1</td><td><span style="color:#34d399;">Active</span></td><td>11ms</td></tr>
+            <tr><td>node-02</td><td>eu-central-1</td><td><span style="color:#34d399;">Active</span></td><td>22ms</td></tr>
+            <tr><td>node-03</td><td>ap-southeast-1</td><td><span style="color:#34d399;">Active</span></td><td>74ms</td></tr>
+          `;
+          table.removeAttribute('aria-busy');
+          spinner.style.display = 'none';
+          hudState.innerText = 'success (Content Preserved)';
+          hudState.style.color = '#34d399';
+          logEvent('[SWR RESILIENT] Refresh complete; updated latencies in-place without destroying focus or DOM.');
+        }, 1200);
+      }
+    }
+
+    // Scenario B: User-Initiated vs Background Error Focus
+    function triggerBackgroundFailure() {
+      const stealFocus = document.getElementById('fault-steal-focus-bg').checked;
+      const theftHUD = document.getElementById('hud-theft-status');
+
+      if (stealFocus) {
+        document.getElementById('form-error-summary').style.display = 'block';
+        document.getElementById('form-error-summary').focus();
+        theftHUD.innerText = 'THEFT! (Stole input focus)';
+        theftHUD.style.color = '#ef4444';
+        logEvent('[FOCUS FAULT] Background failure violently stole hardware focus from active input!');
+      } else {
+        theftHUD.innerText = 'SAFE (Background status)';
+        theftHUD.style.color = '#34d399';
+        logEvent('[FOCUS SAFE] Background sync error occurred. Preserved user typing focus; polite status broadcast.');
+      }
+    }
+
+    function submitFormWithError() {
+      const summary = document.getElementById('form-error-summary');
+      summary.style.display = 'block';
+      summary.focus();
+      logEvent('[USER SUBMIT] User submitted form with errors -> Shifted focus to Error Summary Box.');
+    }
+
+    function focusField(id) {
+      document.getElementById(id).focus();
+      logEvent(`[RECOVERY] Shifted focus directly to invalid field #${id}.`);
+    }
+
+    function clearFormErrors() {
+      document.getElementById('form-error-summary').style.display = 'none';
+      document.getElementById('hud-theft-status').innerText = 'SAFE (No theft)';
+      document.getElementById('hud-theft-status').style.color = '#34d399';
+      logEvent('Cleared form errors.');
+    }
+
+    // Scenario C: Search Widget Degradation
+    function killAutocompleteService() {
+      const killWholeWidget = document.getElementById('fault-kill-whole-widget').checked;
+      const container = document.getElementById('search-widget-container');
+      const hud = document.getElementById('hud-widget-mode');
+
+      if (killWholeWidget) {
+        container.innerHTML = '<div style="color:#f87171; font-size:0.85rem;">⚠️ Search widget unavailable.</div>';
+        hud.innerText = 'DESTROYED (Whole widget dead)';
+        hud.style.color = '#ef4444';
+        logEvent('[WIDGET FAULT] Complete search workflow destroyed due to autocomplete crash!');
+      } else {
+        document.getElementById('autocomplete-suggestions').innerHTML = '<span style="color:#f59e0b; font-size:0.75rem;">⚠️ Autocomplete suggestions unavailable. Native keyword search remains fully active.</span>';
+        hud.innerText = 'DEGRADED (Core Search Preserved)';
+        hud.style.color = '#f59e0b';
+        logEvent('[PROGRESSIVE DEGRADATION] Autocomplete suggestions degraded; plain keyword search preserved.');
+      }
+    }
+
+    function restoreAutocompleteService() {
+      const container = document.getElementById('search-widget-container');
+      container.innerHTML = `
+        <div style="display:flex; gap:0.5rem;">
+          <input id="search-input" class="input-field" placeholder="Search documentation (e.g. hooks, aria)..." />
+          <button class="btn" onclick="executeSearch()">Search</button>
+        </div>
+        <div id="autocomplete-suggestions" style="margin-top:0.5rem; font-size:0.75rem; color:#38bdf8; display:flex; gap:0.5rem;">
+          <span style="color:#64748b;">Suggestions:</span>
+          <span style="background:#1e293b; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer;" onclick="fillSearch('useFocusTrap')">useFocusTrap</span>
+          <span style="background:#1e293b; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer;" onclick="fillSearch('aria-live')">aria-live</span>
+          <span style="background:#1e293b; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer;" onclick="fillSearch('roving tabIndex')">roving tabIndex</span>
+        </div>
+      `;
+      document.getElementById('hud-widget-mode').innerText = 'ENHANCED (Autocomplete)';
+      document.getElementById('hud-widget-mode').style.color = '#38bdf8';
+      logEvent('Restored full autocomplete search widget.');
+    }
+
+    function fillSearch(term) {
+      document.getElementById('search-input').value = term;
+      document.getElementById('search-input').focus();
+    }
+
+    function executeSearch() {
+      const query = document.getElementById('search-input')?.value || 'empty';
+      logEvent(`[SEARCH] Executed query: "${query}"`);
+    }
+
+    // Scenario D: Isolated Error Boundaries
+    function crashChartWidget() {
+      const monolithic = document.getElementById('fault-monolithic-crash').checked;
+      const hud = document.getElementById('hud-containment-status');
+
+      if (monolithic) {
+        document.getElementById('dashboard-host-view').innerHTML = `
+          <div style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; padding:1.25rem; border-radius:6px; color:#f87171;">
+            <strong>⚠️ Catastrophic Dashboard Error</strong><br />
+            <span style="font-size:0.8rem;">Monolithic Error Boundary caught unhandled WebGL crash. Entire fleet table unmounted!</span>
+          </div>
+        `;
+        hud.innerText = 'COLLAPSE (Entire page dead)';
+        hud.style.color = '#ef4444';
+        logEvent('[CATASTROPHIC] Monolithic Error Boundary wiped entire dashboard view!');
+      } else {
+        document.getElementById('chart-fallback-boundary').innerHTML = `
+          <div style="color:#f87171; font-size:0.8rem;">
+            ⚠️ Latency visualization unavailable. Production fleet metrics and tables remain operational.
+            <button class="btn btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem; margin-left:0.5rem;" onclick="recoverChartWidget()">Retry</button>
+          </div>
+        `;
+        hud.innerText = 'ISOLATED (Fleet Table Intact)';
+        hud.style.color = '#34d399';
+        logEvent('[RESILIENCE] Scoped Error Boundary isolated latency chart crash.');
+      }
+    }
+
+    function recoverChartWidget() {
+      document.getElementById('dashboard-host-view').innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem; border-bottom:1px solid #374151; padding-bottom:0.5rem;">
+          <span style="font-weight:600; color:#38bdf8;">Production Fleet Overview</span>
+          <span style="font-size:0.75rem; color:#10b981;">[Primary Table Functional]</span>
+        </div>
+        <div id="chart-fallback-boundary" style="background:#1e293b; padding:0.75rem; border-radius:6px;">
+          <div id="chart-content" style="font-size:0.85rem; color:#9ca3af;">
+            📈 Real-Time Latency P99: <strong>14.2ms</strong> (Chart active)
+          </div>
+        </div>
+      `;
+      document.getElementById('hud-containment-status').innerText = 'ISOLATED (Safe)';
+      document.getElementById('hud-containment-status').style.color = '#34d399';
+      logEvent('Chart widget recovered.');
+    }
+  </script>
+</body>
+</html>
