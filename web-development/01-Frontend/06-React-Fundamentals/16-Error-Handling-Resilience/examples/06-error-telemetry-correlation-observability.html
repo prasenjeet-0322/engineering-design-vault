@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 16 — Part 06 Companion Lab: Error Telemetry & Production Observability</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #050811;
+      color: #f1f5f9;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .active-tab {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
+    }
+    .waterfall-node {
+      position: relative;
+    }
+    .waterfall-node::after {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 32px;
+      bottom: -12px;
+      width: 2px;
+      background: rgba(59, 130, 246, 0.3);
+    }
+    .waterfall-node:last-child::after {
+      display: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, Component } = React;
+
+    // =========================================================================
+    // 1. PRODUCTION OBSERVABILITY ERROR BOUNDARY CLASS
+    // =========================================================================
+    class ObservableErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = {
+          hasError: false,
+          error: null,
+          errorId: null,
+          componentStack: null,
+          attemptIndex: 0,
+        };
+      }
+
+      static getDerivedStateFromError(error) {
+        const normalized = error instanceof Error ? error : new Error(String(error));
+        const errorId = `err_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+        return {
+          hasError: true,
+          error: normalized,
+          errorId,
+        };
+      }
+
+      componentDidCatch(error, info) {
+        const { boundaryName, release, route, onLogTelemetry, telemetryClient } = this.props;
+        const { errorId, attemptIndex } = this.state;
+
+        const telemetryPayload = {
+          eventType: "REACT_BOUNDARY_FAILURE",
+          errorId: errorId || "unknown",
+          attemptIndex,
+          boundaryName: boundaryName || "AppBoundary",
+          release: release || "v2026.09.10",
+          route: route || "/dashboard",
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          },
+          react: {
+            componentStack: info.componentStack,
+          },
+          correlation: {
+            traceId: this.props.traceId || `tr_${Date.now().toString(36)}`,
+            operationId: this.props.operationId || `op_${Math.random().toString(36).substring(2, 7)}`,
+            requestId: this.props.requestId || `req_${Math.random().toString(36).substring(2, 7)}`,
+          },
+          timestamp: Date.now(),
+        };
+
+        this.setState({ componentStack: info.componentStack });
+
+        // Safe telemetry dispatch with try/catch isolation guard
+        try {
+          if (telemetryClient) {
+            telemetryClient.send(telemetryPayload);
+          }
+          if (onLogTelemetry) {
+            onLogTelemetry(telemetryPayload);
+          }
+        } catch (telemetryErr) {
+          console.error("[ObservableErrorBoundary] Telemetry transport crashed (isolated):", telemetryErr);
+        }
+      }
+
+      reset = () => {
+        const { onRecoveryLogged } = this.props;
+        const { errorId, attemptIndex } = this.state;
+
+        if (onRecoveryLogged) {
+          onRecoveryLogged({
+            eventType: "REACT_RECOVERY_ATTEMPT",
+            errorId: `rec_${Date.now().toString(36)}`,
+            rootErrorId: errorId,
+            attemptIndex: attemptIndex + 1,
+            timestamp: Date.now(),
+            status: "SUCCEEDED",
+          });
+        }
+
+        this.setState((prev) => ({
+          hasError: false,
+          error: null,
+          errorId: null,
+          componentStack: null,
+          attemptIndex: prev.attemptIndex + 1,
+        }));
+      };
+
+      render() {
+        const { hasError, error, errorId, componentStack, attemptIndex } = this.state;
+        const { children, fallback } = this.props;
+
+        if (hasError && error) {
+          if (fallback) {
+            return fallback(error, errorId, componentStack, attemptIndex, this.reset);
+          }
+          return (
+            <div className="p-4 bg-red-950/40 border border-red-800 rounded-xl text-red-200">
+              <h4 className="font-bold text-white">Component Crashed</h4>
+              <p className="text-xs font-mono mt-1">{error.message}</p>
+              <button onClick={this.reset} className="mt-3 px-3 py-1 bg-red-600 rounded text-xs font-bold text-white">
+                Retry
+              </button>
+            </div>
+          );
+        }
+
+        return children;
+      }
+    }
+
+    // =========================================================================
+    // 2. CHILD EXPERIMENTAL WIDGETS
+    // =========================================================================
+    function CheckoutDiscountWidget({ throwMode, discountCode }) {
+      if (throwMode === "NULL_POINTER") {
+        const promo = null;
+        return <div>Promo: {promo.discountPercent.toFixed(2)}%</div>;
+      }
+
+      if (throwMode === "PRIMITIVE_STRING") {
+        throw "Gateway Error: Coupon code validation service timed out.";
+      }
+
+      if (throwMode === "OBJECT_LITERAL") {
+        throw { status: 503, code: "PROMO_SERVICE_OVERLOADED" };
+      }
+
+      return (
+        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">🎟️ Applied Coupon Code</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono">
+              ACTIVE
+            </span>
+          </div>
+          <p className="text-sm font-mono text-white bg-slate-950 p-2.5 rounded border border-slate-800">
+            {discountCode || "FALL_PROMO_25"} (25% Off)
+          </p>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 3. MASTER INTERACTIVE COMPANION LAB APP
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("exp_capture");
+
+      // Global Observability Telemetry Store
+      const [telemetryLogs, setTelemetryLogs] = useState([]);
+      const [recoveryLogs, setRecoveryLogs] = useState([]);
+      const [simulateTelemetryCrash, setSimulateTelemetryCrash] = useState(false);
+
+      // Simulation States
+      const [throwType, setThrowType] = useState("NONE");
+      const [activeOperationId, setActiveOperationId] = useState("op_save_cart_01");
+      const [activeRequestId, setActiveRequestId] = useState("req_http_9921");
+      const [activeTraceId, setActiveTraceId] = useState("trace_88a91_004b");
+
+      const handleLogTelemetry = useCallback((payload) => {
+        if (simulateTelemetryCrash) {
+          throw new Error("💥 Simulated Telemetry Transport Network Failure (500)");
+        }
+        setTelemetryLogs((prev) => [payload, ...prev.slice(0, 24)]);
+      }, [simulateTelemetryCrash]);
+
+      const handleRecoveryLogged = useCallback((recoveryPayload) => {
+        setRecoveryLogs((prev) => [recoveryPayload, ...prev.slice(0, 19)]);
+      }, []);
+
+      // Fingerprint Aggregation
+      const groupedFingerprints = telemetryLogs.reduce((acc, log) => {
+        const fp = log.error?.name ? `fp_${log.error.name}_${log.boundaryName}` : "fp_generic";
+        if (!acc[fp]) {
+          acc[fp] = { fingerprint: fp, count: 0, latestError: log.error?.message, logs: [] };
+        }
+        acc[fp].count += 1;
+        acc[fp].logs.push(log);
+        return acc;
+      }, {});
+
+      const totalErrors = telemetryLogs.length;
+      const totalRecoveries = recoveryLogs.length;
+      const recoveryRatio = totalErrors > 0 ? Math.min(100, Math.round((totalRecoveries / totalErrors) * 100)) : 100;
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header Banner */}
+          <header className="glass-panel p-6 rounded-2xl border-b border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">📡</span>
+                <div>
+                  <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                    KPI 16 Part 06: Error Telemetry & Production Observability
+                  </h1>
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                    Staff-Level Pipeline: Normalization ──► Dual Stacks ──► Correlation ──► PII Scrub ──► Recovery Tracking
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+              <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Recovery Ratio (RRR): </span>
+                <span className="text-emerald-400 font-bold">{recoveryRatio}%</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Captured Events: </span>
+                <span className="text-red-400 font-bold">{totalErrors}</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 p-1.5 bg-slate-900/60 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setActiveTab("exp_capture")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_capture" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🔬 Exp A: Structured Event Capture</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_dual_stack")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_dual_stack" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>📚 Exp B: Dual-Stack Inspector</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_waterfall")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_waterfall" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🌊 Exp C: Correlation Waterfall</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_failure_isolation")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_failure_isolation" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🛡️ Exp D: Telemetry Failure Isolation</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_fingerprinting")}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_fingerprinting" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🧬 Exp E: Error Fingerprint Groups</span>
+            </button>
+          </div>
+
+          {/* Main Interactive Workspace Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Columns: Active Experiment & Playground */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* ============================================================= */}
+              {/* TAB 1: STRUCTURED EVENT CAPTURE                               */}
+              {/* ============================================================= */}
+              {activeTab === "exp_capture" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment A: Structured Event Capture & Normalization</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Trigger different types of thrown values. Observe how the boundary normalizes strings, objects, and standard Error instances into a uniform JSON telemetry contract.
+                    </p>
+                  </div>
+
+                  {/* Fault Injection Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      onClick={() => setThrowType("NULL_POINTER")}
+                      className={`p-3 rounded-xl border text-xs font-bold transition ${
+                        throwType === "NULL_POINTER"
+                          ? "bg-red-600 border-red-500 text-white"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      💥 Standard Error (NullPointer)
+                    </button>
+                    <button
+                      onClick={() => setThrowType("PRIMITIVE_STRING")}
+                      className={`p-3 rounded-xl border text-xs font-bold transition ${
+                        throwType === "PRIMITIVE_STRING"
+                          ? "bg-amber-600 border-amber-500 text-white"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      ⚠️ Thrown String Primitive
+                    </button>
+                    <button
+                      onClick={() => setThrowType("OBJECT_LITERAL")}
+                      className={`p-3 rounded-xl border text-xs font-bold transition ${
+                        throwType === "OBJECT_LITERAL"
+                          ? "bg-purple-600 border-purple-500 text-white"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}
+                    >
+                      📦 Thrown Object Literal
+                    </button>
+                  </div>
+
+                  {/* Interactive Sandbox Boundary */}
+                  <div className="p-6 rounded-xl bg-slate-950/70 border border-slate-800 min-h-[200px] flex flex-col justify-center">
+                    <ObservableErrorBoundary
+                      boundaryName="CheckoutPromoBoundary"
+                      release="v2026.09.10-prod"
+                      route="/checkout/payment"
+                      traceId={activeTraceId}
+                      operationId={activeOperationId}
+                      requestId={activeRequestId}
+                      onLogTelemetry={handleLogTelemetry}
+                      onRecoveryLogged={handleRecoveryLogged}
+                      fallback={(error, errorId, stack, attempt, reset) => (
+                        <div className="p-5 bg-red-950/30 border border-red-800/80 rounded-xl space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                              <span>💥 Promo Code Container Interrupted</span>
+                            </h4>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300">
+                              Error ID: {errorId}
+                            </span>
+                          </div>
+                          <p className="text-xs text-red-300 font-mono bg-red-950/60 p-2.5 rounded border border-red-900/50">
+                            {error.message}
+                          </p>
+                          <div className="flex items-center justify-between pt-2">
+                            <span className="text-[11px] text-slate-400 font-mono">Attempt: #{attempt}</span>
+                            <button
+                              onClick={() => {
+                                setThrowType("NONE");
+                                reset();
+                              }}
+                              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-blue-500/20"
+                            >
+                              Clear Fault & Recover
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    >
+                      <CheckoutDiscountWidget throwMode={throwType} discountCode="SUMMER_SAVINGS_50" />
+                    </ObservableErrorBoundary>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* TAB 2: DUAL-STACK INSPECTOR                                   */}
+              {/* ============================================================= */}
+              {activeTab === "exp_dual_stack" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment B: Dual-Stack Inspector (JS Stack vs. Component Stack)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Compare the execution call stack (where CPU failed in code) vs the React component ancestry stack (where in the virtual DOM tree the Fiber failed).
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setThrowType("NULL_POINTER")}
+                      className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition"
+                    >
+                      Trigger Dual-Stack Crash
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                      <span className="text-slate-400 font-bold block pb-1 border-b border-slate-800">
+                        1. JavaScript Call Stack (error.stack)
+                      </span>
+                      <pre className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed overflow-x-auto">
+{`TypeError: Cannot read properties of null (reading 'discountPercent')
+    at CheckoutDiscountWidget (06-error-telemetry.html:142:35)
+    at renderWithHooks (react-dom.development.js:16305)
+    at mountIndeterminateComponent (react-dom.development.js:20074)
+    at beginWork (react-dom.development.js:21587)`}
+                      </pre>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                      <span className="text-blue-400 font-bold block pb-1 border-b border-slate-800">
+                        2. React Component Stack (info.componentStack)
+                      </span>
+                      <pre className="text-blue-300 text-[11px] whitespace-pre-wrap leading-relaxed overflow-x-auto">
+{`    at CheckoutDiscountWidget (file:///src/checkout/Promo.tsx:18)
+    at ObservableErrorBoundary (file:///src/resilience/Boundary.tsx:42)
+    at CheckoutSummary (file:///src/checkout/Summary.tsx:88)
+    at CheckoutPage (file:///src/pages/Checkout.tsx:104)
+    at App (file:///src/App.tsx:12)`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* TAB 3: CORRELATION WATERFALL                                  */}
+              {/* ============================================================= */}
+              {activeTab === "exp_waterfall" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment C: Distributed Correlation Waterfall</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Visualizing how a single user intent links across HTTP headers, backend RPCs, and UI render error UUIDs.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 font-mono text-xs">
+                    <div className="waterfall-node pl-8">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold absolute left-0 top-0">
+                        1
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">USER ACTION</span>
+                        <span className="text-white font-bold">User clicks "Apply Coupon Code"</span>
+                        <span className="text-blue-400 block mt-1 text-[11px]">operationId: "{activeOperationId}"</span>
+                      </div>
+                    </div>
+
+                    <div className="waterfall-node pl-8">
+                      <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold absolute left-0 top-0">
+                        2
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">CLIENT HTTP REQUEST</span>
+                        <span className="text-white font-bold">POST /api/discounts/validate</span>
+                        <span className="text-purple-400 block mt-1 text-[11px]">requestId: "{activeRequestId}" | traceId: "{activeTraceId}"</span>
+                      </div>
+                    </div>
+
+                    <div className="waterfall-node pl-8">
+                      <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center font-bold absolute left-0 top-0">
+                        3
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">RENDER INTERCEPTION</span>
+                        <span className="text-white font-bold">Error Boundary Caught Render Exception</span>
+                        <span className="text-red-400 block mt-1 text-[11px]">errorId: "err_77a1_90b" (Correlated Lineage)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* TAB 4: TELEMETRY FAILURE ISOLATION                            */}
+              {/* ============================================================= */}
+              {activeTab === "exp_failure_isolation" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment D: Telemetry Failure Isolation Guard</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                        CRITICAL INVARIANT
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Toggle "Simulate Telemetry Crash". When active, the telemetry transport deliberately throws a 500 Network Exception. Notice that the user's Error Fallback still mounts and functions flawlessly!
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-white block">Telemetry Transport Chaos Injection</span>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Status: {simulateTelemetryCrash ? "🔴 Remote Sink Throwing 500" : "🟢 Remote Sink Normal"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setSimulateTelemetryCrash(!simulateTelemetryCrash)}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
+                        simulateTelemetryCrash
+                          ? "bg-red-600 text-white hover:bg-red-500"
+                          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      }`}
+                    >
+                      {simulateTelemetryCrash ? "Disable Chaos" : "Simulate Telemetry Sink Crash"}
+                    </button>
+                  </div>
+
+                  <div className="p-6 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col justify-center min-h-[160px]">
+                    <ObservableErrorBoundary
+                      boundaryName="ChaosIsolationBoundary"
+                      onLogTelemetry={handleLogTelemetry}
+                      fallback={(error, errorId, stack, attempt, reset) => (
+                        <div className="p-4 bg-emerald-950/30 border border-emerald-800/80 rounded-xl space-y-2">
+                          <h4 className="font-bold text-emerald-400 text-sm">✅ Fallback Card Rendered Successfully</h4>
+                          <p className="text-xs text-slate-300 font-mono">
+                            Even though telemetry crashed, the application caught the failure gracefully!
+                          </p>
+                          <button onClick={reset} className="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold">
+                            Reset UI
+                          </button>
+                        </div>
+                      )}
+                    >
+                      <CheckoutDiscountWidget throwMode="NULL_POINTER" discountCode="PROMO" />
+                    </ObservableErrorBoundary>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* TAB 5: ERROR FINGERPRINT GROUPS                               */}
+              {/* ============================================================= */}
+              {activeTab === "exp_fingerprinting" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment E: Error Fingerprint Deduplication</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Observe how thousands of individual error event UUIDs collapse into discrete, actionable problem groups for engineering triage.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 font-mono text-xs">
+                    {Object.keys(groupedFingerprints).length === 0 ? (
+                      <p className="text-slate-500 italic py-6 text-center">No grouped fingerprints yet. Trigger crashes in Tab 1!</p>
+                    ) : (
+                      Object.values(groupedFingerprints).map((group) => (
+                        <div key={group.fingerprint} className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                          <div>
+                            <span className="text-purple-400 font-bold block">{group.fingerprint}</span>
+                            <span className="text-slate-400 text-[11px] truncate max-w-md block mt-0.5">{group.latestError}</span>
+                          </div>
+                          <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+                            {group.count} events
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Live Telemetry Dispatch Stream */}
+            <div className="space-y-6">
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>📡 Real-Time Telemetry Log Sink</span>
+                  </h3>
+                  <button
+                    onClick={() => setTelemetryLogs([])}
+                    className="text-[10px] text-slate-400 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-96 overflow-y-auto font-mono text-[11px]">
+                  {telemetryLogs.length === 0 ? (
+                    <p className="text-slate-500 italic text-center py-10">No remote telemetry packets received.</p>
+                  ) : (
+                    telemetryLogs.map((log) => (
+                      <div key={log.errorId + log.timestamp} className="p-2.5 rounded bg-slate-950/80 border border-slate-800/80 space-y-1">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-red-400 font-bold">[{log.boundaryName}]</span>
+                          <span className="text-[10px]">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <p className="text-amber-300 truncate">ID: {log.errorId}</p>
+                        <p className="text-slate-300 truncate">Route: {log.route}</p>
+                        <p className="text-slate-400 truncate text-[10px]">Release: {log.release}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
