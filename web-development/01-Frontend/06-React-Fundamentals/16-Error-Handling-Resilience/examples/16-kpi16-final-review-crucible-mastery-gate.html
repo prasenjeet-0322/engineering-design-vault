@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 16 — KPI 16 Master Crucible, Failure Taxonomy &amp; Resilience Gate</title>
+  <style>
+    :root {
+      --bg-dark: #0a0c10;
+      --panel-bg: #12161f;
+      --card-bg: #1a202c;
+      --border-color: #2d3748;
+      --accent-cyan: #00f0ff;
+      --accent-green: #00e676;
+      --accent-red: #ff5370;
+      --accent-yellow: #ffd600;
+      --accent-purple: #bd93f9;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --font-mono: 'Fira Code', 'Cascadia Code', Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 1.5rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title h1 {
+      font-size: 1.5rem;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .header-title p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      background: rgba(0, 240, 255, 0.1);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: bold;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr 1fr;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .controls-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .scenario-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.6rem 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+
+    .scenario-btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 240, 255, 0.05);
+      transform: translateX(3px);
+    }
+
+    .scenario-btn.active {
+      border-color: var(--accent-green);
+      background: rgba(0, 230, 118, 0.1);
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      padding: 0.55rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #4a5568;
+      transition: .3s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-red);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px);
+    }
+
+    /* Simulation Area */
+    .sim-canvas {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: #0f131a;
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      position: relative;
+      min-height: 500px;
+    }
+
+    .boundary-box {
+      border: 2px solid;
+      border-radius: 6px;
+      padding: 0.85rem;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .boundary-app { border-color: #64748b; background: rgba(30, 41, 59, 0.3); }
+    .boundary-route { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+    .boundary-feature { border-color: var(--accent-purple); background: rgba(189, 147, 249, 0.05); }
+    .boundary-widget { border-color: var(--accent-cyan); background: rgba(0, 240, 255, 0.05); }
+
+    .boundary-label {
+      position: absolute;
+      top: -10px;
+      left: 10px;
+      background: var(--panel-bg);
+      padding: 0 0.4rem;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      border-radius: 3px;
+    }
+
+    .app-label { color: #cbd5e1; }
+    .route-label { color: #60a5fa; }
+    .feature-label { color: var(--accent-purple); }
+    .widget-label { color: var(--accent-cyan); }
+
+    .portal-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .portal-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e2533;
+      padding: 0.6rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .portal-nav-links {
+      display: flex;
+      gap: 1rem;
+      color: var(--accent-cyan);
+    }
+
+    .editor-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .draft-box {
+      background: #1a202c;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .draft-textarea {
+      background: #0a0c10;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .fallback-card {
+      background: #2a1215;
+      border: 1px solid var(--accent-red);
+      color: #ffb8b8;
+      border-radius: 6px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { border-color: #ff5370; }
+      to { border-color: #ff8a9e; }
+    }
+
+    .fallback-btn {
+      background: var(--accent-green);
+      color: #0a0c10;
+      border: none;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    .timeline-entry {
+      background: var(--card-bg);
+      border-left: 3px solid #4a5568;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0 4px 4px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .timeline-entry.t-crash { border-left-color: var(--accent-red); background: rgba(255, 83, 112, 0.05); }
+    .timeline-entry.t-recover { border-left-color: var(--accent-green); background: rgba(0, 230, 118, 0.05); }
+    .timeline-entry.t-retry { border-left-color: var(--accent-yellow); background: rgba(255, 214, 0, 0.05); }
+    .timeline-entry.t-loop { border-left-color: var(--accent-red); font-weight: bold; background: rgba(255, 83, 112, 0.15); }
+
+    .invariants-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-top: 0.5rem;
+    }
+
+    .inv-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.5rem;
+      background: var(--card-bg);
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+    }
+
+    .inv-pass { color: var(--accent-green); }
+    .inv-fail { color: var(--accent-red); font-weight: bold; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      text-align: center;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem;
+      border-radius: 6px;
+    }
+
+    .metric-val {
+      font-size: 1.2rem;
+      font-weight: bold;
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+    }
+
+    .metric-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <h1>🏆 Lab 16 — KPI 16 Final Master Crucible &amp; Resilience Gate</h1>
+      <p>Admin Portal Architecture, Multi-Tier Sandboxes, Sibling Draft Preservation &amp; Governance</p>
+    </div>
+    <div class="badge-bar">
+      <span class="badge">KPI 16 FINAL REVIEW</span>
+      <span class="badge">TIER 🔴 MUST KNOW</span>
+      <span class="badge">GRADUATION GATE</span>
+    </div>
+  </header>
+
+  <div class="grid-container">
+
+    <!-- PANEL 1: CRUCIBLE SCENARIOS & FAULT INJECTION -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>🎮 Master Crucible Scenarios</span>
+        <button id="btnResetAll" class="fallback-btn" style="background: #3b82f6; color: white;">Reset All</button>
+      </div>
+
+      <div class="controls-grid">
+        <button class="scenario-btn active" data-scenario="MASTER_BULKHEAD">
+          <span>1. Master Bulkhead Architecture</span>
+          <span style="color: var(--accent-green); font-size: 0.75rem;">(Optimal)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="MONOLITHIC_REGRESSION">
+          <span>2. Monolithic Hoisting Regression</span>
+          <span style="color: var(--accent-red); font-size: 0.75rem;">(Blast Catastrophe)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="ANALYTICS_FAILURE">
+          <span>3. Independent Analytics Outage</span>
+          <span style="color: var(--accent-purple); font-size: 0.75rem;">(Feature Pod)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="SECONDARY_FALLBACK_CRASH">
+          <span>4. Secondary Fallback Escalation</span>
+          <span style="color: var(--accent-yellow); font-size: 0.75rem;">(Route Catch)</span>
+        </button>
+        <button class="scenario-btn" data-scenario="RETRY_STORM_LOOP">
+          <span>5. Infinite Recovery Loop Storm</span>
+          <span style="color: var(--accent-red); font-size: 0.75rem;">(DDoS Alarm)</span>
+        </button>
+      </div>
+
+      <div class="panel-title" style="margin-top: 0.5rem;">
+        <span>🔥 Fault Injection Matrix</span>
+      </div>
+
+      <div class="controls-grid">
+        <div class="toggle-row">
+          <span>Crash Vendor UI (Render)</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleVendorCrash" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Crash Analytics Pod (Render)</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleAnalyticsCrash" />
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span>Crash Secondary Fallback</span>
+          <label class="switch">
+            <input type="checkbox" id="toggleFallbackCrash" />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="metrics-row" style="margin-top: 0.5rem;">
+        <div class="metric-card">
+          <div class="metric-val" id="valMounts">1</div>
+          <div class="metric-label">Fiber Mounts</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="valRetries">0</div>
+          <div class="metric-label">Retry Attempts</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="valListeners">3</div>
+          <div class="metric-label">Active Listeners</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 2: LIVE SIMULATION CANVAS -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>🏗️ Live Admin Portal Execution Tree</span>
+        <span id="txtTopologyMode" style="font-size: 0.75rem; color: var(--accent-cyan); font-family: var(--font-mono);">TOPOLOGY: MASTER_BULKHEAD</span>
+      </div>
+
+      <div class="sim-canvas" id="simCanvas">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- PANEL 3: DIAGNOSTIC AUDIT LOG & INVARIANTS -->
+    <div class="panel">
+      <div class="panel-title">
+        <span>📜 Diagnostic Incident Timeline</span>
+        <button id="btnClearLogs" class="fallback-btn" style="background: #4a5568; color: white;">Clear</button>
+      </div>
+
+      <div class="timeline-list" id="timelineList">
+        <!-- Logs populated dynamically -->
+      </div>
+
+      <div class="panel-title" style="margin-top: 0.5rem;">
+        <span>🛡️ Master Resilience Invariants (I1–I5)</span>
+      </div>
+
+      <div class="invariants-panel">
+        <div class="inv-row">
+          <span>I1: Order Draft Preserved</span>
+          <span class="inv-pass" id="invDraft">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I2: Navigation Shell Alive</span>
+          <span class="inv-pass" id="invNav">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I3: Retries Bounded (≤ 3)</span>
+          <span class="inv-pass" id="invRetry">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I4: Zero Resource Leakage</span>
+          <span class="inv-pass" id="invLeaks">PASS</span>
+        </div>
+        <div class="inv-row">
+          <span>I5: Loop Storm Suppressed</span>
+          <span class="inv-pass" id="invLoop">PASS</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // System State
+    const state = {
+      scenario: 'MASTER_BULKHEAD',
+      vendorCrashed: false,
+      analyticsCrashed: false,
+      fallbackCrashed: false,
+      retryCount: 0,
+      mountCount: 1,
+      activeListeners: 3,
+      draftText: 'Order #9812: 50x High-Precision Server Blades (Priority Routing)',
+      loopDetected: false,
+      loopInterval: null
+    };
+
+    const simCanvas = document.getElementById('simCanvas');
+    const timelineList = document.getElementById('timelineList');
+    const txtTopologyMode = document.getElementById('txtTopologyMode');
+
+    // Controls
+    const toggleVendorCrash = document.getElementById('toggleVendorCrash');
+    const toggleAnalyticsCrash = document.getElementById('toggleAnalyticsCrash');
+    const toggleFallbackCrash = document.getElementById('toggleFallbackCrash');
+    const btnResetAll = document.getElementById('btnResetAll');
+    const btnClearLogs = document.getElementById('btnClearLogs');
+
+    // Invariants
+    const invDraft = document.getElementById('invDraft');
+    const invNav = document.getElementById('invNav');
+    const invRetry = document.getElementById('invRetry');
+    const invLeaks = document.getElementById('invLeaks');
+    const invLoop = document.getElementById('invLoop');
+
+    const valMounts = document.getElementById('valMounts');
+    const valRetries = document.getElementById('valRetries');
+    const valListeners = document.getElementById('valListeners');
+
+    function logEvent(type, text) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+      const entry = document.createElement('div');
+      entry.className = `timeline-entry t-${type}`;
+      entry.innerHTML = `
+        <div style="display: flex; justify-content: space-between; color: var(--text-muted);">
+          <span>[${timeStr}]</span>
+          <span>${type.toUpperCase()}</span>
+        </div>
+        <div>${text}</div>
+      `;
+      timelineList.insertBefore(entry, timelineList.firstChild);
+    }
+
+    function updateInvariants() {
+      // I1: Draft preserved
+      const isMonolithicCrash = state.scenario === 'MONOLITHIC_REGRESSION' && (state.vendorCrashed || state.analyticsCrashed);
+      const draftSafe = !isMonolithicCrash;
+      invDraft.textContent = draftSafe ? 'PASS' : 'FAIL';
+      invDraft.className = draftSafe ? 'inv-pass' : 'inv-fail';
+
+      // I2: Navigation Shell Alive
+      const navAlive = !isMonolithicCrash;
+      invNav.textContent = navAlive ? 'PASS' : 'DESTROYED';
+      invNav.className = navAlive ? 'inv-pass' : 'inv-fail';
+
+      // I3: Retries Bounded
+      const retrySafe = state.scenario !== 'RETRY_STORM_LOOP' && state.retryCount <= 3;
+      invRetry.textContent = retrySafe ? 'PASS' : 'VIOLATED';
+      invRetry.className = retrySafe ? 'inv-pass' : 'inv-fail';
+
+      // I4: Zero Resource Leakage
+      const leaksSafe = state.activeListeners <= 5;
+      invLeaks.textContent = leaksSafe ? 'PASS' : 'LEAK_DETECTED';
+      invLeaks.className = leaksSafe ? 'inv-pass' : 'inv-fail';
+
+      // I5: Loop Storm Suppressed
+      invLoop.textContent = state.loopDetected ? 'CRITICAL_LOOP_STORM' : 'PASS';
+      invLoop.className = state.loopDetected ? 'inv-fail' : 'inv-pass';
+
+      // Metrics
+      valMounts.textContent = state.mountCount;
+      valRetries.textContent = state.retryCount;
+      valListeners.textContent = state.activeListeners;
+    }
+
+    function renderTree() {
+      simCanvas.innerHTML = '';
+
+      if (state.scenario === 'MONOLITHIC_REGRESSION') {
+        txtTopologyMode.textContent = 'TOPOLOGY: MONOLITHIC_ROOT_BOUNDARY (REGRESSION)';
+        if (state.vendorCrashed || state.analyticsCrashed) {
+          simCanvas.innerHTML = `
+            <div class="boundary-box boundary-app" style="border-color: var(--accent-red); height: 100%;">
+              <span class="boundary-label app-label" style="color: var(--accent-red);">AppBoundary (ROOT)</span>
+              <div class="fallback-card" style="margin-top: 2rem; text-align: center; padding: 2rem;">
+                <h2 style="color: var(--accent-red);">🚨 Application Catastrophe Fallback</h2>
+                <p>Monolithic Root Boundary caught unhandled crash.</p>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem;">
+                  Blast Radius: 100% OF APPLICATION (Navigation, Draft WIP &amp; Account destroyed).
+                </p>
+                <button class="fallback-btn" style="margin: 1rem auto 0 auto;" onclick="resetFailure()">Recover App</button>
+              </div>
+            </div>
+          `;
+        } else {
+          simCanvas.innerHTML = `
+            <div class="boundary-box boundary-app">
+              <span class="boundary-label app-label">AppBoundary (ROOT)</span>
+              <div class="portal-shell">
+                <div class="portal-nav">
+                  <span><strong>Enterprise Admin Portal</strong></span>
+                  <div class="portal-nav-links">
+                    <span>Orders</span>
+                    <span>Analytics</span>
+                    <span>Account Settings</span>
+                  </div>
+                </div>
+                <div class="editor-section">
+                  <div class="draft-box">
+                    <span style="font-weight: bold; font-size: 0.8rem;">Order Draft Form</span>
+                    <textarea class="draft-textarea" oninput="state.draftText = this.value">${state.draftText}</textarea>
+                  </div>
+                  <div class="draft-box">
+                    <span style="font-weight: bold; font-size: 0.8rem;">Third-Party Vendor UI</span>
+                    <div style="font-size: 0.75rem; color: var(--accent-cyan);">Vendor Component Online</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      } else {
+        // MASTER BULKHEAD ARCHITECTURE
+        txtTopologyMode.textContent = 'TOPOLOGY: MASTER_BULKHEAD_HIERARCHY';
+
+        let vendorAreaHtml = '';
+        if (state.vendorCrashed) {
+          if (state.scenario === 'SECONDARY_FALLBACK_CRASH' && state.fallbackCrashed) {
+            vendorAreaHtml = `
+              <div class="fallback-card" style="border-color: var(--accent-yellow);">
+                <span style="font-weight: bold; color: var(--accent-yellow);">⚠️ RouteBoundary Escalation Fallback</span>
+                <p>Vendor fallback threw during render! Caught by ancestor Route sandbox.</p>
+                <button class="fallback-btn" onclick="resetFailure()">Reset Route</button>
+              </div>
+            `;
+          } else {
+            vendorAreaHtml = `
+              <div class="fallback-card">
+                <span style="font-weight: bold;">Vendor UI Failed</span>
+                <p>Isolated fallback active. Order Draft is 100% safe.</p>
+                <button class="fallback-btn" onclick="triggerRetry()">Retry Vendor (${state.retryCount}/3)</button>
+              </div>
+            `;
+          }
+        } else {
+          vendorAreaHtml = `
+            <div style="font-size: 0.75rem; color: var(--accent-cyan); padding: 0.5rem; background: #0a0c10; border-radius: 4px;">
+              Vendor Component Online (v4.2.1)
+            </div>
+          `;
+        }
+
+        let analyticsAreaHtml = '';
+        if (state.analyticsCrashed) {
+          analyticsAreaHtml = `
+            <div class="fallback-card" style="margin-top: 0.5rem;">
+              <span style="font-weight: bold;">Analytics Feature Pod Degraded</span>
+              <p>Analytics unavailable. Order Editor and Navigation remain active.</p>
+              <button class="fallback-btn" onclick="resetAnalytics()">Reload Analytics</button>
+            </div>
+          `;
+        } else {
+          analyticsAreaHtml = `
+            <div style="background: #1a202c; border: 1px solid var(--border-color); padding: 0.6rem; border-radius: 6px; margin-top: 0.5rem; font-size: 0.75rem;">
+              <span style="font-weight: bold; color: var(--accent-purple);">Analytics Feature Pod</span>
+              <div style="color: var(--text-muted); margin-top: 0.2rem;">Revenue: $8.4M ARR | Active Orders: 1,420</div>
+            </div>
+          `;
+        }
+
+        simCanvas.innerHTML = `
+          <div class="boundary-box boundary-app">
+            <span class="boundary-label app-label">AppBoundary (ROOT)</span>
+            <div class="portal-shell">
+              <div class="portal-nav">
+                <span><strong>Enterprise Admin Portal</strong></span>
+                <div class="portal-nav-links">
+                  <span>Orders</span>
+                  <span>Analytics</span>
+                  <span>Account Settings</span>
+                </div>
+              </div>
+              <div class="boundary-box boundary-route">
+                <span class="boundary-label route-label">RouteBoundary (/admin/orders)</span>
+                <div class="editor-section">
+                  <div class="draft-box">
+                    <span style="font-weight: bold; font-size: 0.8rem;">Order Draft Form</span>
+                    <textarea class="draft-textarea" oninput="state.draftText = this.value">${state.draftText}</textarea>
+                  </div>
+                  <div class="boundary-box boundary-widget">
+                    <span class="boundary-label widget-label">VendorBoundary (Bulkhead)</span>
+                    ${vendorAreaHtml}
+                  </div>
+                </div>
+                <div class="boundary-box boundary-feature" style="margin-top: 0.75rem;">
+                  <span class="boundary-label feature-label">AnalyticsBoundary (Feature Pod)</span>
+                  ${analyticsAreaHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      updateInvariants();
+    }
+
+    function triggerVendorCrash() {
+      state.vendorCrashed = true;
+      state.activeListeners = Math.max(0, state.activeListeners - 1);
+      logEvent('crash', `Vendor UI threw: TypeError: Cannot read properties of undefined (reading 'initVendorCanvas')`);
+
+      if (state.scenario === 'MONOLITHIC_REGRESSION') {
+        logEvent('crash', `MONOLITHIC HOISTING REGRESSION: Root AppBoundary caught crash. Navigation & Draft destroyed!`);
+      } else {
+        logEvent('recover', `BULKHEAD SUCCESS: VendorBoundary caught crash. Order Draft & Analytics survive.`);
+      }
+
+      if (state.scenario === 'RETRY_STORM_LOOP') {
+        startInfiniteLoop();
+      }
+
+      renderTree();
+    }
+
+    function triggerAnalyticsCrash() {
+      state.analyticsCrashed = true;
+      logEvent('crash', `Analytics Feature Pod threw: RangeError: Maximum call stack size exceeded in chart reduction`);
+      renderTree();
+    }
+
+    function resetFailure() {
+      stopInfiniteLoop();
+      state.vendorCrashed = false;
+      state.fallbackCrashed = false;
+      toggleVendorCrash.checked = false;
+      toggleFallbackCrash.checked = false;
+      state.retryCount = 0;
+      state.mountCount++;
+      state.activeListeners = 3;
+      logEvent('recover', `Manual Reset executed. Fiber node remounted with clean state.`);
+      renderTree();
+    }
+
+    function resetAnalytics() {
+      state.analyticsCrashed = false;
+      toggleAnalyticsCrash.checked = false;
+      logEvent('recover', `Analytics Feature Pod recovered in-place.`);
+      renderTree();
+    }
+
+    function triggerRetry() {
+      state.retryCount++;
+      logEvent('retry', `Retry attempt #${state.retryCount} initiated with Exponential Backoff.`);
+      if (state.retryCount > 3) {
+        logEvent('crash', `Invariant I3 Enforced: Retry exhausted at attempt 3. Automatic retries stopped.`);
+      }
+      renderTree();
+    }
+
+    function startInfiniteLoop() {
+      if (state.loopInterval) return;
+      state.loopDetected = true;
+      logEvent('loop', `🚨 CRITICAL RECOVERY STORM DETECTED! Unbounded reload loop firing every 300ms.`);
+      state.loopInterval = setInterval(() => {
+        state.retryCount++;
+        state.mountCount++;
+        logEvent('loop', `[LOOP STORM] Attempt #${state.retryCount} - Self-inflicted client DDoS in progress...`);
+        updateInvariants();
+      }, 350);
+    }
+
+    function stopInfiniteLoop() {
+      if (state.loopInterval) {
+        clearInterval(state.loopInterval);
+        state.loopInterval = null;
+      }
+      state.loopDetected = false;
+    }
+
+    // Event Listeners
+    toggleVendorCrash.addEventListener('change', (e) => {
+      if (e.target.checked) triggerVendorCrash();
+      else resetFailure();
+    });
+
+    toggleAnalyticsCrash.addEventListener('change', (e) => {
+      if (e.target.checked) triggerAnalyticsCrash();
+      else resetAnalytics();
+    });
+
+    toggleFallbackCrash.addEventListener('change', (e) => {
+      state.fallbackCrashed = e.target.checked;
+      if (state.fallbackCrashed) {
+        logEvent('crash', `Secondary Fallback crashed during render! Escalating to RouteBoundary.`);
+      }
+      renderTree();
+    });
+
+    btnResetAll.addEventListener('click', () => {
+      stopInfiniteLoop();
+      state.vendorCrashed = false;
+      state.analyticsCrashed = false;
+      state.fallbackCrashed = false;
+      state.retryCount = 0;
+      state.mountCount = 1;
+      state.activeListeners = 3;
+      toggleVendorCrash.checked = false;
+      toggleAnalyticsCrash.checked = false;
+      toggleFallbackCrash.checked = false;
+      logEvent('recover', `System reset to baseline state.`);
+      renderTree();
+    });
+
+    btnClearLogs.addEventListener('click', () => {
+      timelineList.innerHTML = '';
+    });
+
+    document.querySelectorAll('.scenario-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+        const target = e.currentTarget;
+        target.classList.add('active');
+        state.scenario = target.dataset.scenario;
+        stopInfiniteLoop();
+
+        if (state.scenario === 'RETRY_STORM_LOOP' && state.vendorCrashed) {
+          startInfiniteLoop();
+        }
+
+        logEvent('recover', `Switched scenario: ${target.querySelector('span').textContent}.`);
+        renderTree();
+      });
+    });
+
+    // Initial render
+    logEvent('recover', 'Diagnostic Lab 16 Initialized. Master Bulkhead Topology Active.');
+    renderTree();
+  </script>
+</body>
+</html>
