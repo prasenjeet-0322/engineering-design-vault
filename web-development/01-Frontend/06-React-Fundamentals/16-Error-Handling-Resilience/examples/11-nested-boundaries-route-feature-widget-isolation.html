@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 16 Part 11: Nested Boundaries & Resilience Architecture Lab</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              900: '#164e63',
+              950: '#083344',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <!-- React 18 & Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.98); }
+    }
+    .pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-cyan-500 selection:text-black">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, useContext, createContext, Component } = React;
+
+    // =========================================================================
+    // 1. Telemetry & Lineage Context
+    // =========================================================================
+    const LineageContext = createContext([]);
+
+    class TelemetryBus {
+      static listeners = new Set();
+      static events = [];
+
+      static emit(event) {
+        this.events = [event, ...this.events.slice(0, 49)];
+        this.listeners.forEach(fn => fn(this.events));
+      }
+
+      static subscribe(fn) {
+        this.listeners.add(fn);
+        fn(this.events);
+        return () => this.listeners.delete(fn);
+      }
+
+      static clear() {
+        this.events = [];
+        this.listeners.forEach(fn => fn(this.events));
+      }
+    }
+
+    // =========================================================================
+    // 2. Production Nested Bulkhead Error Boundary Class Component
+    // =========================================================================
+    class BulkheadBoundary extends Component {
+      static contextType = LineageContext;
+
+      constructor(props) {
+        super(props);
+        this.state = {
+          hasError: false,
+          error: null,
+          correlationId: null,
+          failureCount: 0,
+        };
+      }
+
+      static getDerivedStateFromError(error) {
+        return {
+          hasError: true,
+          error,
+          correlationId: `err_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+        };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        const parentLineage = this.context || [];
+        const currentLineage = [...parentLineage, `${this.props.tier}:${this.props.name}`];
+        const newCount = this.state.failureCount + 1;
+        this.setState({ failureCount: newCount });
+
+        const telemetryPayload = {
+          id: this.state.correlationId,
+          timestamp: new Date().toLocaleTimeString(),
+          tier: this.props.tier,
+          boundary: this.props.name,
+          message: error.message || "Unknown rendering exception",
+          lineage: currentLineage,
+          failureCount: newCount,
+        };
+
+        TelemetryBus.emit(telemetryPayload);
+
+        if (this.props.onCatch) {
+          this.props.onCatch(error, telemetryPayload);
+        }
+      }
+
+      reset = () => {
+        this.setState({ hasError: false, error: null, correlationId: null });
+        if (this.props.onReset) this.props.onReset();
+      };
+
+      render() {
+        const parentLineage = this.context || [];
+        const currentLineage = [...parentLineage, `${this.props.tier}:${this.props.name}`];
+        const maxRetries = this.props.maxRetries || 3;
+        const isEscalated = this.state.failureCount >= maxRetries;
+
+        if (this.state.hasError && this.state.error) {
+          return (
+            <LineageContext.Provider value={currentLineage}>
+              {this.props.fallback(this.state.error, this.reset, isEscalated, this.state.failureCount)}
+            </LineageContext.Provider>
+          );
+        }
+
+        return (
+          <LineageContext.Provider value={currentLineage}>
+            {this.props.children}
+          </LineageContext.Provider>
+        );
+      }
+    }
+
+    // =========================================================================
+    // 3. Application State & Fault Injection Controllers
+    // =========================================================================
+    const FaultContext = createContext(null);
+
+    function FaultProvider({ children }) {
+      const [faults, setFaults] = useState({
+        crashWidgetA1: false,
+        crashWidgetA2: false,
+        crashFeatureAProvider: false,
+        crashWidgetB1: false,
+        crashRoute: false,
+        crashShell: false,
+        sharedProviderCrash: false,
+      });
+
+      const [searchFilter, setSearchFilter] = useState("Q3-Enterprise-Metrics");
+      const [activeRoute, setActiveRoute] = useState("analytics");
+      const [salesData, setSalesData] = useState([
+        { id: 1, label: "North America", rev: "$4,280,000", growth: "+14.2%" },
+        { id: 2, label: "EMEA Region", rev: "$2,850,000", growth: "+8.9%" },
+        { id: 3, label: "Asia Pacific", rev: "$1,940,000", growth: "+22.4%" },
+      ]);
+
+      const resetAllFaults = () => {
+        setFaults({
+          crashWidgetA1: false,
+          crashWidgetA2: false,
+          crashFeatureAProvider: false,
+          crashWidgetB1: false,
+          crashRoute: false,
+          crashShell: false,
+          sharedProviderCrash: false,
+        });
+      };
+
+      return (
+        <FaultContext.Provider value={{
+          faults,
+          setFaults,
+          resetAllFaults,
+          searchFilter,
+          setSearchFilter,
+          activeRoute,
+          setActiveRoute,
+          salesData,
+          setSalesData,
+        }}>
+          {children}
+        </FaultContext.Provider>
+      );
+    }
+
+    // =========================================================================
+    // 4. Feature A Context & Resilient Provider Pattern
+    // =========================================================================
+    const SalesContext = createContext(null);
+
+    function SalesDataProvider({ children }) {
+      const { faults, salesData } = useContext(FaultContext);
+
+      if (faults.crashFeatureAProvider || faults.sharedProviderCrash) {
+        throw new Error("SalesDataProvider Fatal Error: WebSocket context sync failed (0x8004100E)");
+      }
+
+      const totalRevenue = salesData.reduce((acc, row) => acc + parseInt(row.rev.replace(/[\$,]/g, '')), 0);
+
+      return (
+        <SalesContext.Provider value={{ salesData, totalRevenue }}>
+          {children}
+        </SalesContext.Provider>
+      );
+    }
+
+    // =========================================================================
+    // 5. Interactive UI Components & Widgets
+    // =========================================================================
+
+    // Tier 4: Widget A1 (WebGL Revenue Chart)
+    function RevenueWebGLChart() {
+      const { faults } = useContext(FaultContext);
+      const sales = useContext(SalesContext);
+
+      if (faults.crashWidgetA1) {
+        throw new Error("WebGL Canvas Fatal Loss: GPU Device Context Terminated (0x887A0005)");
+      }
+
+      return (
+        <div className="h-44 bg-slate-900/90 rounded-2xl border border-slate-800 p-4 flex flex-col justify-between relative overflow-hidden group">
+          <div className="flex items-center justify-between z-10">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span className="text-xs font-bold text-slate-200">WebGL Revenue Velocity Chart</span>
+            </div>
+            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded-full border border-cyan-800/50">
+              60 FPS GPU
+            </span>
+          </div>
+
+          <div className="my-auto flex items-end justify-between h-20 px-2 gap-3 z-10">
+            {[45, 78, 62, 90, 84, 98, 115, 130, 125, 142].map((h, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1 group/bar">
+                <div 
+                  className="w-full bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t-sm transition-all duration-300 group-hover/bar:brightness-125"
+                  style={{ height: `${h * 0.45}px` }}
+                ></div>
+                <span className="text-[8px] font-mono text-slate-500">W{i+1}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 z-10 font-mono">
+            <span>Aggregated Gross: <strong className="text-cyan-300 font-bold">${(sales?.totalRevenue || 9070000).toLocaleString()}</strong></span>
+            <span className="text-emerald-400 font-bold">+16.4% YoY</span>
+          </div>
+
+          <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        </div>
+      );
+    }
+
+    // Tier 4: Widget A2 (Orders Table)
+    function OrdersTableWidget() {
+      const { faults } = useContext(FaultContext);
+      const sales = useContext(SalesContext);
+
+      if (faults.crashWidgetA2) {
+        throw new Error("OrdersTable Internal Error: RangeError: Maximum call stack exceeded in sort comparator");
+      }
+
+      return (
+        <div className="h-44 bg-slate-900/90 rounded-2xl border border-slate-800 p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              Regional Order Flow
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">3 Regions Active</span>
+          </div>
+
+          <div className="space-y-1.5 my-auto overflow-y-auto max-h-24 pr-1">
+            {(sales?.salesData || []).map((row) => (
+              <div key={row.id} className="flex items-center justify-between p-2 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs">
+                <span className="font-medium text-slate-300">{row.label}</span>
+                <div className="flex items-center gap-3 font-mono">
+                  <span className="text-slate-200 font-bold">{row.rev}</span>
+                  <span className="text-emerald-400 text-[10px]">{row.growth}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-[10px] text-slate-500 text-right font-mono">
+            Realtime DB Replicated
+          </div>
+        </div>
+      );
+    }
+
+    // Tier 4: Widget B1 (Live Logistics Map)
+    function LiveLogisticsMap() {
+      const { faults } = useContext(FaultContext);
+
+      if (faults.crashWidgetB1) {
+        throw new Error("MapSDK Fatal: Mapbox GL JS encountered Uncaught TileDecodeException");
+      }
+
+      return (
+        <div className="h-44 bg-slate-900/90 rounded-2xl border border-slate-800 p-4 flex flex-col justify-between relative overflow-hidden">
+          <div className="flex items-center justify-between z-10">
+            <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping"></span>
+              Live Freight Fleet (18 Active Couriers)
+            </span>
+            <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded-full border border-indigo-800/50">
+              GPS Synchronized
+            </span>
+          </div>
+
+          <div className="h-20 bg-slate-950 rounded-xl border border-slate-800/80 flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:12px_12px]"></div>
+            <div className="flex items-center gap-6 z-10 text-xs font-mono">
+              <div className="flex items-center gap-1.5 text-indigo-300">
+                <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Truck #882 (En Route)
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Flight #412 (Landed)
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono z-10">
+            <span>Route Efficiency: <strong className="text-indigo-300 font-bold">99.2%</strong></span>
+            <span className="text-slate-500">Zero Delays</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Tier 4: Widget B2 (Customer Support Pulse)
+    function CustomerSupportPulse() {
+      return (
+        <div className="h-44 bg-slate-900/90 rounded-2xl border border-slate-800 p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+              Customer Care SLA Pulse
+            </span>
+            <span className="text-[10px] font-mono text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-800/50">
+              1.2m Avg Response
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 my-auto">
+            <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800/60 text-center">
+              <div className="text-lg font-black text-purple-300 font-mono">42</div>
+              <div className="text-[10px] text-slate-400">Tickets Resolved</div>
+            </div>
+            <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800/60 text-center">
+              <div className="text-lg font-black text-emerald-300 font-mono">99.8%</div>
+              <div className="text-[10px] text-slate-400">CSAT Score</div>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-slate-500 text-right font-mono">
+            Support Pod #4 Operating Normal
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 6. Tier 3: Feature Pods with Bulkheads
+    // =========================================================================
+
+    function FeatureAPod() {
+      const { searchFilter, setSearchFilter, setFaults } = useContext(FaultContext);
+
+      return (
+        <BulkheadBoundary
+          tier="FEATURE"
+          name="SalesRevenuePod"
+          onReset={() => setFaults(prev => ({ ...prev, crashFeatureAProvider: false, crashWidgetA1: false, crashWidgetA2: false }))}
+          fallback={(err, reset) => (
+            <div className="p-6 bg-slate-900/70 border border-amber-900/50 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center text-lg">
+                    ⚠️
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-200">Sales & Revenue Module Suspended</h3>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">{err.message}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={reset}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700 shadow-md"
+                >
+                  Reload Feature Pod
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Feature-level boundary caught this provider outage. Sibling feature pods and global navigation remain 100% operational.
+              </p>
+            </div>
+          )}
+        >
+          <div className="p-6 bg-slate-900/50 border border-slate-800/90 rounded-3xl space-y-4 shadow-xl backdrop-blur-sm">
+            {/* Header & Filter bar (Parent State Preservation) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                  Feature A: Real-Time Sales & Revenue Pod
+                </h3>
+                <p className="text-xs text-slate-400">Protected by Tier 3 Feature Boundary</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-mono">Filter:</span>
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-cyan-300 font-mono focus:outline-none focus:border-cyan-500"
+                  placeholder="Filter state..."
+                />
+              </div>
+            </div>
+
+            {/* Provider and Widgets */}
+            <SalesDataProvider>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Widget A1 Bulkhead */}
+                <BulkheadBoundary
+                  tier="WIDGET"
+                  name="RevenueWebGLChart"
+                  maxRetries={3}
+                  onReset={() => setFaults(prev => ({ ...prev, crashWidgetA1: false }))}
+                  fallback={(err, reset, isEscalated, count) => (
+                    <div className="h-44 bg-amber-950/20 border border-amber-800/70 rounded-2xl p-4 flex flex-col justify-between">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-300 font-mono flex items-center gap-1.5">
+                          <span>📊⚠️</span> WebGL Chart Bulkhead Activated
+                        </span>
+                        {isEscalated ? (
+                          <span className="text-[10px] bg-rose-950 text-rose-300 font-bold px-2 py-0.5 rounded-full border border-rose-800">
+                            Circuit OPEN (Static Degraded)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-amber-400 font-mono">Failures: {count}/3</span>
+                        )}
+                      </div>
+                      
+                      <div className="p-2 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[10px] text-amber-200/90 overflow-x-auto">
+                        {err.message}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">
+                          {isEscalated ? "Fallback SVG table loaded" : "Sibling table intact"}
+                        </span>
+                        <button
+                          onClick={reset}
+                          className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-lg text-xs font-bold border border-amber-500/40 transition"
+                        >
+                          {isEscalated ? "Manual Override" : "Retry Chart"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                >
+                  <RevenueWebGLChart />
+                </BulkheadBoundary>
+
+                {/* Widget A2 Bulkhead */}
+                <BulkheadBoundary
+                  tier="WIDGET"
+                  name="OrdersTable"
+                  onReset={() => setFaults(prev => ({ ...prev, crashWidgetA2: false }))}
+                  fallback={(err, reset) => (
+                    <div className="h-44 bg-amber-950/20 border border-amber-800/70 rounded-2xl p-4 flex flex-col justify-between">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-300 font-mono">
+                          📋 Orders Table Bulkhead Fallback
+                        </span>
+                        <button onClick={reset} className="text-xs text-amber-400 font-bold hover:underline">
+                          Re-mount
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-400 font-mono">{err.message}</p>
+                      <div className="text-[10px] text-slate-500">Cached order records available offline</div>
+                    </div>
+                  )}
+                >
+                  <OrdersTableWidget />
+                </BulkheadBoundary>
+              </div>
+            </SalesDataProvider>
+          </div>
+        </BulkheadBoundary>
+      );
+    }
+
+    function FeatureBPod() {
+      const { setFaults } = useContext(FaultContext);
+
+      return (
+        <BulkheadBoundary
+          tier="FEATURE"
+          name="LogisticsSupportPod"
+          onReset={() => setFaults(prev => ({ ...prev, crashWidgetB1: false }))}
+          fallback={(err, reset) => (
+            <div className="p-6 bg-slate-900/70 border border-rose-900/50 rounded-3xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-rose-300">Feature B (Logistics) Interrupted</h3>
+                <button onClick={reset} className="px-3 py-1.5 bg-slate-800 rounded-xl text-xs font-bold">
+                  Reset Pod
+                </button>
+              </div>
+            </div>
+          )}
+        >
+          <div className="p-6 bg-slate-900/50 border border-slate-800/90 rounded-3xl space-y-4 shadow-xl backdrop-blur-sm">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+                  Feature B: Customer Operations & Logistics Pod
+                </h3>
+                <p className="text-xs text-slate-400">Protected by Tier 3 Feature Boundary</p>
+              </div>
+              <span className="text-xs font-mono text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-800/50">
+                100% SLA Green
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <BulkheadBoundary
+                tier="WIDGET"
+                name="MapboxLogisticsSDK"
+                onReset={() => setFaults(prev => ({ ...prev, crashWidgetB1: false }))}
+                fallback={(err, reset) => (
+                  <div className="h-44 bg-amber-950/20 border border-amber-800/70 rounded-2xl p-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-300 font-mono">🗺️ Mapbox SDK Fallback</span>
+                      <button onClick={reset} className="text-xs text-amber-400 font-bold hover:underline">Retry Map</button>
+                    </div>
+                    <p className="text-xs text-slate-400 font-mono">{err.message}</p>
+                    <div className="text-[10px] text-slate-500">Static GPS coordinates table loaded</div>
+                  </div>
+                )}
+              >
+                <LiveLogisticsMap />
+              </BulkheadBoundary>
+
+              <CustomerSupportPulse />
+            </div>
+          </div>
+        </BulkheadBoundary>
+      );
+    }
+
+    // =========================================================================
+    // 7. Tier 2: Route Container & Tier 1: Root Shell
+    // =========================================================================
+
+    function AnalyticsRoute() {
+      const { faults } = useContext(FaultContext);
+
+      if (faults.crashRoute) {
+        throw new Error("AnalyticsRoute Outage: Invalid Route Params [slug: undefined_tenant_id]");
+      }
+
+      return (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-black text-white tracking-tight">Analytics & Operational Telemetry</h2>
+              <p className="text-xs text-slate-400">Nested bulkheads isolate independent micro-components and domain providers.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-mono">Isolation Tiers:</span>
+              <span className="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded-md border border-cyan-800">Root</span>
+              <span className="text-[10px] bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded-md border border-indigo-800">Route</span>
+              <span className="text-[10px] bg-purple-950 text-purple-300 px-2 py-0.5 rounded-md border border-purple-800">Feature</span>
+              <span className="text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-800">Widget</span>
+            </div>
+          </div>
+
+          <FeatureAPod />
+          <FeatureBPod />
+        </div>
+      );
+    }
+
+    function AppShell() {
+      const { faults, activeRoute, setActiveRoute, setFaults } = useContext(FaultContext);
+
+      if (faults.crashShell) {
+        throw new Error("AppShell Fatal Exception: Global Auth Session corrupted in Root Layout");
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-950">
+          {/* Persistent Global Navigation Header (Preserved during Route Failures!) */}
+          <header className="sticky top-0 z-40 bg-slate-900/80 border-b border-slate-800 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-cyan-400 flex items-center justify-center font-black text-slate-950 text-sm shadow-lg shadow-cyan-500/20">
+                  ⚛️
+                </div>
+                <div>
+                  <h1 className="text-xs font-black text-white tracking-wider uppercase">Enterprise Resilient Portal</h1>
+                  <p className="text-[10px] font-mono text-cyan-400">Multi-Tier Bulkhead Architecture</p>
+                </div>
+              </div>
+
+              <nav className="hidden sm:flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                {['dashboard', 'analytics', 'orders', 'settings'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveRoute(tab)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition ${
+                      activeRoute === tab 
+                        ? "bg-cyan-500 text-slate-950 shadow-sm" 
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-mono text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Live Telemetry</span>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                SK
+              </div>
+            </div>
+          </header>
+
+          {/* Main Layout Body */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+            {/* Route Level Error Boundary */}
+            <BulkheadBoundary
+              tier="ROUTE"
+              name={`/${activeRoute}`}
+              onReset={() => setFaults(prev => ({ ...prev, crashRoute: false }))}
+              fallback={(err, reset) => (
+                <div className="p-12 bg-slate-900/60 border border-amber-800/80 rounded-3xl space-y-6 text-center max-w-2xl mx-auto shadow-2xl">
+                  <div className="w-16 h-16 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-2xl mx-auto flex items-center justify-center text-3xl">
+                    🧭
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold text-white tracking-tight">Route Workspace Suspended (/{activeRoute})</h2>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      An unexpected exception occurred inside this route subtree. Notice that the top <strong>Global Navigation Shell is 100% active</strong>! You can switch routes or retry.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl font-mono text-xs text-amber-300 text-left overflow-x-auto">
+                    {err.message}
+                  </div>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => setActiveRoute("dashboard")}
+                      className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700"
+                    >
+                      ← Switch to Dashboard
+                    </button>
+                    <button
+                      onClick={reset}
+                      className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-cyan-600/30"
+                    >
+                      Retry Route Load
+                    </button>
+                  </div>
+                </div>
+              )}
+            >
+              {activeRoute === "analytics" ? (
+                <AnalyticsRoute />
+              ) : (
+                <div className="p-12 bg-slate-900/40 border border-slate-800 rounded-3xl text-center space-y-3">
+                  <h2 className="text-lg font-bold text-white capitalize">{activeRoute} Workspace</h2>
+                  <p className="text-xs text-slate-400">Clean route mounted without error.</p>
+                  <button
+                    onClick={() => setActiveRoute("analytics")}
+                    className="px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-bold"
+                  >
+                    Go to Analytics Demo
+                  </button>
+                </div>
+              )}
+            </BulkheadBoundary>
+          </main>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 8. Interactive Control Center & Live Telemetry Inspector
+    // =========================================================================
+
+    function ResilienceControlCenter() {
+      const { faults, setFaults, resetAllFaults } = useContext(FaultContext);
+      const [events, setEvents] = useState([]);
+      const [filterTier, setFilterTier] = useState("ALL");
+
+      useEffect(() => {
+        return TelemetryBus.subscribe(setEvents);
+      }, []);
+
+      const filteredEvents = filterTier === "ALL" 
+        ? events 
+        : events.filter(e => e.tier === filterTier);
+
+      return (
+        <div className="border-t border-slate-800 bg-slate-950/90 backdrop-blur-md p-6 max-w-7xl mx-auto w-full space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>🎛️</span> Fault Injection Console & Telemetry Lineage Inspector
+              </h2>
+              <p className="text-xs text-slate-400">Inject unexpected crashes across all 4 tiers and observe bulkhead containment in real-time.</p>
+            </div>
+            <button
+              onClick={resetAllFaults}
+              className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <span>🔄</span> Reset All Injected Faults
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Fault Controls (5 cols) */}
+            <div className="lg:col-span-5 space-y-4">
+              <h3 className="text-xs font-mono uppercase text-slate-400 tracking-wider">Fault Injection Triggers</h3>
+              
+              <div className="space-y-2">
+                <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                  <span className="text-[11px] font-bold text-cyan-300 font-mono">Tier 4: Widget Isolation</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setFaults(prev => ({ ...prev, crashWidgetA1: !prev.crashWidgetA1 }))}
+                      className={`p-2 rounded-xl text-xs font-bold border transition ${
+                        faults.crashWidgetA1 
+                          ? "bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30" 
+                          : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      {faults.crashWidgetA1 ? "💥 Crash WebGL (Active)" : "⚡ Crash WebGL Chart"}
+                    </button>
+                    <button
+                      onClick={() => setFaults(prev => ({ ...prev, crashWidgetA2: !prev.crashWidgetA2 }))}
+                      className={`p-2 rounded-xl text-xs font-bold border transition ${
+                        faults.crashWidgetA2 
+                          ? "bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/30" 
+                          : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      {faults.crashWidgetA2 ? "💥 Crash Orders (Active)" : "⚡ Crash Orders Table"}
+                    </button>
+                    <button
+                      onClick={() => setFaults(prev => ({ ...prev, crashWidgetB1: !prev.crashWidgetB1 }))}
+                      className={`p-2 rounded-xl text-xs font-bold border transition col-span-2 ${
+                        faults.crashWidgetB1 
+                          ? "bg-rose-600 text-white border-rose-500" 
+                          : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      {faults.crashWidgetB1 ? "💥 Crash Mapbox SDK (Active)" : "⚡ Crash Mapbox Logistics SDK"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                  <span className="text-[11px] font-bold text-amber-300 font-mono">Tier 3: Feature & Provider Ancestry</span>
+                  <button
+                    onClick={() => setFaults(prev => ({ ...prev, crashFeatureAProvider: !prev.crashFeatureAProvider }))}
+                    className={`w-full p-2 rounded-xl text-xs font-bold border transition ${
+                      faults.crashFeatureAProvider 
+                        ? "bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/30" 
+                        : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    {faults.crashFeatureAProvider ? "💥 Crash Sales Provider (Active)" : "⚡ Crash Feature A DataProvider"}
+                  </button>
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                  <span className="text-[11px] font-bold text-purple-300 font-mono">Tier 2: Route & Tier 1: Root</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setFaults(prev => ({ ...prev, crashRoute: !prev.crashRoute }))}
+                      className={`p-2 rounded-xl text-xs font-bold border transition ${
+                        faults.crashRoute 
+                          ? "bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-600/30" 
+                          : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      {faults.crashRoute ? "💥 Route Crash (Active)" : "⚡ Crash /analytics Route"}
+                    </button>
+                    <button
+                      onClick={() => setFaults(prev => ({ ...prev, crashShell: !prev.crashShell }))}
+                      className={`p-2 rounded-xl text-xs font-bold border transition ${
+                        faults.crashShell 
+                          ? "bg-rose-700 text-white border-rose-600" 
+                          : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      {faults.crashShell ? "💥 Shell Crash (Active)" : "⚡ Crash Root AppShell"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Telemetry Lineage Log (7 cols) */}
+            <div className="lg:col-span-7 flex flex-col space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-mono uppercase text-slate-400 tracking-wider">Lineage Telemetry Bus</h3>
+                  <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">
+                    {events.length} Events
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => TelemetryBus.clear()}
+                    className="text-[10px] text-slate-400 hover:text-white font-bold"
+                  >
+                    Clear Log
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-3 font-mono text-xs overflow-y-auto max-h-72 space-y-2">
+                {filteredEvents.length === 0 ? (
+                  <div className="h-44 flex items-center justify-center text-slate-500 text-xs">
+                    No exceptions caught. Trigger a fault above to observe telemetry lineage.
+                  </div>
+                ) : (
+                  filteredEvents.map((evt, idx) => (
+                    <div key={idx} className="p-2.5 bg-slate-950 rounded-xl border border-slate-800/80 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-cyan-400 font-bold">{evt.boundary} ({evt.tier})</span>
+                        <span className="text-slate-500 text-[10px]">{evt.timestamp}</span>
+                      </div>
+                      <div className="text-[11px] text-rose-300 font-bold">{evt.message}</div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1 overflow-x-auto py-0.5">
+                        <span className="text-slate-600 font-bold">Lineage:</span>
+                        {evt.lineage.map((item, i) => (
+                          <span key={i} className="flex items-center gap-1">
+                            <span className="bg-slate-900 text-cyan-300 px-1.5 py-0.5 rounded text-[9px] border border-slate-800">
+                              {item}
+                            </span>
+                            {i < evt.lineage.length - 1 && <span className="text-slate-600">►</span>}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="text-[9px] text-slate-500 flex justify-between">
+                        <span>Correlation: {evt.id}</span>
+                        <span>Attempt #{evt.failureCount}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 9. Root App Component with Tier 1 Root Error Boundary
+    // =========================================================================
+
+    function App() {
+      return (
+        <BulkheadBoundary
+          tier="ROOT"
+          name="RootBootstrap"
+          fallback={(err, reset) => (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-white font-sans">
+              <div className="max-w-md w-full p-8 bg-slate-900 border border-rose-900/60 rounded-3xl space-y-6 text-center shadow-2xl">
+                <div className="w-16 h-16 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl mx-auto flex items-center justify-center text-3xl">
+                  🚨
+                </div>
+                <div className="space-y-2">
+                  <h1 className="text-xl font-black tracking-tight">System Critical Outage (Root Bulkhead)</h1>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    The entire application shell encountered an unhandled exception. This is Tier 1 last-resort containment.
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl font-mono text-xs text-rose-300 text-left overflow-x-auto">
+                  {err.message}
+                </div>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition shadow-lg shadow-cyan-600/30"
+                >
+                  Hard Reload Entire Application
+                </button>
+              </div>
+            </div>
+          )}
+        >
+          <FaultProvider>
+            <div className="flex flex-col min-h-screen">
+              <AppShell />
+              <ResilienceControlCenter />
+            </div>
+          </FaultProvider>
+        </BulkheadBoundary>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
