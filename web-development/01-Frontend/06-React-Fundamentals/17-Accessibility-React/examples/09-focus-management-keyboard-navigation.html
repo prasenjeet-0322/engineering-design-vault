@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 09 — Focus Management, Keyboard Navigation & Focus Lifecycle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Focus Telemetry HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Fault Injection Bar */
+    .fault-injection-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.6rem 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: #fca5a5;
+    }
+    .fault-checkbox { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    /* Roving Tablist */
+    .tablist-container {
+      display: flex;
+      gap: 0.5rem;
+      background: #0f172a;
+      padding: 0.4rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+    .tab-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .tab-btn[aria-selected="true"] {
+      background: #2563eb;
+      color: #fff;
+    }
+    .tab-btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.75rem;
+      width: 480px;
+      max-width: 90vw;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 09 — Focus Management & Lifecycle</div>
+      <div class="header-subtitle">Interaction Scopes, Restoration Contracts, Identity Stability & Roving Navigation</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Frontend</span>
+      <span class="badge badge-blue">WAI-ARIA APG 1.2</span>
+      <span class="badge badge-green">WCAG 2.4.3 / 2.4.7</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Live Telemetry HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">document.activeElement</span>
+      <span class="telemetry-value" id="hud-dom-focus" style="color:#38bdf8;">body</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Logical Active ID</span>
+      <span class="telemetry-value" id="hud-active-id">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Selected Entity</span>
+      <span class="telemetry-value" id="hud-selected-id">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Focus Scope</span>
+      <span class="telemetry-value" id="hud-focus-scope">Page Root</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Last Focus Action</span>
+      <span class="telemetry-value" id="hud-last-action" style="color:#34d399;">IDLE</span>
+    </div>
+  </div>
+
+  <!-- Fault Injection Control Bar -->
+  <div class="fault-injection-bar">
+    <span style="font-weight:700; color:#fff;">⚠️ Focus Fault Injection:</span>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-steal-focus" /> Steal Focus on Every Render
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-blind-restore" /> Blindly Restore to Dead Trigger
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-index-identity" /> Use Array Index for Focus Identity
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-global-escape" /> Global Escape Closes All Layers
+    </label>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario 1 & 2 -->
+    <div class="grid-2">
+      <!-- Scenario 01: Active Element Live Inspector -->
+      <div class="card" id="card-scen-1">
+        <div class="card-header">
+          <span class="card-title">🎯 Scenario 01 — document.activeElement Live Inspector</span>
+          <span class="badge badge-blue">DOM Telemetry</span>
+        </div>
+        <p class="card-desc">
+          Tab through the interactive controls below. The diagnostic HUD tracks the exact DOM tag, ID, and bounding rect of <code>document.activeElement</code>.
+        </p>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="demo-btn-alpha">Alpha Control</button>
+          <button class="btn btn-secondary" id="demo-btn-beta">Beta Control</button>
+          <input type="text" class="input-control" id="demo-input-gamma" placeholder="Type here..." style="max-width:200px;" />
+          <button class="btn btn-success" id="demo-btn-delta">Delta Submit</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-1">
+          Focus any control to inspect hardware focus coordinates.
+        </div>
+      </div>
+
+      <!-- Scenario 02: Focus Restoration vs Fallback Recovery -->
+      <div class="card" id="card-scen-2">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario 02 — Focus Restoration with Destroyed Trigger</span>
+          <span class="badge badge-warn">Fallback Contract</span>
+        </div>
+        <p class="card-desc">
+          Open the modal, optionally delete the invoking button while the modal is open, and close the modal. Observe the fallback recovery algorithm.
+        </p>
+        <div id="trigger-container" style="display:flex; gap:0.6rem; align-items:center;">
+          <button class="btn btn-danger" id="btn-modal-invoker" onclick="openRestoreDialog()">
+            Open Modal (Invoking Trigger)
+          </button>
+          <button class="btn btn-secondary" id="btn-kill-trigger" onclick="destroyModalTrigger()">
+            Destroy Trigger Button
+          </button>
+        </div>
+        <div class="speech-bubble" id="output-scen-2">
+          Open dialog, destroy trigger, then close to test fallback recovery.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario 3 & 4 -->
+    <div class="grid-2">
+      <!-- Scenario 03: Roving TabIndex Tabset -->
+      <div class="card" id="card-scen-3">
+        <div class="card-header">
+          <span class="card-title">🧭 Scenario 03 — Roving tabIndex & Directional Navigation</span>
+          <span class="badge badge-green">APG Composite</span>
+        </div>
+        <p class="card-desc">
+          Single Tab stop. Use <kbd>←</kbd> / <kbd>→</kbd> and <kbd>Home</kbd> / <kbd>End</kbd> to move focus. <code>tabindex=0</code> roves to the active item.
+        </p>
+        <div role="tablist" aria-label="Microservice Configurations" class="tablist-container" id="roving-tablist" onkeydown="handleRovingTabKeyDown(event)">
+          <button role="tab" id="rtab-auth" aria-selected="true" tabindex="0" class="tab-btn" onclick="selectRovingTab(0)">Auth Gateway</button>
+          <button role="tab" id="rtab-payment" aria-selected="false" tabindex="-1" class="tab-btn" onclick="selectRovingTab(1)">Payment Engine</button>
+          <button role="tab" id="rtab-telemetry" aria-selected="false" tabindex="-1" class="tab-btn" onclick="selectRovingTab(2)">Telemetry Sinks</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-3">
+          Tab into tablist, use Arrow keys to verify roving tabIndex transition.
+        </div>
+      </div>
+
+      <!-- Scenario 04: Focus vs Selection Separation -->
+      <div class="card" id="card-scen-4">
+        <div class="card-header">
+          <span class="card-title">⚖️ Scenario 04 — Active Focus vs Selected Entity Separation</span>
+          <span class="badge badge-purple">State Invariant</span>
+        </div>
+        <p class="card-desc">
+          In manual mode, Arrow keys navigate <code>activeId</code> (focus ring) without altering <code>selectedId</code> (committed value) until <kbd>Enter</kbd> is pressed.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.6rem; font-size:0.85rem;">
+          <label><input type="radio" name="manual-mode" value="auto" checked onchange="tabManualMode=false" /> Auto Activation (Follow Focus)</label>
+          <label><input type="radio" name="manual-mode" value="manual" onchange="tabManualMode=true" /> Manual Activation (Follow Enter)</label>
+        </div>
+        <div id="manual-tab-display" style="background:#0f172a; padding:0.75rem; border-radius:6px; font-size:0.85rem; border:1px solid #374151;">
+          Selected: <strong id="val-selected" style="color:#34d399;">Auth Gateway</strong> | Active Focus: <strong id="val-active" style="color:#38bdf8;">Auth Gateway</strong>
+        </div>
+        <div class="speech-bubble" id="output-scen-4">
+          Navigate in manual mode to observe focus without premature selection.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Scenario 5 & 6 -->
+    <div class="grid-2">
+      <!-- Scenario 05: Dynamic Item Deletion Recovery -->
+      <div class="card" id="card-scen-5">
+        <div class="card-header">
+          <span class="card-title">🗑️ Scenario 05 — Dynamic Item Deletion Focus Recovery</span>
+          <span class="badge badge-red">Recovery Policy</span>
+        </div>
+        <p class="card-desc">
+          When the currently focused row is deleted, deterministic recovery shifts focus to the next surviving sibling row or fallback container.
+        </p>
+        <div id="deletion-table" style="display:flex; flex-direction:column; gap:0.4rem;">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="speech-bubble" id="output-scen-5">
+          Focus a Delete button and press Enter to verify next-sibling focus recovery.
+        </div>
+      </div>
+
+      <!-- Scenario 06: Entity Identity Preservation through Sorting -->
+      <div class="card" id="card-scen-6">
+        <div class="card-header">
+          <span class="card-title">🔀 Scenario 06 — Focus Identity Preservation During Sort</span>
+          <span class="badge badge-blue">Entity UUID</span>
+        </div>
+        <p class="card-desc">
+          Focus on "Carol". Click Sort Descending. With stable entity UUIDs, focus remains on "Carol", whereas index-based keys jump to whoever landed on index 2.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.6rem;">
+          <button class="btn btn-secondary" onclick="sortEntityList('asc')">Sort A → Z</button>
+          <button class="btn btn-secondary" onclick="sortEntityList('desc')">Sort Z → A</button>
+        </div>
+        <div id="sortable-list" style="display:flex; gap:0.5rem;">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="speech-bubble" id="output-scen-6">
+          Focus an item, toggle sorting, observe whether focus follows entity.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Scenario 7 & 8 -->
+    <div class="grid-2">
+      <!-- Scenario 07: Nested Overlay Escape Stack -->
+      <div class="card" id="card-scen-7">
+        <div class="card-header">
+          <span class="card-title">🥞 Scenario 07 — Nested Overlay LIFO Escape Stack</span>
+          <span class="badge badge-purple">Overlay Ownership</span>
+        </div>
+        <p class="card-desc">
+          Open primary modal, then open child drawer. Pressing <kbd>Escape</kbd> pops and dismisses <em>only</em> the topmost overlay layer.
+        </p>
+        <button class="btn btn-success" id="btn-open-l1" onclick="openLayer1()">Open Modal Scope 1</button>
+        <div class="speech-bubble" id="output-scen-7">
+          Test LIFO Escape stack with or without "Global Escape" fault toggle.
+        </div>
+      </div>
+
+      <!-- Scenario 08: Virtual Focus with aria-activedescendant -->
+      <div class="card" id="card-scen-8">
+        <div class="card-header">
+          <span class="card-title">🔍 Scenario 08 — Virtual Focus (aria-activedescendant)</span>
+          <span class="badge badge-green">Virtual Focus</span>
+        </div>
+        <p class="card-desc">
+          Hardware DOM focus stays anchored inside the <code>&lt;input&gt;</code> while <kbd>↓</kbd> / <kbd>↑</kbd> updates virtual focus on listbox options.
+        </p>
+        <div class="form-group">
+          <label for="virt-search-input" style="font-size:0.875rem; font-weight:600;">Kubernetes Deployment Target</label>
+          <input
+            id="virt-search-input"
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-autocomplete="list"
+            aria-controls="virt-listbox-8"
+            class="input-control"
+            placeholder="Arrow Down to browse..."
+            onkeydown="handleVirtualComboboxKey(event)"
+          />
+          <ul id="virt-listbox-8" role="listbox" class="tablist-container" style="flex-direction:column; margin-top:0.4rem; max-height:130px; overflow-y:auto;">
+            <li id="opt-eks" role="option" aria-selected="false" style="padding:0.4rem 0.8rem; border-radius:4px;">AWS Elastic Kubernetes (EKS)</li>
+            <li id="opt-gke" role="option" aria-selected="false" style="padding:0.4rem 0.8rem; border-radius:4px;">Google Kubernetes Engine (GKE)</li>
+            <li id="opt-aks" role="option" aria-selected="false" style="padding:0.4rem 0.8rem; border-radius:4px;">Azure Kubernetes Service (AKS)</li>
+          </ul>
+        </div>
+        <div class="speech-bubble" id="output-scen-8">
+          Type and arrow down to observe DOM focus vs virtual active descendant.
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Event Telemetry Trace -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Focus Lifecycle & Interaction Event Telemetry</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearFocusTelemetry()">Clear Trace</button>
+      </div>
+      <div class="log-panel" id="focus-telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Focus lifecycle diagnostic workbench ready.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal Dialog for Scenario 02 -->
+  <div class="modal-overlay" id="dialog-scen-2" role="dialog" aria-modal="true" aria-labelledby="d2-title" onkeydown="handleModalTrapKey(event, 'dialog-scen-2')">
+    <div class="modal-box" tabindex="-1">
+      <h3 id="d2-title" style="font-size:1.15rem; color:#38bdf8; margin-bottom:0.75rem;">Dialog Focus Lifecycle Test</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Focus is trapped within this dialog. Closing it will attempt to restore focus to the originating trigger.
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+        <button class="btn btn-secondary" id="d2-btn-cancel" onclick="closeRestoreDialog()">Cancel / Dismiss</button>
+        <button class="btn btn-success" id="d2-btn-confirm" onclick="closeRestoreDialog()">Confirm Action</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 1 Modal for Scenario 07 -->
+  <div class="modal-overlay" id="layer1-modal" role="dialog" aria-modal="true" aria-labelledby="l1-title">
+    <div class="modal-box" tabindex="-1">
+      <h3 id="l1-title" style="font-size:1.15rem; color:#38bdf8; margin-bottom:0.75rem;">Focus Scope Layer 1 (Modal)</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">
+        This is primary focus scope 1. Open the child confirmation drawer to test nested LIFO escape stack.
+      </p>
+      <div style="display:flex; justify-content:space-between;">
+        <button class="btn btn-danger" onclick="openLayer2()">Open Nested Drawer (Layer 2)</button>
+        <button class="btn btn-secondary" onclick="closeLayer1()">Close Layer 1</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 2 Drawer for Scenario 07 -->
+  <div class="modal-overlay" id="layer2-drawer" role="dialog" aria-modal="true" aria-labelledby="l2-title" style="z-index:110;">
+    <div class="modal-box" style="background:#0f172a; border-color:#ef4444;" tabindex="-1">
+      <h3 id="l2-title" style="font-size:1.15rem; color:#f87171; margin-bottom:0.75rem;">Focus Scope Layer 2 (Drawer)</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">
+        Press Escape now. Only Layer 2 should close, returning focus and ownership to Layer 1.
+      </p>
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="btn btn-secondary" onclick="closeLayer2()">Dismiss Layer 2</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let savedOriginRef = null;
+    let overlayStack = [];
+
+    // Global Focus Listener
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      const desc = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`;
+      document.getElementById('hud-dom-focus').innerText = desc;
+      logFocusEvent(`[FOCUSIN] ${desc}`);
+
+      const faultSteal = document.getElementById('fault-steal-focus').checked;
+      if (faultSteal && el.id !== 'demo-input-gamma') {
+        setTimeout(() => {
+          document.getElementById('demo-input-gamma')?.focus();
+          logFocusEvent('[FAULT] Focus stolen back by #demo-input-gamma on render!');
+        }, 10);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const faultGlobal = document.getElementById('fault-global-escape').checked;
+        if (faultGlobal) {
+          closeAllLayers();
+          logFocusEvent('[FAULT] Global Escape closed ALL overlay layers at once!');
+        } else if (overlayStack.length > 0) {
+          e.preventDefault();
+          const topDismiss = overlayStack[overlayStack.length - 1];
+          topDismiss();
+          logFocusEvent('[LIFO STACK] Escape dismissed topmost overlay layer.');
+        }
+      }
+    });
+
+    function logFocusEvent(msg) {
+      const panel = document.getElementById('focus-telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearFocusTelemetry() {
+      document.getElementById('focus-telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Focus trace cleared.</div>';
+    }
+
+    // Scenario 2: Dialog Restoration
+    function openRestoreDialog() {
+      savedOriginRef = document.getElementById('btn-modal-invoker');
+      document.getElementById('dialog-scen-2').style.display = 'flex';
+      document.getElementById('d2-btn-cancel').focus();
+      document.getElementById('hud-focus-scope').innerText = 'Dialog Scope';
+      logFocusEvent('Dialog opened; focus trapped inside.');
+    }
+
+    function destroyModalTrigger() {
+      const btn = document.getElementById('btn-modal-invoker');
+      if (btn) {
+        btn.remove();
+        document.getElementById('output-scen-2').innerText = '⚠️ Invoking trigger button destroyed from DOM!';
+        logFocusEvent('[DOM MUTATION] #btn-modal-invoker unmounted.');
+      }
+    }
+
+    function closeRestoreDialog() {
+      document.getElementById('dialog-scen-2').style.display = 'none';
+      document.getElementById('hud-focus-scope').innerText = 'Page Root';
+
+      const faultBlind = document.getElementById('fault-blind-restore').checked;
+
+      if (faultBlind) {
+        // Bug: Blindly call focus on dead node
+        if (savedOriginRef) {
+          savedOriginRef.focus();
+          document.getElementById('output-scen-2').innerText = '💥 Blind restoration failed on unmounted node! Focus stranded on body.';
+          logFocusEvent('[BUG] Blind focus() call on dead node; focus dropped to body.');
+        }
+      } else {
+        // Robust Fallback Algorithm
+        if (savedOriginRef && document.body.contains(savedOriginRef)) {
+          savedOriginRef.focus();
+          document.getElementById('output-scen-2').innerText = '✓ Focus restored cleanly to original invoking trigger.';
+          logFocusEvent('Focus restored to #btn-modal-invoker');
+        } else {
+          // Fallback to container or sibling
+          const fallback = document.getElementById('btn-kill-trigger') || document.body;
+          fallback.focus();
+          document.getElementById('output-scen-2').innerText = `✓ Trigger gone. Deterministic fallback focused #${fallback.id || 'body'}`;
+          logFocusEvent(`Trigger destroyed. Fallback target #${fallback.id || 'body'} focused.`);
+        }
+      }
+    }
+
+    function handleModalTrapKey(e, dialogId) {
+      if (e.key === 'Tab') {
+        const focusables = document.querySelectorAll(`#${dialogId} button`);
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    // Scenario 3: Roving TabIndex
+    let rovingTabIdx = 0;
+    const rTabIds = ['rtab-auth', 'rtab-payment', 'rtab-telemetry'];
+    const rTabNames = ['Auth Gateway', 'Payment Engine', 'Telemetry Sinks'];
+    let tabManualMode = false;
+
+    function selectRovingTab(idx) {
+      rovingTabIdx = idx;
+      rTabIds.forEach((id, i) => {
+        const btn = document.getElementById(id);
+        const isSel = i === idx;
+        btn.setAttribute('aria-selected', String(isSel));
+        btn.setAttribute('tabindex', isSel ? '0' : '-1');
+      });
+      document.getElementById('val-selected').innerText = rTabNames[idx];
+      document.getElementById('val-active').innerText = rTabNames[idx];
+      document.getElementById('hud-selected-id').innerText = rTabIds[idx];
+      document.getElementById(rTabIds[idx]).focus();
+      logFocusEvent(`Tab activated: ${rTabIds[idx]}`);
+    }
+
+    function handleRovingTabKeyDown(e) {
+      let next = rovingTabIdx;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        next = (rovingTabIdx + 1) % rTabIds.length;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        next = (rovingTabIdx - 1 + rTabIds.length) % rTabIds.length;
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        next = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        next = rTabIds.length - 1;
+      }
+
+      if (next !== rovingTabIdx) {
+        if (!tabManualMode) {
+          selectRovingTab(next);
+        } else {
+          // Manual mode: move focus only
+          rTabIds.forEach((id, i) => {
+            document.getElementById(id).setAttribute('tabindex', i === next ? '0' : '-1');
+          });
+          document.getElementById(rTabIds[next]).focus();
+          document.getElementById('val-active').innerText = rTabNames[next];
+          document.getElementById('hud-active-id').innerText = rTabIds[next];
+          logFocusEvent(`[MANUAL FOCUS] Roved to ${rTabIds[next]} (Selection unchanged)`);
+        }
+      }
+    }
+
+    // Scenario 5: Dynamic Row Deletion
+    let delRows = [
+      { id: 'row-101', name: 'Billing Queue Pipeline' },
+      { id: 'row-102', name: 'Webhooks Ingestion Worker' },
+      { id: 'row-103', name: 'Search Re-index Cron' }
+    ];
+
+    function renderDeletionTable() {
+      const c = document.getElementById('deletion-table');
+      c.innerHTML = '';
+      delRows.forEach((row, idx) => {
+        const div = document.createElement('div');
+        div.id = row.id;
+        div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.5rem 0.75rem; border-radius:6px;';
+        div.innerHTML = `
+          <span>${row.name}</span>
+          <button class="btn btn-danger" id="del-btn-${row.id}" style="font-size:0.75rem; padding:0.25rem 0.6rem;" onclick="deleteRowItem('${row.id}', ${idx})">Delete</button>
+        `;
+        c.appendChild(div);
+      });
+    }
+
+    function deleteRowItem(id, idx) {
+      delRows = delRows.filter(r => r.id !== id);
+      renderDeletionTable();
+
+      // Recovery policy
+      const surviving = delRows[idx] || delRows[idx - 1];
+      if (surviving) {
+        const nextTarget = document.getElementById(`del-btn-${surviving.id}`);
+        nextTarget?.focus();
+        document.getElementById('output-scen-5').innerText = `✓ Item ${id} deleted. Focus recovered to #${nextTarget.id}`;
+        logFocusEvent(`[FOCUS RECOVERY] Recovered to #${nextTarget.id}`);
+      } else {
+        document.getElementById('output-scen-5').innerText = 'All items deleted.';
+      }
+    }
+
+    // Scenario 6: Sort Entity Identity
+    let sortEntities = [
+      { id: 'ent-a', name: 'Alice (Auth Lead)' },
+      { id: 'ent-b', name: 'Bob (Infra SRE)' },
+      { id: 'ent-c', name: 'Carol (Design Architect)' }
+    ];
+
+    function renderSortableList() {
+      const c = document.getElementById('sortable-list');
+      c.innerHTML = '';
+      sortEntities.forEach((ent, idx) => {
+        const btn = document.createElement('button');
+        btn.id = `sort-btn-${ent.id}`;
+        btn.className = 'btn btn-secondary';
+        btn.style.fontSize = '0.8rem';
+        btn.innerText = ent.name;
+        c.appendChild(btn);
+      });
+    }
+
+    function sortEntityList(order) {
+      const activeElementIdBefore = document.activeElement ? document.activeElement.id : null;
+
+      sortEntities.sort((a, b) => order === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+      renderSortableList();
+
+      const faultIndex = document.getElementById('fault-index-identity').checked;
+      if (faultIndex) {
+        // Bug: Index-based focus jump
+        const btns = document.querySelectorAll('#sortable-list button');
+        btns[0]?.focus();
+        document.getElementById('output-scen-6').innerText = '💥 Index identity bug: Focus jumped to first slot instead of following entity!';
+        logFocusEvent('[BUG] Focus stayed on positional slot 0 instead of entity.');
+      } else if (activeElementIdBefore) {
+        // Correct: follow entity ID
+        const target = document.getElementById(activeElementIdBefore);
+        target?.focus();
+        document.getElementById('output-scen-6').innerText = `✓ Focus cleanly followed entity #${activeElementIdBefore}`;
+        logFocusEvent(`Focus followed entity #${activeElementIdBefore}`);
+      }
+    }
+
+    // Scenario 7: Nested Layers
+    function openLayer1() {
+      document.getElementById('layer1-modal').style.display = 'flex';
+      overlayStack.push(closeLayer1);
+      document.getElementById('hud-focus-scope').innerText = 'Layer 1 Modal';
+      logFocusEvent('[STACK PUSH] Layer 1 pushed to overlay stack.');
+    }
+    function closeLayer1() {
+      document.getElementById('layer1-modal').style.display = 'none';
+      overlayStack = overlayStack.filter(fn => fn !== closeLayer1);
+      document.getElementById('hud-focus-scope').innerText = 'Page Root';
+      logFocusEvent('[STACK POP] Layer 1 closed.');
+    }
+    function openLayer2() {
+      document.getElementById('layer2-drawer').style.display = 'flex';
+      overlayStack.push(closeLayer2);
+      document.getElementById('hud-focus-scope').innerText = 'Layer 2 Drawer';
+      logFocusEvent('[STACK PUSH] Layer 2 pushed to overlay stack.');
+    }
+    function closeLayer2() {
+      document.getElementById('layer2-drawer').style.display = 'none';
+      overlayStack = overlayStack.filter(fn => fn !== closeLayer2);
+      document.getElementById('hud-focus-scope').innerText = 'Layer 1 Modal';
+      logFocusEvent('[STACK POP] Layer 2 closed.');
+    }
+    function closeAllLayers() {
+      document.getElementById('layer1-modal').style.display = 'none';
+      document.getElementById('layer2-drawer').style.display = 'none';
+      document.getElementById('dialog-scen-2').style.display = 'none';
+      overlayStack = [];
+      document.getElementById('hud-focus-scope').innerText = 'Page Root';
+    }
+
+    // Scenario 8: Virtual Focus
+    const virtOpts = ['opt-eks', 'opt-gke', 'opt-aks'];
+    let virtIdx = -1;
+
+    function handleVirtualComboboxKey(e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        virtIdx = (virtIdx + 1) % virtOpts.length;
+        updateVirtualFocus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        virtIdx = (virtIdx - 1 + virtOpts.length) % virtOpts.length;
+        updateVirtualFocus();
+      }
+    }
+    function updateVirtualFocus() {
+      const input = document.getElementById('virt-search-input');
+      virtOpts.forEach((id, i) => {
+        const li = document.getElementById(id);
+        const isActive = i === virtIdx;
+        li.style.background = isActive ? '#1e3a8a' : 'transparent';
+        li.style.color = isActive ? '#93c5fd' : '#f9fafb';
+        li.setAttribute('aria-selected', String(isActive));
+      });
+      if (virtIdx >= 0) {
+        input.setAttribute('aria-activedescendant', virtOpts[virtIdx]);
+        document.getElementById('hud-active-id').innerText = virtOpts[virtIdx];
+        document.getElementById('output-scen-8').innerText = `Virtual Focus: aria-activedescendant="${virtOpts[virtIdx]}" (DOM focus = input)`;
+        logFocusEvent(`Virtual focus updated: ${virtOpts[virtIdx]}`);
+      }
+    }
+
+    // Init
+    renderDeletionTable();
+    renderSortableList();
+  </script>
+</body>
+</html>
