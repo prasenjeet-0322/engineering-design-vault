@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 11 — Accessible Application Architecture & Boundaries</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Testing HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Fault Injection Bar */
+    .fault-injection-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.6rem 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: #fca5a5;
+    }
+    .fault-checkbox { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .nav-bar {
+      display: flex;
+      gap: 0.75rem;
+      background: #0f172a;
+      padding: 0.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 1rem;
+    }
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .nav-link.active { color: #38bdf8; background: rgba(56, 189, 248, 0.15); font-weight: 600; }
+    .nav-link:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    .route-view-container {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+      min-height: 140px;
+    }
+
+    .item-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .item-row {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.85rem;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.875rem;
+    }
+    .item-row.active-item {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    /* Modal Overlays for Scenario C */
+    .overlay-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .overlay-dialog {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: 440px;
+      max-width: 90vw;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 11 — Accessible Application Architecture & Boundaries</div>
+      <div class="header-subtitle">Route Focus, Feature Ownership, LIFO Overlay Stacks & Progressive Failure Isolation</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Architecture</span>
+      <span class="badge badge-blue">Route Focus</span>
+      <span class="badge badge-purple">LIFO Stack</span>
+      <span class="badge badge-green">Error Isolation</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Testing HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active DOM Focus</span>
+      <span class="telemetry-value" id="hud-dom-focus" style="color:#38bdf8;">body</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Current Route / Heading</span>
+      <span class="telemetry-value" id="hud-route-context">/dashboard (Dashboard Overview)</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Descendant Validity</span>
+      <span class="telemetry-value" id="hud-desc-status" style="color:#34d399;">VALID (DOM target exists)</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Overlay Stack Depth</span>
+      <span class="telemetry-value" id="hud-stack-depth" style="color:#a855f7;">0 (Root Page)</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Feature Failure Boundary</span>
+      <span class="telemetry-value" id="hud-boundary-status" style="color:#34d399;">ISOLATED (Safe)</span>
+    </div>
+  </div>
+
+  <!-- Fault Injection Control Bar -->
+  <div class="fault-injection-bar">
+    <span style="font-weight:700; color:#fff;">⚠️ Architectural Fault Injection:</span>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-disable-route-focus" /> Disable Route Focus Shift (Strand on Nav Link)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-position-index" /> Key Active State by Index (Corrupt on Delete)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-unstacked-escape" /> Uncoordinated Global Escape (Collapse All Overlays)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-monolithic-boundary" /> Monolithic Error Boundary (Kill Entire Feature)
+    </label>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario A & B -->
+    <div class="grid-2">
+      <!-- Scenario A: SPA Route Navigation & Focus Management -->
+      <div class="card" id="card-scen-a">
+        <div class="card-header">
+          <span class="card-title">🧭 Scenario A — SPA Route Transition & Focus Strategy</span>
+          <span class="badge badge-blue">Route Boundary</span>
+        </div>
+        <p class="card-desc">
+          Click route links. With route focus management enabled, hardware focus shifts immediately to the new page's <code>&lt;h1 tabIndex={-1}&gt;</code> so screen readers announce the new context.
+        </p>
+        <nav class="nav-bar" aria-label="Simulated App Navigation">
+          <button class="nav-link active" id="nav-dash" onclick="navigateTo('/dashboard', 'Dashboard Overview')">Dashboard</button>
+          <button class="nav-link" id="nav-orders" onclick="navigateTo('/orders', 'Orders Management')">Orders</button>
+          <button class="nav-link" id="nav-settings" onclick="navigateTo('/settings', 'System Settings')">Settings</button>
+        </nav>
+        <div class="route-view-container" id="route-viewport">
+          <h1 id="page-heading" tabindex="-1" style="font-size:1.25rem; color:#38bdf8; outline:none; margin-bottom:0.5rem;">Dashboard Overview</h1>
+          <p style="color:var(--text-secondary); font-size:0.875rem;">Welcome to the high-performance cloud management console.</p>
+        </div>
+      </div>
+
+      <!-- Scenario B: Dynamic Listbox & Surviving Sibling Recovery -->
+      <div class="card" id="card-scen-b">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario B — Dynamic Listbox & Recovery Policy</span>
+          <span class="badge badge-green">Entity Identity</span>
+        </div>
+        <p class="card-desc">
+          Select an item and click "Delete Focused Item". An explicit recovery policy transfers active state to the nearest surviving sibling, preventing dangling <code>aria-activedescendant</code> pointers.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <button class="btn btn-danger" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="deleteActiveItem()">Delete Active Item</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="resetItems()">Reset List</button>
+        </div>
+        <ul id="dynamic-listbox" role="listbox" aria-label="Compute Nodes" tabindex="0" class="item-list">
+          <!-- Populated by script -->
+        </ul>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario C & D -->
+    <div class="grid-2">
+      <!-- Scenario C: Nested Overlay Escape Stack Manager -->
+      <div class="card" id="card-scen-c">
+        <div class="card-header">
+          <span class="card-title">🥞 Scenario C — Nested Overlay LIFO Escape Stack</span>
+          <span class="badge badge-purple">LIFO Stack</span>
+        </div>
+        <p class="card-desc">
+          Open Layer 1 (Modal), then Layer 2 (Confirmation). Press <kbd>Escape</kbd>. With LIFO stack coordination, only the topmost active layer dismisses.
+        </p>
+        <div style="display:flex; gap:0.6rem;">
+          <button id="btn-open-modal-1" class="btn btn-secondary" onclick="openLayer1()">Open Layer 1 (Settings Modal)</button>
+        </div>
+      </div>
+
+      <!-- Scenario D: Progressive Failure & Error Boundary Isolation -->
+      <div class="card" id="card-scen-d">
+        <div class="card-header">
+          <span class="card-title">🛡️ Scenario D — Progressive Failure & Boundary Isolation</span>
+          <span class="badge badge-warn">Resilience Boundary</span>
+        </div>
+        <p class="card-desc">
+          Simulate a rendering crash inside the optional analytics chart. Scoped error boundaries preserve primary workflow controls (Search, Filters, Table).
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <button class="btn btn-danger" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="triggerChartError()">Crash Analytics Chart</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="recoverChart()">Recover Chart</button>
+        </div>
+        <div id="feature-container" style="background:#030712; padding:1rem; border-radius:8px; border:1px solid var(--border-color);">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem; border-bottom:1px solid #374151; padding-bottom:0.5rem;">
+            <span style="font-weight:600; color:#38bdf8;">Primary Orders Workflow</span>
+            <span style="font-size:0.75rem; color:#10b981;">[Filters & Search Active]</span>
+          </div>
+          <div id="analytics-boundary" style="background:#1e293b; padding:0.75rem; border-radius:6px;">
+            <div id="analytics-content" style="font-size:0.85rem; color:#9ca3af;">
+              📊 Real-time Throughput: <strong>24,500 req/sec</strong> (Healthy)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Event Telemetry Trace -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Architecture Lifecycle & Telemetry Trace</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearTelemetry()">Clear Trace</button>
+      </div>
+      <div class="log-panel" id="telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Application architecture workbench initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Layer 1 Modal -->
+  <div class="overlay-backdrop" id="modal-layer-1" role="dialog" aria-modal="true" aria-labelledby="m1-title">
+    <div class="overlay-dialog" tabindex="-1">
+      <h3 id="m1-title" style="font-size:1.15rem; color:#38bdf8; margin-bottom:0.75rem;">Layer 1: Security Preferences</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Configure multi-factor authentication and token lifetimes.
+      </p>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-danger" onclick="openLayer2()">Open Layer 2 (Revoke All)</button>
+        <button class="btn btn-secondary" onclick="closeLayer1()">Close Layer 1</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 2 Modal (Nested) -->
+  <div class="overlay-backdrop" id="modal-layer-2" role="dialog" aria-modal="true" aria-labelledby="m2-title" style="z-index:110;">
+    <div class="overlay-dialog" tabindex="-1" style="border-color:#ef4444;">
+      <h3 id="m2-title" style="font-size:1.15rem; color:#f87171; margin-bottom:0.75rem;">Layer 2: Confirm Revocation</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Are you sure you want to revoke all 14 active API keys across all regions?
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+        <button class="btn btn-secondary" id="m2-cancel-btn" onclick="closeLayer2()">Cancel (Esc)</button>
+        <button class="btn btn-danger" onclick="closeLayer2()">Revoke</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentRoute = '/dashboard';
+    let overlayStack = [];
+    let items = [
+      { id: 'node-alpha', name: 'Cluster Alpha (us-east-1)', status: 'Active' },
+      { id: 'node-beta', name: 'Cluster Beta (eu-west-1)', status: 'Active' },
+      { id: 'node-gamma', name: 'Cluster Gamma (ap-southeast-1)', status: 'Standby' },
+      { id: 'node-delta', name: 'Cluster Delta (sa-east-1)', status: 'Active' }
+    ];
+    let activeItemId = 'node-beta';
+
+    // Global Focus Tracking
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      const desc = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`;
+      document.getElementById('hud-dom-focus').innerText = desc;
+      logEvent(`[FOCUSIN] ${desc}`);
+    });
+
+    function logEvent(msg) {
+      const panel = document.getElementById('telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearTelemetry() {
+      document.getElementById('telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Trace cleared.</div>';
+    }
+
+    // Scenario A: Route Navigation
+    function navigateTo(route, title) {
+      currentRoute = route;
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      const activeNav = route === '/dashboard' ? 'nav-dash' : route === '/orders' ? 'nav-orders' : 'nav-settings';
+      document.getElementById(activeNav).classList.add('active');
+
+      document.getElementById('page-heading').innerText = title;
+      document.getElementById('hud-route-context').innerText = `${route} (${title})`;
+
+      const disableFocus = document.getElementById('fault-disable-route-focus').checked;
+      if (disableFocus) {
+        logEvent(`[ROUTE] Navigated to ${route}. [FAULT] Focus left stranded on nav button.`);
+      } else {
+        const heading = document.getElementById('page-heading');
+        heading.focus();
+        logEvent(`[ROUTE] Navigated to ${route}. Shifted focus to <h1> page heading.`);
+      }
+    }
+
+    // Scenario B: Dynamic Listbox
+    function renderItems() {
+      const listbox = document.getElementById('dynamic-listbox');
+      listbox.innerHTML = '';
+      const byIndex = document.getElementById('fault-position-index').checked;
+
+      items.forEach((item, idx) => {
+        const domId = byIndex ? `item-index-${idx}` : `item-${item.id}`;
+        const isActive = byIndex ? (idx === 1) : (item.id === activeItemId);
+
+        const li = document.createElement('li');
+        li.id = domId;
+        li.role = 'option';
+        li.className = `item-row ${isActive ? 'active-item' : ''}`;
+        li.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        li.innerHTML = `
+          <span><strong>${item.name}</strong> <span style="color:#64748b; font-size:0.75rem;">(${item.status})</span></span>
+          <span style="font-family:var(--font-mono); font-size:0.75rem; color:${isActive ? '#38bdf8' : '#6b7280'}">id: ${domId}</span>
+        `;
+        li.onclick = () => {
+          activeItemId = item.id;
+          renderItems();
+        };
+        listbox.appendChild(li);
+      });
+
+      // Update HUD active descendant status
+      const targetDomId = byIndex ? `item-index-1` : `item-${activeItemId}`;
+      const targetExists = document.getElementById(targetDomId) !== null;
+
+      const descStatus = document.getElementById('hud-desc-status');
+      if (targetExists) {
+        descStatus.innerText = `VALID (#${targetDomId})`;
+        descStatus.style.color = '#34d399';
+      } else {
+        descStatus.innerText = `[DANGLING] Target #${targetDomId} does NOT exist!`;
+        descStatus.style.color = '#ef4444';
+      }
+    }
+
+    function deleteActiveItem() {
+      const byIndex = document.getElementById('fault-position-index').checked;
+      const targetIndex = items.findIndex(i => i.id === activeItemId);
+
+      if (targetIndex === -1 && items.length > 0) return;
+
+      const removed = items[targetIndex];
+      logEvent(`[MUTATION] Deleting active item: ${removed?.name}`);
+
+      items.splice(targetIndex, 1);
+
+      if (!byIndex) {
+        // Correct Recovery Policy: Pick surviving sibling
+        if (items.length > 0) {
+          const nextIndex = Math.min(targetIndex, items.length - 1);
+          activeItemId = items[nextIndex].id;
+          logEvent(`[RECOVERY] Recovered active focus to surviving sibling: ${items[nextIndex].name}`);
+        } else {
+          activeItemId = null;
+          logEvent(`[RECOVERY] List empty; cleared active item.`);
+        }
+      } else {
+        logEvent(`[FAULT] Using positional index state; active ID un-reconciled!`);
+      }
+
+      renderItems();
+    }
+
+    function resetItems() {
+      items = [
+        { id: 'node-alpha', name: 'Cluster Alpha (us-east-1)', status: 'Active' },
+        { id: 'node-beta', name: 'Cluster Beta (eu-west-1)', status: 'Active' },
+        { id: 'node-gamma', name: 'Cluster Gamma (ap-southeast-1)', status: 'Standby' },
+        { id: 'node-delta', name: 'Cluster Delta (sa-east-1)', status: 'Active' }
+      ];
+      activeItemId = 'node-beta';
+      renderItems();
+      logEvent('Reset items collection.');
+    }
+
+    // Scenario C: LIFO Overlay Stack
+    function openLayer1() {
+      overlayStack.push('layer-1');
+      document.getElementById('modal-layer-1').style.display = 'flex';
+      updateStackHUD();
+      logEvent('[OVERLAY] Pushed Layer 1 onto LIFO stack.');
+    }
+
+    function closeLayer1() {
+      overlayStack = overlayStack.filter(id => id !== 'layer-1');
+      document.getElementById('modal-layer-1').style.display = 'none';
+      updateStackHUD();
+      document.getElementById('btn-open-modal-1').focus();
+      logEvent('[OVERLAY] Popped Layer 1 from stack; restored focus to trigger.');
+    }
+
+    function openLayer2() {
+      overlayStack.push('layer-2');
+      document.getElementById('modal-layer-2').style.display = 'flex';
+      updateStackHUD();
+      document.getElementById('m2-cancel-btn').focus();
+      logEvent('[OVERLAY] Pushed Layer 2 (Confirmation) onto LIFO stack.');
+    }
+
+    function closeLayer2() {
+      overlayStack = overlayStack.filter(id => id !== 'layer-2');
+      document.getElementById('modal-layer-2').style.display = 'none';
+      updateStackHUD();
+      logEvent('[OVERLAY] Popped Layer 2 from stack.');
+    }
+
+    function updateStackHUD() {
+      const hud = document.getElementById('hud-stack-depth');
+      hud.innerText = `${overlayStack.length} (${overlayStack.join(' -> ') || 'Root Page'})`;
+    }
+
+    // Global Key Listener (Escape handling)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const unstacked = document.getElementById('fault-unstacked-escape').checked;
+
+        if (unstacked) {
+          // Fault: Close everything
+          document.getElementById('modal-layer-1').style.display = 'none';
+          document.getElementById('modal-layer-2').style.display = 'none';
+          overlayStack = [];
+          updateStackHUD();
+          logEvent('[FAULT] Uncoordinated global Escape listener collapsed ALL overlays simultaneously!');
+        } else if (overlayStack.length > 0) {
+          // Correct: Pop topmost layer
+          const top = overlayStack[overlayStack.length - 1];
+          if (top === 'layer-2') {
+            closeLayer2();
+          } else if (top === 'layer-1') {
+            closeLayer1();
+          }
+        }
+      }
+    });
+
+    // Scenario D: Progressive Failure
+    function triggerChartError() {
+      const monolithic = document.getElementById('fault-monolithic-boundary').checked;
+
+      if (monolithic) {
+        // Monolithic crash: Destroy entire feature
+        document.getElementById('feature-container').innerHTML = `
+          <div style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; padding:1.25rem; border-radius:6px; color:#f87171;">
+            <strong>⚠️ Critical Feature Error</strong><br />
+            <span style="font-size:0.8rem;">The entire Orders feature has crashed due to an unhandled analytics exception. Filters, search, and table are unmounted.</span>
+          </div>
+        `;
+        document.getElementById('hud-boundary-status').innerText = 'CRITICAL (Feature Destroyed)';
+        document.getElementById('hud-boundary-status').style.color = '#ef4444';
+        logEvent('[CATASTROPHIC] Monolithic Error Boundary destroyed entire feature workflow!');
+      } else {
+        // Scoped crash: Only analytics fallback
+        document.getElementById('analytics-boundary').innerHTML = `
+          <div style="color:#f87171; font-size:0.8rem;">
+            ⚠️ Analytics visualization unavailable. Primary orders workflow remains fully operable.
+          </div>
+        `;
+        document.getElementById('hud-boundary-status').innerText = 'ISOLATED (Workflow Intact)';
+        document.getElementById('hud-boundary-status').style.color = '#34d399';
+        logEvent('[RESILIENCE] Scoped Error Boundary contained analytics chart failure.');
+      }
+    }
+
+    function recoverChart() {
+      const container = document.getElementById('feature-container');
+      container.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.75rem; border-bottom:1px solid #374151; padding-bottom:0.5rem;">
+          <span style="font-weight:600; color:#38bdf8;">Primary Orders Workflow</span>
+          <span style="font-size:0.75rem; color:#10b981;">[Filters & Search Active]</span>
+        </div>
+        <div id="analytics-boundary" style="background:#1e293b; padding:0.75rem; border-radius:6px;">
+          <div id="analytics-content" style="font-size:0.85rem; color:#9ca3af;">
+            📊 Real-time Throughput: <strong>24,500 req/sec</strong> (Healthy)
+          </div>
+        </div>
+      `;
+      document.getElementById('hud-boundary-status').innerText = 'ISOLATED (Safe)';
+      document.getElementById('hud-boundary-status').style.color = '#34d399';
+      logEvent('Recovered feature components.');
+    }
+
+    // Initialize
+    renderItems();
+  </script>
+</body>
+</html>
