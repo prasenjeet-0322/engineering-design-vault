@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 04 — Screen Readers, Accessible Names, Live Regions & Dynamic Announcements</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-native-bg: rgba(16, 185, 129, 0.1);
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Live Telemetry HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    /* Interactive UI widgets */
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+    }
+
+    .output-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #7ee787;
+      margin-top: 1rem;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+    }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+    .log-polite { color: #34d399; }
+    .log-assertive { color: #f87171; font-weight: 700; }
+    .log-aom { color: #a855f7; }
+
+    .warning-badge {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #f59e0b;
+      color: #fbbf24;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      margin-top: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Hidden element style */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 04 — Screen Readers & Dynamic Live Regions</div>
+      <div class="header-subtitle">WAI-ARIA 1.2 · Accessible Name Computation · Live Region Timing & Politeness</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Frontend</span>
+      <span class="badge badge-blue">WCAG 4.1.3</span>
+      <span class="badge badge-green">ARIA 1.2</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Live Telemetry HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">AOM Virtual Voice Synth</span>
+      <span class="telemetry-value" id="hud-synth">"Ready for speech synthesis..."</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Element Name</span>
+      <span class="telemetry-value" id="hud-name">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Element Role</span>
+      <span class="telemetry-value" id="hud-role">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Live Announcements Sent</span>
+      <span class="telemetry-value" id="hud-count">0</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Lab 1 & Lab 2 -->
+    <div class="grid-2">
+      <!-- Lab 1: Accessible Name Inspector -->
+      <div class="card" id="card-lab-1">
+        <div class="card-header">
+          <span class="card-title">🔬 Lab 01 — Accessible Name Computation Inspector</span>
+          <span class="badge badge-blue">AccName 1.2</span>
+        </div>
+        <p class="card-desc">
+          Inspect how text content, <code>aria-label</code>, and <code>aria-labelledby</code> determine the final accessible name computed by browser AOM.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <button id="btn-demo-1" class="btn" onclick="inspectElement('btn-demo-1')">
+            Save Invoice #4092
+          </button>
+          <button id="btn-demo-2" class="btn btn-secondary" aria-label="Close settings dialog" onclick="inspectElement('btn-demo-2')">
+            ⚙️ (Icon Only)
+          </button>
+          <div id="label-source" style="display:none;">Billing Preferences Panel</div>
+          <button id="btn-demo-3" class="btn btn-secondary" aria-labelledby="label-source" onclick="inspectElement('btn-demo-3')">
+            Overridden Text
+          </button>
+        </div>
+        <div class="speech-bubble" id="output-lab-1">
+          Click or focus any button above to compute its exact AOM Accessible Name.
+        </div>
+      </div>
+
+      <!-- Lab 2: Visible Label vs aria-label Divergence -->
+      <div class="card" id="card-lab-2">
+        <div class="card-header">
+          <span class="card-title">⚠️ Lab 02 — Visible Label vs aria-label Divergence</span>
+          <span class="badge badge-red">Anti-Pattern</span>
+        </div>
+        <p class="card-desc">
+          When <code>aria-label</code> completely overwrites visible text, voice-control users (e.g. Dragon) say "Click Save", but the OS only knows "Submit Transaction".
+        </p>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <button id="btn-divergent" class="btn btn-danger" aria-label="Submit Transaction to Server" onclick="testDivergence()">
+            Save
+          </button>
+        </div>
+        <div class="warning-badge" id="divergence-warning" style="display:none;">
+          ⚠️ <strong>Divergence Detected:</strong> Visible text is "Save", but Screen Reader hears "Submit Transaction to Server"!
+        </div>
+        <div class="speech-bubble" id="output-lab-2">
+          Click button to observe speech announcement divergence.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Lab 3 & Lab 4 -->
+    <div class="grid-2">
+      <!-- Lab 3: Accessible Name vs Accessible Description -->
+      <div class="card" id="card-lab-3">
+        <div class="card-header">
+          <span class="card-title">🏷️ Lab 03 — Name vs Description Hierarchy</span>
+          <span class="badge badge-blue">aria-describedby</span>
+        </div>
+        <p class="card-desc">
+          Name identifies <em>what</em> the control is. Description provides <em>supplementary instruction</em>. Screen readers pause between the two.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <label for="input-email" id="email-label" style="font-size: 0.85rem; font-weight: 600;">Corporate Email</label>
+          <input id="input-email" class="input-control" aria-describedby="email-hint" placeholder="user@company.com" onfocus="inspectInputNameDesc('input-email', 'email-label', 'email-hint')" />
+          <span id="email-hint" style="font-size: 0.75rem; color: var(--text-muted);">Must end with @company.com</span>
+        </div>
+        <div class="speech-bubble" id="output-lab-3">
+          Focus the input to hear the distinct Name followed by Description.
+        </div>
+      </div>
+
+      <!-- Lab 4: Dynamic aria-describedby for Form Errors -->
+      <div class="card" id="card-lab-4">
+        <div class="card-header">
+          <span class="card-title">❌ Lab 04 — Dynamic aria-invalid & Error Binding</span>
+          <span class="badge badge-green">WCAG 3.3.1</span>
+        </div>
+        <p class="card-desc">
+          Associating error messages via <code>aria-invalid="true"</code> and <code>aria-describedby</code> ensures blind users hear validation errors upon focusing.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <label for="input-pass" style="font-size: 0.85rem; font-weight: 600;">Password</label>
+          <input id="input-pass" type="password" class="input-control" value="123" aria-invalid="true" aria-describedby="pass-err" onfocus="inspectErrorBinding()" />
+          <span id="pass-err" style="font-size: 0.75rem; color: #f87171; font-weight: 600;">Password must be at least 12 characters.</span>
+        </div>
+        <div class="speech-bubble" id="output-lab-4">
+          Focus password input to hear AOM announcement of invalid state and error message.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Lab 5 & Lab 6 -->
+    <div class="grid-2">
+      <!-- Lab 5: Dynamic aria-expanded State Projection -->
+      <div class="card" id="card-lab-5">
+        <div class="card-header">
+          <span class="card-title">🔄 Lab 05 — Direct aria-expanded Projection</span>
+          <span class="badge badge-green">State Sync</span>
+        </div>
+        <p class="card-desc">
+          Single authoritative React state directly projecting to <code>aria-expanded</code>. Eliminates split-brain state bugs.
+        </p>
+        <div>
+          <button id="btn-disclosure" class="btn" aria-expanded="false" aria-controls="panel-disclosure" onclick="toggleDisclosure()">
+            Options & Settings ▾
+          </button>
+          <div id="panel-disclosure" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #1e293b; border-radius: 6px; font-size: 0.85rem;">
+            Expanded content: Notification triggers, Webhook URLs, API Keys.
+          </div>
+        </div>
+        <div class="speech-bubble" id="output-lab-5">
+          Click button to observe synchronized screen reader expansion announcement.
+        </div>
+      </div>
+
+      <!-- Lab 6: role="status" (aria-live="polite") -->
+      <div class="card" id="card-lab-6">
+        <div class="card-header">
+          <span class="card-title">📢 Lab 06 — role="status" Polite Announcement</span>
+          <span class="badge badge-blue">Non-Urgent</span>
+        </div>
+        <p class="card-desc">
+          Non-urgent updates are queued and spoken when the screen reader finishes current speech, avoiding user interruption.
+        </p>
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-secondary" onclick="triggerStatusUpdate('Profile changes saved successfully.')">
+            Simulate Save (Polite)
+          </button>
+          <button class="btn btn-secondary" onclick="triggerStatusUpdate('3 new items added to cart.')">
+            Cart Update (Polite)
+          </button>
+        </div>
+        <!-- Live Region container -->
+        <div id="live-status-region" role="status" class="sr-only"></div>
+        <div class="speech-bubble" id="output-lab-6">
+          Click to dispatch non-urgent status announcement.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Lab 7 & Lab 8 -->
+    <div class="grid-2">
+      <!-- Lab 7: role="alert" (aria-live="assertive") -->
+      <div class="card" id="card-lab-7">
+        <div class="card-header">
+          <span class="card-title">🚨 Lab 07 — role="alert" Urgent Interruption</span>
+          <span class="badge badge-red">Urgent / Alert</span>
+        </div>
+        <p class="card-desc">
+          Assertive live regions interrupt whatever the screen reader is currently reading. Use strictly for critical errors and emergencies.
+        </p>
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-danger" onclick="triggerAlertUpdate('Payment processing failed: Card expired!')">
+            Simulate Payment Error (Assertive)
+          </button>
+        </div>
+        <!-- Alert Region container -->
+        <div id="live-alert-region" role="alert" class="sr-only"></div>
+        <div class="speech-bubble" id="output-lab-7">
+          Click to dispatch assertive interrupt announcement.
+        </div>
+      </div>
+
+      <!-- Lab 8: Announcement Spam vs Debounced Policy -->
+      <div class="card" id="card-lab-8">
+        <div class="card-header">
+          <span class="card-title">⚡ Lab 08 — Keystroke Spam vs Debounced Policy</span>
+          <span class="badge badge-warn">Rate Limiting</span>
+        </div>
+        <p class="card-desc">
+          Type quickly below. Uncontrolled live regions announce every letter. Debounced policy announces only once the query stabilizes.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          <input id="input-search-demo" class="input-control" placeholder="Type fast: 'accessibility in react'..." oninput="handleSearchInput(this.value)" />
+          <div style="display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+            <span>Raw Keystrokes: <strong id="raw-count" style="color:#f87171;">0</strong></span>
+            <span>Debounced Announcements: <strong id="debounced-count" style="color:#34d399;">0</strong></span>
+          </div>
+        </div>
+        <div class="speech-bubble" id="output-lab-8">
+          Type in search to test live region rate limiting.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Lab 9 & Lab 10 -->
+    <div class="grid-2">
+      <!-- Lab 9: Duplicate Announcement Detector -->
+      <div class="card" id="card-lab-9">
+        <div class="card-header">
+          <span class="card-title">👥 Lab 09 — Duplicate Announcement Detector</span>
+          <span class="badge badge-warn">Split-Channel</span>
+        </div>
+        <p class="card-desc">
+          When multiple independent components mount live regions for the same event (e.g. inline status + floating toast), duplicate announcements occur.
+        </p>
+        <button class="btn btn-secondary" onclick="simulateDuplicateToast()">
+          Dispatch Save Event (2 Active Regions)
+        </button>
+        <div class="warning-badge" id="dup-warning" style="display:none;">
+          ⚠️ <strong>Duplicate Speech Warning:</strong> Screen reader received 2 identical announcements in &lt; 50ms!
+        </div>
+        <div class="speech-bubble" id="output-lab-9">
+          Click to test duplicate live region emission.
+        </div>
+      </div>
+
+      <!-- Lab 10: Focus Transfer vs Live Announcement -->
+      <div class="card" id="card-lab-10">
+        <div class="card-header">
+          <span class="card-title">🎯 Lab 10 — Focus Transfer vs Live Announcement</span>
+          <span class="badge badge-blue">Architecture</span>
+        </div>
+        <p class="card-desc">
+          Never use an announcement to announce a modal when you should move physical DOM focus. Focus moves context; announcements inform ambient change.
+        </p>
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-danger" onclick="compareFocusVsAnnounce('bad')">
+            Anti-Pattern (Announce only, no focus)
+          </button>
+          <button class="btn btn-secondary" onclick="compareFocusVsAnnounce('good')">
+            Senior Pattern (Acquire focus on modal)
+          </button>
+        </div>
+        <div class="speech-bubble" id="output-lab-10">
+          Compare user experience between focus shift and ambient announcement.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 6: Lab 11 & Lab 12 -->
+    <div class="grid-2">
+      <!-- Lab 11: aria-hidden Contradiction Detector -->
+      <div class="card" id="card-lab-11">
+        <div class="card-header">
+          <span class="card-title">🚫 Lab 11 — aria-hidden Contradiction Detector</span>
+          <span class="badge badge-red">Severe Defect</span>
+        </div>
+        <p class="card-desc">
+          Placing <code>aria-hidden="true"</code> on a container that contains keyboard-focusable interactive children causes focus to land on invisible ghost elements.
+        </p>
+        <div id="hidden-container" aria-hidden="true" style="padding: 0.75rem; background: rgba(239,68,68,0.1); border: 1px dashed #ef4444; border-radius: 6px;">
+          <span style="font-size: 0.8rem; color: #f87171;">Container has aria-hidden="true"</span>
+          <button id="btn-ghost" class="btn btn-secondary" style="margin-top: 0.5rem;" onfocus="detectAriaHiddenFocus()">
+            Ghost Button (Focusable via Tab!)
+          </button>
+        </div>
+        <div class="warning-badge" id="hidden-warning" style="display:none;">
+          🚨 <strong>WCAG 4.1.2 VIOLATION:</strong> Focused element is inside an aria-hidden container! Screen reader perceives nothing!
+        </div>
+        <div class="speech-bubble" id="output-lab-11">
+          Press Tab into the Ghost Button to trigger contradiction detector.
+        </div>
+      </div>
+
+      <!-- Lab 12: Dynamic Search Result Policy -->
+      <div class="card" id="card-lab-12">
+        <div class="card-header">
+          <span class="card-title">📊 Lab 12 — Stabilized Search Result Announcer</span>
+          <span class="badge badge-green">Production Ready</span>
+        </div>
+        <p class="card-desc">
+          Production pattern: Search results announce "14 results found" only after debounce timer expires, avoiding speech overlap.
+        </p>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary" onclick="simulateSearchFilter(24)">Filter: React Components (24)</button>
+          <button class="btn btn-secondary" onclick="simulateSearchFilter(3)">Filter: Critical Bugs (3)</button>
+          <button class="btn btn-secondary" onclick="simulateSearchFilter(0)">Filter: Zero Matches (0)</button>
+        </div>
+        <div class="speech-bubble" id="output-lab-12">
+          Click filters to test stabilized announcement timing.
+        </div>
+      </div>
+    </div>
+
+    <!-- Real-time Speech Event Log -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Screen Reader Speech Event Telemetry Log</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearSpeechLog()">Clear Log</button>
+      </div>
+      <div class="log-panel" id="speech-log-panel">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> <span class="log-aom">Screen reader speech engine initialized.</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let announcementCount = 0;
+
+    function speak(text, priority = 'polite') {
+      announcementCount++;
+      document.getElementById('hud-count').innerText = announcementCount;
+      document.getElementById('hud-synth').innerText = `"${text}" [${priority}]`;
+
+      const logPanel = document.getElementById('speech-log-panel');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const colorClass = priority === 'assertive' ? 'log-assertive' : 'log-polite';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${colorClass}">[${priority.toUpperCase()}] "${text}"</span>`;
+      logPanel.prepend(entry);
+    }
+
+    // Lab 1: Accessible Name Inspector
+    function inspectElement(id) {
+      const el = document.getElementById(id);
+      let name = '';
+      if (el.getAttribute('aria-labelledby')) {
+        const sourceId = el.getAttribute('aria-labelledby');
+        name = document.getElementById(sourceId)?.innerText || '';
+      } else if (el.getAttribute('aria-label')) {
+        name = el.getAttribute('aria-label');
+      } else {
+        name = el.innerText.trim();
+      }
+
+      document.getElementById('hud-name').innerText = name;
+      document.getElementById('hud-role').innerText = el.getAttribute('role') || el.tagName.toLowerCase();
+      document.getElementById('output-lab-1').innerText = `AOM Computed Name: "${name}" | Source: ${el.getAttribute('aria-labelledby') ? 'aria-labelledby' : el.getAttribute('aria-label') ? 'aria-label' : 'innerText'}`;
+      speak(`Focused button: ${name}`, 'polite');
+    }
+
+    // Lab 2: Divergence
+    function testDivergence() {
+      const btn = document.getElementById('btn-divergent');
+      const visibleText = btn.innerText.trim();
+      const ariaLabel = btn.getAttribute('aria-label');
+      document.getElementById('divergence-warning').style.display = 'flex';
+      document.getElementById('output-lab-2').innerText = `Visible: "${visibleText}" ❌ Accessible Name: "${ariaLabel}"`;
+      speak(`Button, ${ariaLabel}`, 'polite');
+    }
+
+    // Lab 3: Name vs Desc
+    function inspectInputNameDesc(inputId, labelId, hintId) {
+      const label = document.getElementById(labelId).innerText;
+      const hint = document.getElementById(hintId).innerText;
+      document.getElementById('hud-name').innerText = label;
+      document.getElementById('hud-role').innerText = 'textbox';
+      document.getElementById('output-lab-3').innerText = `Name: "${label}" | Description: "${hint}"`;
+      speak(`${label}, edit text. ${hint}`, 'polite');
+    }
+
+    // Lab 4: Dynamic error binding
+    function inspectErrorBinding() {
+      const label = 'Password';
+      const err = document.getElementById('pass-err').innerText;
+      document.getElementById('output-lab-4').innerText = `Name: "${label}" | State: Invalid | Description: "${err}"`;
+      speak(`${label}, password edit text, invalid entry. ${err}`, 'assertive');
+    }
+
+    // Lab 5: Disclosure
+    let isExpanded = false;
+    function toggleDisclosure() {
+      isExpanded = !isExpanded;
+      const btn = document.getElementById('btn-disclosure');
+      const panel = document.getElementById('panel-disclosure');
+      btn.setAttribute('aria-expanded', String(isExpanded));
+      btn.innerHTML = isExpanded ? 'Options & Settings ▴' : 'Options & Settings ▾';
+      panel.style.display = isExpanded ? 'block' : 'none';
+      document.getElementById('output-lab-5').innerText = `aria-expanded = "${isExpanded}"`;
+      speak(`Options & Settings, button, ${isExpanded ? 'expanded' : 'collapsed'}`, 'polite');
+    }
+
+    // Lab 6: Status
+    function triggerStatusUpdate(msg) {
+      const region = document.getElementById('live-status-region');
+      region.innerText = '';
+      setTimeout(() => {
+        region.innerText = msg;
+        document.getElementById('output-lab-6').innerText = `Live Region (role="status"): "${msg}"`;
+        speak(msg, 'polite');
+      }, 50);
+    }
+
+    // Lab 7: Alert
+    function triggerAlertUpdate(msg) {
+      const region = document.getElementById('live-alert-region');
+      region.innerText = '';
+      setTimeout(() => {
+        region.innerText = msg;
+        document.getElementById('output-lab-7').innerText = `Live Region (role="alert"): "${msg}"`;
+        speak(msg, 'assertive');
+      }, 50);
+    }
+
+    // Lab 8: Keystroke spam vs debounced
+    let rawKeystrokes = 0;
+    let debouncedAnnouncements = 0;
+    let debounceTimer = null;
+
+    function handleSearchInput(val) {
+      rawKeystrokes++;
+      document.getElementById('raw-count').innerText = rawKeystrokes;
+
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (val.trim()) {
+          debouncedAnnouncements++;
+          document.getElementById('debounced-count').innerText = debouncedAnnouncements;
+          const msg = `Search results for "${val}" updated: ${Math.floor(Math.random() * 20) + 1} matches.`;
+          document.getElementById('output-lab-8').innerText = msg;
+          speak(msg, 'polite');
+        }
+      }, 400);
+    }
+
+    // Lab 9: Duplicate Toast
+    function simulateDuplicateToast() {
+      document.getElementById('dup-warning').style.display = 'flex';
+      document.getElementById('output-lab-9').innerText = `Dispatched to 2 live regions: "Saved successfully."`;
+      speak('Saved successfully.', 'polite');
+      setTimeout(() => speak('Saved successfully.', 'polite'), 30);
+    }
+
+    // Lab 10: Focus vs Announce
+    function compareFocusVsAnnounce(type) {
+      if (type === 'bad') {
+        document.getElementById('output-lab-10').innerText = `❌ Anti-pattern: Spoke "Dialog opened", but focus stayed on the button behind it!`;
+        speak('Dialog opened. Confirm deletion.', 'polite');
+      } else {
+        document.getElementById('output-lab-10').innerText = `✅ Senior pattern: Physical focus acquired by Dialog heading, screen reader reads modal scope automatically.`;
+        speak('Delete Confirmation, dialog. Are you sure you want to delete this invoice? Delete button, focused.', 'polite');
+      }
+    }
+
+    // Lab 11: aria-hidden contradiction
+    function detectAriaHiddenFocus() {
+      document.getElementById('hidden-warning').style.display = 'flex';
+      document.getElementById('output-lab-11').innerText = `Focus received on button, but parent has aria-hidden="true". The screen reader announces SILENCE!`;
+      speak('(SILENCE — Accessibility Tree skipped this node)', 'assertive');
+    }
+
+    // Lab 12: Filter results
+    function simulateSearchFilter(count) {
+      const text = count === 0 ? 'No matching records found.' : `${count} results found.`;
+      document.getElementById('output-lab-12').innerText = `Live Announcement: "${text}"`;
+      speak(text, 'polite');
+    }
+
+    function clearSpeechLog() {
+      document.getElementById('speech-log-panel').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> <span class="log-aom">Log cleared.</span></div>';
+    }
+  </script>
+</body>
+</html>
