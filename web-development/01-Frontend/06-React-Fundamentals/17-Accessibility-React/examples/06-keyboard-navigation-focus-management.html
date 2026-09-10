@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 06 — Keyboard Navigation, Focus Management & Interaction Semantics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Live Telemetry HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    /* Roving Tabindex Container */
+    .tablist-roving {
+      display: flex;
+      gap: 0.5rem;
+      background: #0f172a;
+      padding: 0.4rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+    .tab-roving-item {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .tab-roving-item:hover { color: #fff; }
+    .tab-roving-item[aria-selected="true"] {
+      background: #2563eb;
+      color: #fff;
+    }
+    .tab-roving-item:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    /* Active Descendant Container */
+    .combobox-active-desc {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.5rem;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 0.5rem;
+    }
+    .option-item {
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .option-item.is-active {
+      background: #1e3a8a;
+      color: #93c5fd;
+      outline: 1px solid #3b82f6;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.75rem;
+      width: 480px;
+      max-width: 90vw;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .modal-box:focus { outline: none; }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 06 — Keyboard Navigation & Focus Semantics</div>
+      <div class="header-subtitle">WCAG 2.1.1 · WCAG 2.1.2 · WAI-ARIA 1.2 · Roving tabIndex & Focus Trapping</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Frontend</span>
+      <span class="badge badge-blue">WCAG 2.2 AA</span>
+      <span class="badge badge-green">APG 1.2</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Live Telemetry HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Element ID</span>
+      <span class="telemetry-value" id="hud-active-id">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Logical Active Item</span>
+      <span class="telemetry-value" id="hud-active-item">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Selected Item</span>
+      <span class="telemetry-value" id="hud-selected-item">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Last Key Event</span>
+      <span class="telemetry-value" id="hud-key-event">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Focus State Transition</span>
+      <span class="telemetry-value" id="hud-transition" style="color:#34d399;">Idle</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario 1 & 2 -->
+    <div class="grid-2">
+      <!-- Scenario 01: Native Button vs Clickable Div -->
+      <div class="card" id="card-scen-1">
+        <div class="card-header">
+          <span class="card-title">🔘 Scenario 01 — Native Button vs Clickable Div</span>
+          <span class="badge badge-green">Semantic HTML</span>
+        </div>
+        <p class="card-desc">
+          Compare native <code>&lt;button&gt;</code> vs <code>&lt;div role="button" tabIndex={0}&gt;</code>. Notice how native buttons automatically fire on both <kbd>Enter</kbd> (keydown) and <kbd>Space</kbd> (keyup) without custom JS handlers.
+        </p>
+        <div style="display:flex; gap:1rem; align-items:center;">
+          <button type="button" class="btn btn-success" id="btn-native" onclick="handleNativeButtonClick()">
+            Native &lt;button&gt;
+          </button>
+          <div
+            id="btn-custom-div"
+            role="button"
+            tabindex="0"
+            class="btn btn-secondary"
+            onclick="handleCustomDivClick()"
+            onkeydown="handleCustomDivKey(event)"
+          >
+            Custom &lt;div role="button"&gt;
+          </div>
+        </div>
+        <div class="speech-bubble" id="output-scen-1">
+          Press Tab to focus each button, then test Enter and Space keys.
+        </div>
+      </div>
+
+      <!-- Scenario 02: Positive tabindex Anti-pattern -->
+      <div class="card" id="card-scen-2">
+        <div class="card-header">
+          <span class="card-title">⚠️ Scenario 02 — Positive tabIndex Hazard</span>
+          <span class="badge badge-red">Anti-Pattern</span>
+        </div>
+        <p class="card-desc">
+          Compare natural DOM tab sequence vs positive <code>tabIndex={1, 2, 3}</code>. Notice how positive tabindex hijacks the global page navigation order before any natural element.
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" tabindex="3" id="pos-tab-3">tabIndex="3" (Third in code)</button>
+          <button class="btn btn-danger" tabindex="1" id="pos-tab-1">tabIndex="1" (Hijacks First!)</button>
+          <button class="btn btn-secondary" tabindex="2" id="pos-tab-2">tabIndex="2" (Second)</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-2">
+          Press Tab from the address bar to witness positive tabindex hijacking.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario 3 & 4 -->
+    <div class="grid-2">
+      <!-- Scenario 03: Roving tabIndex Tab Group -->
+      <div class="card" id="card-scen-3">
+        <div class="card-header">
+          <span class="card-title">🧭 Scenario 03 — Roving tabIndex Tab Group</span>
+          <span class="badge badge-blue">APG Pattern</span>
+        </div>
+        <p class="card-desc">
+          Single Tab stop for the entire group. Use <kbd>←</kbd> / <kbd>→</kbd> or <kbd>Home</kbd> / <kbd>End</kbd> to move focus and update <code>tabIndex: 0 / -1</code>.
+        </p>
+        <div role="tablist" aria-label="Account Tabs" class="tablist-roving" id="roving-tablist" onkeydown="handleRovingTabListKey(event)">
+          <button role="tab" id="tab-overview" aria-selected="true" tabindex="0" class="tab-roving-item" onclick="selectRovingTab(0)">
+            Overview
+          </button>
+          <button role="tab" id="tab-security" aria-selected="false" tabindex="-1" class="tab-roving-item" onclick="selectRovingTab(1)">
+            Security
+          </button>
+          <button role="tab" id="tab-billing" aria-selected="false" tabindex="-1" class="tab-roving-item" onclick="selectRovingTab(2)">
+            Billing
+          </button>
+          <button role="tab" id="tab-api" aria-selected="false" tabindex="-1" class="tab-roving-item" onclick="selectRovingTab(3)">
+            API Keys
+          </button>
+        </div>
+        <div class="speech-bubble" id="output-scen-3">
+          Tab into tablist, then use Arrow keys to navigate.
+        </div>
+      </div>
+
+      <!-- Scenario 04: aria-activedescendant Virtual Focus -->
+      <div class="card" id="card-scen-4">
+        <div class="card-header">
+          <span class="card-title">🎯 Scenario 04 — aria-activedescendant Virtual Focus</span>
+          <span class="badge badge-purple">Virtual Focus</span>
+        </div>
+        <p class="card-desc">
+          Physical DOM focus remains on the <code>&lt;input&gt;</code> while <kbd>↓</kbd> / <kbd>↑</kbd> updates <code>aria-activedescendant</code> to highlight virtual options.
+        </p>
+        <div class="form-group">
+          <label for="activedesc-input" style="font-size:0.875rem; font-weight:600;">Search Cloud Providers</label>
+          <input
+            id="activedesc-input"
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-autocomplete="list"
+            aria-controls="activedesc-listbox"
+            class="input-control"
+            placeholder="Type or use Arrow Down..."
+            onkeydown="handleActiveDescendantKey(event)"
+          />
+          <ul id="activedesc-listbox" role="listbox" class="combobox-active-desc">
+            <li id="opt-aws" role="option" aria-selected="false" class="option-item">Amazon Web Services (AWS)</li>
+            <li id="opt-gcp" role="option" aria-selected="false" class="option-item">Google Cloud Platform (GCP)</li>
+            <li id="opt-azure" role="option" aria-selected="false" class="option-item">Microsoft Azure</li>
+            <li id="opt-oci" role="option" aria-selected="false" class="option-item">Oracle Cloud Infrastructure</li>
+          </ul>
+        </div>
+        <div class="speech-bubble" id="output-scen-4">
+          Focus input and use Arrow Down/Up to move virtual focus.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Scenario 5 & 6 -->
+    <div class="grid-2">
+      <!-- Scenario 05: Uncontrolled Focus Stealing -->
+      <div class="card" id="card-scen-5">
+        <div class="card-header">
+          <span class="card-title">🚫 Scenario 05 — Focus Stealing Effect Anti-Pattern</span>
+          <span class="badge badge-red">Bug Simulation</span>
+        </div>
+        <p class="card-desc">
+          Simulates an uncontrolled <code>useEffect(() => ref.current.focus())</code> firing on every state change, preventing users from interacting with other controls.
+        </p>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <input id="search-stealer" class="input-control" placeholder="Search Query (Focus Stealer target)" />
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn btn-secondary" onclick="simulateStateChange()">Click Secondary Button</button>
+            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem;">
+              <input type="checkbox" id="chk-focus-stealing" checked /> Enable Focus Stealing Bug
+            </label>
+          </div>
+        </div>
+        <div class="speech-bubble" id="output-scen-5">
+          Try clicking secondary button with checkbox enabled to witness focus theft.
+        </div>
+      </div>
+
+      <!-- Scenario 06: Dynamic List + Stable Entity IDs -->
+      <div class="card" id="card-scen-6">
+        <div class="card-header">
+          <span class="card-title">🆔 Scenario 06 — Dynamic List + Stable Entity Keying</span>
+          <span class="badge badge-green">React Identity</span>
+        </div>
+        <p class="card-desc">
+          Deleting row #1 preserves exact focus continuity on the surviving sibling when keyed by stable UUID (not array index).
+        </p>
+        <div id="dynamic-list-container" style="display:flex; flex-direction:column; gap:0.5rem;">
+          <!-- Rendered dynamically -->
+        </div>
+        <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="resetDynamicList()">Reset Dynamic List</button>
+        <div class="speech-bubble" id="output-scen-6">
+          Delete items to observe focus recovery on the next surviving entity.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Scenario 7 & 8 -->
+    <div class="grid-2">
+      <!-- Scenario 07: Broken Index-Based Ref Registry -->
+      <div class="card" id="card-scen-7">
+        <div class="card-header">
+          <span class="card-title">🗂️ Scenario 07 — Index-Based Ref Registry vs Map by ID</span>
+          <span class="badge badge-warn">Ref Registry</span>
+        </div>
+        <p class="card-desc">
+          Demonstrates how array-indexed ref arrays point to the wrong item after list reordering, whereas <code>Map&lt;EntityId, HTMLElement&gt;</code> maintains 100% stable references.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <button class="btn btn-secondary" onclick="reorderDataGrid()">Reorder Rows</button>
+          <button class="btn btn-blue" onclick="focusRowEntity('row-alpha')">Focus Entity Alpha via Map Ref</button>
+        </div>
+        <div id="datagrid-container" style="display:flex; flex-direction:column; gap:0.4rem;">
+          <!-- Injected via JS -->
+        </div>
+        <div class="speech-bubble" id="output-scen-7">
+          Reorder rows and click button to verify Map ref resolves Alpha correctly.
+        </div>
+      </div>
+
+      <!-- Scenario 08: Modal Dialog Focus Entry -->
+      <div class="card" id="card-scen-8">
+        <div class="card-header">
+          <span class="card-title">🪟 Scenario 08 — Modal Dialog Focus Trap & Entry</span>
+          <span class="badge badge-blue">Focus Trap</span>
+        </div>
+        <p class="card-desc">
+          Opening a modal transfers focus to its first input, traps <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> inside, and closes on <kbd>Escape</kbd>.
+        </p>
+        <button class="btn btn-danger" id="btn-open-modal" onclick="openModalDialog()">
+          Open Confirmation Modal
+        </button>
+        <div class="speech-bubble" id="output-scen-8">
+          Click to open modal and test focus containment.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Scenario 9 & 10 -->
+    <div class="grid-2">
+      <!-- Scenario 09: Dialog Focus Restoration -->
+      <div class="card" id="card-scen-9">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario 09 — Identity-Aware Focus Restoration</span>
+          <span class="badge badge-green">Focus Recovery</span>
+        </div>
+        <p class="card-desc">
+          When a modal is opened from a delete button and the entity is destroyed upon confirmation, focus restores to the next surviving sibling row rather than a dead DOM node.
+        </p>
+        <div id="restoration-list" style="display:flex; flex-direction:column; gap:0.5rem;">
+          <!-- Injected via JS -->
+        </div>
+        <div class="speech-bubble" id="output-scen-9">
+          Delete a row via modal to test smart surviving focus recovery.
+        </div>
+      </div>
+
+      <!-- Scenario 10: preventDefault Keyboard Failure -->
+      <div class="card" id="card-scen-10">
+        <div class="card-header">
+          <span class="card-title">🛑 Scenario 10 — preventDefault() Keyboard Interception</span>
+          <span class="badge badge-red">Event Suppression</span>
+        </div>
+        <p class="card-desc">
+          Careless global <code>preventDefault()</code> breaks browser Tab ring and text cursor navigation. Selective prevention preserves accessibility.
+        </p>
+        <div class="form-group">
+          <label for="input-prevent-default" style="font-size:0.875rem; font-weight:600;">Custom Filter Input</label>
+          <input
+            id="input-prevent-default"
+            class="input-control"
+            placeholder="Type here..."
+            onkeydown="handleCarefulKeyDown(event)"
+          />
+        </div>
+        <div class="speech-bubble" id="output-scen-10">
+          Typing and Tab navigation work seamlessly because only Arrow keys are selectively handled.
+        </div>
+      </div>
+    </div>
+
+    <!-- Real-time Interaction Event Log -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Keyboard Navigation & Focus Telemetry Log</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearFocusLog()">Clear Log</button>
+      </div>
+      <div class="log-panel" id="focus-telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Keyboard navigation diagnostic telemetry initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal Dialog Sandbox for Scenario 8 & 9 -->
+  <div class="modal-overlay" id="modal-sandbox" role="dialog" aria-modal="true" aria-labelledby="modal-title" onkeydown="handleModalKeyDown(event)">
+    <div class="modal-box" id="modal-box-el" tabindex="-1">
+      <h3 id="modal-title" style="font-size:1.15rem; font-weight:700; color:#f87171; margin-bottom:0.75rem;">
+        Confirm Permanent Deletion
+      </h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Are you sure you want to delete this resource? This action cannot be undone.
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button class="btn btn-secondary" id="modal-btn-cancel" onclick="closeModalDialog(false)">Cancel</button>
+        <button class="btn btn-danger" id="modal-btn-confirm" onclick="closeModalDialog(true)">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global Focus Tracking
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      document.getElementById('hud-active-id').innerText = el.id || el.tagName.toLowerCase();
+      logEvent(`Focus entered: <${el.tagName.toLowerCase()} id="${el.id}">`);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      document.getElementById('hud-key-event').innerText = `${e.key} (${e.code})`;
+    });
+
+    function logEvent(msg) {
+      const panel = document.getElementById('focus-telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearFocusLog() {
+      document.getElementById('focus-telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Log cleared.</div>';
+    }
+
+    // Scenario 1
+    function handleNativeButtonClick() {
+      document.getElementById('output-scen-1').innerText = 'Native <button> activated successfully via Click / Enter / Space!';
+      logEvent('Native button activated.');
+    }
+    function handleCustomDivClick() {
+      document.getElementById('output-scen-1').innerText = 'Custom <div> activated via pointer click.';
+      logEvent('Custom div clicked.');
+    }
+    function handleCustomDivKey(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        document.getElementById('output-scen-1').innerText = `Custom <div> activated via manual onKeyDown: [${e.key}]!`;
+        logEvent(`Custom div keyboard activation: ${e.key}`);
+      }
+    }
+
+    // Scenario 3: Roving tabIndex
+    let activeTabIndex = 0;
+    const tabButtons = ['tab-overview', 'tab-security', 'tab-billing', 'tab-api'];
+
+    function selectRovingTab(index) {
+      activeTabIndex = index;
+      tabButtons.forEach((id, i) => {
+        const btn = document.getElementById(id);
+        const isSelected = i === index;
+        btn.setAttribute('aria-selected', String(isSelected));
+        btn.setAttribute('tabindex', isSelected ? '0' : '-1');
+      });
+      document.getElementById(tabButtons[index]).focus();
+      document.getElementById('hud-selected-item').innerText = tabButtons[index];
+      document.getElementById('output-scen-3').innerText = `Roving tabIndex updated: Active Tab = #${tabButtons[index]}`;
+      logEvent(`Roving tab focused: #${tabButtons[index]}`);
+    }
+
+    function handleRovingTabListKey(e) {
+      let nextIndex = activeTabIndex;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        nextIndex = (activeTabIndex + 1) % tabButtons.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        nextIndex = (activeTabIndex - 1 + tabButtons.length) % tabButtons.length;
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        nextIndex = tabButtons.length - 1;
+      }
+      if (nextIndex !== activeTabIndex) {
+        selectRovingTab(nextIndex);
+      }
+    }
+
+    // Scenario 4: Active Descendant
+    let activeOptionIdx = -1;
+    const optionIds = ['opt-aws', 'opt-gcp', 'opt-azure', 'opt-oci'];
+
+    function handleActiveDescendantKey(e) {
+      const input = document.getElementById('activedesc-input');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeOptionIdx = Math.min(activeOptionIdx + 1, optionIds.length - 1);
+        updateActiveDescendant();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeOptionIdx = Math.max(activeOptionIdx - 1, 0);
+        updateActiveDescendant();
+      } else if (e.key === 'Enter') {
+        if (activeOptionIdx >= 0) {
+          e.preventDefault();
+          const chosen = document.getElementById(optionIds[activeOptionIdx]);
+          input.value = chosen.innerText;
+          document.getElementById('output-scen-4').innerText = `Selected: ${chosen.innerText}`;
+          logEvent(`Selected option: ${chosen.innerText}`);
+        }
+      }
+    }
+
+    function updateActiveDescendant() {
+      const input = document.getElementById('activedesc-input');
+      optionIds.forEach((id, i) => {
+        const el = document.getElementById(id);
+        const isActive = i === activeOptionIdx;
+        el.classList.toggle('is-active', isActive);
+        el.setAttribute('aria-selected', String(isActive));
+      });
+      if (activeOptionIdx >= 0) {
+        const activeId = optionIds[activeOptionIdx];
+        input.setAttribute('aria-activedescendant', activeId);
+        document.getElementById('hud-active-item').innerText = activeId;
+        document.getElementById('output-scen-4').innerText = `aria-activedescendant = #${activeId}`;
+      }
+    }
+
+    // Scenario 5: Focus Stealing
+    function simulateStateChange() {
+      logEvent('State changed in Scenario 5.');
+      const shouldSteal = document.getElementById('chk-focus-stealing').checked;
+      if (shouldSteal) {
+        document.getElementById('search-stealer').focus();
+        document.getElementById('hud-transition').innerText = 'Focus Stolen! (Bug)';
+        document.getElementById('output-scen-5').innerText = '💥 Focus stolen back by search field after render!';
+      } else {
+        document.getElementById('hud-transition').innerText = 'Clean State Change';
+        document.getElementById('output-scen-5').innerText = '✓ Focus remained stable on secondary button.';
+      }
+    }
+
+    // Scenario 6: Dynamic List + Stable Entity IDs
+    let dynamicItems = [
+      { id: 'uuid-101', name: 'Database Server Alpha' },
+      { id: 'uuid-102', name: 'Redis Cache Cluster' },
+      { id: 'uuid-103', name: 'Elasticsearch Indexer' }
+    ];
+
+    function renderDynamicList() {
+      const container = document.getElementById('dynamic-list-container');
+      container.innerHTML = '';
+      dynamicItems.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.id = `dyn-row-${item.id}`;
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.5rem 0.75rem; border-radius:6px;';
+        row.innerHTML = `
+          <span>${item.name} <code style="font-size:0.7rem; color:#9ca3af;">(${item.id})</code></span>
+          <button class="btn btn-danger" style="font-size:0.75rem; padding:0.25rem 0.6rem;" id="btn-del-${item.id}" onclick="deleteDynamicItem('${item.id}', ${index})">Delete</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function deleteDynamicItem(id, index) {
+      dynamicItems = dynamicItems.filter(i => i.id !== id);
+      renderDynamicList();
+      // Smart recovery: Focus next available delete button or container
+      const nextTarget = dynamicItems[index] ? `btn-del-${dynamicItems[index].id}` : (dynamicItems[index - 1] ? `btn-del-${dynamicItems[index - 1].id}` : null);
+      if (nextTarget && document.getElementById(nextTarget)) {
+        document.getElementById(nextTarget).focus();
+        document.getElementById('output-scen-6').innerText = `Deleted ${id}. Focus recovered to #${nextTarget}`;
+      } else {
+        document.getElementById('output-scen-6').innerText = `Deleted ${id}. List empty.`;
+      }
+    }
+
+    function resetDynamicList() {
+      dynamicItems = [
+        { id: 'uuid-101', name: 'Database Server Alpha' },
+        { id: 'uuid-102', name: 'Redis Cache Cluster' },
+        { id: 'uuid-103', name: 'Elasticsearch Indexer' }
+      ];
+      renderDynamicList();
+      document.getElementById('output-scen-6').innerText = 'Dynamic list reset.';
+    }
+
+    // Scenario 7: Map Ref Registry
+    let gridRows = [
+      { id: 'row-alpha', label: 'Row Alpha (Primary)' },
+      { id: 'row-beta', label: 'Row Beta (Secondary)' },
+      { id: 'row-gamma', label: 'Row Gamma (Tertiary)' }
+    ];
+    const gridRefMap = new Map();
+
+    function renderDataGrid() {
+      const container = document.getElementById('datagrid-container');
+      container.innerHTML = '';
+      gridRefMap.clear();
+      gridRows.forEach(r => {
+        const btn = document.createElement('button');
+        btn.id = `grid-${r.id}`;
+        btn.className = 'btn btn-secondary';
+        btn.innerText = r.label;
+        container.appendChild(btn);
+        gridRefMap.set(r.id, btn);
+      });
+    }
+
+    function reorderDataGrid() {
+      gridRows.reverse();
+      renderDataGrid();
+      document.getElementById('output-scen-7').innerText = 'Rows reversed in DOM!';
+    }
+
+    function focusRowEntity(id) {
+      const el = gridRefMap.get(id);
+      if (el) {
+        el.focus();
+        document.getElementById('output-scen-7').innerText = `Successfully focused entity ${id} using Map Ref!`;
+      }
+    }
+
+    // Scenario 8 & 9: Modal Dialog Focus Trap
+    let previousFocusTarget = null;
+    let pendingDeleteRowId = null;
+
+    function openModalDialog(invokingElementId = 'btn-open-modal') {
+      previousFocusTarget = document.getElementById(invokingElementId) || document.activeElement;
+      const modal = document.getElementById('modal-sandbox');
+      modal.style.display = 'flex';
+      document.getElementById('modal-btn-cancel').focus();
+      document.getElementById('hud-transition').innerText = 'Modal Opened -> Focus Trapped';
+      logEvent('Modal dialog opened. Focus trapped inside.');
+    }
+
+    function closeModalDialog(confirmed) {
+      const modal = document.getElementById('modal-sandbox');
+      modal.style.display = 'none';
+
+      if (confirmed && pendingDeleteRowId) {
+        deleteRestorationRow(pendingDeleteRowId);
+        pendingDeleteRowId = null;
+      } else if (previousFocusTarget && document.body.contains(previousFocusTarget)) {
+        previousFocusTarget.focus();
+        document.getElementById('hud-transition').innerText = 'Modal Closed -> Focus Restored';
+        logEvent(`Focus restored to #${previousFocusTarget.id}`);
+      }
+    }
+
+    function handleModalKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModalDialog(false);
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = document.querySelectorAll('#modal-sandbox button, #modal-sandbox input');
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    // Scenario 9: Smart Focus Recovery on Delete
+    let restoreItems = [
+      { id: 'res-item-1', title: 'Kubernetes Pod #1' },
+      { id: 'res-item-2', title: 'Kubernetes Pod #2 (Target to Delete)' },
+      { id: 'res-item-3', title: 'Kubernetes Pod #3' }
+    ];
+
+    function renderRestorationList() {
+      const container = document.getElementById('restoration-list');
+      container.innerHTML = '';
+      restoreItems.forEach(item => {
+        const row = document.createElement('div');
+        row.id = `row-${item.id}`;
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.5rem 0.75rem; border-radius:6px;';
+        row.innerHTML = `
+          <span>${item.title}</span>
+          <button class="btn btn-danger" style="font-size:0.75rem; padding:0.25rem 0.6rem;" id="btn-del-${item.id}" onclick="triggerDeleteWithModal('${item.id}')">Delete Pod</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function triggerDeleteWithModal(id) {
+      pendingDeleteRowId = id;
+      openModalDialog(`btn-del-${id}`);
+    }
+
+    function deleteRestorationRow(id) {
+      const idx = restoreItems.findIndex(i => i.id === id);
+      restoreItems = restoreItems.filter(i => i.id !== id);
+      renderRestorationList();
+
+      // Determine surviving target
+      const surviving = restoreItems[idx] || restoreItems[idx - 1];
+      if (surviving) {
+        const nextBtn = document.getElementById(`btn-del-${surviving.id}`);
+        nextBtn?.focus();
+        document.getElementById('output-scen-9').innerText = `Row ${id} destroyed. Focus recovered to surviving row: #${surviving.id}`;
+        logEvent(`Smart focus recovery: focused #${surviving.id}`);
+      }
+    }
+
+    // Scenario 10
+    function handleCarefulKeyDown(e) {
+      // Only intercept custom commands (e.g. Enter or Escape), do NOT call preventDefault on Tab/Typing
+      if (e.key === 'Escape') {
+        e.target.value = '';
+        document.getElementById('output-scen-10').innerText = 'Input cleared on Escape key!';
+        logEvent('Input cleared on Escape.');
+      }
+    }
+
+    // Init
+    renderDynamicList();
+    renderDataGrid();
+    renderRestorationList();
+  </script>
+</body>
+</html>

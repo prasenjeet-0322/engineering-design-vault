@@ -5,7 +5,7 @@
 > **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
 > **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
 > **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
-> **Status:** 🟡 In Progress (Part 05 of 16 Completed)
+> **Status:** 🟡 In Progress (Part 06 of 16 Completed)
 
 ---
 
@@ -27,7 +27,7 @@ $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tr
 | **Part 03** | [Keyboard Navigation, Focus Rings & The Tab Order Model](./03-keyboard-navigation-tab-order-focus-rings.md) | ✅ **Completed** | [`03-keyboard-focus-management.html`](./examples/03-keyboard-focus-management.html) |
 | **Part 04** | [Screen Readers, Accessible Names, Live Regions & Dynamic Announcements](./04-screen-readers-live-regions.md) | ✅ **Completed** | [`04-screen-readers-live-regions.html`](./examples/04-screen-readers-live-regions.html) |
 | **Part 05** | [Accessible Forms, Labels, Validation, Errors & Submission Feedback](./05-accessible-forms-labels-error-associations.md) | ✅ **Completed** | [`05-accessible-forms-validation.html`](./examples/05-accessible-forms-validation.html) |
-| **Part 06** | [Live Regions: `aria-live`, Dynamic Announcements & Notifications](./06-aria-live-regions-dynamic-announcements.md) | ⏳ Planned | `06-live-region-announcer.html` |
+| **Part 06** | [Keyboard Navigation, Focus Management & Interaction Semantics](./06-keyboard-navigation-focus-management.md) | ✅ **Completed** | [`06-keyboard-navigation-focus-management.html`](./examples/06-keyboard-navigation-focus-management.html) |
 | **Part 07** | [Accessible Complex Component: Modals, Dialogs & Drawers](./07-accessible-dialogs-modals-drawers.md) | ⏳ Planned | `07-modal-a11y-workbench.html` |
 | **Part 08** | [Accessible Complex Component: Dropdowns, Menus, Selects & Comboboxes](./08-accessible-dropdowns-menus-comboboxes.md) | ⏳ Planned | `08-combobox-apg-lab.html` |
 | **Part 09** | [Accessible Complex Component: Accordions, Tabs & Disclosure Widgets](./09-accessible-tabs-accordions-disclosures.md) | ⏳ Planned | `09-tabs-disclosure-lab.html` |
