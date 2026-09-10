@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KPI 16 — Part 01 Companion Lab: React Error Boundaries & Failure Isolation</title>
+  <title>KPI 16 — Part 01 Companion Lab: Error Boundaries & Failure Isolation</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -14,16 +14,24 @@
   <style>
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: #0b0f19;
+      background-color: #080c16;
       color: #f1f5f9;
     }
     code, pre, .font-mono {
       font-family: 'JetBrains Mono', monospace;
     }
     .glass-panel {
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .blast-intact {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(6, 78, 59, 0.15);
+    }
+    .blast-crashed {
+      border-color: rgba(239, 68, 68, 0.6);
+      background: rgba(127, 29, 29, 0.25);
     }
   </style>
 </head>
@@ -31,372 +39,435 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, Component } = React;
+    const { useState, useEffect, Component } = React;
 
     // ==========================================
-    // REUSABLE ERROR BOUNDARY CLASS COMPONENT
+    // PRODUCTION-GRADE ERROR BOUNDARY CLASS
     // ==========================================
-    class ErrorBoundary extends Component {
+    class ResilientErrorBoundary extends Component {
       constructor(props) {
         super(props);
-        this.state = { hasError: false, error: null, retryCount: 0 };
+        this.state = { hasError: false, error: null };
       }
 
       static getDerivedStateFromError(error) {
-        return { hasError: true, error };
+        return { hasError: true, error: error instanceof Error ? error : new Error(String(error)) };
       }
 
       componentDidCatch(error, errorInfo) {
-        if (this.props.onError) {
-          this.props.onError(error, errorInfo, this.props.name || "AnonymousBoundary");
+        if (this.props.onLog) {
+          this.props.onLog(
+            this.props.boundaryName || "ErrorBoundary",
+            `Caught render exception: "${error.message}"`,
+            errorInfo.componentStack,
+            "error"
+          );
         }
       }
 
-      reset = () => {
-        this.setState(prev => ({
-          hasError: false,
-          error: null,
-          retryCount: prev.retryCount + 1
-        }));
-        if (this.props.onReset) this.props.onReset();
+      resetErrorBoundary = () => {
+        if (this.props.onReset) {
+          this.props.onReset();
+        }
+        this.setState({ hasError: false, error: null });
       };
 
       render() {
         if (this.state.hasError) {
-          if (this.props.fallbackRender) {
-            return this.props.fallbackRender({
-              error: this.state.error,
-              resetErrorBoundary: this.reset,
-              retryCount: this.state.retryCount
-            });
-          }
           if (this.props.fallback) {
-            return this.props.fallback;
+            return typeof this.props.fallback === "function"
+              ? this.props.fallback(this.state.error, this.resetErrorBoundary)
+              : this.props.fallback;
           }
+
           return (
-            <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl text-rose-300 space-y-2">
-              <h4 className="font-bold text-sm">⚠️ {this.props.name || "Boundary"} Caught Error</h4>
-              <p className="text-xs font-mono">{this.state.error?.message}</p>
-              <button 
-                onClick={this.reset}
-                className="px-3 py-1 bg-rose-700 hover:bg-rose-600 text-white text-xs rounded font-semibold transition"
-              >
-                Reset Boundary
-              </button>
+            <div role="alert" className="p-4 bg-rose-950/60 border border-rose-800/80 rounded-xl text-rose-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs uppercase font-mono tracking-wider text-rose-400">
+                  ⚠️ {this.props.boundaryName || "Component"} Crash
+                </span>
+                <button
+                  onClick={this.resetErrorBoundary}
+                  className="px-3 py-1 bg-rose-800 hover:bg-rose-700 text-white rounded text-xs font-semibold font-mono transition"
+                >
+                  Reset & Retry
+                </button>
+              </div>
+              <p className="text-xs font-mono text-rose-300/80">{this.state.error?.message}</p>
             </div>
           );
         }
+
         return this.props.children;
       }
     }
 
     // ==========================================
-    // MAIN INTERACTIVE APPLICATION
+    // CRASHABLE TEST COMPONENTS
+    // ==========================================
+    function LiveRevenueChart({ shouldCrash, onReset }) {
+      if (shouldCrash) {
+        throw new Error("WebGLContextLost: Canvas 2D render context crashed on invalid vector coordinate.");
+      }
+
+      return (
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-3">
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-bold text-slate-300 font-mono">Live Revenue Curve</span>
+            <span className="text-emerald-400 font-mono text-[11px]">● Streaming 60fps</span>
+          </div>
+          <div className="h-28 flex items-end gap-2 bg-slate-950 p-3 rounded-lg border border-slate-800/60">
+            {[45, 60, 55, 78, 85, 92, 110, 105, 125, 140].map((val, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-cyan-500/80 hover:bg-cyan-400 rounded-t transition-all duration-300"
+                style={{ height: `${(val / 150) * 100}%` }}
+              ></div>
+            ))}
+          </div>
+          <div className="text-[11px] text-slate-400 font-mono flex justify-between">
+            <span>MRR: $142,500</span>
+            <span>+18.4% WoW</span>
+          </div>
+        </div>
+      );
+    }
+
+    function ActiveOrdersTable({ shouldCrash, onReset }) {
+      if (shouldCrash) {
+        throw new Error("TypeError: Cannot read properties of undefined (reading 'customer.billing_address')");
+      }
+
+      return (
+        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-3">
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-bold text-slate-300 font-mono">Active Fulfillment Queue</span>
+            <span className="text-cyan-400 font-mono text-[11px]">3 Orders Pending</span>
+          </div>
+          <div className="space-y-2">
+            {[
+              { id: "ORD-9821", item: "Enterprise License", amount: "$12,400", status: "PROCESSING" },
+              { id: "ORD-9822", item: "Custom Integration", amount: "$4,500", status: "VERIFIED" },
+              { id: "ORD-9823", item: "Dedicated Node", amount: "$1,800", status: "IN_TRANSIT" },
+            ].map(ord => (
+              <div key={ord.id} className="p-2 bg-slate-950 rounded border border-slate-800 flex justify-between items-center text-xs font-mono">
+                <span className="text-slate-300">{ord.id}</span>
+                <span className="text-slate-400">{ord.item}</span>
+                <span className="text-emerald-400 font-bold">{ord.amount}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function UserProfileHeader({ shouldCrash }) {
+      if (shouldCrash) {
+        throw new Error("ReferenceError: 'user.permissions' is not defined during header mount.");
+      }
+
+      return (
+        <header className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center font-bold text-xs text-white">
+              PK
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">Prasenjeet (Lead Architect)</div>
+              <div className="text-[10px] text-slate-400 font-mono">Tenant: ACME Global HQ</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded text-[11px] font-mono">
+              System: HEALTHY
+            </span>
+          </div>
+        </header>
+      );
+    }
+
+    // ==========================================
+    // MAIN INTERACTIVE APP COMPONENT
     // ==========================================
     function App() {
-      const [telemetry, setTelemetry] = useState([]);
+      const [architectureMode, setArchitectureMode] = useState("granular"); // 'granular' vs 'monolithic'
       const [crashChart, setCrashChart] = useState(false);
-      const [crashMetrics, setCrashMetrics] = useState(false);
-      const [crashFallback, setCrashFallback] = useState(false);
-      const [portfolioId, setPortfolioId] = useState("PORT_ALPHA");
+      const [crashOrders, setCrashOrders] = useState(false);
+      const [crashHeader, setCrashHeader] = useState(false);
+      const [logs, setLogs] = useState([]);
 
-      const logError = (error, errorInfo, boundaryName) => {
-        const event = {
-          id: "err_" + Math.random().toString(36).substring(2, 7),
-          time: new Date().toLocaleTimeString() + "." + Math.floor(performance.now() % 1000).toString().padStart(3, "0"),
-          boundary: boundaryName,
-          message: error.message,
-          stack: errorInfo.componentStack ? errorInfo.componentStack.trim().split("\n").slice(0, 3).join(" -> ") : "N/A"
-        };
-        setTelemetry(prev => [event, ...prev]);
+      const addLog = (tag, message, stack, type = "info") => {
+        setLogs(prev => [
+          {
+            id: Math.random().toString(36).substring(2, 9),
+            time: new Date().toLocaleTimeString(),
+            tag,
+            message,
+            stack,
+            type
+          },
+          ...prev.slice(0, 30)
+        ]);
       };
 
-      const clearTelemetry = () => setTelemetry([]);
+      const handleEventError = () => {
+        addLog("Event Handler", "Triggered throw inside button onClick. Notice: Error Boundary will NOT catch this!", null, "warn");
+        try {
+          throw new Error("Uncaught event exception in button callback.");
+        } catch (e) {
+          console.warn("[Event Handled locally via try/catch]", e);
+        }
+      };
+
+      const handleAsyncError = () => {
+        addLog("Async Task", "Triggered unhandled Promise rejection in setTimeout. Error Boundary cannot catch macrotasks!", null, "warn");
+        setTimeout(() => {
+          console.warn("[Async Task Error - Bypassed React Error Boundary]");
+        }, 100);
+      };
+
+      const resetAll = () => {
+        setCrashChart(false);
+        setCrashOrders(false);
+        setCrashHeader(false);
+        addLog("System", "All fault injection states reset.", null, "info");
+      };
 
       return (
-        <ErrorBoundary 
-          name="RootErrorBoundary" 
-          onError={logError}
-          fallbackRender={({ error, resetErrorBoundary }) => (
-            <div className="min-h-[80vh] flex flex-col items-center justify-center p-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl font-bold">💥</div>
-              <h1 className="text-2xl font-black text-rose-400">Root Application Lifeboat Activated</h1>
-              <p className="text-slate-400 text-sm max-w-md">
-                A catastrophic error escaped all nested feature boundaries. Total blast radius containment engaged.
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <header className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl border-cyan-500/20">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-semibold uppercase tracking-wider">
+                  Level 06 — KPI 16 / Part 01
+                </span>
+                <span className="px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-full text-xs font-semibold">
+                  Failure Isolation Simulator
+                </span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2 text-white">
+                React Error Boundaries & Blast Radius Laboratory
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Explore component-tree failure containment, fiber stack propagation, and monolithic vs granular boundary architectures.
               </p>
-              <pre className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-rose-300 max-w-lg overflow-x-auto text-left">
-                {error?.message}
-              </pre>
+            </div>
+            <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs">
               <button
-                onClick={() => {
-                  setCrashChart(false);
-                  setCrashMetrics(false);
-                  setCrashFallback(false);
-                  resetErrorBoundary();
-                }}
-                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold text-xs transition shadow-lg shadow-rose-600/30"
+                onClick={() => setArchitectureMode("granular")}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                  architectureMode === "granular" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                }`}
               >
-                Reconstruct Full Application Tree
+                Granular Architecture (Defensive)
+              </button>
+              <button
+                onClick={() => setArchitectureMode("monolithic")}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                  architectureMode === "monolithic" ? "bg-rose-600 text-white shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Monolithic Global Boundary (Fragile)
               </button>
             </div>
-          )}
-        >
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <header className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl border-cyan-500/20">
-              <div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-semibold uppercase tracking-wider">
-                    Level 06 — KPI 16 / Part 01
-                  </span>
-                  <span className="px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-full text-xs font-semibold">
-                    Failure Containment Lab
-                  </span>
-                </div>
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2 text-white">
-                  Error Boundaries & Blast Radius Simulator
-                </h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  Simulate local widget errors, feature-level collapses, fallback crashes, and semantic identity resets.
-                </p>
-              </div>
+          </header>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPortfolioId(prev => prev === "PORT_ALPHA" ? "PORT_BETA" : "PORT_ALPHA")}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-xs font-mono font-semibold transition border border-cyan-800/40"
-                >
-                  Switch Identity: {portfolioId}
-                </button>
-                <button
-                  onClick={clearTelemetry}
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg text-xs font-mono transition"
-                >
-                  Clear Logs
-                </button>
-              </div>
-            </header>
-
-            {/* Failure Injection Control Matrix */}
-            <div className="glass-panel p-5 rounded-2xl border-amber-500/20 space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-                <span>⚡ Synthetic Failure Injection Controls</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <button
-                  onClick={() => setCrashChart(true)}
-                  className="p-3 bg-slate-900 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-700 rounded-xl text-left transition group"
-                >
-                  <div className="text-xs font-bold text-rose-400 group-hover:text-rose-300 font-mono">1. Crash Trading Chart (Widget Level)</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Blast Radius ≤ 10%. Metrics & Order Book survive.</div>
-                </button>
-
-                <button
-                  onClick={() => setCrashMetrics(true)}
-                  className="p-3 bg-slate-900 hover:bg-amber-950/40 border border-slate-800 hover:border-amber-700 rounded-xl text-left transition group"
-                >
-                  <div className="text-xs font-bold text-amber-400 group-hover:text-amber-300 font-mono">2. Crash Metrics (Feature Level)</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Blast Radius ≈ 40%. Feature boundary catches.</div>
-                </button>
-
-                <button
-                  onClick={() => { setCrashChart(true); setCrashFallback(true); }}
-                  className="p-3 bg-slate-900 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-700 rounded-xl text-left transition group"
-                >
-                  <div className="text-xs font-bold text-purple-400 group-hover:text-purple-300 font-mono">3. Crash Fallback UI (Cascade Upward)</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Widget fallback throws ──► Escalates to Feature.</div>
-                </button>
-              </div>
+          {/* Fault Injection Control Bar */}
+          <div className="glass-panel p-4 rounded-xl flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setCrashChart(true)}
+                className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                💥 Crash Revenue Chart
+              </button>
+              <button
+                onClick={() => setCrashOrders(true)}
+                className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                💥 Crash Orders Table
+              </button>
+              <button
+                onClick={() => setCrashHeader(true)}
+                className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                💥 Crash Header
+              </button>
+              <button
+                onClick={handleEventError}
+                className="px-3 py-1.5 bg-amber-950/60 hover:bg-amber-900 border border-amber-800 text-amber-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                ⚡ Trigger Event Error (onClick)
+              </button>
+              <button
+                onClick={handleAsyncError}
+                className="px-3 py-1.5 bg-purple-950/60 hover:bg-purple-900 border border-purple-800 text-purple-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                ⏳ Trigger Async Promise Error
+              </button>
             </div>
+            <button
+              onClick={resetAll}
+              className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-mono font-bold transition shadow"
+            >
+              🔄 Reset All Faults
+            </button>
+          </div>
 
-            {/* Main Application Topology */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Active Application Canvas (2 Cols) */}
-              <div className="lg:col-span-2 space-y-6">
-                <div className="glass-panel p-6 rounded-2xl space-y-5">
-                  <div className="flex justify-between items-center pb-4 border-b border-slate-800">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-                      <h2 className="font-bold text-base text-white">Live Trading Terminal Shell</h2>
-                    </div>
-                    <span className="text-xs font-mono bg-slate-900 px-3 py-1 rounded-full text-slate-400 border border-slate-800">
-                      Scope: {portfolioId}
-                    </span>
-                  </div>
-
-                  {/* FEATURE BOUNDARY: ANALYTICS SUITE */}
-                  <ErrorBoundary
-                    key={portfolioId}
-                    name="DashboardFeatureBoundary"
-                    onError={logError}
-                    fallbackRender={({ error, resetErrorBoundary }) => (
-                      <div className="p-6 bg-amber-950/20 border border-amber-800/60 rounded-xl text-center space-y-3">
-                        <div className="text-2xl">⚠️</div>
-                        <h3 className="font-bold text-sm text-amber-300">Dashboard Feature Temporarily Unavailable</h3>
-                        <p className="text-xs text-slate-400 font-mono">{error.message}</p>
-                        <button
-                          onClick={() => {
-                            setCrashMetrics(false);
-                            setCrashChart(false);
-                            setCrashFallback(false);
-                            resetErrorBoundary();
-                          }}
-                          className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition"
-                        >
-                          Recover Feature Subtree
-                        </button>
-                      </div>
-                    )}
-                  >
-                    <div className="space-y-4">
-                      {/* Metrics Component */}
-                      <MetricsSummary crash={crashMetrics} onReset={() => setCrashMetrics(false)} />
-
-                      {/* Widget Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* WIDGET 1: TRADING CHART BOUNDARY */}
-                        <ErrorBoundary
-                          name="ChartWidgetBoundary"
-                          onError={logError}
-                          fallbackRender={({ error, resetErrorBoundary }) => {
-                            if (crashFallback) {
-                              throw new Error("CASCADING_FAILURE: Chart fallback component threw during render!");
-                            }
-                            return (
-                              <div className="p-4 bg-slate-900/90 border border-dashed border-rose-800/80 rounded-xl flex flex-col items-center justify-center min-h-[220px] text-center space-y-2">
-                                <span className="text-lg">📊</span>
-                                <h4 className="text-xs font-bold text-rose-300">Chart Bulkhead Engaged</h4>
-                                <p className="text-[11px] text-slate-400 max-w-xs">{error.message}</p>
-                                <button
-                                  onClick={() => {
-                                    setCrashChart(false);
-                                    resetErrorBoundary();
-                                  }}
-                                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded text-xs font-semibold transition"
-                                >
-                                  Retry Chart Canvas
-                                </button>
-                              </div>
-                            );
-                          }}
-                        >
-                          <TradingChartWidget crash={crashChart} />
-                        </ErrorBoundary>
-
-                        {/* WIDGET 2: ORDER BOOK BOUNDARY */}
-                        <ErrorBoundary name="OrderBookWidgetBoundary" onError={logError}>
-                          <OrderBookWidget />
-                        </ErrorBoundary>
-                      </div>
-                    </div>
-                  </ErrorBoundary>
-                </div>
+          {/* Main Workspace Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Live Component Tree Workspace (2 Cols) */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-slate-300 font-mono uppercase tracking-wider">
+                  Live Enterprise Workspace ({architectureMode.toUpperCase()} BOUNDARY MODE)
+                </h2>
+                <span className={`text-xs px-2.5 py-0.5 rounded font-mono font-semibold ${
+                  architectureMode === "granular" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "bg-rose-950 text-rose-400 border border-rose-800"
+                }`}>
+                  Blast Radius: {architectureMode === "granular" ? "MINIMAL (Leaf-Level)" : "CATASTROPHIC (Full Page)"}
+                </span>
               </div>
 
-              {/* SENTRY / TELEMETRY LOGS (1 Col) */}
-              <div className="glass-panel p-5 rounded-2xl flex flex-col h-[650px] shadow-xl">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></div>
-                    <h3 className="font-bold text-sm text-slate-200">Failure Telemetry Stream</h3>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-500">{telemetry.length} incidents</span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-3 pt-4 pr-1">
-                  {telemetry.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
-                      <p className="text-xs font-mono">No exceptions captured yet.<br/>Trigger synthetic errors above.</p>
+              {/* BOUNDARY RENDERING LOGIC */}
+              {architectureMode === "monolithic" ? (
+                /* MONOLITHIC GLOBAL BOUNDARY (Fragile) */
+                <ResilientErrorBoundary
+                  boundaryName="GlobalAppRootBoundary"
+                  onLog={addLog}
+                  fallback={(error, reset) => (
+                    <div className="p-8 bg-rose-950/80 border-2 border-rose-600 rounded-2xl text-center space-y-4">
+                      <div className="text-4xl">💥</div>
+                      <h3 className="text-lg font-bold text-white">Entire Application Crashed!</h3>
+                      <p className="text-xs font-mono text-rose-300 max-w-md mx-auto">{error.message}</p>
+                      <button
+                        onClick={() => { resetAll(); reset(); }}
+                        className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs font-mono transition shadow-lg"
+                      >
+                        Reboot Entire Application Root
+                      </button>
                     </div>
-                  ) : (
-                    telemetry.map(t => (
-                      <div key={t.id} className="p-3 bg-slate-950 border border-rose-900/60 rounded-xl font-mono text-xs space-y-1 text-slate-300">
-                        <div className="flex justify-between items-center text-[10px]">
-                          <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 rounded font-semibold">{t.boundary}</span>
-                          <span className="text-slate-500">{t.time}</span>
-                        </div>
-                        <div className="text-rose-400 font-bold text-[11px] pt-1">{t.message}</div>
-                        <div className="text-[10px] text-slate-500 truncate pt-1">{t.stack}</div>
-                      </div>
-                    ))
                   )}
+                >
+                  <div className="space-y-4">
+                    <UserProfileHeader shouldCrash={crashHeader} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <LiveRevenueChart shouldCrash={crashChart} onReset={() => setCrashChart(false)} />
+                      <ActiveOrdersTable shouldCrash={crashOrders} onReset={() => setCrashOrders(false)} />
+                    </div>
+                  </div>
+                </ResilientErrorBoundary>
+              ) : (
+                /* GRANULAR DEFENSIVE ARCHITECTURE */
+                <div className="space-y-4">
+                  {/* Header Boundary */}
+                  <ResilientErrorBoundary
+                    boundaryName="HeaderBoundary"
+                    onLog={addLog}
+                    onReset={() => setCrashHeader(false)}
+                  >
+                    <UserProfileHeader shouldCrash={crashHeader} />
+                  </ResilientErrorBoundary>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Revenue Chart Isolated Boundary */}
+                    <ResilientErrorBoundary
+                      boundaryName="RevenueChartBoundary"
+                      onLog={addLog}
+                      onReset={() => setCrashChart(false)}
+                      fallback={(error, reset) => (
+                        <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-rose-400 font-mono">⚠️ Revenue Chart Unavailable</span>
+                            <button
+                              onClick={() => { setCrashChart(false); reset(); }}
+                              className="px-3 py-1 bg-rose-800 hover:bg-rose-700 text-white rounded text-xs font-mono transition"
+                            >
+                              Retry Widget
+                            </button>
+                          </div>
+                          <p className="text-[11px] font-mono text-rose-300/80">{error.message}</p>
+                        </div>
+                      )}
+                    >
+                      <LiveRevenueChart shouldCrash={crashChart} onReset={() => setCrashChart(false)} />
+                    </ResilientErrorBoundary>
+
+                    {/* Orders Table Isolated Boundary */}
+                    <ResilientErrorBoundary
+                      boundaryName="OrdersTableBoundary"
+                      onLog={addLog}
+                      onReset={() => setCrashOrders(false)}
+                      fallback={(error, reset) => (
+                        <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-rose-400 font-mono">⚠️ Orders Queue Unavailable</span>
+                            <button
+                              onClick={() => { setCrashOrders(false); reset(); }}
+                              className="px-3 py-1 bg-rose-800 hover:bg-rose-700 text-white rounded text-xs font-mono transition"
+                            >
+                              Retry Widget
+                            </button>
+                          </div>
+                          <p className="text-[11px] font-mono text-rose-300/80">{error.message}</p>
+                        </div>
+                      )}
+                    >
+                      <ActiveOrdersTable shouldCrash={crashOrders} onReset={() => setCrashOrders(false)} />
+                    </ResilientErrorBoundary>
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Telemetry Stream & Stack Inspector (1 Col) */}
+            <div className="glass-panel p-5 rounded-2xl flex flex-col h-[650px] shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                  <h3 className="font-bold text-sm text-slate-200">Fiber Error Telemetry Stream</h3>
+                </div>
+                <button
+                  onClick={() => setLogs([])}
+                  className="text-[10px] text-slate-400 hover:text-white font-mono"
+                >
+                  Clear
+                </button>
               </div>
-            </div>
-          </div>
-        </ErrorBoundary>
-      );
-    }
 
-    // ==========================================
-    // LEAF COMPONENTS WITH CRASH INJECTORS
-    // ==========================================
-    function MetricsSummary({ crash, onReset }) {
-      if (crash) {
-        throw new Error("TYPE_ERROR: Cannot read properties of undefined (reading 'map') in MetricsSummary");
-      }
-      return (
-        <div className="grid grid-cols-3 gap-3 p-4 bg-slate-900/90 rounded-xl border border-slate-800">
-          <div>
-            <div className="text-[11px] text-slate-500 font-medium">Portfolio NAV</div>
-            <div className="text-base font-bold text-emerald-400 font-mono mt-0.5">$1,849,200.40</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-slate-500 font-medium">Daily P&L</div>
-            <div className="text-base font-bold text-cyan-400 font-mono mt-0.5">+$42,110.00 (2.3%)</div>
-          </div>
-          <div>
-            <div className="text-[11px] text-slate-500 font-medium">Active Limit Orders</div>
-            <div className="text-base font-bold text-purple-400 font-mono mt-0.5">18 Active</div>
-          </div>
-        </div>
-      );
-    }
-
-    function TradingChartWidget({ crash }) {
-      if (crash) {
-        throw new Error("CANVAS_CRASH: ThirdPartyWebGLCanvas buffer overflow exception during frame tick");
-      }
-      return (
-        <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 min-h-[220px] flex flex-col justify-between">
-          <div className="flex justify-between items-center text-xs font-mono">
-            <span className="text-slate-300 font-semibold">BTC-USD Live Stream</span>
-            <span className="text-emerald-400 font-bold">$68,490.50</span>
-          </div>
-          <div className="h-28 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-center text-xs text-slate-600 font-mono">
-            [Interactive WebGL Candlestick Rendering Engine Active]
-          </div>
-          <div className="text-[10px] text-slate-500 font-mono flex justify-between">
-            <span>Latency: 14ms</span>
-            <span>Feed: WS_PRIMARY</span>
-          </div>
-        </div>
-      );
-    }
-
-    function OrderBookWidget() {
-      return (
-        <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 min-h-[220px] space-y-2">
-          <div className="flex justify-between items-center text-xs font-mono">
-            <span className="text-slate-300 font-semibold">Order Depth Book</span>
-            <span className="text-slate-500">Spread: $0.50</span>
-          </div>
-          <div className="space-y-1 text-xs font-mono">
-            <div className="flex justify-between text-emerald-400 bg-emerald-950/20 px-2 py-0.5 rounded">
-              <span>68,491.00</span>
-              <span>1.42 BTC</span>
-            </div>
-            <div className="flex justify-between text-emerald-400 bg-emerald-950/20 px-2 py-0.5 rounded">
-              <span>68,490.50</span>
-              <span>4.18 BTC</span>
-            </div>
-            <div className="flex justify-between text-rose-400 bg-rose-950/20 px-2 py-0.5 rounded">
-              <span>68,489.50</span>
-              <span>2.80 BTC</span>
-            </div>
-            <div className="flex justify-between text-rose-400 bg-rose-950/20 px-2 py-0.5 rounded">
-              <span>68,489.00</span>
-              <span>0.95 BTC</span>
+              <div className="flex-1 overflow-y-auto space-y-3 pt-4 pr-1">
+                {logs.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
+                    <svg className="w-10 h-10 mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p className="text-xs font-mono">No exceptions intercepted. Trigger fault injection buttons above.</p>
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div
+                      key={log.id}
+                      className={`p-3 rounded-xl border text-xs font-mono space-y-1.5 ${
+                        log.type === "error"
+                          ? "bg-rose-950/40 border-rose-800/60 text-rose-200"
+                          : "bg-amber-950/40 border-amber-800/60 text-amber-200"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center text-[10px] opacity-70">
+                        <span className="font-bold uppercase tracking-wider text-cyan-400">{log.tag}</span>
+                        <span>{log.time}</span>
+                      </div>
+                      <p className="font-semibold text-slate-200">{log.message}</p>
+                      {log.stack && (
+                        <div className="p-2 bg-slate-950 rounded border border-slate-800 text-[10px] text-slate-400 overflow-x-auto whitespace-pre leading-tight">
+                          {log.stack.trim()}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
