@@ -5,13 +5,13 @@
 > **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
 > **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
 > **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
-> **Status:** 🟡 In Progress (Part 01 of 16 Completed)
+> **Status:** 🟡 In Progress (Part 02 of 16 Completed)
 
 ---
 
 ## 🧭 Curriculum Overview & Executive Architecture
 
-Accessibility in React is not an afterthought, a cosmetic checklist, or a matter of adding arbitrary \`aria-*\` attributes to generic elements. It is a fundamental architectural discipline spanning **Semantic Structure**, **Host DOM Contracts**, **Operating System Accessibility APIs (AOM)**, **Keyboard Interaction State Machines**, and **Assistive Technology Protocols**.
+Accessibility in React is not an afterthought, a cosmetic checklist, or a matter of adding arbitrary `aria-*` attributes to generic elements. It is a fundamental architectural discipline spanning **Semantic Structure**, **Host DOM Contracts**, **Operating System Accessibility APIs (AOM)**, **Keyboard Interaction State Machines**, and **Assistive Technology Protocols**.
 
 ### The Core Architectural Pipeline:
 $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tree} \xrightarrow{\text{Commit}} \text{Browser Host DOM} \xrightarrow{\text{Derivation}} \text{Accessibility Tree (AOM)} \xrightarrow{\text{OS Bridge}} \text{Assistive Technology}$$
@@ -23,7 +23,7 @@ $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tr
 | Part | Title & Focus Area | Status | Companion Interactive Lab |
 | :--- | :--- | :--- | :--- |
 | **Part 01** | [The React Accessibility Mental Model & Semantic HTML Foundations](./01-react-a11y-mental-model-semantic-html.md) | ✅ **Completed** | [`01-aom-semantic-html-visualizer.html`](./examples/01-aom-semantic-html-visualizer.html) |
-| **Part 02** | [ARIA Roles, States, Properties & The First Rule of ARIA in React](./02-aria-roles-states-properties.md) | ⏳ Planned | `02-aria-matrix-explorer.html` |
+| **Part 02** | [ARIA Roles, States, Properties & The First Rule of ARIA in React](./02-aria-roles-states-properties.md) | ✅ **Completed** | [`02-aria-semantics-visualizer.html`](./examples/02-aria-semantics-visualizer.html) |
 | **Part 03** | [Keyboard Navigation, Focus Rings & The Tab Order Model](./03-keyboard-navigation-tab-order-focus-rings.md) | ⏳ Planned | `03-focus-ring-tab-tracker.html` |
 | **Part 04** | [Focus Management: Trapping, Moving & Restoring Focus with Hooks](./04-focus-management-traps-restoration.md) | ⏳ Planned | `04-focus-trap-sandbox.html` |
 | **Part 05** | [Accessible Forms: Labels, Fieldsets, Errors & Description Binding](./05-accessible-forms-labels-error-associations.md) | ⏳ Planned | `05-accessible-form-auditor.html` |
