@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 16 — Part 05 Companion Lab: Boundary State, Error Identity & Reset Keys</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #060913;
+      color: #f1f5f9;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .active-tab {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
+    }
+    .badge-pulse {
+      animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .75; transform: scale(1.03); }
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, Component } = React;
+
+    // =========================================================================
+    // 1. PRODUCTION-GRADE RESILIENT RESET-KEYS ERROR BOUNDARY
+    // =========================================================================
+    let globalBoundaryInstanceCounter = 0;
+
+    class ResilientResetKeysBoundary extends Component {
+      constructor(props) {
+        super(props);
+        globalBoundaryInstanceCounter += 1;
+        this.instanceId = `boundary_inst_${globalBoundaryInstanceCounter}`;
+        this.state = {
+          hasError: false,
+          error: null,
+          errorId: null,
+          prevResetKeys: props.resetKeys || [],
+        };
+      }
+
+      static getDerivedStateFromError(error) {
+        const normalized = error instanceof Error ? error : new Error(String(error));
+        const errorId = `err_${Math.random().toString(36).substring(2, 8)}`;
+        return {
+          hasError: true,
+          error: normalized,
+          errorId,
+        };
+      }
+
+      static getDerivedStateFromProps(nextProps, prevState) {
+        const { resetKeys } = nextProps;
+        const { prevResetKeys, hasError } = prevState;
+
+        if (!resetKeys) return { prevResetKeys: [] };
+
+        // Compare keys via referential equality
+        let keysChanged = false;
+        if (prevResetKeys.length !== resetKeys.length) {
+          keysChanged = true;
+        } else {
+          for (let i = 0; i < resetKeys.length; i++) {
+            if (!Object.is(prevResetKeys[i], resetKeys[i])) {
+              keysChanged = true;
+              break;
+            }
+          }
+        }
+
+        if (keysChanged) {
+          if (hasError) {
+            return {
+              hasError: false,
+              error: null,
+              errorId: null,
+              prevResetKeys: resetKeys,
+            };
+          }
+          return { prevResetKeys: resetKeys };
+        }
+
+        return null;
+      }
+
+      componentDidCatch(error, info) {
+        if (this.props.onLog) {
+          this.props.onLog({
+            boundaryInstanceId: this.instanceId,
+            boundaryName: this.props.boundaryName || "ResetKeysBoundary",
+            errorId: this.state.errorId || "unknown",
+            error: error.message,
+            stack: info.componentStack,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      componentDidUpdate(prevProps, prevState) {
+        if (prevState.hasError && !this.state.hasError) {
+          if (this.props.onResetNotify) {
+            this.props.onResetNotify("DECLARATIVE_RESET_KEYS");
+          }
+        }
+      }
+
+      reset = () => {
+        if (this.props.onResetNotify) {
+          this.props.onResetNotify("IMPERATIVE_USER_CLICK");
+        }
+        this.setState({
+          hasError: false,
+          error: null,
+          errorId: null,
+        });
+      };
+
+      render() {
+        const { hasError, error, errorId } = this.state;
+        const { children, fallback, boundaryName } = this.props;
+
+        if (hasError && error) {
+          if (fallback) {
+            return fallback(error, errorId, this.reset, this.instanceId);
+          }
+          return (
+            <div className="p-4 bg-red-950/40 border border-red-800/80 rounded-xl text-red-200">
+              <h4 className="font-bold text-white">Boundary Failure Intercepted</h4>
+              <p className="text-xs font-mono mt-1">{error.message}</p>
+              <button onClick={this.reset} className="mt-3 px-3 py-1 bg-red-600 rounded text-xs font-bold text-white">
+                Reset Boundary
+              </button>
+            </div>
+          );
+        }
+
+        return children;
+      }
+    }
+
+    // =========================================================================
+    // 2. CHILD EXPERIMENT COMPONENTS
+    // =========================================================================
+    let globalComponentMountCounter = 0;
+
+    function ProfileWidget({ userId, isCorrupted, theme }) {
+      const [localState, setLocalState] = useState(() => Math.floor(Math.random() * 9000 + 1000));
+      const [mountTime] = useState(() => new Date().toLocaleTimeString());
+      const componentIdRef = useRef(null);
+
+      if (!componentIdRef.current) {
+        globalComponentMountCounter += 1;
+        componentIdRef.current = `fiber_comp_${globalComponentMountCounter}`;
+      }
+
+      if (isCorrupted) {
+        throw new Error(`[Fiber Crash]: Patient Record for [${userId}] is malformed (NullPointer in vitals sensor payload).`);
+      }
+
+      return (
+        <div className={`p-5 rounded-xl border transition-all ${theme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-800/90 border-slate-700'}`}>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-700/60 mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">👤</span>
+              <div>
+                <h3 className="font-bold text-white text-base">Patient Profile: <span className="text-blue-400 font-mono">{userId}</span></h3>
+                <p className="text-xs text-slate-400">Component Fiber: <span className="font-mono text-emerald-400">{componentIdRef.current}</span></p>
+              </div>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+              🟢 Healthy Instance
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+            <div className="p-2.5 rounded bg-slate-950/60 border border-slate-800">
+              <span className="text-slate-500 block">Local State Token:</span>
+              <span className="text-amber-300 font-bold">#{localState}</span>
+            </div>
+            <div className="p-2.5 rounded bg-slate-950/60 border border-slate-800">
+              <span className="text-slate-500 block">Mounted At:</span>
+              <span className="text-slate-300">{mountTime}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Stateful rich editor component demonstrating draft destruction
+    function StatefulEditor({ docId, initialContent, onDraftChange, onMountInfo }) {
+      const [draft, setDraft] = useState(initialContent);
+      const [cursorPos, setCursorPos] = useState(0);
+      const editorIdRef = useRef(null);
+      const mountEpochRef = useRef(Date.now());
+
+      if (!editorIdRef.current) {
+        globalComponentMountCounter += 1;
+        editorIdRef.current = `editor_fiber_${globalComponentMountCounter}`;
+        if (onMountInfo) onMountInfo(editorIdRef.current);
+      }
+
+      const handleChange = (e) => {
+        const text = e.target.value;
+        setDraft(text);
+        setCursorPos(e.target.selectionStart);
+        if (onDraftChange) onDraftChange(text);
+      };
+
+      return (
+        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/90 flex flex-col h-full">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+            <div>
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                <span>📝 Interactive Clinical Editor</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">
+                  {docId}
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                Instance: <span className="text-purple-400">{editorIdRef.current}</span> | Cursor: {cursorPos} | Characters: {draft.length}
+              </p>
+            </div>
+            <span className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono">
+              Live Draft
+            </span>
+          </div>
+
+          <textarea
+            value={draft}
+            onChange={handleChange}
+            placeholder="Type confidential clinical notes here..."
+            className="w-full h-32 bg-slate-950 text-slate-100 p-3 rounded-lg border border-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs resize-none"
+          />
+          <p className="text-[10px] text-slate-500 mt-2 italic">
+            Notice: If this component remounts (key changes), any unsaved text typed above will be permanently discarded!
+          </p>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 3. MASTER INTERACTIVE COMPANION LAB APP
+    // =========================================================================
+    function App() {
+      const [activeTab, setActiveTab] = useState("experiment_a");
+
+      // Shared Global Telemetry State
+      const [telemetryLogs, setTelemetryLogs] = useState([]);
+      const [metrics, setMetrics] = useState({
+        mounts: 0,
+        unmounts: 0,
+        resets: 0,
+        errorsCaught: 0,
+      });
+
+      const handleLog = useCallback((payload) => {
+        setTelemetryLogs((prev) => [payload, ...prev.slice(0, 19)]);
+        setMetrics((prev) => ({ ...prev, errorsCaught: prev.errorsCaught + 1 }));
+      }, []);
+
+      const handleResetNotify = useCallback((reason) => {
+        setMetrics((prev) => ({ ...prev, resets: prev.resets + 1 }));
+      }, []);
+
+      // -----------------------------------------------------------------------
+      // State for Experiment A (Same Boundary Identity Trap)
+      // -----------------------------------------------------------------------
+      const [expAPatient, setExpAPatient] = useState("PATIENT_101");
+      const [expACorrupted, setExpACorrupted] = useState(false);
+
+      // -----------------------------------------------------------------------
+      // State for Experiment B (Boundary Dynamic Key)
+      // -----------------------------------------------------------------------
+      const [expBPatient, setExpBPatient] = useState("PATIENT_201");
+      const [expBCorrupted, setExpBCorrupted] = useState(false);
+
+      // -----------------------------------------------------------------------
+      // State for Experiment C (The Retry Key Form Destroyer)
+      // -----------------------------------------------------------------------
+      const [expCRetryCount, setExpCRetryCount] = useState(0);
+      const [expCUseKeyAntiPattern, setExpCUseKeyAntiPattern] = useState(false);
+      const [expCEditorInstance, setExpCEditorInstance] = useState("");
+      const [expCDraftContent, setExpCDraftContent] = useState("Clinical summary: Patient exhibits mild tachycardia. Administer 50mg Metoprolol.");
+
+      // -----------------------------------------------------------------------
+      // State for Experiment D (Semantic resetKeys vs Unstable Object Allocations)
+      // -----------------------------------------------------------------------
+      const [expDPatient, setExpDPatient] = useState("PATIENT_401");
+      const [expDTheme, setExpDTheme] = useState("dark");
+      const [expDCorrupted, setExpDCorrupted] = useState(false);
+      const [expDUnstableKeys, setExpDUnstableKeys] = useState(false);
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header Banner */}
+          <header className="glass-panel p-6 rounded-2xl border-b border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🛡️</span>
+                <div>
+                  <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                    KPI 16 Part 05: Boundary State, Error Identity & Reset Keys
+                  </h1>
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                    Staff-Level Identity Topology: Domain ID ≠ Boundary ID ≠ Component ID ≠ Error ID
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+              <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Resets: </span>
+                <span className="text-emerald-400 font-bold">{metrics.resets}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400">Errors Caught: </span>
+                <span className="text-red-400 font-bold">{metrics.errorsCaught}</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 p-1.5 bg-slate-900/60 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setActiveTab("experiment_a")}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "experiment_a" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🔬 Exp A: Stale Boundary Trap</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("experiment_b")}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "experiment_b" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🔑 Exp B: Dynamic Boundary Key</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("experiment_c")}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "experiment_c" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>💥 Exp C: Retry Key Form Destroyer</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("experiment_d")}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "experiment_d" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>⚖️ Exp D: Semantic resetKeys</span>
+            </button>
+          </div>
+
+          {/* Main Experiment Container */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Columns: Active Experiment Interactive Canvas */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* ============================================================= */}
+              {/* EXPERIMENT A: STALE BOUNDARY FAILURE TRAP                     */}
+              {/* ============================================================= */}
+              {activeTab === "experiment_a" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment A: The Stale Error Boundary Trap</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                        NO KEY / NO RESETKEYS
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Observe what happens when <span className="text-red-400 font-mono">Patient 101</span> crashes, and you switch to <span className="text-emerald-400 font-mono">Patient 102</span>. Because the boundary instance persists, Patient 102 remains trapped behind Patient 101's stale error!
+                    </p>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Select Active Patient
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setExpAPatient("PATIENT_101")}
+                          className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold border transition ${
+                            expAPatient === "PATIENT_101"
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-slate-950 border-slate-800 text-slate-400"
+                          }`}
+                        >
+                          Patient 101
+                        </button>
+                        <button
+                          onClick={() => setExpAPatient("PATIENT_102")}
+                          className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold border transition ${
+                            expAPatient === "PATIENT_102"
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-slate-950 border-slate-800 text-slate-400"
+                          }`}
+                        >
+                          Patient 102
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Inject Sensor Fault on Active Patient
+                      </span>
+                      <button
+                        onClick={() => setExpACorrupted(!expACorrupted)}
+                        className={`w-full py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 ${
+                          expACorrupted
+                            ? "bg-red-600 text-white hover:bg-red-500"
+                            : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        }`}
+                      >
+                        <span>{expACorrupted ? "💥 Fault Active (Crashed)" : "💉 Inject Render Crash"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Render Area */}
+                  <div className="p-6 rounded-xl bg-slate-950/70 border border-slate-800 min-h-[200px] flex flex-col justify-center">
+                    <ResilientResetKeysBoundary
+                      boundaryName="ExpA_StaleTrapBoundary"
+                      onLog={handleLog}
+                      onResetNotify={handleResetNotify}
+                      fallback={(error, errorId, reset, instId) => (
+                        <div className="p-5 bg-red-950/30 border border-red-800/80 rounded-xl text-center space-y-3">
+                          <div className="text-3xl">🚨</div>
+                          <h4 className="text-base font-bold text-white">Boundary Failed (Instance: <span className="text-amber-400 font-mono">{instId}</span>)</h4>
+                          <p className="text-xs text-red-300 max-w-md mx-auto font-mono bg-red-950/60 p-2.5 rounded border border-red-900/50">
+                            {error.message}
+                          </p>
+                          <p className="text-[11px] text-slate-400 font-mono">
+                            Notice: Switching patients will NOT clear this card because this boundary instance never unmounted!
+                          </p>
+                          <button
+                            onClick={reset}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition"
+                          >
+                            Manual Imperative Reset
+                          </button>
+                        </div>
+                      )}
+                    >
+                      <ProfileWidget userId={expAPatient} isCorrupted={expACorrupted} theme="dark" />
+                    </ResilientResetKeysBoundary>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* EXPERIMENT B: DYNAMIC BOUNDARY KEY (REMOUNT)                 */}
+              {/* ============================================================= */}
+              {activeTab === "experiment_b" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment B: Dynamic Boundary Key</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
+                        key=&#123;patientId&#125;
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Here, the boundary receives <span className="text-blue-400 font-mono">key=&#123;patientId&#125;</span>. When you switch patients, React completely unmounts the old boundary Fiber and mounts a fresh instance with <span className="text-emerald-400 font-mono">hasError: false</span>!
+                    </p>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Select Active Patient
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setExpBPatient("PATIENT_201")}
+                          className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold border transition ${
+                            expBPatient === "PATIENT_201"
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-slate-950 border-slate-800 text-slate-400"
+                          }`}
+                        >
+                          Patient 201
+                        </button>
+                        <button
+                          onClick={() => setExpBPatient("PATIENT_202")}
+                          className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold border transition ${
+                            expBPatient === "PATIENT_202"
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-slate-950 border-slate-800 text-slate-400"
+                          }`}
+                        >
+                          Patient 202
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Toggle Sensor Crash
+                      </span>
+                      <button
+                        onClick={() => setExpBCorrupted(!expBCorrupted)}
+                        className={`w-full py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 ${
+                          expBCorrupted
+                            ? "bg-red-600 text-white hover:bg-red-500"
+                            : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        }`}
+                      >
+                        <span>{expBCorrupted ? "💥 Fault Active" : "💉 Inject Render Crash"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Render Area with Dynamic Key */}
+                  <div className="p-6 rounded-xl bg-slate-950/70 border border-slate-800 min-h-[200px] flex flex-col justify-center">
+                    <ResilientResetKeysBoundary
+                      key={expBPatient}
+                      boundaryName="ExpB_DynamicKeyBoundary"
+                      onLog={handleLog}
+                      onResetNotify={handleResetNotify}
+                      fallback={(error, errorId, reset, instId) => (
+                        <div className="p-5 bg-red-950/30 border border-red-800/80 rounded-xl text-center space-y-3">
+                          <div className="text-3xl">💥</div>
+                          <h4 className="text-base font-bold text-white">Patient {expBPatient} Crashed (Boundary: <span className="text-amber-400 font-mono">{instId}</span>)</h4>
+                          <p className="text-xs text-red-300 max-w-md mx-auto font-mono bg-red-950/60 p-2.5 rounded border border-red-900/50">
+                            {error.message}
+                          </p>
+                          <p className="text-[11px] text-emerald-400 font-mono">
+                            ⚡ Try switching to the other patient now: the error clears instantly because the boundary remounts!
+                          </p>
+                        </div>
+                      )}
+                    >
+                      <ProfileWidget userId={expBPatient} isCorrupted={expBCorrupted} theme="dark" />
+                    </ResilientResetKeysBoundary>
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* EXPERIMENT C: THE RETRY KEY FORM DESTROYER                   */}
+              {/* ============================================================= */}
+              {activeTab === "experiment_c" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment C: The Retry Key Form Destroyer</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-mono">
+                        ANTI-PATTERN CRUCIBLE
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Type custom notes in the textarea below. Compare what happens when you click "Retry Save" with <span className="text-red-400 font-mono">key=&#123;retryCount&#125;</span> (WIPES YOUR DRAFT!) vs In-Place Reset (PRESERVES DRAFT!).
+                    </p>
+                  </div>
+
+                  {/* Anti-Pattern Toggle & Retry Button */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Architecture Configuration
+                      </span>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={expCUseKeyAntiPattern}
+                          onChange={(e) => setExpCUseKeyAntiPattern(e.target.checked)}
+                          className="w-4 h-4 rounded text-red-600 focus:ring-red-500 bg-slate-950 border-slate-800"
+                        />
+                        <span className="text-xs font-mono text-slate-200">
+                          Enable <code className="text-red-400">key=&#123;retryCount&#125;</code> (Anti-Pattern)
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs text-slate-400 block">Retry Attempts:</span>
+                        <span className="text-base font-bold font-mono text-amber-400">#{expCRetryCount}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setExpCRetryCount((c) => c + 1);
+                          setMetrics((prev) => ({ ...prev, resets: prev.resets + 1 }));
+                        }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-blue-500/20"
+                      >
+                        Simulate Retry Save
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Render Editor */}
+                  <div className="p-6 rounded-xl bg-slate-950/70 border border-slate-800">
+                    <StatefulEditor
+                      key={expCUseKeyAntiPattern ? `retry_${expCRetryCount}` : "stable_editor_key"}
+                      docId="DOC_MED_99"
+                      initialContent={expCDraftContent}
+                      onMountInfo={(id) => setExpCEditorInstance(id)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ============================================================= */}
+              {/* EXPERIMENT D: SEMANTIC RESETKEYS VS UNSTABLE ALLOCATIONS      */}
+              {/* ============================================================= */}
+              {activeTab === "experiment_d" && (
+                <div className="glass-panel p-6 rounded-2xl space-y-6 border border-slate-800">
+                  <div className="border-b border-slate-800 pb-4">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Experiment D: Semantic resetKeys vs. Identity Explosion</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                        resetKeys=[patientId]
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      1. Trigger a crash. 2. Toggle Theme (dark/light) ──► Error persists (correct, theme is not recovery-relevant). 3. Switch Patient ──► Boundary resets declaratively!
+                    </p>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Domain ID (Patient)
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setExpDPatient("PATIENT_401")}
+                          className={`flex-1 py-1.5 rounded text-xs font-mono font-bold border ${
+                            expDPatient === "PATIENT_401"
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-slate-950 border-slate-800 text-slate-400"
+                          }`}
+                        >
+                          401
+                        </button>
+                        <button
+                          onClick={() => setExpDPatient("PATIENT_402")}
+                          className={`flex-1 py-1.5 rounded text-xs font-mono font-bold border ${
+                            expDPatient === "PATIENT_402"
+                              ? "bg-blue-600 border-blue-500 text-white"
+                              : "bg-slate-950 border-slate-800 text-slate-400"
+                          }`}
+                        >
+                          402
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Theme (Non-Recovery Prop)
+                      </span>
+                      <button
+                        onClick={() => setExpDTheme(expDTheme === "dark" ? "light" : "dark")}
+                        className="w-full py-1.5 rounded text-xs font-bold bg-slate-950 border border-slate-800 text-slate-200"
+                      >
+                        {expDTheme === "dark" ? "🌙 Dark Mode" : "☀️ Light Mode"}
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                        Inject Sensor Crash
+                      </span>
+                      <button
+                        onClick={() => setExpDCorrupted(!expDCorrupted)}
+                        className={`w-full py-1.5 rounded text-xs font-bold transition ${
+                          expDCorrupted ? "bg-red-600 text-white" : "bg-slate-800 text-slate-300"
+                        }`}
+                      >
+                        {expDCorrupted ? "💥 Crashed" : "💉 Inject Fault"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Render Area */}
+                  <div className="p-6 rounded-xl bg-slate-950/70 border border-slate-800 min-h-[200px] flex flex-col justify-center">
+                    <ResilientResetKeysBoundary
+                      boundaryName="ExpD_SemanticBoundary"
+                      resetKeys={[expDPatient]}
+                      onLog={handleLog}
+                      onResetNotify={handleResetNotify}
+                      fallback={(error, errorId, reset, instId) => (
+                        <div className="p-5 bg-red-950/30 border border-red-800/80 rounded-xl text-center space-y-3">
+                          <div className="text-3xl">🛡️</div>
+                          <h4 className="text-base font-bold text-white">Boundary Intercepted Fault</h4>
+                          <p className="text-xs text-red-300 max-w-md mx-auto font-mono bg-red-950/60 p-2.5 rounded border border-red-900/50">
+                            {error.message}
+                          </p>
+                          <p className="text-[11px] text-amber-300 font-mono">
+                            Semantic resetKeys=[{expDPatient}]. Changing theme does not reset; changing patient auto-resets!
+                          </p>
+                        </div>
+                      )}
+                    >
+                      <ProfileWidget userId={expDPatient} isCorrupted={expDCorrupted} theme={expDTheme} />
+                    </ResilientResetKeysBoundary>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Live Identity & Telemetry Inspector */}
+            <div className="space-y-6">
+              {/* Identity Inspector Panel */}
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>🔬 Live Identity Inspector</span>
+                  </h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono">
+                    REAL-TIME
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 text-xs font-mono">
+                  <div className="p-2.5 rounded bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <span className="text-slate-400">Domain ID:</span>
+                    <span className="text-blue-400 font-bold">
+                      {activeTab === "experiment_a" ? expAPatient : activeTab === "experiment_b" ? expBPatient : activeTab === "experiment_c" ? "DOC_MED_99" : expDPatient}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <span className="text-slate-400">Active Boundary:</span>
+                    <span className="text-purple-400 font-bold">
+                      {activeTab === "experiment_a" ? "ExpA_Boundary" : activeTab === "experiment_b" ? `Boundary[${expBPatient}]` : "ExpC_Boundary"}
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <span className="text-slate-400">Total Component Mounts:</span>
+                    <span className="text-emerald-400 font-bold">#{globalComponentMountCounter}</span>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <span className="text-slate-400">Total Boundary Instantiations:</span>
+                    <span className="text-amber-400 font-bold">#{globalBoundaryInstanceCounter}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Telemetry Stream */}
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>📡 Observability Stream</span>
+                  </h3>
+                  <button
+                    onClick={() => setTelemetryLogs([])}
+                    className="text-[10px] text-slate-400 hover:text-white"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto font-mono text-[11px]">
+                  {telemetryLogs.length === 0 ? (
+                    <p className="text-slate-500 italic text-center py-6">No failure events intercepted.</p>
+                  ) : (
+                    telemetryLogs.map((log) => (
+                      <div key={log.errorId + log.timestamp} className="p-2.5 rounded bg-slate-950/80 border border-slate-800/80 space-y-1">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span className="text-red-400 font-bold">[{log.boundaryName}]</span>
+                          <span className="text-[10px]">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <p className="text-amber-300 truncate">ID: {log.errorId}</p>
+                        <p className="text-slate-400 truncate">{log.error}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
