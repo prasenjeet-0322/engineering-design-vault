@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 16 Part 09 — Error Handling with Effects, Subscriptions & External Systems</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code, .font-mono { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useReducer, useCallback, Component } = React;
+
+    // ---------------------------------------------------------------------------
+    // Bulkhead Boundary Component
+    // ---------------------------------------------------------------------------
+    class BulkheadBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        console.error(`[Bulkhead:${this.props.boundaryName}] Intercepted crash:`, error, errorInfo);
+        if (this.props.onCatch) {
+          this.props.onCatch(error, errorInfo);
+        }
+      }
+
+      reset = () => {
+        this.setState({ hasError: false, error: null });
+      };
+
+      render() {
+        if (this.state.hasError) {
+          return this.props.fallback(this.state.error, this.reset);
+        }
+        return this.props.children;
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Simulated Mock WebSocket Network Layer
+    // ---------------------------------------------------------------------------
+    class MockWebSocketServer {
+      constructor() {
+        this.listeners = new Map(); // socketInstance -> callback
+        this.activeSockets = new Set();
+        this.socketIdCounter = 0;
+      }
+
+      createSocket(url) {
+        const id = ++this.socketIdCounter;
+        const socket = {
+          id,
+          url,
+          readyState: 0, // CONNECTING
+          onopen: null,
+          onmessage: null,
+          onerror: null,
+          onclose: null,
+          close: (code = 1000, reason = "Normal") => {
+            socket.readyState = 3; // CLOSED
+            this.activeSockets.delete(socket);
+            if (socket.onclose) socket.onclose({ code, reason });
+          }
+        };
+
+        this.activeSockets.add(socket);
+
+        setTimeout(() => {
+          if (socket.readyState === 0) {
+            socket.readyState = 1; // OPEN
+            if (socket.onopen) socket.onopen();
+          }
+        }, 150);
+
+        return socket;
+      }
+
+      broadcast(url, data) {
+        this.activeSockets.forEach(socket => {
+          if (socket.url === url && socket.readyState === 1 && socket.onmessage) {
+            socket.onmessage({ data: typeof data === "string" ? data : JSON.stringify(data) });
+          }
+        });
+      }
+
+      injectError(url, code = 1006, reason = "Abnormal Drop") {
+        this.activeSockets.forEach(socket => {
+          if (socket.url === url) {
+            if (socket.onerror) socket.onerror(new Event("error"));
+            if (socket.onclose) socket.onclose({ code, reason });
+            this.activeSockets.delete(socket);
+          }
+        });
+      }
+    }
+
+    const globalMockServer = new MockWebSocketServer();
+
+    // ---------------------------------------------------------------------------
+    // Main Application Dashboard
+    // ---------------------------------------------------------------------------
+    function App() {
+      const [activeTab, setActiveTab] = useState("expA");
+      const [telemetryLogs, setTelemetryLogs] = useState([]);
+
+      const logTelemetry = useCallback((source, event, level = "info", details = {}) => {
+        setTelemetryLogs(prev => [
+          {
+            id: Date.now() + Math.random(),
+            timestamp: new Date().toLocaleTimeString(),
+            source,
+            event,
+            level,
+            details
+          },
+          ...prev.slice(0, 39)
+        ]);
+      }, []);
+
+      return (
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+          {/* Header */}
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-3xl shadow-2xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold font-mono border border-cyan-500/30">
+                  KPI 16 · PART 09
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold font-mono border border-emerald-500/30">
+                  INTERACTIVE LAB
+                </span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                External Systems, Effects & Subscriptions Resilience Lab
+              </h1>
+              <p className="text-slate-400 text-xs sm:text-sm">
+                Mastering WebSocket adapters, generation guards, StrictMode cleanup symmetry, and third-party WebGL bulkheads.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTelemetryLogs([])}
+                className="px-3.5 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition"
+              >
+                Clear Telemetry Logs
+              </button>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 p-1.5 bg-slate-900/70 border border-slate-800/80 rounded-2xl">
+            {[
+              { id: "expA", label: "🧪 Exp A: Duplicate Subscriptions & StrictMode" },
+              { id: "expB", label: "🛡️ Exp B: Stale Socket Race (Generation Guard)" },
+              { id: "expC", label: "⏱️ Exp C: Unmount During Reconnect Delay" },
+              { id: "expD", label: "🛡️ Exp D: Malformed Packet & Schema Ingestion" },
+              { id: "expE", label: "📊 Exp E: Third-Party WebGL Canvas Bulkhead" },
+              { id: "expF", label: "🔄 Exp F: Shared Stream Multiplexer (Ref-Counted)" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === tab.id
+                    ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-400/40"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Main Experiment Container */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8 space-y-6">
+              {activeTab === "expA" && <ExperimentA log={logTelemetry} />}
+              {activeTab === "expB" && <ExperimentB log={logTelemetry} />}
+              {activeTab === "expC" && <ExperimentC log={logTelemetry} />}
+              {activeTab === "expD" && <ExperimentD log={logTelemetry} />}
+              {activeTab === "expE" && <ExperimentE log={logTelemetry} />}
+              {activeTab === "expF" && <ExperimentF log={logTelemetry} />}
+            </div>
+
+            {/* Live Telemetry & Inspector Panel */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-3xl shadow-xl flex flex-col h-[650px]">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <h3 className="text-xs font-bold text-slate-200 tracking-wider uppercase font-mono">
+                      Subsystem Telemetry Stream
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">{telemetryLogs.length} events</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2.5 pt-3 pr-1 font-mono text-xs">
+                  {telemetryLogs.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                      <span className="text-3xl mb-2">📡</span>
+                      <p className="text-xs">No telemetry emitted yet.</p>
+                      <p className="text-[11px] text-slate-600">Trigger actions in the lab to observe lifecycle events.</p>
+                    </div>
+                  ) : (
+                    telemetryLogs.map(item => (
+                      <div
+                        key={item.id}
+                        className={`p-2.5 rounded-xl border transition-all ${
+                          item.level === "error"
+                            ? "bg-rose-950/40 border-rose-800/80 text-rose-200"
+                            : item.level === "warn"
+                            ? "bg-amber-950/40 border-amber-800/80 text-amber-200"
+                            : item.level === "success"
+                            ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-200"
+                            : "bg-slate-950/60 border-slate-800 text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[10px] mb-1 opacity-70">
+                          <span className="font-bold uppercase tracking-wider">{item.source}</span>
+                          <span>{item.timestamp}</span>
+                        </div>
+                        <div className="font-semibold text-[11px]">{item.event}</div>
+                        {Object.keys(item.details).length > 0 && (
+                          <pre className="mt-1 text-[10px] opacity-80 overflow-x-auto bg-black/40 p-1.5 rounded">
+                            {JSON.stringify(item.details, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment A: Duplicate Subscriptions & StrictMode
+    // ---------------------------------------------------------------------------
+    function ExperimentA({ log }) {
+      const [mode, setMode] = useState("resilient"); // "broken" | "resilient"
+      const [isMounted, setIsMounted] = useState(true);
+      const [emitCount, setEmitCount] = useState(0);
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🧪</span> Experiment A: Duplicate Subscription & StrictMode Symmetry
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Demonstrates why missing cleanup causes exponential listener accumulation under React StrictMode or component remounts.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Architecture Mode</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode("broken")}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                    mode === "broken"
+                      ? "bg-rose-600 text-white border-rose-400 shadow-lg shadow-rose-900/40"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"
+                  }`}
+                >
+                  ❌ Broken (No Cleanup)
+                </button>
+                <button
+                  onClick={() => setMode("resilient")}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                    mode === "resilient"
+                      ? "bg-emerald-600 text-white border-emerald-400 shadow-lg shadow-emerald-900/40"
+                      : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"
+                  }`}
+                >
+                  ✅ Resilient (Symmetric)
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Control Pod</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsMounted(m => !m)}
+                  className="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition"
+                >
+                  {isMounted ? "Unmount Component" : "Mount Component"}
+                </button>
+                <button
+                  onClick={() => {
+                    setEmitCount(c => c + 1);
+                    window.dispatchEvent(new CustomEvent("lab:crypto-tick", { detail: { price: 65000 + Math.floor(Math.random() * 500) } }));
+                    log("WindowBroadcaster", "Dispatched 1 single 'crypto-tick' event", "info");
+                  }}
+                  className="flex-1 py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl border border-cyan-400 transition"
+                >
+                  Emit 1 Tick Event
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Target Component */}
+          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800">
+            <div className="text-xs font-mono text-slate-500 mb-2">Target Component Container:</div>
+            {isMounted ? (
+              <SubscriberPod mode={mode} log={log} />
+            ) : (
+              <div className="p-6 text-center text-slate-500 text-xs font-mono border border-dashed border-slate-800 rounded-xl">
+                Component is currently UNMOUNTED.
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function SubscriberPod({ mode, log }) {
+      const [receivedTicks, setReceivedTicks] = useState(0);
+      const [lastPrice, setLastPrice] = useState(null);
+      const mountCountRef = useRef(0);
+
+      useEffect(() => {
+        mountCountRef.current++;
+        log("SubscriberPod", `Effect Mounted (Mode: ${mode})`, "info", { mountCount: mountCountRef.current });
+
+        const handler = (e) => {
+          setReceivedTicks(c => c + 1);
+          setLastPrice(e.detail.price);
+          log("SubscriberPod", `Received Tick Event! Updated Price to $${e.detail.price}`, "success");
+        };
+
+        window.addEventListener("lab:crypto-tick", handler);
+
+        return () => {
+          if (mode === "resilient") {
+            window.removeEventListener("lab:crypto-tick", handler);
+            log("SubscriberPod", "Cleaned up event listener (Symmetric Release)", "warn");
+          } else {
+            log("SubscriberPod", "⚠️ TEARDOWN OMITTED: Listener leaked in memory!", "error");
+          }
+        };
+      }, [mode, log]);
+
+      return (
+        <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-cyan-400">Live Crypto Subscriber Pod</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+              mode === "resilient" ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "bg-rose-950 text-rose-400 border border-rose-800"
+            }`}>
+              Mode: {mode.toUpperCase()}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-center">
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="text-[10px] font-mono text-slate-500 uppercase">State Updates Count</div>
+              <div className="text-2xl font-black text-white font-mono">{receivedTicks}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Should be 1:1 with emitted events</div>
+            </div>
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="text-[10px] font-mono text-slate-500 uppercase">Current Price</div>
+              <div className="text-2xl font-black text-cyan-400 font-mono">
+                {lastPrice ? `$${lastPrice.toLocaleString()}` : "Waiting..."}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Live ticker snapshot</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment B: Stale Socket Race (Generation Guard)
+    // ---------------------------------------------------------------------------
+    function ExperimentB({ log }) {
+      const [currentRoom, setCurrentRoom] = useState("BTC-USDT");
+      const [useGenerationGuard, setUseGenerationGuard] = useState(true);
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🛡️</span> Experiment B: Stale Socket Error Race Condition
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Simulate switching trading rooms rapidly while an obsolete socket connection emits a delayed 1006 error.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Generation Guard State</label>
+              <button
+                onClick={() => setUseGenerationGuard(g => !g)}
+                className={`w-full py-2 rounded-xl text-xs font-bold border transition ${
+                  useGenerationGuard
+                    ? "bg-emerald-600 text-white border-emerald-400 shadow-lg shadow-emerald-900/40"
+                    : "bg-rose-600 text-white border-rose-400 shadow-lg shadow-rose-900/40"
+                }`}
+              >
+                {useGenerationGuard ? "✅ Generation Guard ENABLED (Resilient)" : "❌ Generation Guard DISABLED (Vulnerable)"}
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Switch Active Trading Room</label>
+              <div className="flex gap-2">
+                {["BTC-USDT", "ETH-USDT", "SOL-USDT"].map(room => (
+                  <button
+                    key={room}
+                    onClick={() => {
+                      setCurrentRoom(room);
+                      log("UserAction", `Switched active room to ${room}`, "info");
+                    }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition ${
+                      currentRoom === room
+                        ? "bg-cyan-600 text-white border-cyan-400"
+                        : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"
+                    }`}
+                  >
+                    {room}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <GuardedRoomPod
+            room={currentRoom}
+            useGuard={useGenerationGuard}
+            log={log}
+          />
+        </div>
+      );
+    }
+
+    function GuardedRoomPod({ room, useGuard, log }) {
+      const [status, setStatus] = useState("IDLE");
+      const [messages, setMessages] = useState([]);
+      const generationRef = useRef(0);
+      const [displayGen, setDisplayGen] = useState(0);
+
+      useEffect(() => {
+        const activeGen = ++generationRef.current;
+        setDisplayGen(activeGen);
+        setStatus("CONNECTING");
+        setMessages([]);
+
+        log("SocketClient", `Initialized connection for ${room} (Gen #${activeGen})`, "info");
+
+        // Simulate WebSocket handshake
+        const socketId = activeGen;
+        const timer = setTimeout(() => {
+          if (!useGuard || activeGen === generationRef.current) {
+            setStatus("CONNECTED");
+            setMessages([`Connected to feed ${room} (Gen #${activeGen})`]);
+            log("SocketClient", `Socket for ${room} (Gen #${activeGen}) OPENED successfully`, "success");
+          }
+        }, 300);
+
+        return () => {
+          clearTimeout(timer);
+          log("SocketClient", `Teardown triggered for ${room} (Gen #${activeGen})`, "warn");
+
+          // Simulate delayed abnormal close event occurring 800ms AFTER room unmount/switch!
+          setTimeout(() => {
+            log("ServerGateway", `Delayed 1006 CloseEvent fired for dead Gen #${activeGen}`, "error");
+            if (useGuard) {
+              if (activeGen === generationRef.current) {
+                setStatus("ERROR");
+              } else {
+                log("GenerationGuard", `🛡️ DROPPED stale error from Gen #${activeGen} (Current is #${generationRef.current})`, "success");
+              }
+            } else {
+              // Vulnerable: Stale socket crashes current healthy view!
+              setStatus("ERROR");
+              setMessages(prev => [...prev, `💥 STALE ERROR from Gen #${activeGen} killed ${room}!`]);
+              log("Vulnerability", `💥 Stale error from Gen #${activeGen} overwritten current state!`, "error");
+            }
+          }, 800);
+        };
+      }, [room, useGuard, log]);
+
+      return (
+        <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">📡</span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Active Room: {room}</h3>
+                <span className="text-xs font-mono text-cyan-400">Generation Token: #{displayGen}</span>
+              </div>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
+              status === "CONNECTED"
+                ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                : status === "CONNECTING"
+                ? "bg-amber-950 text-amber-300 border border-amber-800"
+                : "bg-rose-950 text-rose-300 border border-rose-800"
+            }`}>
+              Status: {status}
+            </span>
+          </div>
+
+          <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 font-mono text-xs space-y-1 max-h-36 overflow-y-auto">
+            {messages.length === 0 ? (
+              <span className="text-slate-500">Connecting to stream...</span>
+            ) : (
+              messages.map((m, idx) => (
+                <div key={idx} className={status === "ERROR" ? "text-rose-400" : "text-emerald-400"}>
+                  {m}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment C: Unmount During Reconnect Delay
+    // ---------------------------------------------------------------------------
+    function ExperimentC({ log }) {
+      const [isMounted, setIsMounted] = useState(true);
+      const [resilientCleanup, setResilientCleanup] = useState(true);
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>⏱️</span> Experiment C: Unmount During Reconnection Backoff Window
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Simulate dropping a connection, scheduling a 3-second reconnect timer, and unmounting before the timer fires.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Cleanup Configuration</label>
+              <button
+                onClick={() => setResilientCleanup(c => !c)}
+                className={`w-full py-2 rounded-xl text-xs font-bold border transition ${
+                  resilientCleanup
+                    ? "bg-emerald-600 text-white border-emerald-400"
+                    : "bg-rose-600 text-white border-rose-400"
+                }`}
+              >
+                {resilientCleanup ? "✅ Cancels Timer on Unmount" : "❌ Timer Leaks on Unmount"}
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Mounting Control</label>
+              <button
+                onClick={() => setIsMounted(m => !m)}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition"
+              >
+                {isMounted ? "Unmount Component Now" : "Re-Mount Component"}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800">
+            {isMounted ? (
+              <ReconnectPod resilient={resilientCleanup} log={log} />
+            ) : (
+              <div className="p-6 text-center text-slate-500 font-mono text-xs border border-dashed border-slate-800 rounded-xl">
+                Component unmounted. Watch the Telemetry Stream to see if orphan reconnect timers fire!
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function ReconnectPod({ resilient, log }) {
+      const [countdown, setCountdown] = useState(null);
+      const timerRef = useRef(null);
+
+      const triggerDropAndReconnect = () => {
+        log("ReconnectPod", "Connection dropped! Scheduling reconnect in 3000ms...", "warn");
+        setCountdown(3);
+
+        timerRef.current = window.setTimeout(() => {
+          log("ReconnectPod", "🔄 Reconnect timer fired: Spawned new WebSocket connection!", "success");
+          setCountdown(null);
+        }, 3000);
+      };
+
+      useEffect(() => {
+        return () => {
+          if (resilient) {
+            if (timerRef.current !== null) {
+              window.clearTimeout(timerRef.current);
+              log("CleanupContract", "🛡️ Successfully cleared in-flight reconnect timer upon unmount", "success");
+            }
+          } else {
+            log("CleanupContract", "💥 FAILED TO CLEAR TIMER: Orphan timer will fire in background!", "error");
+          }
+        };
+      }, [resilient, log]);
+
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">Live Trade Reconnect Controller</span>
+            <button
+              onClick={triggerDropAndReconnect}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition"
+            >
+              Simulate Network Drop (Schedule Reconnect)
+            </button>
+          </div>
+
+          <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-center font-mono text-xs">
+            {countdown !== null ? (
+              <span className="text-amber-400 font-bold animate-pulse">
+                ⏳ Reconnection scheduled in 3 seconds... (Try unmounting now!)
+              </span>
+            ) : (
+              <span className="text-slate-400">Connection status: IDLE / Ready</span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment D: Malformed Packet & Schema Ingestion
+    // ---------------------------------------------------------------------------
+    function ExperimentD({ log }) {
+      const [messages, setMessages] = useState([]);
+      const [droppedPackets, setDroppedPackets] = useState(0);
+
+      const handleIngest = (rawPacket) => {
+        log("SocketAdapter", "Raw payload received over wire", "info", { raw: rawPacket });
+
+        // Stage 2: Defensive JSON Deserialization
+        let parsed;
+        try {
+          parsed = typeof rawPacket === "string" ? JSON.parse(rawPacket) : rawPacket;
+        } catch (e) {
+          log("SocketAdapter", "💥 SyntaxError: Non-JSON payload rejected at parse gate", "error");
+          setDroppedPackets(d => d + 1);
+          return;
+        }
+
+        // Stage 3: Schema Validation Gate
+        if (
+          parsed &&
+          typeof parsed.symbol === "string" &&
+          typeof parsed.price === "number" &&
+          !isNaN(parsed.price)
+        ) {
+          log("SocketAdapter", "✅ Schema validation passed. Dispatched to state.", "success");
+          setMessages(prev => [parsed, ...prev.slice(0, 4)]);
+        } else {
+          log("SocketAdapter", "⚠️ Schema Mismatch: Invalid price/symbol structure", "warn", parsed);
+          setDroppedPackets(d => d + 1);
+        }
+      };
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🛡️</span> Experiment D: Defensive Parsing & Schema Validation
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Test how the 4-Stage Defensive Adapter intercepts HTML error pages and corrupt types without crashing the React UI.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              onClick={() => handleIngest(JSON.stringify({ symbol: "BTC", price: 65200, volume: 140 }))}
+              className="p-3 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800 text-emerald-300 rounded-2xl text-xs font-bold text-left transition"
+            >
+              <div className="text-sm mb-1">🟢 Valid Packet</div>
+              <div className="font-mono text-[10px] opacity-75">{"{symbol: 'BTC', price: 65200}"}</div>
+            </button>
+
+            <button
+              onClick={() => handleIngest("<html>502 Bad Gateway</html>")}
+              className="p-3 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800 text-rose-300 rounded-2xl text-xs font-bold text-left transition"
+            >
+              <div className="text-sm mb-1">🔴 HTML 502 String</div>
+              <div className="font-mono text-[10px] opacity-75">&lt;html&gt;502 Bad Gateway&lt;/html&gt;</div>
+            </button>
+
+            <button
+              onClick={() => handleIngest(JSON.stringify({ symbol: "BTC", price: "CORRUPTED_STRING" }))}
+              className="p-3 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800 text-amber-300 rounded-2xl text-xs font-bold text-left transition"
+            >
+              <div className="text-sm mb-1">🟡 Schema Type Mismatch</div>
+              <div className="font-mono text-[10px] opacity-75">{"{price: 'CORRUPTED'}"}</div>
+            </button>
+          </div>
+
+          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-400">Accepted Valid Packets: {messages.length}</span>
+              <span className="text-rose-400 font-bold">Discarded Malformed: {droppedPackets}</span>
+            </div>
+            <div className="space-y-2">
+              {messages.length === 0 ? (
+                <div className="p-4 text-center text-slate-600 text-xs font-mono">No valid packets ingested yet.</div>
+              ) : (
+                messages.map((m, idx) => (
+                  <div key={idx} className="p-2.5 bg-slate-900 rounded-xl border border-slate-800 flex justify-between font-mono text-xs">
+                    <span className="font-bold text-cyan-400">{m.symbol}</span>
+                    <span className="text-emerald-400">${m.price.toLocaleString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment E: Third-Party WebGL Canvas Bulkhead
+    // ---------------------------------------------------------------------------
+    function ExperimentE({ log }) {
+      const [chartData, setChartData] = useState([15, 30, 45, 60, 80, 50, 95]);
+      const [crashTriggered, setCrashTriggered] = useState(false);
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>📊</span> Experiment E: Third-Party Canvas / WebGL Bulkhead
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Isolate imperative canvas and GPU rendering errors inside a local Bulkhead Boundary so unhandled WebGL crashes do not unmount surrounding dashboard widgets.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setCrashTriggered(true);
+                log("WebGLDriver", "💥 Synthetic GPU Context Loss Injected!", "error");
+              }}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition"
+            >
+              Simulate WebGL Context Loss / Crash
+            </button>
+            <button
+              onClick={() => {
+                setCrashTriggered(false);
+                setChartData(prev => prev.map(() => Math.floor(Math.random() * 80 + 20)));
+                log("ChartPod", "Regenerated live telemetry data", "info");
+              }}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition"
+            >
+              Randomize Data
+            </button>
+          </div>
+
+          {/* Bulkhead Boundary Wrapped Pod */}
+          <BulkheadBoundary
+            boundaryName="WebGLAnalyticsPod"
+            onCatch={(err) => log("BulkheadBoundary", `Intercepted WebGL Crash: ${err.message}`, "error")}
+            fallback={(err, reset) => (
+              <div className="p-6 bg-amber-950/40 border border-amber-800/80 rounded-2xl space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-200">WebGL Acceleration Suspended</h4>
+                    <p className="text-xs text-amber-300/80">
+                      GPU memory limit exceeded or context lost. Fallback SVG data view rendered.
+                    </p>
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-xs text-slate-300">
+                  Fallback Values: {chartData.join(", ")}
+                </div>
+                <button
+                  onClick={() => {
+                    setCrashTriggered(false);
+                    reset();
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition"
+                >
+                  Re-initialize WebGL Context
+                </button>
+              </div>
+            )}
+          >
+            <CanvasChartPod data={chartData} shouldCrash={crashTriggered} />
+          </BulkheadBoundary>
+        </div>
+      );
+    }
+
+    function CanvasChartPod({ data, shouldCrash }) {
+      if (shouldCrash) {
+        throw new Error("WebGL context lost: GPU process terminated unexpectedly (0x887A0005).");
+      }
+
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        data.forEach((val, idx) => {
+          const barWidth = 35;
+          const x = idx * 45 + 15;
+          const y = canvas.height - val;
+
+          // Gradient fill
+          const grad = ctx.createLinearGradient(0, y, 0, canvas.height);
+          grad.addColorStop(0, "#06b6d4");
+          grad.addColorStop(1, "#3b82f6");
+
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, y, barWidth, val);
+        });
+      }, [data]);
+
+      return (
+        <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+          <div className="flex justify-between text-xs font-mono text-slate-400">
+            <span>Hardware Accelerated Canvas Ticker</span>
+            <span>FPS: 60 (Normal)</span>
+          </div>
+          <canvas ref={canvasRef} width={360} height={120} className="w-full bg-slate-900/60 rounded-xl" />
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment F: Shared Stream Multiplexer (Reference-Counted)
+    // ---------------------------------------------------------------------------
+    function ExperimentF({ log }) {
+      const [subscribers, setSubscribers] = useState(["Pod Alpha", "Pod Beta"]);
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🔄</span> Experiment F: Reference-Counted Shared Stream Multiplexer
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Multiplex multiple React components into a single shared WebSocket connection with retain/release reference counting.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const name = `Pod ${String.fromCharCode(65 + subscribers.length)}`;
+                setSubscribers(s => [...s, name]);
+                log("MultiplexerManager", `Spawned new consumer ${name}`, "info");
+              }}
+              className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl transition"
+            >
+              + Mount Consumer Pod
+            </button>
+            <button
+              onClick={() => {
+                if (subscribers.length > 0) {
+                  const removed = subscribers[subscribers.length - 1];
+                  setSubscribers(s => s.slice(0, -1));
+                  log("MultiplexerManager", `Unmounted consumer ${removed}`, "warn");
+                }
+              }}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition"
+            >
+              - Unmount Last Pod
+            </button>
+          </div>
+
+          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+            <div className="text-xs font-mono text-cyan-400 mb-3">
+              Active Consumers (RefCount: {subscribers.length}) | Shared WebSocket Count: {subscribers.length > 0 ? 1 : 0}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {subscribers.map((name, idx) => (
+                <div key={idx} className="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs space-y-1 font-mono">
+                  <div className="font-bold text-white">{name}</div>
+                  <div className="text-emerald-400 text-[11px]">Stream: CONNECTED (Shared)</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount Root
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
