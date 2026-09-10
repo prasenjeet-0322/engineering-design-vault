@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 16 — Part 04 Companion Lab: Failure Domains & Blast-Radius Architecture</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #070b14;
+      color: #f1f5f9;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, Component } = React;
+
+    // ==========================================
+    // GENERIC BULKHEAD ERROR BOUNDARY
+    // ==========================================
+    class LabBulkheadBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error: error instanceof Error ? error : new Error(String(error)) };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        if (this.props.onLog) {
+          this.props.onLog(
+            this.props.name || "Boundary",
+            `Caught crash in [${this.props.name}]: "${error.message}"`,
+            this.props.tier || "feature"
+          );
+        }
+      }
+
+      reset = () => {
+        this.setState({ hasError: false, error: null });
+        if (this.props.onReset) this.props.onReset();
+      };
+
+      render() {
+        if (this.state.hasError) {
+          if (this.props.fallback) {
+            return this.props.fallback(this.state.error, this.reset);
+          }
+
+          return (
+            <div role="alert" className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl space-y-2">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-rose-400 font-bold uppercase">
+                  ⚠️ {this.props.name} Failed
+                </span>
+                <button
+                  onClick={this.reset}
+                  className="px-2.5 py-1 bg-rose-800 hover:bg-rose-700 text-white rounded text-[11px] font-mono transition"
+                >
+                  Reset
+                </button>
+              </div>
+              <p className="text-[11px] font-mono text-rose-300/80">{this.state.error?.message}</p>
+            </div>
+          );
+        }
+
+        return this.props.children;
+      }
+    }
+
+    // ==========================================
+    // CRASHABLE TEST WIDGETS
+    // ==========================================
+    function RevenueWidget({ shouldCrash }) {
+      if (shouldCrash) throw new Error("WebGLContextLost: Canvas array initialization failed in RevenueWidget.");
+
+      return (
+        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+          <div className="flex justify-between text-xs font-mono">
+            <span className="text-slate-400">Monthly Revenue</span>
+            <span className="text-emerald-400 font-bold">● Live</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 font-mono">$184,200</div>
+          <div className="text-[10px] text-slate-500 font-mono">+12.4% vs last month</div>
+        </div>
+      );
+    }
+
+    function InventoryWidget({ shouldCrash }) {
+      if (shouldCrash) throw new Error("TypeError: Cannot read properties of undefined (reading 'stock_units') in InventoryWidget.");
+
+      return (
+        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+          <div className="flex justify-between text-xs font-mono">
+            <span className="text-slate-400">Inventory Status</span>
+            <span className="text-cyan-400 font-bold">4,890 SKU</span>
+          </div>
+          <div className="text-2xl font-bold text-cyan-400 font-mono">98.2% Filled</div>
+          <div className="text-[10px] text-slate-500 font-mono">All distribution hubs online</div>
+        </div>
+      );
+    }
+
+    function OrdersWidget({ shouldCrash }) {
+      if (shouldCrash) throw new Error("RangeError: Invalid array length in OrdersWidget parser.");
+
+      return (
+        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+          <div className="flex justify-between text-xs font-mono">
+            <span className="text-slate-400">Fulfillment Queue</span>
+            <span className="text-amber-400 font-bold">12 Pending</span>
+          </div>
+          <div className="text-2xl font-bold text-amber-400 font-mono">142 Shipped</div>
+          <div className="text-[10px] text-slate-500 font-mono">Avg processing time: 14m</div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MAIN INTERACTIVE LAB
+    // ==========================================
+    function App() {
+      const [topologyMode, setTopologyMode] = useState("feature"); // 'root', 'feature', 'checkout'
+      const [crashInventory, setCrashInventory] = useState(false);
+      const [crashRevenue, setCrashRevenue] = useState(false);
+      const [crashPayment, setCrashPayment] = useState(false);
+      const [draftText, setDraftText] = useState("Active clinical evaluation draft in progress...");
+      const [logs, setLogs] = useState([]);
+
+      const addLog = (name, message, tier) => {
+        setLogs(prev => [
+          {
+            id: Math.random().toString(36).substring(2, 9),
+            time: new Date().toLocaleTimeString(),
+            name,
+            message,
+            tier
+          },
+          ...prev.slice(0, 30)
+        ]);
+      };
+
+      const resetAll = () => {
+        setCrashInventory(false);
+        setCrashRevenue(false);
+        setCrashPayment(false);
+        addLog("System", "All fault injection states reset.", "system");
+      };
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <header className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl border-cyan-500/20">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="px-3 py-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 rounded-full text-xs font-semibold uppercase tracking-wider">
+                  Level 06 — KPI 16 / Part 04
+                </span>
+                <span className="px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded-full text-xs font-semibold">
+                  Failure Domains & Blast Radius Crucible
+                </span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2 text-white">
+                Error Boundary Placement & Blast-Radius Architecture
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Compare Monolithic Root vs Granular Feature vs Shared Transactional failure domains in real-time.
+              </p>
+            </div>
+            <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs">
+              <button
+                onClick={() => { setTopologyMode("feature"); resetAll(); }}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                  topologyMode === "feature" ? "bg-emerald-600 text-white shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Granular Feature Bulkheads
+              </button>
+              <button
+                onClick={() => { setTopologyMode("root"); resetAll(); }}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                  topologyMode === "root" ? "bg-rose-600 text-white shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Monolithic Root Boundary
+              </button>
+              <button
+                onClick={() => { setTopologyMode("checkout"); resetAll(); }}
+                className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                  topologyMode === "checkout" ? "bg-cyan-600 text-white shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Shared Transaction Domain
+              </button>
+            </div>
+          </header>
+
+          {/* Fault Control Toolbar */}
+          <div className="glass-panel p-4 rounded-xl flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setCrashInventory(true)}
+                className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                💥 Crash Inventory Widget
+              </button>
+              <button
+                onClick={() => setCrashRevenue(true)}
+                className="px-3.5 py-2 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-200 rounded-lg text-xs font-mono font-semibold transition"
+              >
+                💥 Crash Revenue Widget
+              </button>
+              {topologyMode === "checkout" && (
+                <button
+                  onClick={() => setCrashPayment(true)}
+                  className="px-3.5 py-2 bg-amber-950/60 hover:bg-amber-900 border border-amber-800 text-amber-200 rounded-lg text-xs font-mono font-semibold transition"
+                >
+                  💥 Crash Payment Method in Checkout
+                </button>
+              )}
+            </div>
+            <button
+              onClick={resetAll}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-mono font-bold transition shadow"
+            >
+              🔄 Reset Faults
+            </button>
+          </div>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Live Topology Sandbox (2 Cols) */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="glass-panel p-6 rounded-2xl space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                    Topology Mode: <strong className="text-cyan-400">{topologyMode.toUpperCase()}</strong>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    Blast Radius: <strong className={topologyMode === "feature" ? "text-emerald-400" : topologyMode === "checkout" ? "text-cyan-400" : "text-rose-400"}>
+                      {topologyMode === "feature" ? "MINIMAL (1 Card)" : topologyMode === "checkout" ? "TRANSACTIONAL (Checkout Flow)" : "MAXIMUM (Full Page Wipe)"}
+                    </strong>
+                  </span>
+                </div>
+
+                {/* TOPOLOGY A: MONOLITHIC ROOT BOUNDARY */}
+                {topologyMode === "root" && (
+                  <LabBulkheadBoundary
+                    name="GlobalRootBoundary"
+                    tier="root"
+                    onLog={addLog}
+                    onReset={() => { setCrashInventory(false); setCrashRevenue(false); }}
+                  >
+                    <div className="space-y-4">
+                      <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs font-mono text-slate-400 flex justify-between">
+                        <span>Application Shell Navigation</span>
+                        <span className="text-emerald-400">● Global Status: OK</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <RevenueWidget shouldCrash={crashRevenue} />
+                        <InventoryWidget shouldCrash={crashInventory} />
+                        <OrdersWidget shouldCrash={false} />
+                      </div>
+                    </div>
+                  </LabBulkheadBoundary>
+                )}
+
+                {/* TOPOLOGY B: GRANULAR FEATURE BULKHEADS */}
+                {topologyMode === "feature" && (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs font-mono text-slate-400 flex justify-between">
+                      <span>Application Shell Navigation</span>
+                      <span className="text-emerald-400">● Global Status: OK</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <LabBulkheadBoundary
+                        name="RevenueBulkhead"
+                        tier="feature"
+                        onLog={addLog}
+                        onReset={() => setCrashRevenue(false)}
+                      >
+                        <RevenueWidget shouldCrash={crashRevenue} />
+                      </LabBulkheadBoundary>
+
+                      <LabBulkheadBoundary
+                        name="InventoryBulkhead"
+                        tier="feature"
+                        onLog={addLog}
+                        onReset={() => setCrashInventory(false)}
+                      >
+                        <InventoryWidget shouldCrash={crashInventory} />
+                      </LabBulkheadBoundary>
+
+                      <LabBulkheadBoundary
+                        name="OrdersBulkhead"
+                        tier="feature"
+                        onLog={addLog}
+                      >
+                        <OrdersWidget shouldCrash={false} />
+                      </LabBulkheadBoundary>
+                    </div>
+                  </div>
+                )}
+
+                {/* TOPOLOGY C: SHARED TRANSACTIONAL WORKFLOW */}
+                {topologyMode === "checkout" && (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs font-mono text-slate-400 flex justify-between">
+                      <span>Checkout Flow Navigation</span>
+                      <span className="text-cyan-400">● Step 2 of 3</span>
+                    </div>
+
+                    <LabBulkheadBoundary
+                      name="UnifiedCheckoutTransactionDomain"
+                      tier="route"
+                      onLog={addLog}
+                      onReset={() => setCrashPayment(false)}
+                      fallback={(error, reset) => (
+                        <div className="p-6 bg-slate-950 border border-cyan-800/60 rounded-xl space-y-3 text-center">
+                          <h4 className="font-bold text-sm text-cyan-400 font-mono">Checkout Transaction Failed</h4>
+                          <p className="text-xs font-mono text-slate-400 max-w-md mx-auto">{error.message}</p>
+                          <button
+                            onClick={reset}
+                            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold rounded-lg transition"
+                          >
+                            Reinitialize Checkout Session
+                          </button>
+                        </div>
+                      )}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono space-y-1">
+                          <div className="text-slate-400">Cart Items</div>
+                          <div className="font-bold text-white">3 Licenses ($450)</div>
+                        </div>
+                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono space-y-1">
+                          <div className="text-slate-400">Billing Address</div>
+                          <div className="font-bold text-white">New York, NY 10001</div>
+                        </div>
+                        <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 text-xs font-mono space-y-1">
+                          <div className="text-slate-400">Payment Gateway</div>
+                          {crashPayment ? (() => { throw new Error("PaymentGatewayTimeout: Stripe tokenization failed."); })() : (
+                            <div className="font-bold text-emerald-400">Visa ending in 4242</div>
+                          )}
+                        </div>
+                      </div>
+                    </LabBulkheadBoundary>
+                  </div>
+                )}
+
+                {/* State Preservation Box */}
+                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                  <div className="flex justify-between text-xs font-mono text-slate-400">
+                    <span>Durable Form Draft (Parent State Container)</span>
+                    <span className="text-emerald-400 text-[10px]">Survives Feature Resets!</span>
+                  </div>
+                  <textarea
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    rows={2}
+                    className="w-full p-2 bg-slate-900 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Telemetry Stream (1 Col) */}
+            <div className="glass-panel p-5 rounded-2xl flex flex-col h-[650px] shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                  <h3 className="font-bold text-sm text-slate-200">Failure-Domain Telemetry</h3>
+                </div>
+                <button
+                  onClick={() => setLogs([])}
+                  className="text-[10px] text-slate-400 hover:text-white font-mono"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2.5 pt-4 pr-1">
+                {logs.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
+                    <svg className="w-10 h-10 mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <p className="text-xs font-mono">Trigger crashes to inspect blast radius containment.</p>
+                  </div>
+                ) : (
+                  logs.map(log => (
+                    <div
+                      key={log.id}
+                      className="p-3 rounded-xl border border-slate-800 bg-slate-900/90 text-xs font-mono space-y-1"
+                    >
+                      <div className="flex justify-between items-center text-[10px] opacity-70">
+                        <span className="font-bold uppercase tracking-wider text-cyan-400">{log.name}</span>
+                        <span>{log.time}</span>
+                      </div>
+                      <p className="text-slate-300">{log.message}</p>
+                      <div className="text-[10px] text-slate-500">
+                        Domain Tier: <strong className="text-amber-400 uppercase">{log.tier}</strong>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
