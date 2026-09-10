@@ -5,7 +5,7 @@
 > **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
 > **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
 > **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
-> **Status:** 🟡 In Progress (Part 02 of 16 Completed)
+> **Status:** 🟡 In Progress (Part 03 of 16 Completed)
 
 ---
 
@@ -24,7 +24,7 @@ $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tr
 | :--- | :--- | :--- | :--- |
 | **Part 01** | [The React Accessibility Mental Model & Semantic HTML Foundations](./01-react-a11y-mental-model-semantic-html.md) | ✅ **Completed** | [`01-aom-semantic-html-visualizer.html`](./examples/01-aom-semantic-html-visualizer.html) |
 | **Part 02** | [ARIA Roles, States, Properties & The First Rule of ARIA in React](./02-aria-roles-states-properties.md) | ✅ **Completed** | [`02-aria-semantics-visualizer.html`](./examples/02-aria-semantics-visualizer.html) |
-| **Part 03** | [Keyboard Navigation, Focus Rings & The Tab Order Model](./03-keyboard-navigation-tab-order-focus-rings.md) | ⏳ Planned | `03-focus-ring-tab-tracker.html` |
+| **Part 03** | [Keyboard Navigation, Focus Rings & The Tab Order Model](./03-keyboard-navigation-tab-order-focus-rings.md) | ✅ **Completed** | [`03-keyboard-focus-management.html`](./examples/03-keyboard-focus-management.html) |
 | **Part 04** | [Focus Management: Trapping, Moving & Restoring Focus with Hooks](./04-focus-management-traps-restoration.md) | ⏳ Planned | `04-focus-trap-sandbox.html` |
 | **Part 05** | [Accessible Forms: Labels, Fieldsets, Errors & Description Binding](./05-accessible-forms-labels-error-associations.md) | ⏳ Planned | `05-accessible-form-auditor.html` |
 | **Part 06** | [Live Regions: `aria-live`, Dynamic Announcements & Notifications](./06-aria-live-regions-dynamic-announcements.md) | ⏳ Planned | `06-live-region-announcer.html` |

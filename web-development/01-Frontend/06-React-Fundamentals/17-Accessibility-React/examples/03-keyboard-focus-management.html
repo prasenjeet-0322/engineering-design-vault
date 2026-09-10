@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 03 — Keyboard Navigation, Focus Management & Interaction Accessibility</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-native-bg: rgba(16, 185, 129, 0.1);
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-react { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #0284c7; }
+    .badge-focus { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #7e22ce; }
+    .badge-a11y { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+
+    h1.lab-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lab-container {
+      max-width: 1400px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Top HUD: Real-time activeElement monitor */
+    .hud-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 900px) { .hud-grid { grid-template-columns: 1fr; } }
+
+    .hud-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .hud-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent-info);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .active-display-box {
+      background: #000;
+      border: 1px solid var(--border-focus);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #38bdf8;
+    }
+
+    .key-logger-feed {
+      background: #000;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #34d399;
+      height: 90px;
+      overflow-y: auto;
+    }
+
+    /* Lab Scenarios Grid */
+    .scenarios-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) { .scenarios-grid { grid-template-columns: 1fr; } }
+
+    .scenario-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .scenario-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+
+    .scenario-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .demo-sandbox {
+      background: #080c14;
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* UI Interactive elements */
+    button.btn-test {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    button.btn-test:hover { background: #0369a1; }
+    button.btn-test:focus-visible {
+      outline: 3px solid #38bdf8;
+      outline-offset: 3px;
+    }
+
+    /* Roving TabIndex Group */
+    .roving-group {
+      display: flex;
+      gap: 0.5rem;
+      background: var(--bg-tertiary);
+      padding: 0.5rem;
+      border-radius: 8px;
+    }
+
+    .roving-tab {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid transparent;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .roving-tab:focus-visible {
+      outline: 2px solid #38bdf8;
+      outline-offset: 2px;
+      color: #fff;
+    }
+
+    .roving-tab.active {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    /* ActiveDescendant Listbox */
+    .activedesc-listbox {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.5rem;
+      max-height: 140px;
+      overflow-y: auto;
+      list-style: none;
+    }
+
+    .activedesc-listbox:focus-visible {
+      outline: 2px solid #38bdf8;
+      outline-offset: 2px;
+    }
+
+    .activedesc-option {
+      padding: 0.4rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .activedesc-option.active-desc {
+      background: rgba(56, 189, 248, 0.25);
+      color: #38bdf8;
+      font-weight: 700;
+      border-left: 3px solid #38bdf8;
+    }
+
+    /* Modal Overlay Simulation */
+    .sim-modal-overlay {
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      border-radius: 8px;
+      padding: 1.25rem;
+      border: 1px solid #38bdf8;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* Nested Escape Stack */
+    .escape-stack-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: #1e293b;
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div class="lab-badge-group">
+      <span class="badge badge-react">React A11y</span>
+      <span class="badge badge-focus">Focus Mechanics</span>
+      <span class="badge badge-a11y">WCAG 2.2</span>
+      <h1 class="lab-title">KPI 17 — Lab 03: Keyboard Navigation & Focus Management Workbench</h1>
+    </div>
+    <div style="font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono);">
+      Interactive Diagnostics
+    </div>
+  </header>
+
+  <div class="lab-container">
+
+    <!-- Top Real-time Monitor HUD -->
+    <section class="hud-grid" aria-labelledby="hud-heading">
+      <div class="hud-card">
+        <div class="hud-title" id="hud-heading">
+          <span>🎯</span> Live <code>document.activeElement</code> Inspector
+        </div>
+        <div class="active-display-box" id="active-element-display">
+          Active DOM Node: &lt;BODY&gt; (No element focused)
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">
+          Press <kbd style="background: #1f2937; padding: 2px 5px; border-radius: 4px;">Tab</kbd>, <kbd style="background: #1f2937; padding: 2px 5px; border-radius: 4px;">Shift+Tab</kbd>, or arrow keys to observe real-time focus ownership.
+        </div>
+      </div>
+
+      <div class="hud-card">
+        <div class="hud-title">
+          <span>⌨️</span> Keyboard Event Telemetry Feed
+        </div>
+        <div class="key-logger-feed" id="key-logger-feed" aria-live="polite">
+          [Keyboard telemetry initialized. Keystrokes will be captured here.]
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Scenarios Grid -->
+    <div class="scenarios-grid">
+
+      <!-- Scenario 1: Modal Focus Acquisition & Restoration -->
+      <section class="scenario-card" aria-labelledby="s1-title">
+        <div class="scenario-header">
+          <div class="scenario-title" id="s1-title">
+            <span>🪟</span> 1. Modal Focus Acquisition & Restoration Lifecycle
+          </div>
+          <span class="badge" style="background: var(--accent-native-bg); color: var(--accent-native);">APG Dialog</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary);">
+          Captures <code>previousFocusRef.current</code>, traps focus in dialog, and restores focus upon closure.
+        </p>
+
+        <div class="demo-sandbox">
+          <button type="button" class="btn-test" id="open-modal-trigger" onclick="openModal()">
+            Open Delete Confirmation Modal
+          </button>
+
+          <div id="modal-container" style="display: none;">
+            <div class="sim-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-head" id="active-dialog-box" tabindex="-1">
+              <h3 id="modal-head" style="font-size: 1rem; color: #f87171;">Confirm Cluster Deletion</h3>
+              <p style="font-size: 0.8rem; color: #cbd5e1;">Are you sure you want to permanently delete cluster us-east-1?</p>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                <button type="button" class="btn-test" id="modal-btn-cancel" onclick="closeModal()">Cancel</button>
+                <button type="button" class="btn-test" id="modal-btn-confirm" style="background: #ef4444;" onclick="closeModal()">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scenario 2: Roving tabIndex Pattern -->
+      <section class="scenario-card" aria-labelledby="s2-title">
+        <div class="scenario-header">
+          <div class="scenario-title" id="s2-title">
+            <span>🔄</span> 2. Roving <code>tabIndex</code> (Composite Tabs)
+          </div>
+          <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">Arrow Navigation</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary);">
+          Single Tab stop (<code>tabIndex=0</code> on active tab, <code>-1</code> on siblings). Navigate with Left/Right arrows.
+        </p>
+
+        <div class="demo-sandbox">
+          <div role="tablist" aria-label="Cloud Services" class="roving-group" id="roving-tabs-group" onkeydown="handleRovingKeys(event)">
+            <button role="tab" id="rtab-1" class="roving-tab active" tabindex="0" onclick="setRovingActive(0)">Compute</button>
+            <button role="tab" id="rtab-2" class="roving-tab" tabindex="-1" onclick="setRovingActive(1)">Storage</button>
+            <button role="tab" id="rtab-3" class="roving-tab" tabindex="-1" onclick="setRovingActive(2)">Networking</button>
+            <button role="tab" id="rtab-4" class="roving-tab" tabindex="-1" onclick="setRovingActive(3)">Database</button>
+          </div>
+          <div id="roving-active-summary" style="font-size: 0.8rem; color: #34d399; font-family: var(--font-mono);">
+            Current Active Tab: Compute (tabIndex=0)
+          </div>
+        </div>
+      </section>
+
+      <!-- Scenario 3: aria-activedescendant Pattern -->
+      <section class="scenario-card" aria-labelledby="s3-title">
+        <div class="scenario-header">
+          <div class="scenario-title" id="s3-title">
+            <span>📜</span> 3. <code>aria-activedescendant</code> (Virtual Focus Listbox)
+          </div>
+          <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">Single DOM Focus</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary);">
+          DOM focus remains permanently on the container <code>&lt;ul&gt;</code> while active item is pointed via ID.
+        </p>
+
+        <div class="demo-sandbox">
+          <ul role="listbox" id="activedesc-box" tabindex="0" class="activedesc-listbox" aria-activedescendant="opt-1" onkeydown="handleActiveDescKeys(event)">
+            <li role="option" id="opt-1" class="activedesc-option active-desc" onclick="setActiveDesc(0)">us-east-1 (N. Virginia)</li>
+            <li role="option" id="opt-2" class="activedesc-option" onclick="setActiveDesc(1)">us-west-2 (Oregon)</li>
+            <li role="option" id="opt-3" class="activedesc-option" onclick="setActiveDesc(2)">eu-central-1 (Frankfurt)</li>
+            <li role="option" id="opt-4" class="activedesc-option" onclick="setActiveDesc(3)">ap-southeast-1 (Singapore)</li>
+          </ul>
+          <div id="activedesc-summary" style="font-size: 0.75rem; color: #38bdf8; font-family: var(--font-mono);">
+            DOM focus: #activedesc-box | aria-activedescendant: "opt-1"
+          </div>
+        </div>
+      </section>
+
+      <!-- Scenario 4: Dynamic Item Removal & Focus Recovery -->
+      <section class="scenario-card" aria-labelledby="s4-title">
+        <div class="scenario-header">
+          <div class="scenario-title" id="s4-title">
+            <span>🗑️</span> 4. Dynamic Removal & Focus Recovery Policy
+          </div>
+          <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">Recovery Policy</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary);">
+          When focused item is deleted, focus moves to next sibling or fallback instead of dropping to <code>&lt;body&gt;</code>.
+        </p>
+
+        <div class="demo-sandbox">
+          <div id="dynamic-list" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <div id="d-item-1" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 4px;">
+              <span>Worker Node 01 (Healthy)</span>
+              <button type="button" class="btn-test" style="background: #ef4444; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteNode('d-item-1')">Delete</button>
+            </div>
+            <div id="d-item-2" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 4px;">
+              <span>Worker Node 02 (Degraded)</span>
+              <button type="button" class="btn-test" style="background: #ef4444; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteNode('d-item-2')">Delete</button>
+            </div>
+            <div id="d-item-3" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 4px;">
+              <span>Worker Node 03 (Healthy)</span>
+              <button type="button" class="btn-test" style="background: #ef4444; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteNode('d-item-3')">Delete</button>
+            </div>
+          </div>
+          <button type="button" class="btn-test" id="reset-nodes-btn" onclick="resetNodes()">Reset Node List</button>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+  <script>
+    let previousFocusedElement = null;
+    let rovingIndex = 0;
+    let activeDescIndex = 0;
+
+    // Track activeElement continuously
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      const tag = el.tagName.toLowerCase();
+      const id = el.id ? `#${el.id}` : '(no id)';
+      const role = el.getAttribute('role') || 'none';
+      const tabIndex = el.getAttribute('tabindex') || '(default)';
+
+      const display = document.getElementById('active-element-display');
+      display.textContent = `Active DOM Node: <${tag}> ${id} | Role: ${role} | TabIndex: ${tabIndex}`;
+    });
+
+    // Track Keystrokes
+    document.addEventListener('keydown', (e) => {
+      const feed = document.getElementById('key-logger-feed');
+      const entry = document.createElement('div');
+      entry.textContent = `⚡ Keydown: "${e.key}" (Code: ${e.code}) | Target: <${e.target.tagName.toLowerCase()}> ${e.target.id || ''}`;
+      feed.appendChild(entry);
+      feed.scrollTop = feed.scrollHeight;
+    });
+
+    // 1. Modal Focus Lifecycle
+    function openModal() {
+      previousFocusedElement = document.activeElement;
+      document.getElementById('modal-container').style.display = 'block';
+      document.getElementById('open-modal-trigger').style.display = 'none';
+      
+      // Move focus inside dialog
+      setTimeout(() => {
+        document.getElementById('modal-btn-cancel').focus();
+      }, 50);
+    }
+
+    function closeModal() {
+      document.getElementById('modal-container').style.display = 'none';
+      document.getElementById('open-modal-trigger').style.display = 'inline-block';
+      
+      // Restore previous focus
+      if (previousFocusedElement && typeof previousFocusedElement.focus === 'function') {
+        previousFocusedElement.focus();
+      }
+    }
+
+    // 2. Roving TabIndex Logic
+    function setRovingActive(idx) {
+      const tabs = document.querySelectorAll('#roving-tabs-group button');
+      tabs.forEach((tab, i) => {
+        if (i === idx) {
+          tab.classList.add('active');
+          tab.setAttribute('tabindex', '0');
+          tab.focus();
+        } else {
+          tab.classList.remove('active');
+          tab.setAttribute('tabindex', '-1');
+        }
+      });
+      rovingIndex = idx;
+      document.getElementById('roving-active-summary').textContent = 
+        `Current Active Tab: ${tabs[idx].textContent} (tabIndex=0)`;
+    }
+
+    function handleRovingKeys(e) {
+      const tabs = document.querySelectorAll('#roving-tabs-group button');
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = (rovingIndex + 1) % tabs.length;
+        setRovingActive(next);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = (rovingIndex - 1 + tabs.length) % tabs.length;
+        setRovingActive(prev);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setRovingActive(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setRovingActive(tabs.length - 1);
+      }
+    }
+
+    // 3. ActiveDescendant Logic
+    function setActiveDesc(idx) {
+      const items = document.querySelectorAll('#activedesc-box li');
+      items.forEach((item, i) => {
+        if (i === idx) {
+          item.classList.add('active-desc');
+        } else {
+          item.classList.remove('active-desc');
+        }
+      });
+      activeDescIndex = idx;
+      const listbox = document.getElementById('activedesc-box');
+      const targetId = items[idx].id;
+      listbox.setAttribute('aria-activedescendant', targetId);
+      document.getElementById('activedesc-summary').textContent = 
+        `DOM focus: #activedesc-box | aria-activedescendant: "${targetId}" (${items[idx].textContent})`;
+    }
+
+    function handleActiveDescKeys(e) {
+      const items = document.querySelectorAll('#activedesc-box li');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = (activeDescIndex + 1) % items.length;
+        setActiveDesc(next);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = (activeDescIndex - 1 + items.length) % items.length;
+        setActiveDesc(prev);
+      }
+    }
+
+    // 4. Dynamic Removal & Recovery
+    function deleteNode(itemId) {
+      const item = document.getElementById(itemId);
+      if (!item) return;
+
+      const nextSibling = item.nextElementSibling;
+      const prevSibling = item.previousElementSibling;
+      item.remove();
+
+      // Focus Recovery Policy
+      if (nextSibling && nextSibling.querySelector('button')) {
+        nextSibling.querySelector('button').focus();
+      } else if (prevSibling && prevSibling.querySelector('button')) {
+        prevSibling.querySelector('button').focus();
+      } else {
+        document.getElementById('reset-nodes-btn').focus();
+      }
+    }
+
+    function resetNodes() {
+      const container = document.getElementById('dynamic-list');
+      container.innerHTML = `
+        <div id="d-item-1" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 4px;">
+          <span>Worker Node 01 (Healthy)</span>
+          <button type="button" class="btn-test" style="background: #ef4444; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteNode('d-item-1')">Delete</button>
+        </div>
+        <div id="d-item-2" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 4px;">
+          <span>Worker Node 02 (Degraded)</span>
+          <button type="button" class="btn-test" style="background: #ef4444; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteNode('d-item-2')">Delete</button>
+        </div>
+        <div id="d-item-3" style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 0.4rem 0.75rem; border-radius: 4px;">
+          <span>Worker Node 03 (Healthy)</span>
+          <button type="button" class="btn-test" style="background: #ef4444; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteNode('d-item-3')">Delete</button>
+        </div>
+      `;
+      document.querySelector('#d-item-1 button').focus();
+    }
+  </script>
+</body>
+</html>
