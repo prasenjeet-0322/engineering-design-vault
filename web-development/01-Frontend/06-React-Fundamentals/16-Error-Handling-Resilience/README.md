@@ -26,6 +26,7 @@ Error Boundaries, render errors vs async errors, failure isolation, fallback UI 
 | [Expected vs Unexpected Errors & Domain-Level Error Modeling](./07-expected-vs-unexpected-errors-domain-modeling.md) | ✅ Completed | 3-tier failure taxonomy, discriminated union domain states, HTTP status decoupling, 403/409 resolvers, bulkhead containment. | [🧪 Lab 07](./examples/07-expected-vs-unexpected-errors-domain-modeling.html) |
 | [Async Failure Recovery, Stale Errors & Revalidation Failure States](./08-async-failure-recovery-stale-errors-revalidation.md) | ✅ Completed | SWR data retention, Zombie Error race conditions, monotonic operation IDs, bounded jitter retries, multi-resource isolation. | [🧪 Lab 08](./examples/08-async-failure-recovery-stale-errors-revalidation.html) |
 | [Error Handling with Effects, Subscriptions & External Systems](./09-error-handling-effects-subscriptions-external-systems.md) | ✅ Completed | WebSocket defensive adapters, Zod schema validation, Generation Guard tokens, StrictMode cleanup symmetry, WebGL bulkheads. | [🧪 Lab 09](./examples/09-error-handling-effects-subscriptions-external-systems.html) |
+| [Forms, Validation, Submission Failures & User-Recoverable Errors](./10-forms-validation-submission-failures.md) | ✅ Completed | Draft preservation, 422 field error mapping, 409 OCC 3-way reconciliation, Idempotency-Key headers, Operation IDs. | [🧪 Lab 10](./examples/10-forms-validation-submission-failures.html) |
 
 
 ---

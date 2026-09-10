@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 16 Part 10 — Forms, Validation & Submission Failures Resilience Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    pre, code, .font-mono { font-family: 'Fira Code', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, Component } = React;
+
+    // ---------------------------------------------------------------------------
+    // Bulkhead Boundary Component (For Unexpected Render Exceptions)
+    // ---------------------------------------------------------------------------
+    class BulkheadBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        console.error(`[Bulkhead:${this.props.boundaryName}] Intercepted crash:`, error, errorInfo);
+        if (this.props.onCatch) {
+          this.props.onCatch(error, errorInfo);
+        }
+      }
+
+      reset = () => {
+        this.setState({ hasError: false, error: null });
+      };
+
+      render() {
+        if (this.state.hasError) {
+          return this.props.fallback(this.state.error, this.reset);
+        }
+        return this.props.children;
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Main Application Dashboard
+    // ---------------------------------------------------------------------------
+    function App() {
+      const [activeTab, setActiveTab] = useState("expA");
+      const [telemetryLogs, setTelemetryLogs] = useState([]);
+
+      const logTelemetry = useCallback((source, event, level = "info", details = {}) => {
+        setTelemetryLogs(prev => [
+          {
+            id: Date.now() + Math.random(),
+            timestamp: new Date().toLocaleTimeString(),
+            source,
+            event,
+            level,
+            details
+          },
+          ...prev.slice(0, 39)
+        ]);
+      }, []);
+
+      return (
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+          {/* Header */}
+          <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-3xl shadow-2xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold font-mono border border-cyan-500/30">
+                  KPI 16 · PART 10
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold font-mono border border-emerald-500/30">
+                  INTERACTIVE LAB
+                </span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Forms, Validation, Submission Failures & User-Recoverable Errors
+              </h1>
+              <p className="text-slate-400 text-xs sm:text-sm">
+                Mastering draft preservation, 422 field mapping, 409 conflict reconciliation, idempotency keys, and operation generation guards.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTelemetryLogs([])}
+                className="px-3.5 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition"
+              >
+                Clear Telemetry Logs
+              </button>
+            </div>
+          </header>
+
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 p-1.5 bg-slate-900/70 border border-slate-800/80 rounded-2xl">
+            {[
+              { id: "expA", label: "📝 Exp A: Multi-Tier Validation & Draft Retention" },
+              { id: "expB", label: "🛡️ Exp B: Stale Submission Race (Operation ID)" },
+              { id: "expC", label: "🔀 Exp C: 409 Concurrency Conflict & 3-Way Merge" },
+              { id: "expD", label: "💳 Exp D: Idempotency Keys & 504 Timeout Recovery" },
+              { id: "expE", label: "📋 Exp E: Dynamic Field Array with Entity UUIDs" },
+              { id: "expF", label: "💥 Exp F: Unexpected Fiber Crash vs Domain State" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === tab.id
+                    ? "bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-400/40"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Main Experiment Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8 space-y-6">
+              {activeTab === "expA" && <ExperimentA log={logTelemetry} />}
+              {activeTab === "expB" && <ExperimentB log={logTelemetry} />}
+              {activeTab === "expC" && <ExperimentC log={logTelemetry} />}
+              {activeTab === "expD" && <ExperimentD log={logTelemetry} />}
+              {activeTab === "expE" && <ExperimentE log={logTelemetry} />}
+              {activeTab === "expF" && <ExperimentF log={logTelemetry} />}
+            </div>
+
+            {/* Live Telemetry Stream Panel */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-3xl shadow-xl flex flex-col h-[650px]">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <h3 className="text-xs font-bold text-slate-200 tracking-wider uppercase font-mono">
+                      Form Telemetry & Audit Stream
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">{telemetryLogs.length} events</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2.5 pt-3 pr-1 font-mono text-xs">
+                  {telemetryLogs.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                      <span className="text-3xl mb-2">📡</span>
+                      <p className="text-xs">No telemetry emitted yet.</p>
+                      <p className="text-[11px] text-slate-600">Trigger mutations in the lab to inspect validation and network transitions.</p>
+                    </div>
+                  ) : (
+                    telemetryLogs.map(item => (
+                      <div
+                        key={item.id}
+                        className={`p-2.5 rounded-xl border transition-all ${
+                          item.level === "error"
+                            ? "bg-rose-950/40 border-rose-800/80 text-rose-200"
+                            : item.level === "warn"
+                            ? "bg-amber-950/40 border-amber-800/80 text-amber-200"
+                            : item.level === "success"
+                            ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-200"
+                            : "bg-slate-950/60 border-slate-800 text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[10px] mb-1 opacity-70">
+                          <span className="font-bold uppercase tracking-wider">{item.source}</span>
+                          <span>{item.timestamp}</span>
+                        </div>
+                        <div className="font-semibold text-[11px]">{item.event}</div>
+                        {Object.keys(item.details).length > 0 && (
+                          <pre className="mt-1 text-[10px] opacity-80 overflow-x-auto bg-black/40 p-1.5 rounded">
+                            {JSON.stringify(item.details, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment A: Multi-Tier Validation & Draft Retention
+    // ---------------------------------------------------------------------------
+    function ExperimentA({ log }) {
+      const [formData, setFormData] = useState({ fullName: "Alex Mercer", email: "alex@taken.io", seatCount: "5" });
+      const [fieldErrors, setFieldErrors] = useState({});
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submitSuccess, setSubmitSuccess] = useState(false);
+
+      const handleFieldChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        // Clean error immediately on change
+        if (fieldErrors[field]) {
+          setFieldErrors(prev => {
+            const next = { ...prev };
+            delete next[field];
+            return next;
+          });
+        }
+        setSubmitSuccess(false);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setSubmitSuccess(false);
+
+        // Layer 2: Client Syntax Validation
+        const clientErrors = {};
+        if (!formData.fullName || formData.fullName.length < 2) {
+          clientErrors.fullName = "Full name must be at least 2 characters.";
+        }
+        if (!formData.email || !formData.email.includes("@")) {
+          clientErrors.email = "Please provide a valid email address.";
+        }
+        if (Number(formData.seatCount) < 1 || Number(formData.seatCount) > 50) {
+          clientErrors.seatCount = "Seat count must be between 1 and 50.";
+        }
+
+        if (Object.keys(clientErrors).length > 0) {
+          setFieldErrors(clientErrors);
+          log("ClientValidator", "Client-side validation rejected submission", "warn", clientErrors);
+          return;
+        }
+
+        setIsSubmitting(true);
+        log("FormPipeline", "Dispatched validated payload to backend API...", "info", formData);
+
+        // Simulate Layer 3: Server Authoritative Validation
+        setTimeout(() => {
+          setIsSubmitting(false);
+
+          if (formData.email === "alex@taken.io") {
+            const serverErrors = { email: "This corporate email is already registered in our database (HTTP 422)." };
+            setFieldErrors(serverErrors);
+            log("ServerGateway", "HTTP 422: Server rejected email as duplicate", "error", serverErrors);
+          } else {
+            setSubmitSuccess(true);
+            log("ServerGateway", "HTTP 201: Registration successfully committed!", "success", formData);
+          }
+        }, 600);
+      };
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>📝</span> Experiment A: Multi-Layer Validation & Draft Retention
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Experience how client-side Zod validation and server-authoritative 422 rejections attach errors inline without wiping user inputs.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-300">Full Name</label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={e => handleFieldChange("fullName", e.target.value)}
+                className={`w-full px-3.5 py-2 rounded-xl text-xs bg-slate-900 border transition outline-none font-mono ${
+                  fieldErrors.fullName ? "border-rose-500 text-rose-200" : "border-slate-800 text-white focus:border-cyan-500"
+                }`}
+              />
+              {fieldErrors.fullName && (
+                <p className="text-[11px] text-rose-400 font-semibold mt-1">⚠️ {fieldErrors.fullName}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-300">Corporate Email (Try 'alex@taken.io' to trigger 422)</label>
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange("email", "alex.fresh@startup.io")}
+                  className="text-[10px] text-cyan-400 hover:underline"
+                >
+                  Use fresh email
+                </button>
+              </div>
+              <input
+                type="text"
+                value={formData.email}
+                onChange={e => handleFieldChange("email", e.target.value)}
+                className={`w-full px-3.5 py-2 rounded-xl text-xs bg-slate-900 border transition outline-none font-mono ${
+                  fieldErrors.email ? "border-rose-500 text-rose-200" : "border-slate-800 text-white focus:border-cyan-500"
+                }`}
+              />
+              {fieldErrors.email && (
+                <p className="text-[11px] text-rose-400 font-semibold mt-1">⚠️ {fieldErrors.email}</p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-300">Seat Licenses (1–50)</label>
+              <input
+                type="number"
+                value={formData.seatCount}
+                onChange={e => handleFieldChange("seatCount", e.target.value)}
+                className={`w-full px-3.5 py-2 rounded-xl text-xs bg-slate-900 border transition outline-none font-mono ${
+                  fieldErrors.seatCount ? "border-rose-500 text-rose-200" : "border-slate-800 text-white focus:border-cyan-500"
+                }`}
+              />
+              {fieldErrors.seatCount && (
+                <p className="text-[11px] text-rose-400 font-semibold mt-1">⚠️ {fieldErrors.seatCount}</p>
+              )}
+            </div>
+
+            {submitSuccess && (
+              <div className="p-3 bg-emerald-950/50 border border-emerald-800 text-emerald-300 rounded-xl text-xs font-bold">
+                🎉 Registration confirmed! User account created successfully.
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-cyan-600/30"
+            >
+              {isSubmitting ? "Validating & Submitting..." : "Submit Registration (Preserve Draft)"}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment B: Stale Submission Race (Operation ID Token)
+    // ---------------------------------------------------------------------------
+    function ExperimentB({ log }) {
+      const [useGenerationGuard, setUseGenerationGuard] = useState(true);
+      const [activeStatus, setActiveStatus] = useState("IDLE");
+      const [ticketTitle, setTicketTitle] = useState("Bug: Login button unresponsive");
+      const operationRef = useRef(0);
+      const [displayOpId, setDisplayOpId] = useState(0);
+
+      const triggerSlowFailedSubmit = () => {
+        const opId = ++operationRef.current;
+        setDisplayOpId(opId);
+        setActiveStatus("SUBMITTING (Op #1 - Slow)");
+        log("FormMutation", `Dispatched Operation #${opId} (Simulating 2000ms delay + 422 failure)`, "info");
+
+        setTimeout(() => {
+          log("ServerGateway", `Operation #${opId} completed with 422 Validation Error`, "error");
+          if (useGenerationGuard) {
+            if (opId === operationRef.current) {
+              setActiveStatus("ERROR (Op #1)");
+            } else {
+              log("GenerationGuard", `🛡️ DROPPED stale failure from Op #${opId}! Active is Op #${operationRef.current}`, "success");
+            }
+          } else {
+            setActiveStatus("💥 CORRUPTED BY STALE OP #1");
+            log("Vulnerability", `💥 Stale failure from Op #${opId} overwrote newer state!`, "error");
+          }
+        }, 2000);
+      };
+
+      const triggerFastSuccessfulSubmit = () => {
+        const opId = ++operationRef.current;
+        setDisplayOpId(opId);
+        setActiveStatus("SUBMITTING (Op #2 - Fast)");
+        log("FormMutation", `Dispatched Operation #${opId} (Fast 300ms success)`, "info");
+
+        setTimeout(() => {
+          if (!useGenerationGuard || opId === operationRef.current) {
+            setActiveStatus("SUCCESS (Op #2 Confirmed)");
+            log("ServerGateway", `Operation #${opId} SUCCESS: Ticket updated!`, "success");
+          }
+        }, 300);
+      };
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🛡️</span> Experiment B: Stale Submission Race Condition Elimination
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Trigger a slow failing submission, then immediately fire a fast successful submission. Observe how the monotonic Operation ID protects active state.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Generation Guard Mode</label>
+              <button
+                onClick={() => setUseGenerationGuard(g => !g)}
+                className={`w-full py-2 rounded-xl text-xs font-bold border transition ${
+                  useGenerationGuard
+                    ? "bg-emerald-600 text-white border-emerald-400"
+                    : "bg-rose-600 text-white border-rose-400"
+                }`}
+              >
+                {useGenerationGuard ? "✅ Operation ID Guard ENABLED" : "❌ Guard DISABLED (Vulnerable)"}
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block uppercase font-mono">Race Trigger Controls</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={triggerSlowFailedSubmit}
+                  className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition"
+                >
+                  1. Submit Slow (Op #1)
+                </button>
+                <button
+                  onClick={triggerFastSuccessfulSubmit}
+                  className="flex-1 py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl transition"
+                >
+                  2. Submit Fast (Op #2)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+            <div className="flex justify-between items-center text-xs font-mono">
+              <span className="text-slate-400">Current Operation Token: #{displayOpId}</span>
+              <span className={`px-3 py-1 rounded-full font-bold ${
+                activeStatus.includes("SUCCESS") ? "bg-emerald-950 text-emerald-300 border border-emerald-800" :
+                activeStatus.includes("CORRUPTED") ? "bg-rose-950 text-rose-300 border border-rose-800" :
+                "bg-slate-900 text-cyan-300 border border-slate-800"
+              }`}>
+                Status: {activeStatus}
+              </span>
+            </div>
+            <input
+              type="text"
+              value={ticketTitle}
+              onChange={e => setTicketTitle(e.target.value)}
+              className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment C: 409 Concurrency Conflict & 3-Way Merge
+    // ---------------------------------------------------------------------------
+    function ExperimentC({ log }) {
+      const [userDraft, setUserDraft] = useState({ title: "Q3 Marketing Strategy (My Edits)", budget: "$85,000", status: "In Review" });
+      const [serverVersion, setServerVersion] = useState({ title: "Q3 Marketing Strategy (By Lead)", budget: "$120,000", status: "Approved" });
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [selectedMerge, setSelectedMerge] = useState({ title: "mine", budget: "theirs", status: "theirs" });
+
+      const triggerConflictSubmission = () => {
+        log("FormMutation", "Submitting draft with version token v4...", "info");
+        setTimeout(() => {
+          log("ServerGateway", "HTTP 409 CONFLICT: Document updated to v5 by another editor!", "error", serverVersion);
+          setIsModalOpen(true);
+        }, 400);
+      };
+
+      const handleApplyMerge = () => {
+        const merged = {
+          title: selectedMerge.title === "mine" ? userDraft.title : serverVersion.title,
+          budget: selectedMerge.budget === "mine" ? userDraft.budget : serverVersion.budget,
+          status: selectedMerge.status === "mine" ? userDraft.status : serverVersion.status,
+        };
+        setUserDraft(merged);
+        setIsModalOpen(false);
+        log("ConflictResolver", "Applied 3-way merged values and refreshed version token to v5", "success", merged);
+      };
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>🔀</span> Experiment C: Optimistic Concurrency 409 & 3-Way Merge
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              When two users edit the same record concurrently, HTTP 409 opens an interactive diff merge modal instead of overwriting data.
+            </p>
+          </div>
+
+          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 font-mono">Campaign Title</label>
+                <input
+                  type="text"
+                  value={userDraft.title}
+                  onChange={e => setUserDraft(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 font-mono">Allocated Budget</label>
+                <input
+                  type="text"
+                  value={userDraft.budget}
+                  onChange={e => setUserDraft(prev => ({ ...prev, budget: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 font-mono">Review Status</label>
+                <input
+                  type="text"
+                  value={userDraft.status}
+                  onChange={e => setUserDraft(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white mt-1"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={triggerConflictSubmission}
+              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-amber-900/40"
+            >
+              Simulate Submit & Trigger 409 Conflict
+            </button>
+          </div>
+
+          {/* 3-Way Merge Modal */}
+          {isModalOpen && (
+            <div className="p-6 bg-slate-950 border border-amber-800/80 rounded-3xl space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold font-mono">
+                    HTTP 409 CONFLICT MODAL
+                  </span>
+                  <h3 className="text-sm font-bold text-white mt-1">Resolve Conflicting Attribute Updates</h3>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="text-xs text-slate-500 hover:text-white">✕</button>
+              </div>
+
+              {["title", "budget", "status"].map(key => (
+                <div key={key} className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+                  <span className="text-xs font-bold text-cyan-400 uppercase font-mono">{key}</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setSelectedMerge(prev => ({ ...prev, [key]: "mine" }))}
+                      className={`p-2.5 rounded-lg border text-left text-xs font-mono transition ${
+                        selectedMerge[key] === "mine"
+                          ? "bg-cyan-950/60 border-cyan-400 text-cyan-200"
+                          : "bg-slate-950 border-slate-800 text-slate-400"
+                      }`}
+                    >
+                      <div className="text-[10px] text-cyan-400 font-bold mb-0.5">Keep My Draft</div>
+                      {userDraft[key]}
+                    </button>
+                    <button
+                      onClick={() => setSelectedMerge(prev => ({ ...prev, [key]: "theirs" }))}
+                      className={`p-2.5 rounded-lg border text-left text-xs font-mono transition ${
+                        selectedMerge[key] === "theirs"
+                          ? "bg-amber-950/60 border-amber-400 text-amber-200"
+                          : "bg-slate-950 border-slate-800 text-slate-400"
+                      }`}
+                    >
+                      <div className="text-[10px] text-amber-400 font-bold mb-0.5">Accept Server Version</div>
+                      {serverVersion[key]}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={handleApplyMerge}
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition"
+              >
+                Apply Merged Resolution & Resubmit
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment D: Idempotency Keys & 504 Timeout Recovery
+    // ---------------------------------------------------------------------------
+    function ExperimentD({ log }) {
+      const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+      const [orderTotal, setOrderTotal] = useState(499);
+      const [isProcessing, setIsProcessing] = useState(false);
+      const [transactionResult, setTransactionResult] = useState(null);
+      const [chargeCount, setChargeCount] = useState(0);
+
+      const handleCheckout = (isRetry = false) => {
+        setIsProcessing(true);
+        log("CheckoutGateway", `Transmitting checkout mutation ($${orderTotal}) with Idempotency-Key`, "info", { idempotencyKey });
+
+        setTimeout(() => {
+          setIsProcessing(false);
+          if (!isRetry) {
+            // First attempt: Server actually processed charge, but HTTP response dropped!
+            setChargeCount(1);
+            setTransactionResult("TIMEOUT_DROP");
+            log("NetworkInterceptor", "💥 HTTP 504 Gateway Timeout: Response dropped before ACK!", "error");
+          } else {
+            // Retry attempt: Server recognizes existing idempotency key and returns cached ACK!
+            setTransactionResult("CONFIRMED_SAFE");
+            log("CheckoutGateway", `🛡️ IDEMPOTENCY HIT: Server returned cached charge ACK without double billing!`, "success", { chargeCount: 1 });
+          }
+        }, 700);
+      };
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>💳</span> Experiment D: Idempotency Keys & 504 Timeout Recovery
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Simulate a payment where the network drops before response delivery. Retrying with the same Idempotency-Key ensures zero duplicate billing.
+            </p>
+          </div>
+
+          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+            <div className="flex justify-between items-center text-xs font-mono">
+              <span className="text-slate-400">Idempotency-Key Header:</span>
+              <span className="text-cyan-400 font-bold">{idempotencyKey}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 font-mono">
+                <div className="text-[10px] text-slate-500 uppercase">Order Value</div>
+                <div className="text-2xl font-black text-white">${orderTotal}</div>
+              </div>
+              <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 font-mono">
+                <div className="text-[10px] text-slate-500 uppercase">Backend Server Charges</div>
+                <div className={`text-2xl font-black ${chargeCount > 1 ? "text-rose-400" : "text-emerald-400"}`}>
+                  {chargeCount} × ${orderTotal}
+                </div>
+              </div>
+            </div>
+
+            {transactionResult === "TIMEOUT_DROP" && (
+              <div className="p-4 bg-amber-950/40 border border-amber-800 text-amber-200 rounded-xl text-xs space-y-2">
+                <div className="font-bold flex items-center gap-2">
+                  <span>⚠️</span> HTTP 504 Network Timeout (Unknown Execution Outcome)
+                </div>
+                <p className="text-[11px] text-amber-300/80">
+                  Response lost in transit. Clicking Retry will reuse the same Idempotency-Key to prevent duplicate charges.
+                </p>
+                <button
+                  onClick={() => handleCheckout(true)}
+                  disabled={isProcessing}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition"
+                >
+                  {isProcessing ? "Verifying..." : "Safe Idempotent Retry"}
+                </button>
+              </div>
+            )}
+
+            {transactionResult === "CONFIRMED_SAFE" && (
+              <div className="p-4 bg-emerald-950/40 border border-emerald-800 text-emerald-200 rounded-xl text-xs font-bold">
+                ✅ Order #TX-9842 Confirmed! Zero duplicate charges incurred.
+              </div>
+            )}
+
+            {!transactionResult && (
+              <button
+                onClick={() => handleCheckout(false)}
+                disabled={isProcessing}
+                className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition"
+              >
+                {isProcessing ? "Authorizing Payment..." : "Place Order ($499.00)"}
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment E: Dynamic Field Array with Entity UUIDs
+    // ---------------------------------------------------------------------------
+    function ExperimentE({ log }) {
+      const [items, setItems] = useState([
+        { id: "item_1", name: "Custom Domain SSL", price: "29" },
+        { id: "item_2", name: "Dedicated Load Balancer", price: "invalid_price" },
+        { id: "item_3", name: "24/7 Phone SLA", price: "99" },
+      ]);
+      const [entityErrors, setEntityErrors] = useState({ item_2: { price: "Price must be a valid positive integer." } });
+
+      const removeItem = (id) => {
+        setItems(prev => prev.filter(item => item.id !== id));
+        // Clean up entity error without shifting array index associations!
+        setEntityErrors(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        log("FieldArray", `Deleted item ${id}. Sibling error mappings remain locked to their UUIDs!`, "info");
+      };
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>📋</span> Experiment E: Dynamic Field Array with Logical Entity Keys
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Delete Item #1 above the failing Item #2. Notice how the error stays locked to Item #2 because errors are keyed by entity UUID, not array index!
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {items.map(item => (
+              <div key={item.id} className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">UUID: {item.id}</span>
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                  >
+                    Delete Row
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setItems(prev => prev.map(i => i.id === item.id ? { ...i, name: val } : i));
+                    }}
+                    className="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-white"
+                  />
+                  <input
+                    type="text"
+                    value={item.price}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setItems(prev => prev.map(i => i.id === item.id ? { ...i, price: val } : i));
+                    }}
+                    className={`px-3 py-1.5 bg-slate-900 border rounded-lg text-xs font-mono ${
+                      entityErrors[item.id]?.price ? "border-rose-500 text-rose-200" : "border-slate-800 text-white"
+                    }`}
+                  />
+                </div>
+                {entityErrors[item.id]?.price && (
+                  <p className="text-[11px] text-rose-400 font-semibold">⚠️ {entityErrors[item.id].price}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Experiment F: Unexpected Fiber Crash vs Domain State
+    // ---------------------------------------------------------------------------
+    function ExperimentF({ log }) {
+      const [shouldCrash, setShouldCrash] = useState(false);
+
+      return (
+        <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>💥</span> Experiment F: Unexpected Render Crash vs Error Boundary
+            </h2>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Demonstrates the vital difference: Validation errors are domain state, while unexpected JS crashes (e.g. `undefined.toUpperCase()`) are caught by the Bulkhead Boundary.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShouldCrash(true)}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition"
+            >
+              Throw Unexpected Fiber Render Exception
+            </button>
+          </div>
+
+          <BulkheadBoundary
+            boundaryName="FormFiberBoundary"
+            onCatch={(err) => log("BulkheadBoundary", `Intercepted unexpected render crash: ${err.message}`, "error")}
+            fallback={(err, reset) => (
+              <div className="p-6 bg-rose-950/40 border border-rose-800 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
+                  <span>🚨</span> Form Rendering Engine Suspended
+                </div>
+                <p className="text-xs text-rose-300/80 font-mono">Exception: {err.message}</p>
+                <button
+                  onClick={() => {
+                    setShouldCrash(false);
+                    reset();
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition"
+                >
+                  Reset Form Boundary
+                </button>
+              </div>
+            )}
+          >
+            <CrashingFormWidget shouldCrash={shouldCrash} />
+          </BulkheadBoundary>
+        </div>
+      );
+    }
+
+    function CrashingFormWidget({ shouldCrash }) {
+      if (shouldCrash) {
+        const user = undefined;
+        return <div>{user.profile.name.toUpperCase()}</div>;
+      }
+
+      return (
+        <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+          <div className="text-xs font-bold text-emerald-400 font-mono">Status: Healthy Form Component</div>
+          <p className="text-xs text-slate-400">This component is running smoothly within the React Fiber tree.</p>
+        </div>
+      );
+    }
+
+    // Mount Root
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
