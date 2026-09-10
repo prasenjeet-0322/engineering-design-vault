@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 05 — Accessible Forms, Labels, Validation & Error Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Live Telemetry HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    /* Interactive Form Controls */
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+    .form-label { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+    .required-star { color: var(--accent-danger); font-weight: 700; margin-left: 0.2rem; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+      transition: all 0.15s ease;
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+    .input-control.is-invalid {
+      border-color: var(--accent-danger);
+      background: rgba(239, 68, 68, 0.05);
+    }
+    .input-control.is-invalid:focus-visible {
+      outline: 2px solid var(--accent-danger);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+    }
+
+    .form-hint { font-size: 0.75rem; color: var(--text-muted); }
+    .form-error { font-size: 0.775rem; color: #f87171; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .error-summary-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 2px solid #ef4444;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .error-summary-box:focus {
+      outline: 3px solid #38bdf8;
+      outline-offset: 2px;
+    }
+    .error-summary-title { font-size: 0.95rem; font-weight: 700; color: #f87171; margin-bottom: 0.5rem; }
+    .error-summary-list { list-style: disc; margin-left: 1.5rem; font-size: 0.85rem; color: #fca5a5; }
+    .error-summary-link { color: #38bdf8; text-decoration: underline; cursor: pointer; }
+    .error-summary-link:hover { color: #7dd3fc; }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+    fieldset {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    legend {
+      padding: 0 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-info);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 05 — Accessible Forms, Validation & Errors</div>
+      <div class="header-subtitle">WCAG 3.3.1 · WCAG 3.3.2 · WAI-ARIA 1.2 · Error Association & Focus Recovery</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Frontend</span>
+      <span class="badge badge-blue">WCAG 2.2 AA</span>
+      <span class="badge badge-green">ARIA 1.2</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Live Telemetry HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Field ID</span>
+      <span class="telemetry-value" id="hud-field-id">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">AOM Accessible Name</span>
+      <span class="telemetry-value" id="hud-acc-name">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">aria-describedby IDs</span>
+      <span class="telemetry-value" id="hud-describedby">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">aria-invalid State</span>
+      <span class="telemetry-value" id="hud-invalid">false</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Screen Reader Voice</span>
+      <span class="telemetry-value" id="hud-voice" style="color:#34d399;">"Ready"</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Lab 1 & Lab 2 -->
+    <div class="grid-2">
+      <!-- Lab 1: Label/Control Association -->
+      <div class="card" id="card-lab-1">
+        <div class="card-header">
+          <span class="card-title">🔗 Lab 01 — Label-to-Control Binding Contract</span>
+          <span class="badge badge-green">WCAG 1.3.1</span>
+        </div>
+        <p class="card-desc">
+          Compare explicit <code>htmlFor === input.id</code> vs wrapping labels. Notice how clicking either label moves physical focus and announces the field.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="email-explicit" id="lbl-email-exp">
+            Billing Work Email (Explicit htmlFor)
+          </label>
+          <input
+            id="email-explicit"
+            type="email"
+            class="input-control"
+            placeholder="name@company.com"
+            onfocus="updateTelemetry('email-explicit', 'Billing Work Email (Explicit htmlFor)', 'None', 'false')"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <span>Personal Phone (Implicit Wrapping Label)</span>
+            <input
+              id="phone-implicit"
+              type="tel"
+              class="input-control"
+              placeholder="+1 (555) 000-0000"
+              onfocus="updateTelemetry('phone-implicit', 'Personal Phone (Implicit Wrapping Label)', 'None', 'false')"
+            />
+          </label>
+        </div>
+        <div class="speech-bubble" id="output-lab-1">
+          Click labels or focus inputs to observe AOM Accessible Name resolution.
+        </div>
+      </div>
+
+      <!-- Lab 2: Placeholder vs Persistent Label -->
+      <div class="card" id="card-lab-2">
+        <div class="card-header">
+          <span class="card-title">⚠️ Lab 02 — Placeholder vs Persistent Label</span>
+          <span class="badge badge-red">Anti-Pattern</span>
+        </div>
+        <p class="card-desc">
+          Type into both inputs. Notice how placeholder-only fields lose their visual label upon typing, causing cognitive disorientation.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="input-correct-label">Full Legal Name</label>
+          <input
+            id="input-correct-label"
+            class="input-control"
+            placeholder="e.g. John Doe"
+            onfocus="updateTelemetry('input-correct-label', 'Full Legal Name', 'None', 'false')"
+          />
+        </div>
+        <div class="form-group">
+          <input
+            id="input-placeholder-only"
+            class="input-control"
+            placeholder="Organization Name (No <label>!)"
+            aria-label=""
+            onfocus="updateTelemetry('input-placeholder-only', 'Organization Name (Placeholder fallback)', 'None', 'false')"
+          />
+        </div>
+        <div class="speech-bubble" id="output-lab-2">
+          Type text in both fields to observe semantic identity retention.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Lab 3 & Lab 4 -->
+    <div class="grid-2">
+      <!-- Lab 3: Accessible Descriptions -->
+      <div class="card" id="card-lab-3">
+        <div class="card-header">
+          <span class="card-title">ℹ️ Lab 03 — Multi-ID aria-describedby Binding</span>
+          <span class="badge badge-blue">aria-describedby</span>
+        </div>
+        <p class="card-desc">
+          Inspect how space-separated IDs in <code>aria-describedby="rule-1 rule-2"</code> concatenate into a comprehensive description.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="input-secret-key">API Secret Key</label>
+          <input
+            id="input-secret-key"
+            type="password"
+            class="input-control"
+            aria-describedby="sec-hint-1 sec-hint-2"
+            value="sk_test_9042810"
+            onfocus="updateTelemetry('input-secret-key', 'API Secret Key', 'sec-hint-1 sec-hint-2', 'false')"
+          />
+          <span id="sec-hint-1" class="form-hint">Must start with 'sk_live_' or 'sk_test_'.</span>
+          <span id="sec-hint-2" class="form-hint">Never expose secret keys in client-side code bundles.</span>
+        </div>
+        <div class="speech-bubble" id="output-lab-3">
+          Focus API Key to hear the screen reader vocalize both instruction sentences after a pause.
+        </div>
+      </div>
+
+      <!-- Lab 4: Required vs Invalid -->
+      <div class="card" id="card-lab-4">
+        <div class="card-header">
+          <span class="card-title">⚖️ Lab 04 — Required vs Invalid Orthogonality</span>
+          <span class="badge badge-warn">Semantics</span>
+        </div>
+        <p class="card-desc">
+          Demonstrate that <code>required</code> (must contain value) is orthogonal to <code>aria-invalid</code> (current value violates format).
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="input-tax-code">
+            Tax Code <span class="required-star">*</span>
+          </label>
+          <input
+            id="input-tax-code"
+            required
+            aria-required="true"
+            aria-invalid="true"
+            aria-describedby="tax-err"
+            class="input-control is-invalid"
+            value="ABC-99"
+            onfocus="updateTelemetry('input-tax-code', 'Tax Code', 'tax-err', 'true')"
+          />
+          <span id="tax-err" class="form-error">❌ Invalid Tax Code: Must match pattern [A-Z]{3}-[0-9]{4}</span>
+        </div>
+        <div class="speech-bubble" id="output-lab-4">
+          AOM State: required=true AND aria-invalid=true.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Lab 5 & Lab 6 -->
+    <div class="grid-2">
+      <!-- Lab 5: Field-Level Errors -->
+      <div class="card" id="card-lab-5">
+        <div class="card-header">
+          <span class="card-title">🎯 Lab 05 — Dynamic Field-Level Error Injection</span>
+          <span class="badge badge-green">WCAG 3.3.1</span>
+        </div>
+        <p class="card-desc">
+          Toggle validation on the field. Observe how <code>aria-invalid</code> and <code>aria-describedby</code> update dynamically on error.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="input-zip">Postal / Zip Code</label>
+          <input
+            id="input-zip"
+            class="input-control"
+            value="123"
+            onfocus="inspectZipField()"
+          />
+          <span id="zip-err" class="form-error" style="display:none;">❌ Invalid Postal Code: Must be 5 digits.</span>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-danger" onclick="setZipError(true)">Trigger Error</button>
+          <button class="btn btn-secondary" onclick="setZipError(false)">Clear Error</button>
+        </div>
+        <div class="speech-bubble" id="output-lab-5">
+          Toggle buttons to observe real-time ARIA state mutation.
+        </div>
+      </div>
+
+      <!-- Lab 6: Form-Level vs Field-Level Errors -->
+      <div class="card" id="card-lab-6">
+        <div class="card-header">
+          <span class="card-title">🏛️ Lab 06 — Form-Level System Failure Banner</span>
+          <span class="badge badge-red">Error Taxonomy</span>
+        </div>
+        <p class="card-desc">
+          Global system failures (e.g. Gateway 503) belong to a form-level <code>role="alert"</code>, not mapped to individual inputs.
+        </p>
+        <div id="form-global-alert" role="alert" style="display:none;" class="error-summary-box">
+          <div class="error-summary-title">🚨 Submission Failed: Payment Gateway Timeout</div>
+          <p style="font-size:0.85rem; color:#fca5a5;">Our payment processor is currently unreachable. Please wait 60 seconds and retry.</p>
+        </div>
+        <button class="btn btn-danger" onclick="triggerGlobalFormError()">Simulate 503 Gateway Failure</button>
+        <button class="btn btn-secondary" onclick="clearGlobalFormError()">Dismiss Alert</button>
+        <div class="speech-bubble" id="output-lab-6">
+          Click button to trigger assertive form-level alert.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Lab 7 & Lab 8 -->
+    <div class="grid-2">
+      <!-- Lab 7: Navigable Error Summary -->
+      <div class="card" id="card-lab-7">
+        <div class="card-header">
+          <span class="card-title">📋 Lab 07 — Navigable Error Summary with Focus Links</span>
+          <span class="badge badge-blue">WCAG 3.3.2</span>
+        </div>
+        <p class="card-desc">
+          Clicking an error in the summary banner programmatically moves keyboard focus directly to the offending invalid input.
+        </p>
+        <div id="demo-error-summary" class="error-summary-box" tabindex="-1">
+          <div class="error-summary-title">There are 2 errors on this form:</div>
+          <ul class="error-summary-list">
+            <li><a class="error-summary-link" onclick="focusFieldById('sum-email')">Email — Invalid email format</a></li>
+            <li><a class="error-summary-link" onclick="focusFieldById('sum-age')">Age — Must be 18 or older</a></li>
+          </ul>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sum-email">Email Address</label>
+          <input id="sum-email" class="input-control is-invalid" value="invalid@" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="sum-age">Applicant Age</label>
+          <input id="sum-age" type="number" class="input-control is-invalid" value="16" />
+        </div>
+        <div class="speech-bubble" id="output-lab-7">
+          Click error summary link to jump keyboard focus to invalid field.
+        </div>
+      </div>
+
+      <!-- Lab 8: First-Invalid Focus Strategy -->
+      <div class="card" id="card-lab-8">
+        <div class="card-header">
+          <span class="card-title">🎯 Lab 08 — First-Invalid Field Focus on Submit</span>
+          <span class="badge badge-green">Focus Strategy</span>
+        </div>
+        <p class="card-desc">
+          Upon form submission failure, focus deterministically moves to the <em>first actionable invalid field</em> in document order.
+        </p>
+        <form id="multi-field-form" onsubmit="handleMultiSubmit(event)">
+          <div class="form-group">
+            <label class="form-label" for="mf-first">First Name <span class="required-star">*</span></label>
+            <input id="mf-first" class="input-control" value="Sarah" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="mf-last">Last Name <span class="required-star">*</span></label>
+            <input id="mf-last" class="input-control is-invalid" value="" placeholder="Required" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="mf-phone">Phone Number <span class="required-star">*</span></label>
+            <input id="mf-phone" class="input-control is-invalid" value="" placeholder="Required" />
+          </div>
+          <button type="submit" class="btn btn-danger">Submit Application</button>
+        </form>
+        <div class="speech-bubble" id="output-lab-8">
+          Click submit to test automatic first-invalid focus shift.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Lab 9 & Lab 10 -->
+    <div class="grid-2">
+      <!-- Lab 9: Submission Success Feedback -->
+      <div class="card" id="card-lab-9">
+        <div class="card-header">
+          <span class="card-title">✅ Lab 09 — Submission Success Feedback</span>
+          <span class="badge badge-green">role="status"</span>
+        </div>
+        <p class="card-desc">
+          Successful form submission announces confirmation via polite live region without disruptive page reloading.
+        </p>
+        <button class="btn btn-success" onclick="simulateFormSuccess()">Submit Payment ($120.00)</button>
+        <div id="form-success-region" role="status" class="sr-only"></div>
+        <div id="success-banner" style="display:none; margin-top:1rem; padding:0.75rem; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:6px; color:#34d399; font-weight:600;">
+          ✓ Payment of $120.00 processed successfully! Confirmation #TX-89021.
+        </div>
+        <div class="speech-bubble" id="output-lab-9">
+          Click button to trigger accessible success notification.
+        </div>
+      </div>
+
+      <!-- Lab 10: Dynamic Field Identity -->
+      <div class="card" id="card-lab-10">
+        <div class="card-header">
+          <span class="card-title">🆔 Lab 10 — Dynamic Field Identity & Key Stability</span>
+          <span class="badge badge-warn">React Identity</span>
+        </div>
+        <p class="card-desc">
+          Removing row #1 preserves exact error associations for surviving rows when keyed by stable domain ID (not array index).
+        </p>
+        <div id="dynamic-contacts-list" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <!-- Items injected via JS -->
+        </div>
+        <button class="btn btn-secondary" onclick="resetContacts()">Reset Contact List</button>
+        <div class="speech-bubble" id="output-lab-10">
+          Delete contacts to test error association persistence.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 6: Lab 11 & Lab 12 -->
+    <div class="grid-2">
+      <!-- Lab 11: Cross-Field Validation -->
+      <div class="card" id="card-lab-11">
+        <div class="card-header">
+          <span class="card-title">🔐 Lab 11 — Cross-Field Validation Association</span>
+          <span class="badge badge-blue">Compound Fields</span>
+        </div>
+        <p class="card-desc">
+          Mismatch error is attached semantically to the Confirm Password input where the user can take immediate corrective action.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="pass-new">New Password</label>
+          <input id="pass-new" type="password" class="input-control" value="SuperSecret123" oninput="checkPasswordMatch()" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="pass-confirm">Confirm Password</label>
+          <input id="pass-confirm" type="password" class="input-control" value="DifferentPassword" oninput="checkPasswordMatch()" />
+          <span id="match-err" class="form-error" style="display:none;">❌ Passwords do not match.</span>
+        </div>
+        <div class="speech-bubble" id="output-lab-11">
+          Edit passwords to test cross-field error binding.
+        </div>
+      </div>
+
+      <!-- Lab 12: Async Validation Race Condition -->
+      <div class="card" id="card-lab-12">
+        <div class="card-header">
+          <span class="card-title">⚡ Lab 12 — Async Validation & Debounced Status</span>
+          <span class="badge badge-purple">Async UX</span>
+        </div>
+        <p class="card-desc">
+          Async username checker cancels stale requests and announces availability only once user stops typing.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="input-async-user">Choose Username</label>
+          <input id="input-async-user" class="input-control" placeholder="Type: 'alice' (taken) or 'bob' (available)" oninput="handleAsyncUsername(this.value)" />
+          <span id="async-status-msg" class="form-hint" style="color:#38bdf8;">Type username to check availability...</span>
+        </div>
+        <div class="speech-bubble" id="output-lab-12">
+          Type in username to observe debounced async validation.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 7: Lab 13 & Lab 14 -->
+    <div class="grid-2">
+      <!-- Lab 13: Live Announcement Policy for Forms -->
+      <div class="card" id="card-lab-13">
+        <div class="card-header">
+          <span class="card-title">📢 Lab 13 — Form Submission Live Region Policy</span>
+          <span class="badge badge-blue">Announcement Policy</span>
+        </div>
+        <p class="card-desc">
+          Demonstrate the rule: On submission failure, announce summary count in polite region and focus first error.
+        </p>
+        <button class="btn btn-danger" onclick="triggerSubmitFailurePolicy()">Simulate Submit with 3 Errors</button>
+        <div id="submit-policy-region" role="status" class="sr-only"></div>
+        <div class="speech-bubble" id="output-lab-13">
+          Click button to test dual strategy: Speech count + focus shift.
+        </div>
+      </div>
+
+      <!-- Lab 14: Native Fieldset / Radio Groups vs Custom Divs -->
+      <div class="card" id="card-lab-14">
+        <div class="card-header">
+          <span class="card-title">📻 Lab 14 — Native &lt;fieldset&gt; vs Custom Radio Divs</span>
+          <span class="badge badge-green">Native APG</span>
+        </div>
+        <p class="card-desc">
+          Native <code>&lt;fieldset&gt;</code> and <code>&lt;legend&gt;</code> group radio options so screen readers announce group context upon focusing any option.
+        </p>
+        <fieldset>
+          <legend>Preferred Notification Channel</legend>
+          <div style="display:flex; gap:1.5rem; margin-top:0.5rem;">
+            <label style="font-size:0.875rem; cursor:pointer;">
+              <input type="radio" name="notify-pref" value="email" checked onchange="updateTelemetry('radio-email', 'Preferred Notification Channel: Email', 'None', 'false')" /> Email
+            </label>
+            <label style="font-size:0.875rem; cursor:pointer;">
+              <input type="radio" name="notify-pref" value="sms" onchange="updateTelemetry('radio-sms', 'Preferred Notification Channel: SMS', 'None', 'false')" /> SMS
+            </label>
+            <label style="font-size:0.875rem; cursor:pointer;">
+              <input type="radio" name="notify-pref" value="push" onchange="updateTelemetry('radio-push', 'Preferred Notification Channel: Push Notification', 'None', 'false')" /> Push
+            </label>
+          </div>
+        </fieldset>
+        <div class="speech-bubble" id="output-lab-14">
+          Select radio buttons with arrow keys to hear automatic group legend vocalization.
+        </div>
+      </div>
+    </div>
+
+    <!-- Real-time Speech Event Log -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Screen Reader Form Interaction Telemetry Log</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearFormLog()">Clear Log</button>
+      </div>
+      <div class="log-panel" id="form-speech-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Form accessibility inspection telemetry initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function updateTelemetry(fieldId, accName, describedBy, isInvalid) {
+      document.getElementById('hud-field-id').innerText = fieldId;
+      document.getElementById('hud-acc-name').innerText = accName;
+      document.getElementById('hud-describedby').innerText = describedBy;
+      document.getElementById('hud-invalid').innerText = isInvalid;
+      
+      const speech = `${accName}, edit text${isInvalid === 'true' ? ', invalid entry' : ''}.${describedBy !== 'None' ? ' ' + describedBy : ''}`;
+      document.getElementById('hud-voice').innerText = `"${speech}"`;
+      
+      logSpeech(speech);
+    }
+
+    function logSpeech(text) {
+      const logPanel = document.getElementById('form-speech-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">"${text}"</span>`;
+      logPanel.prepend(entry);
+    }
+
+    // Lab 5: Zip code
+    function inspectZipField() {
+      const el = document.getElementById('input-zip');
+      const isInv = el.getAttribute('aria-invalid') === 'true';
+      updateTelemetry('input-zip', 'Postal / Zip Code', isInv ? 'zip-err' : 'None', String(isInv));
+    }
+
+    function setZipError(hasError) {
+      const input = document.getElementById('input-zip');
+      const err = document.getElementById('zip-err');
+      if (hasError) {
+        input.classList.add('is-invalid');
+        input.setAttribute('aria-invalid', 'true');
+        input.setAttribute('aria-describedby', 'zip-err');
+        err.style.display = 'flex';
+        document.getElementById('output-lab-5').innerText = 'aria-invalid="true" | aria-describedby="zip-err"';
+      } else {
+        input.classList.remove('is-invalid');
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+        err.style.display = 'none';
+        document.getElementById('output-lab-5').innerText = 'aria-invalid="false" | Clean field';
+      }
+      inspectZipField();
+    }
+
+    // Lab 6: Global form error
+    function triggerGlobalFormError() {
+      const banner = document.getElementById('form-global-alert');
+      banner.style.display = 'block';
+      document.getElementById('output-lab-6').innerText = 'role="alert" banner displayed to screen readers.';
+      logSpeech('ALERT: Submission Failed: Payment Gateway Timeout. Our payment processor is currently unreachable.');
+    }
+    function clearGlobalFormError() {
+      document.getElementById('form-global-alert').style.display = 'none';
+      document.getElementById('output-lab-6').innerText = 'Alert dismissed.';
+    }
+
+    // Lab 7: Focus field by ID
+    function focusFieldById(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.focus();
+        document.getElementById('output-lab-7').innerText = `Focus shifted to #${id}`;
+      }
+    }
+
+    // Lab 8: Multi-field submit
+    function handleMultiSubmit(e) {
+      e.preventDefault();
+      const firstInvalid = document.querySelector('#multi-field-form .is-invalid');
+      if (firstInvalid) {
+        firstInvalid.focus();
+        document.getElementById('output-lab-8').innerText = `Form invalid! Focused first error field: #${firstInvalid.id}`;
+        logSpeech(`Focus moved to ${firstInvalid.id}, invalid entry, required.`);
+      }
+    }
+
+    // Lab 9: Success feedback
+    function simulateFormSuccess() {
+      const region = document.getElementById('form-success-region');
+      const banner = document.getElementById('success-banner');
+      banner.style.display = 'block';
+      region.innerText = 'Payment of $120.00 processed successfully. Confirmation TX-89021.';
+      document.getElementById('output-lab-9').innerText = 'Polite live region vocalized confirmation message.';
+      logSpeech('STATUS: Payment of $120.00 processed successfully! Confirmation #TX-89021.');
+    }
+
+    // Lab 10: Dynamic contacts
+    let contacts = [
+      { id: 'c-1', name: 'Alice Smith', phone: '+1 555-0192', hasError: false },
+      { id: 'c-2', name: 'Bob Jones', phone: 'invalid-num', hasError: true },
+      { id: 'c-3', name: 'Charlie Brown', phone: '+1 555-4820', hasError: false }
+    ];
+
+    function renderContacts() {
+      const container = document.getElementById('dynamic-contacts-list');
+      container.innerHTML = '';
+      contacts.forEach(c => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.5rem 0.75rem; border-radius:6px;';
+        row.innerHTML = `
+          <div>
+            <strong>${c.name}</strong> — <span style="${c.hasError ? 'color:#f87171; font-weight:600;' : ''}">${c.phone}</span>
+            ${c.hasError ? '<span class="form-error" id="' + c.id + '-err" style="font-size:0.7rem;">(Invalid Phone)</span>' : ''}
+          </div>
+          <button class="btn btn-danger" style="font-size:0.75rem; padding:0.2rem 0.5rem;" onclick="deleteContact('${c.id}')">Delete</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function deleteContact(id) {
+      contacts = contacts.filter(c => c.id !== id);
+      renderContacts();
+      document.getElementById('output-lab-10').innerText = `Contact ${id} deleted. Surviving errors preserve exact entity IDs!`;
+    }
+
+    function resetContacts() {
+      contacts = [
+        { id: 'c-1', name: 'Alice Smith', phone: '+1 555-0192', hasError: false },
+        { id: 'c-2', name: 'Bob Jones', phone: 'invalid-num', hasError: true },
+        { id: 'c-3', name: 'Charlie Brown', phone: '+1 555-4820', hasError: false }
+      ];
+      renderContacts();
+      document.getElementById('output-lab-10').innerText = 'Contact list reset.';
+    }
+
+    // Lab 11: Cross-field match
+    function checkPasswordMatch() {
+      const p1 = document.getElementById('pass-new').value;
+      const p2 = document.getElementById('pass-confirm').value;
+      const err = document.getElementById('match-err');
+      const input2 = document.getElementById('pass-confirm');
+      if (p1 !== p2) {
+        err.style.display = 'flex';
+        input2.classList.add('is-invalid');
+        input2.setAttribute('aria-invalid', 'true');
+        input2.setAttribute('aria-describedby', 'match-err');
+        document.getElementById('output-lab-11').innerText = 'Mismatch error attached to Confirm Password field.';
+      } else {
+        err.style.display = 'none';
+        input2.classList.remove('is-invalid');
+        input2.removeAttribute('aria-invalid');
+        input2.removeAttribute('aria-describedby');
+        document.getElementById('output-lab-11').innerText = 'Passwords match!';
+      }
+    }
+
+    // Lab 12: Async username
+    let asyncTimer = null;
+    function handleAsyncUsername(val) {
+      clearTimeout(asyncTimer);
+      const status = document.getElementById('async-status-msg');
+      if (!val.trim()) {
+        status.innerText = 'Type username to check availability...';
+        status.style.color = '#38bdf8';
+        return;
+      }
+      status.innerText = 'Checking availability...';
+      status.style.color = '#fbbf24';
+
+      asyncTimer = setTimeout(() => {
+        if (val.toLowerCase() === 'alice') {
+          status.innerText = '❌ Username "alice" is already taken!';
+          status.style.color = '#f87171';
+          logSpeech('Username alice is already taken.');
+        } else {
+          status.innerText = '✓ Username is available!';
+          status.style.color = '#34d399';
+          logSpeech('Username is available.');
+        }
+      }, 500);
+    }
+
+    // Lab 13: Submit failure policy
+    function triggerSubmitFailurePolicy() {
+      const region = document.getElementById('submit-policy-region');
+      region.innerText = 'Form submission failed: 3 fields contain invalid data.';
+      document.getElementById('output-lab-13').innerText = 'Vocalized 3 errors in polite region + focused first invalid field.';
+      logSpeech('STATUS: Form submission failed. 3 fields contain invalid data.');
+    }
+
+    function clearFormLog() {
+      document.getElementById('form-speech-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Log cleared.</div>';
+    }
+
+    // Initial setup
+    renderContacts();
+    checkPasswordMatch();
+  </script>
+</body>
+</html>
