@@ -5,7 +5,7 @@
 > **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
 > **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
 > **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
-> **Status:** 🟡 In Progress (Part 07 of 16 Completed)
+> **Status:** 🟡 In Progress (Part 08 of 16 Completed)
 
 ---
 
@@ -29,7 +29,7 @@ $$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tr
 | **Part 05** | [Accessible Forms, Labels, Validation, Errors & Submission Feedback](./05-accessible-forms-labels-error-associations.md) | ✅ **Completed** | [`05-accessible-forms-validation.html`](./examples/05-accessible-forms-validation.html) |
 | **Part 06** | [Keyboard Navigation, Focus Management & Interaction Semantics](./06-keyboard-navigation-focus-management.md) | ✅ **Completed** | [`06-keyboard-navigation-focus-management.html`](./examples/06-keyboard-navigation-focus-management.html) |
 | **Part 07** | [Screen Readers, Live Regions & Accessible Dynamic Updates](./07-screen-readers-live-regions.md) | ✅ **Completed** | [`07-screen-readers-live-regions.html`](./examples/07-screen-readers-live-regions.html) |
-| **Part 08** | [Accessible Complex Component: Dropdowns, Menus, Selects & Comboboxes](./08-accessible-dropdowns-menus-comboboxes.md) | ⏳ Planned | `08-combobox-apg-lab.html` |
+| **Part 08** | [Accessible Component Patterns: Dialogs, Menus, Tabs, Comboboxes & Composite Widgets](./08-accessible-dropdowns-menus-comboboxes.md) | ✅ **Completed** | [`08-accessible-component-patterns.html`](./examples/08-accessible-component-patterns.html) |
 | **Part 09** | [Accessible Complex Component: Accordions, Tabs & Disclosure Widgets](./09-accessible-tabs-accordions-disclosures.md) | ⏳ Planned | `09-tabs-disclosure-lab.html` |
 | **Part 10** | [Accessible Complex Component: Toast Notifications, Alerts & Snackbars](./10-accessible-toasts-alerts-snackbars.md) | ⏳ Planned | `10-toast-announcer-sandbox.html` |
 | **Part 11** | [Visual Accessibility: Color Contrast, High Contrast Mode & Zoom Scaling](./11-visual-a11y-contrast-zoom-scaling.md) | ⏳ Planned | `11-contrast-zoom-analyzer.html` |

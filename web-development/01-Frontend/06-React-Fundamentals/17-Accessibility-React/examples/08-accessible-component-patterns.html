@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 08 — Accessible Component Patterns: Dialogs, Menus, Tabs & Comboboxes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Live Telemetry HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Fault Injection Bar */
+    .fault-injection-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.6rem 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: #fca5a5;
+    }
+    .fault-checkbox { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    /* Roving Tablist */
+    .tablist-container {
+      display: flex;
+      gap: 0.5rem;
+      background: #0f172a;
+      padding: 0.4rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+    .tab-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .tab-btn[aria-selected="true"] {
+      background: #2563eb;
+      color: #fff;
+    }
+    .tab-btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    /* Combobox / Listbox items */
+    .dropdown-panel {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.4rem;
+      max-height: 180px;
+      overflow-y: auto;
+      list-style: none;
+      margin-top: 0.4rem;
+    }
+    .dropdown-item {
+      padding: 0.45rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .dropdown-item.is-active {
+      background: #1e3a8a;
+      color: #93c5fd;
+      outline: 1px solid #3b82f6;
+    }
+    .dropdown-item[aria-selected="true"] {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.75rem;
+      width: 480px;
+      max-width: 90vw;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 08 — Accessible Component Patterns</div>
+      <div class="header-subtitle">Dialogs, Menus, Tabs, Comboboxes & Composite Interaction Contracts</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Frontend</span>
+      <span class="badge badge-blue">WAI-ARIA APG 1.2</span>
+      <span class="badge badge-green">WCAG 2.2 AA</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Live Telemetry HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Widget</span>
+      <span class="telemetry-value" id="hud-widget">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Logical Active ID</span>
+      <span class="telemetry-value" id="hud-active-id">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Selected State</span>
+      <span class="telemetry-value" id="hud-selected-state">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">document.activeElement</span>
+      <span class="telemetry-value" id="hud-dom-focus">body</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Last Command</span>
+      <span class="telemetry-value" id="hud-last-command" style="color:#34d399;">IDLE</span>
+    </div>
+  </div>
+
+  <!-- Fault Injection Control Bar -->
+  <div class="fault-injection-bar">
+    <span style="font-weight:700; color:#fff;">⚠️ Fault Injection:</span>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-break-restoration" /> Break Focus Restoration
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-confuse-selection" /> Confuse Focus & Selection
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-global-escape" /> Global Escape Closes All
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-stale-async" /> Allow Stale Async Combobox
+    </label>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario 1 & 2 -->
+    <div class="grid-2">
+      <!-- Scenario 01: Accessible Dialog -->
+      <div class="card" id="card-scen-1">
+        <div class="card-header">
+          <span class="card-title">🪟 Scenario 01 — Accessible Dialog Lifecycle</span>
+          <span class="badge badge-green">aria-modal="true"</span>
+        </div>
+        <p class="card-desc">
+          Test complete dialog lifecycle: focus entry to first control, Tab/Shift+Tab trapping, Escape dismissal, and return focus to invoking button.
+        </p>
+        <button class="btn btn-danger" id="btn-trigger-dialog-1" onclick="openAccessibleDialog('dialog-scen-1', 'btn-trigger-dialog-1')">
+          Open Deletion Dialog
+        </button>
+        <div class="speech-bubble" id="output-scen-1">
+          Click button to open dialog and test keyboard containment.
+        </div>
+      </div>
+
+      <!-- Scenario 02: Broken Restoration on Item Deletion -->
+      <div class="card" id="card-scen-2">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario 02 — Focus Recovery When Invoker Is Deleted</span>
+          <span class="badge badge-warn">Entity Identity</span>
+        </div>
+        <p class="card-desc">
+          When the invoking delete button is destroyed, identity-aware recovery shifts focus to the next surviving sibling row rather than collapsing to body.
+        </p>
+        <div id="dynamic-cluster-list" style="display:flex; flex-direction:column; gap:0.4rem;">
+          <!-- Rendered via JS -->
+        </div>
+        <div class="speech-bubble" id="output-scen-2">
+          Delete an entity via dialog to test smart surviving target recovery.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario 3 & 4 -->
+    <div class="grid-2">
+      <!-- Scenario 03: Automatic vs Manual Tabs -->
+      <div class="card" id="card-scen-3">
+        <div class="card-header">
+          <span class="card-title">🧭 Scenario 03 — Automatic vs Manual Tab Activation</span>
+          <span class="badge badge-blue">Tabs APG</span>
+        </div>
+        <p class="card-desc">
+          Toggle between <strong>Automatic</strong> (Arrow keys select immediately) vs <strong>Manual</strong> (Arrow moves focus; Enter/Space confirms selection).
+        </p>
+        <div style="margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; font-size:0.85rem;">
+          <label><input type="radio" name="tab-mode" value="auto" checked onchange="tabMode='auto'" /> Automatic Activation</label>
+          <label><input type="radio" name="tab-mode" value="manual" onchange="tabMode='manual'" /> Manual Activation</label>
+        </div>
+        <div role="tablist" aria-label="Cloud Configuration Tabs" class="tablist-container" id="tabs-widget" onkeydown="handleTabListKeyDown(event)">
+          <button role="tab" id="tab-compute" aria-selected="true" tabindex="0" class="tab-btn" onclick="selectTab(0)">Compute</button>
+          <button role="tab" id="tab-storage" aria-selected="false" tabindex="-1" class="tab-btn" onclick="selectTab(1)">Storage</button>
+          <button role="tab" id="tab-network" aria-selected="false" tabindex="-1" class="tab-btn" onclick="selectTab(2)">Networking</button>
+        </div>
+        <div id="tab-panel-display" style="background:#1e293b; padding:0.75rem; border-radius:6px; margin-top:0.5rem; font-size:0.85rem;">
+          Active Panel: <strong>Compute Node Specs</strong>
+        </div>
+        <div class="speech-bubble" id="output-scen-3">
+          Use Arrow keys to test focus vs selection separation.
+        </div>
+      </div>
+
+      <!-- Scenario 04: Roving tabIndex Toolbar -->
+      <div class="card" id="card-scen-4">
+        <div class="card-header">
+          <span class="card-title">🛠️ Scenario 04 — Roving tabIndex Toolbar</span>
+          <span class="badge badge-purple">role="toolbar"</span>
+        </div>
+        <p class="card-desc">
+          A single Tab stop for the entire editor toolbar. Use <kbd>←</kbd> / <kbd>→</kbd> and <kbd>Home</kbd> / <kbd>End</kbd> to move within tools.
+        </p>
+        <div role="toolbar" aria-label="Text Formatting Tools" class="tablist-container" id="toolbar-widget" onkeydown="handleToolbarKeyDown(event)">
+          <button type="button" id="tool-bold" tabindex="0" class="tab-btn" onclick="activateTool('Bold')">Bold</button>
+          <button type="button" id="tool-italic" tabindex="-1" class="tab-btn" onclick="activateTool('Italic')">Italic</button>
+          <button type="button" id="tool-underline" tabindex="-1" class="tab-btn" onclick="activateTool('Underline')">Underline</button>
+          <button type="button" id="tool-link" tabindex="-1" class="tab-btn" onclick="activateTool('Insert Link')">Link</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-4">
+          Tab into toolbar, use arrows, and press Space/Enter to activate.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Scenario 5 & 6 -->
+    <div class="grid-2">
+      <!-- Scenario 05: Accessible Command Menu -->
+      <div class="card" id="card-scen-5">
+        <div class="card-header">
+          <span class="card-title">📜 Scenario 05 — Accessible Command Menu</span>
+          <span class="badge badge-blue">role="menu"</span>
+        </div>
+        <p class="card-desc">
+          Distinguish true command menus (Arrow Up/Down, Enter to invoke, Escape to dismiss) from standard website navigation.
+        </p>
+        <div style="position:relative; display:inline-block;">
+          <button id="btn-actions-menu" aria-haspopup="menu" aria-expanded="false" class="btn btn-secondary" onclick="toggleActionsMenu()">
+            Actions ▾
+          </button>
+          <ul id="menu-dropdown" role="menu" aria-labelledby="btn-actions-menu" class="dropdown-panel" style="display:none; position:absolute; top:100%; left:0; width:180px; z-index:20;" onkeydown="handleMenuKeyDown(event)">
+            <li id="menu-opt-clone" role="menuitem" tabindex="-1" class="dropdown-item" onclick="invokeMenuAction('Clone')">Clone Instance</li>
+            <li id="menu-opt-restart" role="menuitem" tabindex="-1" class="dropdown-item" onclick="invokeMenuAction('Restart')">Restart Server</li>
+            <li id="menu-opt-export" role="menuitem" tabindex="-1" class="dropdown-item" onclick="invokeMenuAction('Export')">Export Telemetry</li>
+          </ul>
+        </div>
+        <div class="speech-bubble" id="output-scen-5">
+          Press Enter on Actions button to open menu and navigate items.
+        </div>
+      </div>
+
+      <!-- Scenario 06: Searchable Combobox with aria-activedescendant -->
+      <div class="card" id="card-scen-6">
+        <div class="card-header">
+          <span class="card-title">🔍 Scenario 06 — Combobox with Virtual Focus</span>
+          <span class="badge badge-purple">aria-activedescendant</span>
+        </div>
+        <p class="card-desc">
+          DOM focus stays anchored inside the input during active typing while <kbd>↓</kbd> / <kbd>↑</kbd> updates <code>aria-activedescendant</code>.
+        </p>
+        <div class="form-group">
+          <label for="combobox-search-input" style="font-size:0.875rem; font-weight:600;">Select Kubernetes Region</label>
+          <input
+            id="combobox-search-input"
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-autocomplete="list"
+            aria-controls="combobox-listbox-6"
+            class="input-control"
+            placeholder="Type or press Arrow Down..."
+            oninput="handleComboboxInput(this.value)"
+            onkeydown="handleComboboxKeyDown(event)"
+          />
+          <ul id="combobox-listbox-6" role="listbox" class="dropdown-panel">
+            <!-- Rendered dynamically -->
+          </ul>
+        </div>
+        <div class="speech-bubble" id="output-scen-6">
+          Type to filter, arrow down to select with virtual focus.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Scenario 7 & 8 -->
+    <div class="grid-2">
+      <!-- Scenario 07: Async Combobox Currentness -->
+      <div class="card" id="card-scen-7">
+        <div class="card-header">
+          <span class="card-title">⚡ Scenario 07 — Async Combobox Race Conditions</span>
+          <span class="badge badge-warn">Concurrency Guard</span>
+        </div>
+        <p class="card-desc">
+          Simulate out-of-order network responses. Currentness guards prevent slow stale query responses from overwriting newer options.
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" onclick="simulateAsyncComboboxRace()">Dispatch Async Race Simulation</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-7">
+          Test with "Allow Stale Async" fault toggle enabled/disabled.
+        </div>
+      </div>
+
+      <!-- Scenario 08: Multi-Select Listbox -->
+      <div class="card" id="card-scen-8">
+        <div class="card-header">
+          <span class="card-title">☑️ Scenario 08 — Multi-Select Listbox State Model</span>
+          <span class="badge badge-blue">aria-multiselectable</span>
+        </div>
+        <p class="card-desc">
+          Listbox allows moving active focus with <kbd>↑</kbd> / <kbd>↓</kbd> and toggling multi-selection with <kbd>Space</kbd> or <kbd>Shift+Arrow</kbd>.
+        </p>
+        <ul id="multiselect-listbox" role="listbox" aria-multiselectable="true" tabindex="0" class="dropdown-panel" style="max-height:140px;" onkeydown="handleMultiSelectListboxKey(event)">
+          <li id="ms-opt-auth" role="option" aria-selected="false" class="dropdown-item">OAuth2 Authentication</li>
+          <li id="ms-opt-rbac" role="option" aria-selected="false" class="dropdown-item">Role-Based Access Control</li>
+          <li id="ms-opt-audit" role="option" aria-selected="false" class="dropdown-item">Real-Time Audit Logging</li>
+          <li id="ms-opt-sso" role="option" aria-selected="false" class="dropdown-item">SAML Single Sign-On</li>
+        </ul>
+        <div class="speech-bubble" id="output-scen-8">
+          Focus listbox, use Arrows to navigate, press Space to toggle selection.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Scenario 9 & 10 -->
+    <div class="grid-2">
+      <!-- Scenario 09: Dynamic Option Removal -->
+      <div class="card" id="card-scen-9">
+        <div class="card-header">
+          <span class="card-title">🗑️ Scenario 09 — Dynamic Active Item Removal</span>
+          <span class="badge badge-red">Active Recovery</span>
+        </div>
+        <p class="card-desc">
+          When the currently active option is removed from the dataset, the widget preserves active state invariants by snapping to the next valid sibling.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+          <button class="btn btn-danger" onclick="deleteActiveListboxOption()">Delete Active Option</button>
+          <button class="btn btn-secondary" onclick="resetDynamicListbox()">Reset Options</button>
+        </div>
+        <ul id="dynamic-removal-listbox" role="listbox" tabindex="0" class="dropdown-panel" style="max-height:120px;" onkeydown="handleDynamicRemovalListboxKey(event)">
+          <!-- Rendered dynamically -->
+        </ul>
+        <div class="speech-bubble" id="output-scen-9">
+          Navigate listbox, delete active option, observe recovery.
+        </div>
+      </div>
+
+      <!-- Scenario 10: LIFO Overlay Escape Stack -->
+      <div class="card" id="card-scen-10">
+        <div class="card-header">
+          <span class="card-title">🥞 Scenario 10 — Nested Overlay LIFO Escape Stack</span>
+          <span class="badge badge-purple">Overlay Stack</span>
+        </div>
+        <p class="card-desc">
+          Open a primary modal, then open a nested confirmation drawer inside it. Pressing <kbd>Escape</kbd> dismisses <em>only the topmost</em> overlay.
+        </p>
+        <button class="btn btn-success" id="btn-open-primary-modal" onclick="openPrimaryModal()">Open Primary Modal Layer 1</button>
+        <div class="speech-bubble" id="output-scen-10">
+          Open nested layers and press Escape to test LIFO dismissal.
+        </div>
+      </div>
+    </div>
+
+    <!-- Real-time Interaction Event Log -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Component Pattern Diagnostic Event Telemetry</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearTelemetryLog()">Clear Log</button>
+      </div>
+      <div class="log-panel" id="telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Component pattern diagnostic workbench initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Accessible Modal Sandbox 1 -->
+  <div class="modal-overlay" id="dialog-scen-1" role="dialog" aria-modal="true" aria-labelledby="dialog-1-title" onkeydown="handleDialogKeyDown(event, 'dialog-scen-1')">
+    <div class="modal-box" tabindex="-1">
+      <h3 id="dialog-1-title" style="font-size:1.15rem; font-weight:700; color:#f87171; margin-bottom:0.75rem;">
+        Confirm Permanent Deletion
+      </h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Are you sure you want to delete this resource? All active pipelines will terminate.
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button class="btn btn-secondary" id="dialog-1-btn-cancel" onclick="closeAccessibleDialog('dialog-scen-1')">Cancel</button>
+        <button class="btn btn-danger" id="dialog-1-btn-confirm" onclick="closeAccessibleDialog('dialog-scen-1')">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Primary Modal for Scenario 10 -->
+  <div class="modal-overlay" id="modal-layer-1" role="dialog" aria-modal="true" aria-labelledby="layer-1-title">
+    <div class="modal-box" tabindex="-1">
+      <h3 id="layer-1-title" style="font-size:1.15rem; color:#38bdf8; margin-bottom:0.75rem;">Layer 1: Project Settings</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">
+        This is the primary settings dialog. You can open a nested confirmation drawer from here.
+      </p>
+      <div style="display:flex; justify-content:space-between;">
+        <button class="btn btn-danger" onclick="openNestedModal()">Open Nested Drawer Layer 2</button>
+        <button class="btn btn-secondary" onclick="closePrimaryModal()">Close Layer 1</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nested Modal for Scenario 10 -->
+  <div class="modal-overlay" id="modal-layer-2" role="dialog" aria-modal="true" aria-labelledby="layer-2-title" style="z-index:110;">
+    <div class="modal-box" style="background:#0f172a; border-color:#ef4444;" tabindex="-1">
+      <h3 id="layer-2-title" style="font-size:1.15rem; color:#f87171; margin-bottom:0.75rem;">Layer 2: Destructive Confirmation</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">
+        Press Escape now. Only Layer 2 should close, keeping Layer 1 open.
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+        <button class="btn btn-secondary" onclick="closeNestedModal()">Dismiss Layer 2</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeDialogInvoker = null;
+    let overlayStack = [];
+
+    // Global Overlay Stack Manager
+    document.addEventListener('keydown', (e) => {
+      document.getElementById('hud-last-command').innerText = `${e.key} (${e.code})`;
+      if (e.key === 'Escape') {
+        const faultGlobal = document.getElementById('fault-global-escape').checked;
+        if (faultGlobal) {
+          // Bug: Closes all overlays
+          closeAllOverlays();
+          logEvent('[FAULT] Global Escape handler closed ALL open overlay layers simultaneously!');
+        } else if (overlayStack.length > 0) {
+          e.preventDefault();
+          const topDismiss = overlayStack[overlayStack.length - 1];
+          topDismiss();
+          logEvent('[LIFO STACK] Escape dismissed topmost overlay layer.');
+        }
+      }
+    });
+
+    document.addEventListener('focusin', (e) => {
+      document.getElementById('hud-dom-focus').innerText = e.target.id || e.target.tagName.toLowerCase();
+    });
+
+    function logEvent(msg) {
+      const panel = document.getElementById('telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearTelemetryLog() {
+      document.getElementById('telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Telemetry cleared.</div>';
+    }
+
+    // Scenario 1: Dialog
+    function openAccessibleDialog(dialogId, invokerId) {
+      activeDialogInvoker = document.getElementById(invokerId);
+      const dialog = document.getElementById(dialogId);
+      dialog.style.display = 'flex';
+      document.getElementById('dialog-1-btn-cancel').focus();
+      document.getElementById('hud-widget').innerText = 'Dialog (Scen 1)';
+      logEvent(`Dialog ${dialogId} opened. Focus trapped inside.`);
+    }
+
+    function closeAccessibleDialog(dialogId) {
+      const dialog = document.getElementById(dialogId);
+      dialog.style.display = 'none';
+
+      const faultRestoration = document.getElementById('fault-break-restoration').checked;
+      if (faultRestoration) {
+        document.body.focus();
+        document.getElementById('output-scen-1').innerText = '💥 Focus lost to body on dialog close (Restoration broken)!';
+        logEvent('[BUG] Focus restoration skipped; activeElement set to body.');
+      } else if (activeDialogInvoker && document.body.contains(activeDialogInvoker)) {
+        activeDialogInvoker.focus();
+        document.getElementById('output-scen-1').innerText = `✓ Focus cleanly restored to #${activeDialogInvoker.id}`;
+        logEvent(`Focus restored to #${activeDialogInvoker.id}`);
+      }
+    }
+
+    function handleDialogKeyDown(e, dialogId) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeAccessibleDialog(dialogId);
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = document.querySelectorAll(`#${dialogId} button, #${dialogId} input`);
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    // Scenario 2: Dynamic deletion list
+    let clusterItems = [
+      { id: 'c-101', name: 'US-East Production Cluster' },
+      { id: 'c-102', name: 'EU-Central Staging Cluster' },
+      { id: 'c-103', name: 'AP-South Analytics Cluster' }
+    ];
+
+    function renderClusterList() {
+      const c = document.getElementById('dynamic-cluster-list');
+      c.innerHTML = '';
+      clusterItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.id = `row-${item.id}`;
+        row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.5rem 0.75rem; border-radius:6px;';
+        row.innerHTML = `
+          <span>${item.name} <code style="font-size:0.7rem; color:#6b7280;">(${item.id})</code></span>
+          <button class="btn btn-danger" id="btn-del-${item.id}" style="font-size:0.75rem; padding:0.25rem 0.6rem;" onclick="deleteClusterItem('${item.id}', ${idx})">Delete</button>
+        `;
+        c.appendChild(row);
+      });
+    }
+
+    function deleteClusterItem(id, idx) {
+      clusterItems = clusterItems.filter(i => i.id !== id);
+      renderClusterList();
+
+      const faultRestoration = document.getElementById('fault-break-restoration').checked;
+      if (faultRestoration) {
+        document.body.focus();
+        document.getElementById('output-scen-2').innerText = '💥 Focus lost to body after item deletion!';
+        return;
+      }
+
+      // Smart surviving recovery
+      const surviving = clusterItems[idx] || clusterItems[idx - 1];
+      if (surviving) {
+        const nextBtn = document.getElementById(`btn-del-${surviving.id}`);
+        nextBtn?.focus();
+        document.getElementById('output-scen-2').innerText = `✓ Item ${id} deleted. Focus recovered to #${surviving.id}`;
+        logEvent(`Focus recovered to surviving #${surviving.id}`);
+      } else {
+        document.getElementById('output-scen-2').innerText = 'All items deleted.';
+      }
+    }
+
+    // Scenario 3: Tabs
+    let tabMode = 'auto';
+    let currentTabIdx = 0;
+    const tabIds = ['tab-compute', 'tab-storage', 'tab-network'];
+    const tabLabels = ['Compute Node Specs', 'Distributed NVMe Storage', 'VPC & Subnet Topologies'];
+
+    function selectTab(idx, moveFocus = true) {
+      currentTabIdx = idx;
+      tabIds.forEach((id, i) => {
+        const btn = document.getElementById(id);
+        const isSelected = i === idx;
+        btn.setAttribute('aria-selected', String(isSelected));
+        btn.setAttribute('tabindex', isSelected ? '0' : '-1');
+      });
+      document.getElementById('tab-panel-display').innerHTML = `Active Panel: <strong>${tabLabels[idx]}</strong>`;
+      document.getElementById('hud-selected-state', tabLabels[idx]);
+      if (moveFocus) document.getElementById(tabIds[idx]).focus();
+      logEvent(`Tab selected: ${tabIds[idx]}`);
+    }
+
+    function handleTabListKeyDown(e) {
+      let nextIdx = currentTabIdx;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextIdx = (currentTabIdx + 1) % tabIds.length;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        nextIdx = (currentTabIdx - 1 + tabIds.length) % tabIds.length;
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        nextIdx = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        nextIdx = tabIds.length - 1;
+      }
+
+      if (nextIdx !== currentTabIdx) {
+        if (tabMode === 'auto') {
+          selectTab(nextIdx, true);
+        } else {
+          // Manual activation: move focus only
+          tabIds.forEach((id, i) => {
+            document.getElementById(id).setAttribute('tabindex', i === nextIdx ? '0' : '-1');
+          });
+          document.getElementById(tabIds[nextIdx]).focus();
+          document.getElementById('hud-active-id').innerText = tabIds[nextIdx];
+          document.getElementById('output-scen-3').innerText = `Manual mode: Focus moved to #${tabIds[nextIdx]} (Press Enter to activate)`;
+          logEvent(`Focus moved (Manual): ${tabIds[nextIdx]}`);
+        }
+      }
+    }
+
+    // Scenario 4: Toolbar
+    const toolIds = ['tool-bold', 'tool-italic', 'tool-underline', 'tool-link'];
+    let activeToolIdx = 0;
+
+    function handleToolbarKeyDown(e) {
+      let next = activeToolIdx;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        next = (activeToolIdx + 1) % toolIds.length;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        next = (activeToolIdx - 1 + toolIds.length) % toolIds.length;
+      }
+      if (next !== activeToolIdx) {
+        toolIds.forEach((id, i) => {
+          document.getElementById(id).setAttribute('tabindex', i === next ? '0' : '-1');
+        });
+        activeToolIdx = next;
+        document.getElementById(toolIds[next]).focus();
+        document.getElementById('hud-active-id').innerText = toolIds[next];
+      }
+    }
+    function activateTool(name) {
+      document.getElementById('output-scen-4').innerText = `Tool Activated: ${name}`;
+      logEvent(`Tool activated: ${name}`);
+    }
+
+    // Scenario 5: Menu
+    let isMenuOpen = false;
+    const menuOptIds = ['menu-opt-clone', 'menu-opt-restart', 'menu-opt-export'];
+    let activeMenuIdx = -1;
+
+    function toggleActionsMenu() {
+      isMenuOpen = !isMenuOpen;
+      const menu = document.getElementById('menu-dropdown');
+      const btn = document.getElementById('btn-actions-menu');
+      menu.style.display = isMenuOpen ? 'block' : 'none';
+      btn.setAttribute('aria-expanded', String(isMenuOpen));
+
+      if (isMenuOpen) {
+        activeMenuIdx = 0;
+        document.getElementById(menuOptIds[0]).focus();
+      }
+    }
+
+    function handleMenuKeyDown(e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeMenuIdx = (activeMenuIdx + 1) % menuOptIds.length;
+        document.getElementById(menuOptIds[activeMenuIdx]).focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeMenuIdx = (activeMenuIdx - 1 + menuOptIds.length) % menuOptIds.length;
+        document.getElementById(menuOptIds[activeMenuIdx]).focus();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        toggleActionsMenu();
+        document.getElementById('btn-actions-menu').focus();
+      }
+    }
+    function invokeMenuAction(action) {
+      document.getElementById('output-scen-5').innerText = `Menu Action Invoked: ${action}`;
+      logEvent(`Menu command: ${action}`);
+      toggleActionsMenu();
+      document.getElementById('btn-actions-menu').focus();
+    }
+
+    // Scenario 6: Combobox
+    const k8sRegions = [
+      { id: 'us-east-1', label: 'us-east-1 (N. Virginia)' },
+      { id: 'us-west-2', label: 'us-west-2 (Oregon)' },
+      { id: 'eu-west-1', label: 'eu-west-1 (Ireland)' },
+      { id: 'ap-northeast-1', label: 'ap-northeast-1 (Tokyo)' }
+    ];
+    let filteredRegions = [...k8sRegions];
+    let activeComboIdx = -1;
+
+    function renderComboboxList() {
+      const ul = document.getElementById('combobox-listbox-6');
+      ul.innerHTML = '';
+      filteredRegions.forEach((reg, idx) => {
+        const li = document.createElement('li');
+        li.id = `combo-opt-${reg.id}`;
+        li.role = 'option';
+        li.className = idx === activeComboIdx ? 'dropdown-item is-active' : 'dropdown-item';
+        li.innerText = reg.label;
+        li.onclick = () => selectComboOption(reg);
+        ul.appendChild(li);
+      });
+    }
+
+    function handleComboboxInput(val) {
+      filteredRegions = k8sRegions.filter(r => r.label.toLowerCase().includes(val.toLowerCase()));
+      activeComboIdx = filteredRegions.length > 0 ? 0 : -1;
+      renderComboboxList();
+      updateActiveDescendantAttribute();
+    }
+
+    function handleComboboxKeyDown(e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (filteredRegions.length > 0) {
+          activeComboIdx = (activeComboIdx + 1) % filteredRegions.length;
+          renderComboboxList();
+          updateActiveDescendantAttribute();
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (filteredRegions.length > 0) {
+          activeComboIdx = (activeComboIdx - 1 + filteredRegions.length) % filteredRegions.length;
+          renderComboboxList();
+          updateActiveDescendantAttribute();
+        }
+      } else if (e.key === 'Enter') {
+        if (activeComboIdx >= 0 && filteredRegions[activeComboIdx]) {
+          e.preventDefault();
+          selectComboOption(filteredRegions[activeComboIdx]);
+        }
+      }
+    }
+
+    function updateActiveDescendantAttribute() {
+      const input = document.getElementById('combobox-search-input');
+      if (activeComboIdx >= 0 && filteredRegions[activeComboIdx]) {
+        const optId = `combo-opt-${filteredRegions[activeComboIdx].id}`;
+        input.setAttribute('aria-activedescendant', optId);
+        document.getElementById('hud-active-id').innerText = optId;
+      } else {
+        input.removeAttribute('aria-activedescendant');
+      }
+    }
+
+    function selectComboOption(reg) {
+      document.getElementById('combobox-search-input').value = reg.label;
+      document.getElementById('output-scen-6').innerText = `Selected Region: ${reg.label}`;
+      logEvent(`Combobox chosen: ${reg.id}`);
+    }
+
+    // Scenario 7: Async Race
+    let asyncReqCount = 0;
+    function simulateAsyncComboboxRace() {
+      asyncReqCount++;
+      const reqId = asyncReqCount;
+      const faultStale = document.getElementById('fault-stale-async').checked;
+
+      logEvent(`Dispatched Async Query #${reqId} ("react")`);
+
+      // Fast new request
+      setTimeout(() => {
+        if (faultStale || reqId === asyncReqCount) {
+          document.getElementById('output-scen-7').innerText = `✓ Async Result #${reqId} rendered ("react hooks")`;
+          logEvent(`[VALID] Rendered Result #${reqId}`);
+        }
+      }, 100);
+
+      // Slow stale request
+      setTimeout(() => {
+        if (faultStale) {
+          document.getElementById('output-scen-7').innerText = `💥 Stale Result #${reqId - 1} overwrote newer results!`;
+          logEvent(`[BUG] Stale response #${reqId - 1} rendered!`);
+        } else {
+          logEvent(`[GUARDED] Discarded stale response #${reqId - 1}`);
+        }
+      }, 350);
+    }
+
+    // Scenario 8: Multi-select
+    let multiSelectIdx = 0;
+    const msOptIds = ['ms-opt-auth', 'ms-opt-rbac', 'ms-opt-audit', 'ms-opt-sso'];
+
+    function handleMultiSelectListboxKey(e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        multiSelectIdx = (multiSelectIdx + 1) % msOptIds.length;
+        updateMultiSelectFocus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        multiSelectIdx = (multiSelectIdx - 1 + msOptIds.length) % msOptIds.length;
+        updateMultiSelectFocus();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        const el = document.getElementById(msOptIds[multiSelectIdx]);
+        const isSel = el.getAttribute('aria-selected') === 'true';
+        el.setAttribute('aria-selected', String(!isSel));
+        document.getElementById('output-scen-8').innerText = `Toggled ${msOptIds[multiSelectIdx]}: ${!isSel}`;
+        logEvent(`Multi-select toggled: ${msOptIds[multiSelectIdx]} = ${!isSel}`);
+      }
+    }
+    function updateMultiSelectFocus() {
+      msOptIds.forEach((id, i) => {
+        const el = document.getElementById(id);
+        el.classList.toggle('is-active', i === multiSelectIdx);
+      });
+      document.getElementById('hud-active-id').innerText = msOptIds[multiSelectIdx];
+    }
+
+    // Scenario 9: Dynamic removal
+    let dynamicOpts = ['AWS Lambda', 'Google Cloud Run', 'Azure Container Apps', 'Cloudflare Workers'];
+    let activeDynOptIdx = 0;
+
+    function renderDynamicRemovalListbox() {
+      const ul = document.getElementById('dynamic-removal-listbox');
+      ul.innerHTML = '';
+      dynamicOpts.forEach((opt, idx) => {
+        const li = document.createElement('li');
+        li.id = `dyn-opt-${idx}`;
+        li.role = 'option';
+        li.className = idx === activeDynOptIdx ? 'dropdown-item is-active' : 'dropdown-item';
+        li.innerText = opt;
+        ul.appendChild(li);
+      });
+    }
+
+    function handleDynamicRemovalListboxKey(e) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeDynOptIdx = (activeDynOptIdx + 1) % dynamicOpts.length;
+        renderDynamicRemovalListbox();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeDynOptIdx = (activeDynOptIdx - 1 + dynamicOpts.length) % dynamicOpts.length;
+        renderDynamicRemovalListbox();
+      }
+    }
+
+    function deleteActiveListboxOption() {
+      if (dynamicOpts.length === 0) return;
+      const removed = dynamicOpts[activeDynOptIdx];
+      dynamicOpts.splice(activeDynOptIdx, 1);
+      activeDynOptIdx = Math.min(activeDynOptIdx, Math.max(0, dynamicOpts.length - 1));
+      renderDynamicRemovalListbox();
+      document.getElementById('output-scen-9').innerText = `Deleted "${removed}". Active index recovered to ${activeDynOptIdx}`;
+      logEvent(`Active item removed. Recovered to index ${activeDynOptIdx}`);
+    }
+
+    function resetDynamicListbox() {
+      dynamicOpts = ['AWS Lambda', 'Google Cloud Run', 'Azure Container Apps', 'Cloudflare Workers'];
+      activeDynOptIdx = 0;
+      renderDynamicRemovalListbox();
+      document.getElementById('output-scen-9').innerText = 'Options reset.';
+    }
+
+    // Scenario 10: Nested Overlays
+    function openPrimaryModal() {
+      const m = document.getElementById('modal-layer-1');
+      m.style.display = 'flex';
+      overlayStack.push(closePrimaryModal);
+      document.getElementById('hud-widget').innerText = 'Layer 1 Modal';
+      logEvent('[STACK PUSH] Layer 1 added to overlay stack.');
+    }
+    function closePrimaryModal() {
+      const m = document.getElementById('modal-layer-1');
+      m.style.display = 'none';
+      overlayStack = overlayStack.filter(fn => fn !== closePrimaryModal);
+      logEvent('[STACK POP] Layer 1 closed.');
+    }
+
+    function openNestedModal() {
+      const m = document.getElementById('modal-layer-2');
+      m.style.display = 'flex';
+      overlayStack.push(closeNestedModal);
+      document.getElementById('hud-widget').innerText = 'Layer 2 Drawer';
+      logEvent('[STACK PUSH] Layer 2 added to overlay stack.');
+    }
+    function closeNestedModal() {
+      const m = document.getElementById('modal-layer-2');
+      m.style.display = 'none';
+      overlayStack = overlayStack.filter(fn => fn !== closeNestedModal);
+      logEvent('[STACK POP] Layer 2 closed.');
+    }
+    function closeAllOverlays() {
+      document.getElementById('modal-layer-1').style.display = 'none';
+      document.getElementById('modal-layer-2').style.display = 'none';
+      document.getElementById('dialog-scen-1').style.display = 'none';
+      overlayStack = [];
+    }
+
+    // Init
+    renderClusterList();
+    renderComboboxList();
+    renderDynamicRemovalListbox();
+  </script>
+</body>
+</html>
