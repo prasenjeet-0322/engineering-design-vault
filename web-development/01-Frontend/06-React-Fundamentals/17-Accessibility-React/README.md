@@ -1,34 +1,48 @@
-# KPI 17 — Accessibility & React
+# Level 06 — React Fundamentals
 
-[⬅️ Level 06 Master Hub](../README.md)
+# KPI 17 — Accessibility in React (A11y Masterclass)
 
-> **Tier:** 🔴 MUST KNOW (Core Senior Full-Stack Competency)  
-> **Author & Lead System Architect:** [Srikar Kudurmalla](https://www.linkedin.com/in/kudurmallasrikar/) (Full Stack Developer \| Founding Engineer)
-
----
-
-## 🎯 Executive Overview
-
-Semantic HTML, accessible APIs, focus management via refs, ARIA live announcements.
+> **Tier:** 🔴 MUST KNOW — Core Senior Full-Stack Competency  
+> **Standards:** WCAG 2.1 / 2.2 AA · WAI-ARIA 1.2 · WAI-ARIA Authoring Practices Guide (APG) · Accessibility Object Model (AOM)  
+> **Authors:** Srikar Kudurmalla (Lead System Architect) & Prasenjeet (Mid-Level Full Stack Developer)  
+> **Status:** 🟡 In Progress (Part 01 of 16 Completed)
 
 ---
 
-## 🗺️ KPI 17 Part Index
+## 🧭 Curriculum Overview & Executive Architecture
 
-| Part & File | Status | Key Focus & Mechanics |
-| :--- | :---: | :--- |
-| [Semantic JSX & Keyboard Accessibility](./01-semantic-jsx-accessibility.md) | ⏳ Pending | Semantic elements vs div soups, tabIndex management, keyboard event handlers (Enter/Space). |
-| [Focus Management & Ref Control](./02-focus-management-refs.md) | ⏳ Pending | Focus trapping in modals, autofocusing first error field, restoring focus on close. |
-| [ARIA Live Regions & Dynamic Notifications](./03-aria-live-dynamic-announcements.md) | ⏳ Pending | aria-live (polite vs assertive), announcing toast notifications, accessible dialogs. |
-| [A11y Crucible & Accessible Design System Lab](./04-a11y-crucible-accessible-widget-lab.md) | ⏳ Pending | Auditing accessible custom select boxes, tabs, and accessible comboboxes. |
+Accessibility in React is not an afterthought, a cosmetic checklist, or a matter of adding arbitrary \`aria-*\` attributes to generic elements. It is a fundamental architectural discipline spanning **Semantic Structure**, **Host DOM Contracts**, **Operating System Accessibility APIs (AOM)**, **Keyboard Interaction State Machines**, and **Assistive Technology Protocols**.
 
+### The Core Architectural Pipeline:
+$$\text{React JSX Components} \xrightarrow{\text{Render}} \text{React Element Tree} \xrightarrow{\text{Commit}} \text{Browser Host DOM} \xrightarrow{\text{Derivation}} \text{Accessibility Tree (AOM)} \xrightarrow{\text{OS Bridge}} \text{Assistive Technology}$$
 
 ---
 
-## 🧪 Interactive Diagnostic Labs
+## 📚 16-Part Roadmap Index
 
-* Companion interactive HTML diagnostic visualizers are placed in the [`examples/`](./examples/) directory for live runtime inspection.
+| Part | Title & Focus Area | Status | Companion Interactive Lab |
+| :--- | :--- | :--- | :--- |
+| **Part 01** | [The React Accessibility Mental Model & Semantic HTML Foundations](./01-react-a11y-mental-model-semantic-html.md) | ✅ **Completed** | [`01-aom-semantic-html-visualizer.html`](./examples/01-aom-semantic-html-visualizer.html) |
+| **Part 02** | [ARIA Roles, States, Properties & The First Rule of ARIA in React](./02-aria-roles-states-properties.md) | ⏳ Planned | `02-aria-matrix-explorer.html` |
+| **Part 03** | [Keyboard Navigation, Focus Rings & The Tab Order Model](./03-keyboard-navigation-tab-order-focus-rings.md) | ⏳ Planned | `03-focus-ring-tab-tracker.html` |
+| **Part 04** | [Focus Management: Trapping, Moving & Restoring Focus with Hooks](./04-focus-management-traps-restoration.md) | ⏳ Planned | `04-focus-trap-sandbox.html` |
+| **Part 05** | [Accessible Forms: Labels, Fieldsets, Errors & Description Binding](./05-accessible-forms-labels-error-associations.md) | ⏳ Planned | `05-accessible-form-auditor.html` |
+| **Part 06** | [Live Regions: `aria-live`, Dynamic Announcements & Notifications](./06-aria-live-regions-dynamic-announcements.md) | ⏳ Planned | `06-live-region-announcer.html` |
+| **Part 07** | [Accessible Complex Component: Modals, Dialogs & Drawers](./07-accessible-dialogs-modals-drawers.md) | ⏳ Planned | `07-modal-a11y-workbench.html` |
+| **Part 08** | [Accessible Complex Component: Dropdowns, Menus, Selects & Comboboxes](./08-accessible-dropdowns-menus-comboboxes.md) | ⏳ Planned | `08-combobox-apg-lab.html` |
+| **Part 09** | [Accessible Complex Component: Accordions, Tabs & Disclosure Widgets](./09-accessible-tabs-accordions-disclosures.md) | ⏳ Planned | `09-tabs-disclosure-lab.html` |
+| **Part 10** | [Accessible Complex Component: Toast Notifications, Alerts & Snackbars](./10-accessible-toasts-alerts-snackbars.md) | ⏳ Planned | `10-toast-announcer-sandbox.html` |
+| **Part 11** | [Visual Accessibility: Color Contrast, High Contrast Mode & Zoom Scaling](./11-visual-a11y-contrast-zoom-scaling.md) | ⏳ Planned | `11-contrast-zoom-analyzer.html` |
+| **Part 12** | [Accessible Motion: `prefers-reduced-motion` & Safe Animations](./12-accessible-motion-reduced-motion-tokens.md) | ⏳ Planned | `12-reduced-motion-sandbox.html` |
+| **Part 13** | [Automated A11y Testing: `jest-axe`, `@testing-library/react`, Playwright Axe & CI](./13-automated-a11y-testing-ci-pipeline.md) | ⏳ Planned | `13-axe-ci-test-runner.html` |
+| **Part 14** | [Manual A11y Auditing: Screen Reader Runbooks (NVDA, VoiceOver, JAWS)](./14-manual-screen-reader-auditing-runbooks.md) | ⏳ Planned | `14-screen-reader-sim.html` |
+| **Part 15** | [Enterprise Design System A11y Architecture & Polymorphic Primitives](./15-enterprise-design-system-a11y-primitives.md) | ⏳ Planned | `15-design-system-primitives.html` |
+| **Part 16** | [KPI 17 Final Review, Master Crucible & Staff-Level Certification](./16-kpi17-final-review-crucible-mastery.md) | ⏳ Planned | `16-a11y-master-crucible.html` |
 
 ---
 
-[⬅️ Level 06 Master Hub](../README.md)
+## 🎯 Master Architecture Equation
+
+$$\mathbf{\text{Accessible UI}} = \mathbf{\text{Semantic Structure}} \times \mathbf{\text{Operable Interaction}} \times \mathbf{\text{Perceivable Feedback}} \times \mathbf{\text{Understandable State}}$$
+
+If any variable in this equation approaches zero, the resulting user interface is severely broken for assistive technology and keyboard users.

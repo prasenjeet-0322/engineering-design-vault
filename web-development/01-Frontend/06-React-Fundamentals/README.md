@@ -62,7 +62,7 @@
 | **KPI 14** | [Render Performance, Transitions & Concurrency](./14-Render-Performance-Optimization/README.md) | ✅ Completed | Concurrent transitions, `useTransition`, `useDeferredValue`, virtualization, priority lanes. |
 | **KPI 15** | [Async UI State & Data Lifecycle](./15-Async-UI-State-Lifecycle/README.md) | ✅ Completed | Idle/Loading/Success/Error state machines, optimistic UI, cancellation, race guards, and layered reconciliation. |
 | **KPI 16** | [Error Handling & Resilience](./16-Error-Handling-Resilience/README.md) | ✅ Completed | Error Boundaries, render errors vs async errors, failure isolation, fallback UI architecture. |
-| **KPI 17** | `17-Accessibility-React` | ⏳ Pending | Semantic HTML, accessible APIs, focus management via refs, ARIA live announcements. |
+| **KPI 17** | [Accessibility in React](./17-Accessibility-React/README.md) | 🟡 In Progress | Semantic HTML, accessible APIs, focus management via refs, ARIA live announcements. |
 | **KPI 18** | `18-React-TypeScript-Engineering` | ⏳ Pending | Generic components/hooks, discriminated props, polymorphic components, event/ref typing. |
 | **KPI 19** | `19-React-Component-Architecture` | ⏳ Pending | Domain vs UI components, dependency direction, cohesion, refactoring God components. |
 | **KPI 20** | `20-Capstone-Senior-Reasoning` | ⏳ Pending | Full-stack synthesis, production debugging runbooks, architecture reviews, interview crucibles. |

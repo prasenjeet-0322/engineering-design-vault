@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 01 — React Accessibility Object Model (AOM) & Semantic HTML Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-semantic: #10b981;
+      --accent-semantic-bg: rgba(16, 185, 129, 0.1);
+      --accent-divsoup: #ef4444;
+      --accent-divsoup-bg: rgba(239, 68, 68, 0.1);
+      --accent-info: #38bdf8;
+      --accent-warning: #f59e0b;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    /* Top Navigation Header */
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-react { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #0284c7; }
+    .badge-a11y { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+    .badge-wcag { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #7e22ce; }
+
+    h1.lab-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lab-container {
+      max-width: 1400px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Pipeline Banner */
+    .pipeline-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .pipeline-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent-info);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pipeline-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      position: relative;
+    }
+
+    .pipeline-step {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .pipeline-step:hover {
+      border-color: var(--border-focus);
+      transform: translateY(-2px);
+    }
+
+    .step-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent-info);
+      margin-bottom: 0.4rem;
+    }
+
+    .step-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+
+    .step-desc {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.35rem;
+    }
+
+    /* Dual Sandbox Grid */
+    .sandbox-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .sandbox-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-semantic { border-top: 4px solid var(--accent-semantic); }
+    .panel-divsoup { border-top: 4px solid var(--accent-divsoup); }
+
+    .panel-header {
+      padding: 1rem 1.25rem;
+      background: rgba(31, 41, 55, 0.5);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-header-title {
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .panel-semantic .panel-header-title { color: var(--accent-semantic); }
+    .panel-divsoup .panel-header-title { color: var(--accent-divsoup); }
+
+    .panel-body {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Rendered UI Box */
+    .preview-box {
+      background: #0f172a;
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+      min-height: 180px;
+    }
+
+    .preview-box:focus-within {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    /* UI Components for Semantic Panel */
+    .semantic-preview header {
+      background: #1e293b;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .semantic-preview nav {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .semantic-preview nav a {
+      color: var(--accent-info);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .semantic-preview nav a:focus,
+    .semantic-preview nav a:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-info);
+      outline: 2px solid var(--accent-info);
+      outline-offset: 2px;
+    }
+
+    .semantic-preview main {
+      background: #1e293b;
+      padding: 1rem;
+      border-radius: 6px;
+    }
+
+    .semantic-preview h2 {
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .semantic-preview button {
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .semantic-preview button:hover {
+      background: #0369a1;
+    }
+
+    .semantic-preview button:focus-visible {
+      outline: 3px solid #38bdf8;
+      outline-offset: 3px;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+
+    /* UI Components for Div Soup Panel */
+    .divsoup-preview .fake-header {
+      background: #1e293b;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .divsoup-preview .fake-nav {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .divsoup-preview .fake-link {
+      color: var(--accent-info);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .divsoup-preview .fake-link:hover {
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .divsoup-preview .fake-main {
+      background: #1e293b;
+      padding: 1rem;
+      border-radius: 6px;
+    }
+
+    .divsoup-preview .fake-heading {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .divsoup-preview .fake-button {
+      background: #0284c7;
+      color: #ffffff;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      display: inline-block;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Tree Inspector tabs */
+    .inspector-tabs {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-tertiary);
+      border-color: var(--border-color);
+      color: var(--accent-info);
+    }
+
+    .tree-view {
+      background: #080c14;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .tree-node {
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.15s ease;
+    }
+
+    .tree-node:hover {
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    .tree-node.selected {
+      background: rgba(56, 189, 248, 0.25);
+      border-left: 3px solid var(--accent-info);
+    }
+
+    .tag-name { color: #f472b6; }
+    .role-name { color: #34d399; font-weight: 600; }
+    .acc-name { color: #fbbf24; }
+    .tree-indent-1 { margin-left: 1.25rem; }
+    .tree-indent-2 { margin-left: 2.5rem; }
+    .tree-indent-3 { margin-left: 3.75rem; }
+
+    /* Interactive Live Inspector Card */
+    .live-inspector-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .live-inspector-card { grid-template-columns: 1fr; }
+    }
+
+    .aom-property-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+
+    .aom-property-table th {
+      text-align: left;
+      padding: 0.5rem;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .aom-property-table td {
+      padding: 0.5rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+
+    .prop-name { color: #94a3b8; }
+    .prop-val-good { color: var(--accent-semantic); font-weight: 600; }
+    .prop-val-bad { color: var(--accent-divsoup); font-weight: 600; }
+    .prop-val-warn { color: var(--accent-warning); font-weight: 600; }
+
+    /* Keyboard Navigation HUD */
+    .keyboard-hud {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .hud-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .active-element-display {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .screen-reader-log {
+      background: #000;
+      border: 1px solid #22c55e;
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      color: #4ade80;
+      font-size: 0.8rem;
+      height: 90px;
+      overflow-y: auto;
+    }
+
+    /* Refactoring Lab Challenge Section */
+    .challenge-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .editor-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      .editor-container { grid-template-columns: 1fr; }
+    }
+
+    textarea.code-editor {
+      width: 100%;
+      height: 180px;
+      background: #080c14;
+      color: #e2e8f0;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: vertical;
+    }
+
+    textarea.code-editor:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+
+    .test-results {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .test-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .test-pass { color: var(--accent-semantic); }
+    .test-fail { color: var(--accent-divsoup); }
+
+    .btn-action {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: opacity 0.2s ease;
+      align-self: flex-start;
+      margin-top: 0.75rem;
+    }
+
+    .btn-action:hover { opacity: 0.9; }
+
+    /* Fragment Visualizer Component */
+    .fragment-visualizer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .dom-table-demo {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border-color);
+    }
+
+    .dom-table-demo th,
+    .dom-table-demo td {
+      border: 1px solid var(--border-color);
+      padding: 0.5rem;
+      text-align: left;
+      font-size: 0.8rem;
+    }
+
+    .broken-wrapper-warning {
+      color: var(--accent-divsoup);
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="lab-header">
+    <div class="lab-badge-group">
+      <span class="badge badge-react">React A11y</span>
+      <span class="badge badge-a11y">AOM Visualizer</span>
+      <span class="badge badge-wcag">WCAG 2.2 AA</span>
+      <h1 class="lab-title">KPI 17 — Lab 01: The React $\to$ DOM $\to$ Accessibility Tree Pipeline</h1>
+    </div>
+    <div style="font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono);">
+      Interactive Diagnostic Tool
+    </div>
+  </header>
+
+  <div class="lab-container">
+
+    <!-- Pipeline Architecture Banner -->
+    <section class="pipeline-card" aria-labelledby="pipeline-heading">
+      <div class="pipeline-title" id="pipeline-heading">
+        <span>⚙️</span> The Mechanical Accessibility Pipeline: From JSX to Screen Reader
+      </div>
+      <div class="pipeline-steps">
+        <div class="pipeline-step">
+          <div class="step-badge">LAYER 01</div>
+          <div class="step-name">React Element Tree</div>
+          <div class="step-desc">Declarative JSX VDOM objects (<code>type: 'button', props: {...}</code>)</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-badge">LAYER 02</div>
+          <div class="step-name">Host DOM Tree</div>
+          <div class="step-desc">Committed browser nodes (<code>&lt;button&gt;</code>, <code>&lt;div&gt;</code>, attributes)</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-badge">LAYER 03</div>
+          <div class="step-name">Browser AOM Engine</div>
+          <div class="step-desc">Calculates computed roles, accessible names, focusability & states</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-badge">LAYER 04</div>
+          <div class="step-name">Platform A11y API</div>
+          <div class="step-desc">Exposes objects to OS (UIAutomation, NSAccessibility, AT-SPI)</div>
+        </div>
+        <div class="pipeline-step">
+          <div class="step-badge">LAYER 05</div>
+          <div class="step-name">Assistive Tech</div>
+          <div class="step-desc">Screen readers (NVDA/VoiceOver/JAWS), Switch Access, Braille</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Side by Side Sandbox -->
+    <div class="sandbox-grid">
+
+      <!-- Implementation A: Semantic HTML -->
+      <section class="panel panel-semantic" aria-labelledby="semantic-heading">
+        <div class="panel-header">
+          <div class="panel-header-title" id="semantic-heading">
+            <span>✅</span> Implementation A — Native Semantic HTML
+          </div>
+          <span class="badge" style="background: var(--accent-semantic-bg); color: var(--accent-semantic);">Platform Leveraged</span>
+        </div>
+        <div class="panel-body">
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">
+            Uses native <code>&lt;header&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;a&gt;</code>, <code>&lt;main&gt;</code>, <code>&lt;h2&gt;</code>, and <code>&lt;button&gt;</code>.
+          </p>
+
+          <!-- Live Interactive Sandbox Component -->
+          <div class="preview-box semantic-preview" id="semantic-sandbox">
+            <header>
+              <div style="font-weight: 700; font-size: 0.9rem;">Acme Console</div>
+              <nav aria-label="Primary Navigation">
+                <a href="#home" id="sem-nav-home" class="interactive-probe" data-name="Home" data-role="link" data-tag="a" data-tabindex="0" data-key="Enter" data-valid="true">Home</a>
+                <a href="#settings" id="sem-nav-settings" class="interactive-probe" data-name="Settings" data-role="link" data-tag="a" data-tabindex="0" data-key="Enter" data-valid="true">Settings</a>
+              </nav>
+            </header>
+            <main>
+              <h2 id="sem-heading" class="interactive-probe" data-name="Active Dashboard" data-role="heading" data-level="2" data-tag="h2" data-tabindex="-1" data-key="None" data-valid="true">Active Dashboard</h2>
+              <button type="button" id="sem-btn-refresh" class="interactive-probe" data-name="Refresh Metrics" data-role="button" data-tag="button" data-tabindex="0" data-key="Enter, Space" data-valid="true">
+                Refresh Metrics
+              </button>
+            </main>
+          </div>
+
+          <!-- Semantic Inspector Tabs -->
+          <div>
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab('sem', 'aom')">Computed AOM Tree</button>
+              <button class="tab-btn" onclick="switchTab('sem', 'dom')">DOM Tree</button>
+            </div>
+            <div class="tree-view" id="sem-tree-view">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Implementation B: Div Soup Anti-Pattern -->
+      <section class="panel panel-divsoup" aria-labelledby="divsoup-heading">
+        <div class="panel-header">
+          <div class="panel-header-title" id="divsoup-heading">
+            <span>❌</span> Implementation B — Generic Div Soup
+          </div>
+          <span class="badge" style="background: var(--accent-divsoup-bg); color: var(--accent-divsoup);">A11y Deficient</span>
+        </div>
+        <div class="panel-body">
+          <p style="font-size: 0.8rem; color: var(--text-secondary);">
+            Visually styled with CSS classes (<code>.header</code>, <code>.link</code>, <code>.button</code>) using generic <code>&lt;div&gt;</code> elements with <code>onClick</code>.
+          </p>
+
+          <!-- Live Interactive Sandbox Component -->
+          <div class="preview-box divsoup-preview" id="divsoup-sandbox">
+            <div class="fake-header">
+              <div style="font-weight: 700; font-size: 0.9rem;">Acme Console</div>
+              <div class="fake-nav">
+                <div class="fake-link interactive-probe" id="soup-nav-home" data-name="Home" data-role="generic (div)" data-tag="div" data-tabindex="None" data-key="None (Mouse Click Only)" data-valid="false">Home</div>
+                <div class="fake-link interactive-probe" id="soup-nav-settings" data-name="Settings" data-role="generic (div)" data-tag="div" data-tabindex="None" data-key="None (Mouse Click Only)" data-valid="false">Settings</div>
+              </div>
+            </div>
+            <div class="fake-main">
+              <div class="fake-heading interactive-probe" id="soup-heading" data-name="Active Dashboard" data-role="generic (div)" data-tag="div" data-tabindex="None" data-key="None" data-valid="false">Active Dashboard</div>
+              <div class="fake-button interactive-probe" id="soup-btn-refresh" data-name="Refresh Metrics" data-role="generic (div)" data-tag="div" data-tabindex="None" data-key="None (Mouse Click Only)" data-valid="false">
+                Refresh Metrics
+              </div>
+            </div>
+          </div>
+
+          <!-- DivSoup Inspector Tabs -->
+          <div>
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab('soup', 'aom')">Computed AOM Tree</button>
+              <button class="tab-btn" onclick="switchTab('soup', 'dom')">DOM Tree</button>
+            </div>
+            <div class="tree-view" id="soup-tree-view">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Live Inspector & Keyboard Navigation HUD -->
+    <section class="live-inspector-card" aria-labelledby="hud-heading">
+      <!-- Node Deep Inspector -->
+      <div>
+        <h3 id="hud-heading" style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--accent-info); display: flex; align-items: center; gap: 0.5rem;">
+          <span>🔍</span> Computed Accessibility Node Diagnostics (Selected Element)
+        </h3>
+        <table class="aom-property-table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Semantic HTML (Impl A)</th>
+              <th>Div Soup (Impl B)</th>
+            </tr>
+          </thead>
+          <tbody id="inspector-tbody">
+            <tr>
+              <td class="prop-name">Target Node</td>
+              <td id="diag-sem-tag" class="prop-val-good">&lt;button&gt;</td>
+              <td id="diag-soup-tag" class="prop-val-bad">&lt;div class="button"&gt;</td>
+            </tr>
+            <tr>
+              <td class="prop-name">Computed Role</td>
+              <td id="diag-sem-role" class="prop-val-good">button</td>
+              <td id="diag-soup-role" class="prop-val-bad">generic (none)</td>
+            </tr>
+            <tr>
+              <td class="prop-name">Accessible Name</td>
+              <td id="diag-sem-name" class="prop-val-good">"Refresh Metrics"</td>
+              <td id="diag-soup-name" class="prop-val-bad">None (Text content only)</td>
+            </tr>
+            <tr>
+              <td class="prop-name">Keyboard Focusable</td>
+              <td id="diag-sem-focus" class="prop-val-good">YES (tabIndex: 0)</td>
+              <td id="diag-soup-focus" class="prop-val-bad">NO (Unreachable via Tab)</td>
+            </tr>
+            <tr>
+              <td class="prop-name">Keyboard Activation</td>
+              <td id="diag-sem-key" class="prop-val-good">Enter & Space (Native)</td>
+              <td id="diag-soup-key" class="prop-val-bad">None (Dead to Keyboard)</td>
+            </tr>
+            <tr>
+              <td class="prop-name">Landmark / Hierarchy</td>
+              <td id="diag-sem-landmark" class="prop-val-good">main landmark &gt; heading h2</td>
+              <td id="diag-soup-landmark" class="prop-val-bad">Flat div container</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Real-time Keyboard & Screen Reader Simulator HUD -->
+      <div class="keyboard-hud">
+        <div class="hud-title">
+          <span>🎮</span> Real-Time Keyboard & Focus Ring HUD
+        </div>
+
+        <div class="active-element-display">
+          <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 0.25rem;">CURRENTLY FOCUSED DOM NODE:</div>
+          <div id="live-focused-node" style="color: #38bdf8; font-weight: 600;">None (Click here or press Tab)</div>
+          <div id="live-focused-role" style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem;">Role: none | TabIndex: -</div>
+        </div>
+
+        <div>
+          <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 0.25rem;">SIMULATED SCREEN READER SPOKEN UTTERANCE:</div>
+          <div class="screen-reader-log" id="sr-speech-log" aria-live="polite">
+            [Screen Reader Initialized. Press TAB to navigate through the interactive controls.]
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Refactoring Lab Challenge -->
+    <section class="challenge-section" aria-labelledby="challenge-heading">
+      <h3 id="challenge-heading" style="font-size: 1.05rem; color: #f59e0b; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🧨</span> Lab Challenge: Refactor Broken Navigation & Validate AST Semantics
+      </h3>
+      <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.35rem;">
+        The JSX below represents a broken navigation bar. Refactor it to use semantic HTML (<code>&lt;nav&gt;</code>, <code>&lt;a&gt;</code>, <code>aria-label</code>) and click "Run AST Verification".
+      </p>
+
+      <div class="editor-container">
+        <div>
+          <textarea class="code-editor" id="jsx-editor" spellcheck="false">
+function BrokenNavigation() {
+  return (
+    <div className="navigation">
+      <div className="link" onClick={() => navigate("/")}>
+        Home
+      </div>
+      <div className="link" onClick={() => navigate("/docs")}>
+        Documentation
+      </div>
+    </div>
+  );
+}</textarea>
+          <button class="btn-action" onclick="runAstValidator()">Run AST Verification</button>
+        </div>
+
+        <div class="test-results" id="test-output">
+          <div style="font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 0.35rem;">
+            Automated Semantic Lint Assertions
+          </div>
+          <div class="test-item test-fail" id="t-nav">❌ Replaces wrapper div with semantic &lt;nav&gt; landmark</div>
+          <div class="test-item test-fail" id="t-aria">❌ Provides accessible name via aria-label on navigation</div>
+          <div class="test-item test-fail" id="t-link">❌ Replaces fake div links with native &lt;a href="..."&gt;</div>
+          <div class="test-item test-fail" id="t-onclick">❌ Eliminates invalid onClick handlers on generic containers</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- React Fragment Semantic DOM Preservation Sandbox -->
+    <section class="pipeline-card" aria-labelledby="fragment-heading">
+      <div class="pipeline-title" id="fragment-heading" style="color: var(--accent-purple);">
+        <span>🧩</span> React Fragments: Preserving HTML Tree Invariants
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-secondary);">
+        Demonstrating how wrapper <code>&lt;div&gt;</code> tags break strict HTML table and list constraints versus React <code>&lt;&gt;...&lt;/&gt;</code> Fragments.
+      </p>
+
+      <div class="fragment-visualizer">
+        <!-- Broken with Div -->
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-divsoup); margin-bottom: 0.5rem;">
+            ❌ Broken: Wrapped in &lt;div&gt; (Invalid Table Markup)
+          </div>
+          <table class="dom-table-demo">
+            <thead>
+              <tr><th>Metric</th><th>Score</th></tr>
+            </thead>
+            <!-- In standard HTML, div inside tbody causes DOM tree corruption -->
+            <tbody>
+              <tr><td>First Contentful Paint</td><td>0.8s</td></tr>
+              <tr><td>Time to Interactive</td><td>1.2s</td></tr>
+            </tbody>
+          </table>
+          <div class="broken-wrapper-warning">
+            ⚠️ Rendering <code>&lt;div&gt;&lt;tr&gt;...&lt;/tr&gt;&lt;/div&gt;</code> causes browser HTML parsers to eject nodes from the table model, breaking screen-reader table navigation shortcuts (e.g. CTRL+ALT+Arrows in NVDA).
+          </div>
+        </div>
+
+        <!-- Valid with Fragment -->
+        <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-semantic); margin-bottom: 0.5rem;">
+            ✅ Correct: Wrapped in &lt;React.Fragment&gt; (Pure Rows)
+          </div>
+          <table class="dom-table-demo">
+            <thead>
+              <tr><th>Metric</th><th>Score</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>First Contentful Paint</td><td>0.8s</td></tr>
+              <tr><td>Time to Interactive</td><td>1.2s</td></tr>
+            </tbody>
+          </table>
+          <div style="color: var(--accent-semantic); font-size: 0.75rem; font-weight: 600; margin-top: 0.5rem;">
+            ✨ Fragment produces 0 intermediate DOM elements, strictly preserving the <code>&lt;table&gt; &gt; &lt;tbody&gt; &gt; &lt;tr&gt;</code> schema and native assistive table navigation matrices.
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // State management for tree representations
+    const state = {
+      semView: 'aom',
+      soupView: 'aom',
+      selectedNode: 'btn'
+    };
+
+    const treeData = {
+      sem: {
+        aom: `
+<div class="tree-node selected" onclick="inspectNode('header')"><span class="role-name">banner</span> <span class="acc-name">"Header"</span></div>
+<div class="tree-node tree-indent-1" onclick="inspectNode('nav')"><span class="role-name">navigation</span> <span class="acc-name">"Primary Navigation"</span></div>
+<div class="tree-node tree-indent-2" onclick="inspectNode('link-home')"><span class="role-name">link</span> <span class="acc-name">"Home"</span> (focusable, Enter)</div>
+<div class="tree-node tree-indent-2" onclick="inspectNode('link-settings')"><span class="role-name">link</span> <span class="acc-name">"Settings"</span> (focusable, Enter)</div>
+<div class="tree-node" onclick="inspectNode('main')"><span class="role-name">main</span> <span class="acc-name">"Main Content"</span></div>
+<div class="tree-node tree-indent-1" onclick="inspectNode('heading')"><span class="role-name">heading</span> <span class="acc-name">"Active Dashboard"</span> (level 2)</div>
+<div class="tree-node tree-indent-1 selected" onclick="inspectNode('btn')"><span class="role-name">button</span> <span class="acc-name">"Refresh Metrics"</span> (focusable, Enter/Space)</div>
+`,
+        dom: `
+<div class="tree-node">&lt;<span class="tag-name">header</span>&gt;</div>
+<div class="tree-node tree-indent-1">&lt;<span class="tag-name">nav</span> aria-label="Primary Navigation"&gt;</div>
+<div class="tree-node tree-indent-2">&lt;<span class="tag-name">a</span> href="#home"&gt;Home&lt;/<span class="tag-name">a</span>&gt;</div>
+<div class="tree-node tree-indent-2">&lt;<span class="tag-name">a</span> href="#settings"&gt;Settings&lt;/<span class="tag-name">a</span>&gt;</div>
+<div class="tree-node">&lt;<span class="tag-name">main</span>&gt;</div>
+<div class="tree-node tree-indent-1">&lt;<span class="tag-name">h2</span>&gt;Active Dashboard&lt;/<span class="tag-name">h2</span>&gt;</div>
+<div class="tree-node tree-indent-1">&lt;<span class="tag-name">button</span> type="button"&gt;Refresh Metrics&lt;/<span class="tag-name">button</span>&gt;</div>
+`
+      },
+      soup: {
+        aom: `
+<div class="tree-node"><span class="role-name" style="color:#ef4444;">generic</span> (div.fake-header)</div>
+<div class="tree-node tree-indent-1"><span class="role-name" style="color:#ef4444;">generic</span> (div.fake-nav)</div>
+<div class="tree-node tree-indent-2"><span class="role-name" style="color:#ef4444;">generic</span> "Home" (NOT focusable, dead to AT)</div>
+<div class="tree-node tree-indent-2"><span class="role-name" style="color:#ef4444;">generic</span> "Settings" (NOT focusable, dead to AT)</div>
+<div class="tree-node"><span class="role-name" style="color:#ef4444;">generic</span> (div.fake-main)</div>
+<div class="tree-node tree-indent-1"><span class="role-name" style="color:#ef4444;">generic</span> "Active Dashboard" (No heading hierarchy)</div>
+<div class="tree-node tree-indent-1"><span class="role-name" style="color:#ef4444;">generic</span> "Refresh Metrics" (NO button role, NOT focusable)</div>
+`,
+        dom: `
+<div class="tree-node">&lt;<span class="tag-name">div</span> class="header"&gt;</div>
+<div class="tree-node tree-indent-1">&lt;<span class="tag-name">div</span> class="nav"&gt;</div>
+<div class="tree-node tree-indent-2">&lt;<span class="tag-name">div</span> class="link" onclick="..."&gt;Home&lt;/<span class="tag-name">div</span>&gt;</div>
+<div class="tree-node tree-indent-2">&lt;<span class="tag-name">div</span> class="link" onclick="..."&gt;Settings&lt;/<span class="tag-name">div</span>&gt;</div>
+<div class="tree-node">&lt;<span class="tag-name">div</span> class="main"&gt;</div>
+<div class="tree-node tree-indent-1">&lt;<span class="tag-name">div</span> class="heading"&gt;Active Dashboard&lt;/<span class="tag-name">div</span>&gt;</div>
+<div class="tree-node tree-indent-1">&lt;<span class="tag-name">div</span> class="button" onclick="..."&gt;Refresh Metrics&lt;/<span class="tag-name">div</span>&gt;</div>
+`
+      }
+    };
+
+    function renderTrees() {
+      document.getElementById('sem-tree-view').innerHTML = treeData.sem[state.semView];
+      document.getElementById('soup-tree-view').innerHTML = treeData.soup[state.soupView];
+    }
+
+    function switchTab(panel, view) {
+      if (panel === 'sem') {
+        state.semView = view;
+        const btns = document.querySelectorAll('.panel-semantic .tab-btn');
+        btns[0].classList.toggle('active', view === 'aom');
+        btns[1].classList.toggle('active', view === 'dom');
+      } else {
+        state.soupView = view;
+        const btns = document.querySelectorAll('.panel-divsoup .tab-btn');
+        btns[0].classList.toggle('active', view === 'aom');
+        btns[1].classList.toggle('active', view === 'dom');
+      }
+      renderTrees();
+    }
+
+    function inspectNode(type) {
+      const diagSemTag = document.getElementById('diag-sem-tag');
+      const diagSoupTag = document.getElementById('diag-soup-tag');
+      const diagSemRole = document.getElementById('diag-sem-role');
+      const diagSoupRole = document.getElementById('diag-soup-role');
+      const diagSemName = document.getElementById('diag-sem-name');
+      const diagSoupName = document.getElementById('diag-soup-name');
+      const diagSemFocus = document.getElementById('diag-sem-focus');
+      const diagSoupFocus = document.getElementById('diag-soup-focus');
+      const diagSemKey = document.getElementById('diag-sem-key');
+      const diagSoupKey = document.getElementById('diag-soup-key');
+      const diagSemLandmark = document.getElementById('diag-sem-landmark');
+      const diagSoupLandmark = document.getElementById('diag-soup-landmark');
+
+      if (type === 'btn') {
+        diagSemTag.textContent = '<button type="button">';
+        diagSoupTag.textContent = '<div class="button">';
+        diagSemRole.textContent = 'button';
+        diagSoupRole.textContent = 'generic (none)';
+        diagSemName.textContent = '"Refresh Metrics"';
+        diagSoupName.textContent = 'Text leaf only';
+        diagSemFocus.textContent = 'YES (tabIndex: 0)';
+        diagSoupFocus.textContent = 'NO (Unreachable)';
+        diagSemKey.textContent = 'Enter, Space (Native)';
+        diagSoupKey.textContent = 'None (Dead to keyboard)';
+        diagSemLandmark.textContent = 'Child of <main>';
+        diagSoupLandmark.textContent = 'Child of <div class="main">';
+      } else if (type === 'nav' || type === 'link-home' || type === 'link-settings') {
+        diagSemTag.textContent = '<a href="...">';
+        diagSoupTag.textContent = '<div class="link" onClick="...">';
+        diagSemRole.textContent = 'link';
+        diagSoupRole.textContent = 'generic';
+        diagSemName.textContent = type === 'link-home' ? '"Home"' : '"Settings"';
+        diagSoupName.textContent = 'Text leaf only';
+        diagSemFocus.textContent = 'YES (tabIndex: 0)';
+        diagSoupFocus.textContent = 'NO (Unreachable)';
+        diagSemKey.textContent = 'Enter (Native navigation)';
+        diagSoupKey.textContent = 'None';
+        diagSemLandmark.textContent = 'Inside <nav aria-label="Primary Navigation">';
+        diagSoupLandmark.textContent = 'Inside <div class="nav">';
+      } else if (type === 'heading') {
+        diagSemTag.textContent = '<h2>';
+        diagSoupTag.textContent = '<div class="heading">';
+        diagSemRole.textContent = 'heading (Level 2)';
+        diagSoupRole.textContent = 'generic';
+        diagSemName.textContent = '"Active Dashboard"';
+        diagSoupName.textContent = 'Text leaf only';
+        diagSemFocus.textContent = 'NO (Static structural node)';
+        diagSoupFocus.textContent = 'NO (Static)';
+        diagSemKey.textContent = 'N/A';
+        diagSoupKey.textContent = 'N/A';
+        diagSemLandmark.textContent = 'Heading Level 2 in Main';
+        diagSoupLandmark.textContent = 'Unstructured visual text';
+      }
+    }
+
+    // Keyboard & Focus Event Listeners
+    document.addEventListener('focusin', (e) => {
+      const target = e.target;
+      const liveNode = document.getElementById('live-focused-node');
+      const liveRole = document.getElementById('live-focused-role');
+      const speechLog = document.getElementById('sr-speech-log');
+
+      if (!target) return;
+
+      const tag = target.tagName.toLowerCase();
+      const id = target.id || 'anonymous';
+      const role = target.getAttribute('role') || (tag === 'button' ? 'button' : tag === 'a' ? 'link' : tag === 'input' ? 'textbox' : 'generic');
+      const name = target.getAttribute('aria-label') || target.innerText || target.value || '';
+      const tabIndex = target.tabIndex;
+
+      liveNode.textContent = `<${tag} id="${id}"> — "${name.trim().slice(0, 25)}"`;
+      liveRole.textContent = `Role: ${role} | Accessible Name: "${name.trim()}" | TabIndex: ${tabIndex}`;
+
+      // Simulate screen reader announcement
+      const utterance = `[Announcing] ${name.trim()}, ${role}${tag === 'a' ? ', link' : ''}`;
+      const logEntry = document.createElement('div');
+      logEntry.textContent = `🔊 ${utterance}`;
+      speechLog.appendChild(logEntry);
+      speechLog.scrollTop = speechLog.scrollHeight;
+    });
+
+    // Lab Challenge Validator
+    function runAstValidator() {
+      const code = document.getElementById('jsx-editor').value;
+      const tNav = document.getElementById('t-nav');
+      const tAria = document.getElementById('t-aria');
+      const tLink = document.getElementById('t-link');
+      const tOnClick = document.getElementById('t-onclick');
+
+      const hasNav = /<nav[\s>]/.test(code);
+      const hasAria = /aria-label=["'][^"']+["']/.test(code);
+      const hasLink = /<a\s+href=/.test(code);
+      const hasBadOnClick = /<div[^>]*onClick/.test(code);
+
+      tNav.className = hasNav ? 'test-item test-pass' : 'test-item test-fail';
+      tNav.textContent = (hasNav ? '✅' : '❌') + ' Replaces wrapper div with semantic <nav> landmark';
+
+      tAria.className = hasAria ? 'test-item test-pass' : 'test-item test-fail';
+      tAria.textContent = (hasAria ? '✅' : '❌') + ' Provides accessible name via aria-label on navigation';
+
+      tLink.className = hasLink ? 'test-item test-pass' : 'test-item test-fail';
+      tLink.textContent = (hasLink ? '✅' : '❌') + ' Replaces fake div links with native <a href="...">';
+
+      tOnClick.className = !hasBadOnClick ? 'test-item test-pass' : 'test-item test-fail';
+      tOnClick.textContent = (!hasBadOnClick ? '✅' : '❌') + ' Eliminates invalid onClick handlers on generic containers';
+    }
+
+    // Initialize default view
+    renderTrees();
+    inspectNode('btn');
+  </script>
+</body>
+</html>
