@@ -19,7 +19,7 @@ Error Boundaries, render errors vs async errors, failure isolation, fallback UI 
 | :--- | :---: | :--- | :---: |
 | [React Error Boundaries & Component-Tree Failure Isolation](./01-error-boundaries-isolation.md) | ✅ Completed | `componentDidCatch`, `getDerivedStateFromError`, render phase catch, blast radius isolation. | [🧪 Lab 01](./examples/01-error-boundaries-isolation.html) |
 | [Render Errors vs Async/Event Handler Errors](./02-render-errors-vs-async-errors.md) | ✅ Completed | What Error Boundaries catch (render, lifecycle) vs what they miss (async, events, SSR). | [🧪 Lab 02](./examples/02-render-errors-vs-async-errors.html) |
-| [Fallback UI & Error Recovery Strategies](./03-fallback-ui-recovery-patterns.md) | ⏳ Pending | Resetting error boundaries on route navigation, retry buttons, Sentry telemetry reporting. | ⏳ Pending |
+| [Fallback UI & Error Recovery Strategies](./03-fallback-ui-recovery-patterns.md) | ✅ Completed | Resetting error boundaries on route navigation, retry buttons, Sentry telemetry reporting. | [🧪 Lab 03](./examples/03-fallback-ui-recovery-patterns.html) |
 | [Error Crucible & Enterprise Resilience Architecture](./04-error-crucible-resilience-design.md) | ⏳ Pending | Designing granular widget error boundaries vs page-level fallback boundaries. | ⏳ Pending |
 
 
