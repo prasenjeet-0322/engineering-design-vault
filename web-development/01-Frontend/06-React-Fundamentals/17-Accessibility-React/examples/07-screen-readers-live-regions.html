@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 07 — Screen Readers, Live Regions & Accessible Dynamic Updates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Live Telemetry HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Fault Injection Bar */
+    .fault-injection-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.6rem 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: #fca5a5;
+    }
+    .fault-checkbox { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 07 — Screen Readers, Live Regions & Dynamic Updates</div>
+      <div class="header-subtitle">WCAG 4.1.3 · WAI-ARIA 1.2 · aria-live polite vs assertive · Async Currentness</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Frontend</span>
+      <span class="badge badge-blue">WCAG 2.2 AA</span>
+      <span class="badge badge-green">ARIA 1.2</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Live Telemetry HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Authoritative State</span>
+      <span class="telemetry-value" id="hud-auth-state">idle</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">State Transition</span>
+      <span class="telemetry-value" id="hud-transition">None</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Live Announcement</span>
+      <span class="telemetry-value" id="hud-announcement" style="color:#34d399;">"Ready"</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">document.activeElement</span>
+      <span class="telemetry-value" id="hud-focus">body</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Speech Synthesizer Queue</span>
+      <span class="telemetry-value" id="hud-speech-queue">0 pending</span>
+    </div>
+  </div>
+
+  <!-- Fault Injection Control Bar -->
+  <div class="fault-injection-bar">
+    <span style="font-weight:700; color:#fff;">⚠️ Fault Injection:</span>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-announce-every-render" /> Announce Every Render (Spam)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-alert-everything" /> Alert Everything (Assertive)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-focus-steal" /> Move Focus for Announcements
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-allow-stale" /> Allow Stale Async Announcements
+    </label>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario 1 & 2 -->
+    <div class="grid-2">
+      <!-- Scenario 01: Semantic DOM vs Arbitrary ARIA -->
+      <div class="card" id="card-scen-1">
+        <div class="card-header">
+          <span class="card-title">🌲 Scenario 01 — Semantic DOM vs Arbitrary ARIA</span>
+          <span class="badge badge-green">Semantic HTML</span>
+        </div>
+        <p class="card-desc">
+          Compare updating native HTML text content vs arbitrary ARIA attributes. Notice how native DOM changes are naturally discoverable without redundant live announcements.
+        </p>
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.75rem; border-radius:6px;">
+          <div>
+            <strong>Shopping Cart:</strong> <span id="cart-item-count" style="color:#38bdf8; font-weight:700;">2</span> items
+          </div>
+          <button class="btn btn-success" onclick="incrementCart()">Add Item to Cart</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-1">
+          Click button to observe native DOM update vs polite announcement.
+        </div>
+      </div>
+
+      <!-- Scenario 02: aria-live="polite" -->
+      <div class="card" id="card-scen-2">
+        <div class="card-header">
+          <span class="card-title">💬 Scenario 02 — aria-live="polite" Status Updates</span>
+          <span class="badge badge-blue">role="status"</span>
+        </div>
+        <p class="card-desc">
+          Polite live regions queue messages asynchronously and speak once the user finishes typing or active speech finishes.
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" onclick="triggerPoliteStatus('Draft saved at ' + new Date().toLocaleTimeString())">
+            Save Draft (Polite)
+          </button>
+          <button class="btn btn-secondary" onclick="triggerPoliteStatus('Filter: Status = Active applied')">
+            Apply Filter (Polite)
+          </button>
+        </div>
+        <div id="polite-live-region" role="status" class="sr-only"></div>
+        <div class="speech-bubble" id="output-scen-2">
+          Click button to enqueue polite announcement into FIFO speech queue.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario 3 & 4 -->
+    <div class="grid-2">
+      <!-- Scenario 03: Status vs Alert Semantic Urgency -->
+      <div class="card" id="card-scen-3">
+        <div class="card-header">
+          <span class="card-title">🚨 Scenario 03 — role="status" vs role="alert" Urgency</span>
+          <span class="badge badge-warn">Urgency</span>
+        </div>
+        <p class="card-desc">
+          <code>role="status"</code> waits for idle speech, while <code>role="alert"</code> immediately interrupts active screen reader speech synthesis.
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" onclick="triggerPoliteStatus('Routine sync complete.')">
+            Status (Non-urgent)
+          </button>
+          <button class="btn btn-danger" onclick="triggerAssertiveAlert('CRITICAL: Payment Gateway Offline!')">
+            Alert (Emergency Interruption)
+          </button>
+        </div>
+        <div id="assertive-live-region" role="alert" class="sr-only"></div>
+        <div class="speech-bubble" id="output-scen-3">
+          Compare non-interrupting status vs immediate assertive alert.
+        </div>
+      </div>
+
+      <!-- Scenario 04: Announcement Deduplication -->
+      <div class="card" id="card-scen-4">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario 04 — Announcement Deduplication</span>
+          <span class="badge badge-purple">Event Boundaries</span>
+        </div>
+        <p class="card-desc">
+          Compare announcing only on state <em>transitions</em> vs announcing on every component re-render pass.
+        </p>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-secondary" onclick="simulateRenderPass()">Trigger Component Re-render (x5)</button>
+          <button class="btn btn-success" onclick="triggerStateTransition('Document published')">Publish Document (Transition)</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-4">
+          Test re-renders with "Announce Every Render" fault toggle.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Scenario 5 & 6 -->
+    <div class="grid-2">
+      <!-- Scenario 05: Focus vs Announcement -->
+      <div class="card" id="card-scen-5">
+        <div class="card-header">
+          <span class="card-title">🎯 Scenario 05 — Focus Movement vs Live Announcement</span>
+          <span class="badge badge-red">Focus Anti-pattern</span>
+        </div>
+        <p class="card-desc">
+          Demonstrates why moving focus just to make text vocalize ruins the user's typing position in search bars.
+        </p>
+        <div class="form-group">
+          <label for="input-search-demo" style="font-size:0.875rem; font-weight:600;">Search Knowledge Vault</label>
+          <input id="input-search-demo" class="input-control" placeholder="Type here..." oninput="handleSearchKeystroke(this.value)" />
+          <span id="search-count-badge" style="font-size:0.8rem; color:#38bdf8; margin-top:0.3rem; display:block;">0 results</span>
+        </div>
+        <div class="speech-bubble" id="output-scen-5">
+          Type text to test whether focus remains in input or is stolen by results.
+        </div>
+      </div>
+
+      <!-- Scenario 06: Stable Live-Region Container -->
+      <div class="card" id="card-scen-6">
+        <div class="card-header">
+          <span class="card-title">🏛️ Scenario 06 — Persistent vs Dynamically Mounted Live Regions</span>
+          <span class="badge badge-green">DOM Persistence</span>
+        </div>
+        <p class="card-desc">
+          Screen readers require live region containers to exist in the DOM <em>before</em> text mutations occur. Dynamically mounting live regions causes silent drops.
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-success" onclick="testPersistentAnnouncer()">Test Persistent Announcer</button>
+          <button class="btn btn-danger" onclick="testFlawedDynamicMount()">Test Flawed Dynamic Mount</button>
+        </div>
+        <div id="dynamic-mount-container"></div>
+        <div class="speech-bubble" id="output-scen-6">
+          Compare persistent live container vs dynamically mounted div.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Scenario 7 & 8 -->
+    <div class="grid-2">
+      <!-- Scenario 07: aria-atomic Behavior -->
+      <div class="card" id="card-scen-7">
+        <div class="card-header">
+          <span class="card-title">⚛️ Scenario 07 — aria-atomic="true" vs Partial Fragment</span>
+          <span class="badge badge-blue">aria-atomic</span>
+        </div>
+        <p class="card-desc">
+          <code>aria-atomic="true"</code> causes the entire region to be announced together (e.g. "Upload: 45% of 100MB") rather than just the changed number.
+        </p>
+        <div id="atomic-region" role="status" aria-atomic="true" style="background:#1e293b; padding:0.75rem; border-radius:6px; font-family:var(--font-mono); font-size:0.85rem;">
+          File upload progress: <span id="atomic-progress" style="color:#38bdf8; font-weight:700;">0%</span> of 250 MB
+        </div>
+        <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="simulateProgressStep()">Advance Progress (+25%)</button>
+        <div class="speech-bubble" id="output-scen-7">
+          Click button to observe whole-region vs partial vocalization.
+        </div>
+      </div>
+
+      <!-- Scenario 08: Async Stale Announcement -->
+      <div class="card" id="card-scen-8">
+        <div class="card-header">
+          <span class="card-title">⚡ Scenario 08 — Async Validation Currentness & Stale Race</span>
+          <span class="badge badge-purple">Concurrency</span>
+        </div>
+        <p class="card-desc">
+          Demonstrates how out-of-order network responses (Query A finishes after Query B) can announce stale results if currentness guards are missing.
+        </p>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-secondary" onclick="triggerAsyncRaceCondition()">Simulate Out-of-Order API Responses</button>
+        </div>
+        <div class="speech-bubble" id="output-scen-8">
+          Click button to test stale async announcement rejection.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Scenario 9 & 10 -->
+    <div class="grid-2">
+      <!-- Scenario 09: Search Result Coalescing -->
+      <div class="card" id="card-scen-9">
+        <div class="card-header">
+          <span class="card-title">⏳ Scenario 09 — Debounced Search Result Coalescing</span>
+          <span class="badge badge-green">Debouncing</span>
+        </div>
+        <p class="card-desc">
+          Rapid typing coalesces intermediate search result counts, announcing only the terminal result count after typing stops for 400ms.
+        </p>
+        <div class="form-group">
+          <label for="input-coalesce" style="font-size:0.875rem; font-weight:600;">Fast Typeahead Filter</label>
+          <input id="input-coalesce" class="input-control" placeholder="Type quickly to observe coalescing..." oninput="handleCoalescedSearch(this.value)" />
+        </div>
+        <div class="speech-bubble" id="output-scen-9">
+          Type fast to verify intermediate speech suppression.
+        </div>
+      </div>
+
+      <!-- Scenario 10: SPA Route Change Announcement -->
+      <div class="card" id="card-scen-10">
+        <div class="card-header">
+          <span class="card-title">🗺️ Scenario 10 — SPA Route Transition Announcement & Focus</span>
+          <span class="badge badge-blue">SPA Routing</span>
+        </div>
+        <p class="card-desc">
+          Single-page client-side route changes announce the new document title and programmatically shift focus to the page <code>&lt;h1&gt;</code>.
+        </p>
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <button class="btn btn-secondary" onclick="simulateRouteTransition('Dashboard', '/dashboard')">Go to Dashboard</button>
+          <button class="btn btn-secondary" onclick="simulateRouteTransition('Security Settings', '/settings/security')">Go to Security</button>
+        </div>
+        <div id="spa-page-view" style="background:#1e293b; padding:1rem; border-radius:8px;">
+          <h2 id="spa-page-heading" tabindex="-1" style="font-size:1.1rem; color:#fff; outline:none;">
+            Current View: Overview Dashboard
+          </h2>
+          <p style="font-size:0.85rem; color:var(--text-secondary);">Active Route: <code id="spa-route-url">/dashboard</code></p>
+        </div>
+        <div class="speech-bubble" id="output-scen-10">
+          Click route buttons to test heading focus transfer + title announcement.
+        </div>
+      </div>
+    </div>
+
+    <!-- Persistent Live Region Infrastructure -->
+    <div id="persistent-polite-announcer" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <div id="persistent-assertive-announcer" role="alert" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
+
+    <!-- Real-time Speech Event Log -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Screen Reader Live Region Dispatch Telemetry Log</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearSpeechLog()">Clear Log</button>
+      </div>
+      <div class="log-panel" id="speech-telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Live region speech dispatcher initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let cartCount = 2;
+    let progressVal = 0;
+    let latestRequestId = 0;
+    let speechQueueCount = 0;
+
+    function announce(msg, priority = 'polite') {
+      const forceAlert = document.getElementById('fault-alert-everything').checked;
+      const actualPriority = forceAlert ? 'assertive' : priority;
+
+      const announcer = actualPriority === 'assertive'
+        ? document.getElementById('persistent-assertive-announcer')
+        : document.getElementById('persistent-polite-announcer');
+
+      // Clear momentarily to re-trigger AT mutation
+      announcer.innerText = '';
+      setTimeout(() => {
+        announcer.innerText = msg;
+      }, 20);
+
+      document.getElementById('hud-announcement').innerText = `"${msg}"`;
+      document.getElementById('hud-auth-state').innerText = actualPriority.toUpperCase();
+      logSpeech(`[${actualPriority.toUpperCase()}] "${msg}"`);
+    }
+
+    function logSpeech(msg) {
+      const panel = document.getElementById('speech-telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#34d399;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearSpeechLog() {
+      document.getElementById('speech-telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Log cleared.</div>';
+    }
+
+    // Scenario 1: Cart
+    function incrementCart() {
+      cartCount++;
+      document.getElementById('cart-item-count').innerText = cartCount;
+      announce(`Item added to cart. Total items: ${cartCount}`, 'polite');
+      document.getElementById('output-scen-1').innerText = `Cart updated to ${cartCount} items. Live region announced.`;
+    }
+
+    // Scenario 2: Polite
+    function triggerPoliteStatus(msg) {
+      document.getElementById('hud-transition').innerText = 'State: Save Completed';
+      announce(msg, 'polite');
+      document.getElementById('output-scen-2').innerText = `Polite status dispatched: "${msg}"`;
+    }
+
+    // Scenario 3: Assertive
+    function triggerAssertiveAlert(msg) {
+      document.getElementById('hud-transition').innerText = 'State: Gateway Error';
+      announce(msg, 'assertive');
+      document.getElementById('output-scen-3').innerText = `Assertive alert dispatched: "${msg}"`;
+    }
+
+    // Scenario 4: Deduplication
+    let lastTransitionMessage = '';
+    function triggerStateTransition(msg) {
+      if (lastTransitionMessage === msg) {
+        document.getElementById('output-scen-4').innerText = 'Deduplicated: Identical transition ignored.';
+        return;
+      }
+      lastTransitionMessage = msg;
+      announce(msg, 'polite');
+      document.getElementById('output-scen-4').innerText = `Transition announced: "${msg}"`;
+    }
+
+    function simulateRenderPass() {
+      const faultSpam = document.getElementById('fault-announce-every-render').checked;
+      if (faultSpam) {
+        for (let i = 1; i <= 5; i++) {
+          announce(`Render Pass #${i} update`, 'polite');
+        }
+        document.getElementById('output-scen-4').innerText = '💥 5 redundant announcements spammed across render passes!';
+      } else {
+        document.getElementById('output-scen-4').innerText = '✓ Re-rendered 5 times without redundant speech dispatch.';
+      }
+    }
+
+    // Scenario 5: Focus vs Announcement
+    function handleSearchKeystroke(val) {
+      const count = val.length * 3;
+      document.getElementById('search-count-badge').innerText = `${count} results`;
+      const faultFocus = document.getElementById('fault-focus-steal').checked;
+
+      if (faultFocus) {
+        document.getElementById('search-count-badge').setAttribute('tabindex', '-1');
+        document.getElementById('search-count-badge').focus();
+        document.getElementById('output-scen-5').innerText = '💥 Focus stolen from search bar to results badge!';
+      } else {
+        document.getElementById('output-scen-5').innerText = '✓ Focus remained in search bar while results updated.';
+      }
+    }
+
+    // Scenario 6: Persistent vs Dynamic
+    function testPersistentAnnouncer() {
+      announce('Operation completed via persistent root announcer.', 'polite');
+      document.getElementById('output-scen-6').innerText = '✓ Announced cleanly via pre-mounted live container.';
+    }
+
+    function testFlawedDynamicMount() {
+      const container = document.getElementById('dynamic-mount-container');
+      container.innerHTML = '<div role="status" class="sr-only">Dynamically mounted message (Silent drop hazard!)</div>';
+      document.getElementById('output-scen-6').innerText = '⚠️ Dynamically mounted live region created. Often ignored by NVDA/VoiceOver.';
+      logSpeech('[WARNING] Dynamically mounted live region created simultaneously with text.');
+    }
+
+    // Scenario 7: Atomic
+    function simulateProgressStep() {
+      progressVal = (progressVal + 25) % 125;
+      document.getElementById('atomic-progress').innerText = `${progressVal}%`;
+      announce(`File upload progress: ${progressVal}% of 250 MB`, 'polite');
+      document.getElementById('output-scen-7').innerText = `Atomic region updated: ${progressVal}%`;
+    }
+
+    // Scenario 8: Async Race
+    function triggerAsyncRaceCondition() {
+      latestRequestId++;
+      const currentReq = latestRequestId;
+      const allowStale = document.getElementById('fault-allow-stale').checked;
+
+      logSpeech(`Dispatched Request #${currentReq} (Query: "react hooks")`);
+
+      // Simulate Fast Request (New)
+      setTimeout(() => {
+        if (allowStale || currentReq === latestRequestId) {
+          announce('7 results found for "react hooks"', 'polite');
+          document.getElementById('output-scen-8').innerText = '✓ Current Request #1 completed: "7 results found"';
+        }
+      }, 100);
+
+      // Simulate Slow Stale Request (Old)
+      setTimeout(() => {
+        if (allowStale) {
+          announce('18 results found for "react" (STALE BUG!)', 'polite');
+          document.getElementById('output-scen-8').innerText = '💥 Stale Request overwrote newer result announcement!';
+        } else {
+          logSpeech(`[GUARDED] Stale response from Request #${currentReq - 1} discarded.`);
+        }
+      }, 300);
+    }
+
+    // Scenario 9: Coalescing
+    let coalesceTimer = null;
+    function handleCoalescedSearch(val) {
+      clearTimeout(coalesceTimer);
+      if (!val.trim()) return;
+
+      coalesceTimer = setTimeout(() => {
+        const count = val.length * 4;
+        announce(`${count} results found for "${val}"`, 'polite');
+        document.getElementById('output-scen-9').innerText = `Coalesced final announcement: ${count} results found.`;
+      }, 400);
+    }
+
+    // Scenario 10: SPA Route
+    function simulateRouteTransition(title, path) {
+      document.getElementById('spa-page-heading').innerText = `Current View: ${title}`;
+      document.getElementById('spa-route-url').innerText = path;
+      document.getElementById('spa-page-heading').focus();
+      announce(`Navigated to ${title}`, 'polite');
+      document.getElementById('hud-focus').innerText = `#spa-page-heading`;
+      document.getElementById('output-scen-10').innerText = `Route transition: Focused heading + announced "${title}"`;
+    }
+
+    // Focus tracking
+    document.addEventListener('focusin', (e) => {
+      document.getElementById('hud-focus').innerText = e.target.id || e.target.tagName.toLowerCase();
+    });
+  </script>
+</body>
+</html>
