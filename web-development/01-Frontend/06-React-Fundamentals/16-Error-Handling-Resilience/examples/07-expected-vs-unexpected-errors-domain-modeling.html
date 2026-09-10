@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 16 — Part 07 Companion Lab: Expected vs Unexpected Errors & Domain Modeling</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #030712;
+      color: #f1f5f9;
+    }
+    code, pre, .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .active-tab {
+      background: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.4);
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 9999px;
+    }
+    .diff-deleted {
+      background-color: rgba(239, 68, 68, 0.15);
+      border-left: 3px solid #ef4444;
+      color: #fca5a5;
+    }
+    .diff-added {
+      background-color: rgba(16, 185, 129, 0.15);
+      border-left: 3px solid #10b981;
+      color: #6ee7b7;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, useMemo, Component } = React;
+
+    // =========================================================================
+    // 1. BULKHEAD ERROR BOUNDARY FOR UNEXPECTED RUNTIME/FIBER DEFECTS
+    // =========================================================================
+    class BulkheadErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorId: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        const errorId = `err_${Math.random().toString(36).substring(2, 9)}`;
+        return { hasError: true, error, errorId };
+      }
+
+      componentDidCatch(error, info) {
+        if (this.props.onTelemetry) {
+          this.props.onTelemetry({
+            category: "UNEXPECTED_FIBER_EXCEPTION",
+            boundary: this.props.boundaryName || "AnonymousBulkhead",
+            message: error.message,
+            stack: error.stack,
+            componentStack: info.componentStack,
+            errorId: this.state.errorId,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      reset = () => {
+        this.setState({ hasError: false, error: null, errorId: null });
+      };
+
+      render() {
+        if (this.state.hasError && this.state.error) {
+          if (this.props.fallback) {
+            return this.props.fallback(this.state.error, this.reset, this.state.errorId);
+          }
+          return (
+            <div className="p-6 rounded-2xl bg-red-950/40 border border-red-800/60 text-red-200 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">💥</span>
+                <div>
+                  <h3 className="font-bold text-white text-base">Bulkhead Intercepted Fatal Render Exception</h3>
+                  <p className="text-xs text-red-300 font-mono">ID: {this.state.errorId} | Boundary: {this.props.boundaryName}</p>
+                </div>
+              </div>
+              <p className="text-xs text-red-300 bg-red-950/80 p-3 rounded-lg font-mono">{this.state.error.message}</p>
+              <button onClick={this.reset} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition">
+                Reset Bulkhead
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // =========================================================================
+    // 2. MAIN INTERACTIVE LAB COMPONENT
+    // =========================================================================
+    function DomainModelingLab() {
+      const [activeTab, setActiveTab] = useState("exp_a");
+      const [telemetryLogs, setTelemetryLogs] = useState([]);
+
+      const logTelemetry = useCallback((event) => {
+        setTelemetryLogs((prev) => [
+          { id: Math.random().toString(36).substring(2, 9), ...event },
+          ...prev.slice(0, 24),
+        ]);
+      }, []);
+
+      const clearTelemetry = () => setTelemetryLogs([]);
+
+      return (
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-mono text-blue-400 mb-1">
+                <span>LEVEL 06</span>
+                <span>•</span>
+                <span>KPI 16</span>
+                <span>•</span>
+                <span className="bg-blue-950/80 px-2 py-0.5 rounded border border-blue-800 text-blue-300 font-bold">
+                  PART 07 COMPANION LAB
+                </span>
+              </div>
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                Expected vs Unexpected Errors & Domain Modeling Lab
+              </h1>
+              <p className="text-xs text-slate-400 mt-1">
+                Interactive verification of 3-tier failure taxonomy: Domain Outcome Data vs Operational Async Retries vs Bulkhead Boundaries.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
+                Events Logged: <strong className="text-blue-400">{telemetryLogs.length}</strong>
+              </div>
+              <button
+                onClick={clearTelemetry}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+              >
+                Clear Log
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 p-1.5 glass-panel rounded-2xl">
+            <button
+              onClick={() => setActiveTab("exp_a")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_a" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>📝</span> Exp A: Form Validation
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_b")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_b" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🔒</span> Exp B: Authorization (403)
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_c")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_c" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>⚡</span> Exp C: Concurrency Conflict (409)
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_d")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_d" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>⏳</span> Exp D: Operational Network (504)
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_e")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_e" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>💥</span> Exp E: Unexpected Fiber Bug
+            </button>
+            <button
+              onClick={() => setActiveTab("exp_f")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                activeTab === "exp_f" ? "active-tab" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>🎓</span> Exp F: Classification Quiz
+            </button>
+          </div>
+
+          {/* Tab Content Panels */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Active Interactive Experiment */}
+            <div className="lg:col-span-2 space-y-6">
+              {activeTab === "exp_a" && <ExperimentValidation onTelemetry={logTelemetry} />}
+              {activeTab === "exp_b" && <ExperimentAuthorization onTelemetry={logTelemetry} />}
+              {activeTab === "exp_c" && <ExperimentConflict onTelemetry={logTelemetry} />}
+              {activeTab === "exp_d" && <ExperimentOperational onTelemetry={logTelemetry} />}
+              {activeTab === "exp_e" && <ExperimentFiberBug onTelemetry={logTelemetry} />}
+              {activeTab === "exp_f" && <ExperimentClassificationQuiz onTelemetry={logTelemetry} />}
+            </div>
+
+            {/* Right 1 Col: Live Observability & Telemetry Stream */}
+            <div className="space-y-6">
+              <TelemetryStreamViewer logs={telemetryLogs} />
+              <ArchitecturalRuleCard activeTab={activeTab} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT A: FORM VALIDATION AS LOCAL DOMAIN STATE
+    // =========================================================================
+    function ExperimentValidation({ onTelemetry }) {
+      const [email, setEmail] = useState("");
+      const [password, setPassword] = useState("");
+      const [touched, setTouched] = useState({ email: false, password: false });
+      const [simulateBadThrow, setSimulateBadThrow] = useState(false);
+      const [submitStatus, setSubmitStatus] = useState(null);
+
+      const emailErrors = useMemo(() => {
+        if (!touched.email) return [];
+        const errs = [];
+        if (!email.trim()) errs.push("Email is required.");
+        else if (!email.includes("@") || !email.includes(".")) errs.push("Must be a valid corporate email format.");
+        return errs;
+      }, [email, touched.email]);
+
+      const passwordErrors = useMemo(() => {
+        if (!touched.password) return [];
+        const errs = [];
+        if (!password) errs.push("Password is required.");
+        else if (password.length < 8) errs.push("Password must be at least 8 characters.");
+        return errs;
+      }, [password, touched.password]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setTouched({ email: true, password: true });
+
+        if (emailErrors.length > 0 || passwordErrors.length > 0 || !email || !password) {
+          if (simulateBadThrow) {
+            // ❌ Anti-pattern: throwing exception on invalid user input!
+            throw new Error("Fatal Junior Error: Threw JavaScript Exception on Invalid Form Validation!");
+          }
+          setSubmitStatus({ type: "error", message: "Form has validation errors. Please correct the red fields." });
+          onTelemetry({
+            category: "EXPECTED_DOMAIN_EVENT",
+            type: "FORM_VALIDATION_FAILED",
+            fields: { email: emailErrors, password: passwordErrors },
+            message: "User submitted invalid form fields (Handled gracefully in local state).",
+          });
+          return;
+        }
+
+        setSubmitStatus({ type: "success", message: `Account initialized for ${email}!` });
+        onTelemetry({
+          category: "BUSINESS_ANALYTICS_EVENT",
+          type: "FORM_SUBMISSION_SUCCESS",
+          user: email,
+          message: "Form successfully validated and submitted.",
+        });
+      };
+
+      return (
+        <BulkheadErrorBoundary boundaryName="FormValidationBoundary" onTelemetry={onTelemetry}>
+          <div className="glass-panel p-6 rounded-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-300">
+                  EXPERIMENT A: DOMAIN STATE
+                </span>
+                <h2 className="text-lg font-bold text-white mt-1">Form Validation Modeling</h2>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-amber-400 bg-amber-950/30 px-3 py-1.5 rounded-xl border border-amber-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={simulateBadThrow}
+                  onChange={(e) => setSimulateBadThrow(e.target.checked)}
+                  className="rounded border-amber-600 text-amber-500 focus:ring-0"
+                />
+                <span className="font-mono font-bold">Simulate Anti-Pattern (Throw on Submit)</span>
+              </label>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Corporate Email Address</label>
+                <input
+                  type="text"
+                  value={email}
+                  placeholder="engineer@enterprise.io"
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setTouched((p) => ({ ...p, email: true }))}
+                  className={`w-full p-3 bg-slate-950 border rounded-xl text-xs font-mono text-slate-200 transition focus:outline-none ${
+                    emailErrors.length > 0 ? "border-red-500 focus:border-red-400" : "border-slate-800 focus:border-blue-500"
+                  }`}
+                />
+                {emailErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-red-400 mt-1 flex items-center gap-1 font-mono">
+                    <span>⚠️</span> {err}
+                  </p>
+                ))}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Account Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  placeholder="••••••••••••"
+                  onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => setTouched((p) => ({ ...p, password: true }))}
+                  className={`w-full p-3 bg-slate-950 border rounded-xl text-xs font-mono text-slate-200 transition focus:outline-none ${
+                    passwordErrors.length > 0 ? "border-red-500 focus:border-red-400" : "border-slate-800 focus:border-blue-500"
+                  }`}
+                />
+                {passwordErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-red-400 mt-1 flex items-center gap-1 font-mono">
+                    <span>⚠️</span> {err}
+                  </p>
+                ))}
+              </div>
+
+              {submitStatus && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-mono ${
+                    submitStatus.type === "success"
+                      ? "bg-emerald-950/60 border border-emerald-800 text-emerald-300"
+                      : "bg-red-950/60 border border-red-800 text-red-300"
+                  }`}
+                >
+                  {submitStatus.message}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-blue-600/30"
+                >
+                  Submit Registration
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("");
+                    setPassword("");
+                    setTouched({ email: false, password: false });
+                    setSubmitStatus(null);
+                  }}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition"
+                >
+                  Reset Form
+                </button>
+              </div>
+            </form>
+          </div>
+        </BulkheadErrorBoundary>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT B: AUTHORIZATION 403 AS INLINE FEATURE STATE
+    // =========================================================================
+    function ExperimentAuthorization({ onTelemetry }) {
+      const [currentRole, setCurrentRole] = useState("VIEWER");
+      const [documentId, setDocumentId] = useState("DOC-LEGAL-204");
+      const [requestElevationOpen, setRequestElevationOpen] = useState(false);
+      const [elevationReason, setElevationReason] = useState("");
+      const [isPendingReview, setIsPendingReview] = useState(false);
+
+      const requiredRole = "COMPLIANCE_ADMIN";
+      const isAuthorized = currentRole === "COMPLIANCE_ADMIN";
+
+      const handleSimulate403 = () => {
+        onTelemetry({
+          category: "EXPECTED_DOMAIN_EVENT",
+          type: "HTTP_403_FORBIDDEN",
+          resourceId: documentId,
+          userRole: currentRole,
+          requiredRole,
+          message: "User received HTTP 403. Rendered inline <AccessRestrictedCard /> without crashing parent shell.",
+        });
+      };
+
+      const handleElevateRequest = (e) => {
+        e.preventDefault();
+        setIsPendingReview(true);
+        setRequestElevationOpen(false);
+        onTelemetry({
+          category: "BUSINESS_WORKFLOW_EVENT",
+          type: "ROLE_ELEVATION_REQUESTED",
+          requestedRole: requiredRole,
+          reason: elevationReason,
+          message: "Access request dispatched to SecOps team.",
+        });
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-300">
+                EXPERIMENT B: AUTHORIZATION
+              </span>
+              <h2 className="text-lg font-bold text-white mt-1">HTTP 403 Permission Matrix</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-mono">Simulate User Role:</span>
+              <select
+                value={currentRole}
+                onChange={(e) => {
+                  setCurrentRole(e.target.value);
+                  setIsPendingReview(false);
+                }}
+                className="bg-slate-950 border border-slate-700 text-slate-200 text-xs font-mono rounded-lg p-2 focus:outline-none"
+              >
+                <option value="VIEWER">VIEWER (Restricted)</option>
+                <option value="EDITOR">EDITOR (Restricted)</option>
+                <option value="COMPLIANCE_ADMIN">COMPLIANCE_ADMIN (Authorized)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Parent Workspace Shell */}
+          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-400 font-mono border-b border-slate-900 pb-2">
+              <span>Cloud Storage / Agreements / {documentId}</span>
+              <span className="text-blue-400">Workspace Header Active (Non-Crashed)</span>
+            </div>
+
+            {!isAuthorized ? (
+              <div className="p-6 rounded-2xl bg-amber-950/30 border border-amber-800/60 text-amber-200 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🔒</span>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Access Restricted (HTTP 403)</h3>
+                    <p className="text-xs text-amber-300 font-mono">Resource ID: {documentId}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Your current account role is <span className="font-mono text-white font-bold">{currentRole}</span>. 
+                  Accessing confidential audit logs requires <span className="font-mono text-amber-400 font-bold">{requiredRole}</span> permissions.
+                </p>
+
+                {isPendingReview ? (
+                  <div className="p-3 bg-amber-900/40 rounded-xl border border-amber-700 text-xs text-amber-200 flex items-center gap-2 font-mono">
+                    <span className="animate-spin">⏳</span>
+                    Access request submitted. Pending review by SecOps team.
+                  </div>
+                ) : (
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setRequestElevationOpen(true)}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-amber-600/30"
+                    >
+                      Request Role Elevation
+                    </button>
+                    <button
+                      onClick={handleSimulate403}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition"
+                    >
+                      Log 403 Telemetry
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-6 rounded-2xl bg-emerald-950/30 border border-emerald-800/60 text-emerald-200 space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🔓</span>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Confidential Audit Log Active</h3>
+                    <p className="text-xs text-emerald-300 font-mono">Access Level: COMPLIANCE_ADMIN</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 font-mono">
+                  [AUDIT LOG ENTRY #9921]: Verified SHA-256 integrity hash: 8f9a2b7c4d1e0f3... All internal sign-offs active.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Elevation Request Modal */}
+          {requestElevationOpen && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="glass-panel p-6 rounded-2xl max-w-md w-full space-y-4 border border-slate-700">
+                <h3 className="font-bold text-white text-base">Request Compliance Role Elevation</h3>
+                <p className="text-xs text-slate-300">
+                  Please specify business rationale for accessing confidential document <span className="font-mono text-amber-400">{documentId}</span>.
+                </p>
+                <textarea
+                  value={elevationReason}
+                  onChange={(e) => setElevationReason(e.target.value)}
+                  placeholder="Need access for annual Q3 compliance audit review..."
+                  rows={3}
+                  className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setRequestElevationOpen(false)}
+                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleElevateRequest}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold"
+                  >
+                    Submit Request
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT C: CONCURRENCY CONFLICT (409) SIDE-BY-SIDE DIFF RESOLVER
+    // =========================================================================
+    function ExperimentConflict({ onTelemetry }) {
+      const [localDraft, setLocalDraft] = useState(
+        "Section 4.1: The licensee shall maintain 99.9% monthly service uptime with standard enterprise SLAs."
+      );
+      const [serverDraft, setServerDraft] = useState(
+        "Section 4.1: The licensee shall maintain 99.99% monthly service uptime with 24/7 dedicated support SLAs."
+      );
+      const [version, setVersion] = useState(1);
+      const [conflictActive, setConflictActive] = useState(false);
+      const [saveStatus, setSaveStatus] = useState("idle");
+
+      const handleSimulateConcurrentSave = () => {
+        setSaveStatus("saving");
+        setTimeout(() => {
+          setSaveStatus("conflict");
+          setConflictActive(true);
+          onTelemetry({
+            category: "EXPECTED_DOMAIN_EVENT",
+            type: "HTTP_409_CONCURRENCY_CONFLICT",
+            localVersion: version,
+            serverVersion: version + 1,
+            message: "User encountered 409 Conflict. Mounted interactive side-by-side diff resolver.",
+          });
+        }, 600);
+      };
+
+      const handleResolve = (chosenText, strategy) => {
+        setLocalDraft(chosenText);
+        setConflictActive(false);
+        setVersion((v) => v + 1);
+        setSaveStatus("resolved");
+        onTelemetry({
+          category: "BUSINESS_WORKFLOW_EVENT",
+          type: "CONFLICT_RESOLVED",
+          strategy,
+          resolvedVersion: version + 1,
+          message: `User resolved conflict using strategy: ${strategy}`,
+        });
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-purple-950/80 border border-purple-800 text-purple-300">
+                EXPERIMENT C: CONCURRENCY CONFLICT
+              </span>
+              <h2 className="text-lg font-bold text-white mt-1">HTTP 409 Diff Resolution Engine</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg text-purple-300">
+                Version {version}
+              </span>
+            </div>
+          </div>
+
+          {!conflictActive ? (
+            <div className="space-y-4">
+              <label className="block text-xs font-bold text-slate-300">Contract Agreement Clause 4</label>
+              <textarea
+                value={localDraft}
+                onChange={(e) => setLocalDraft(e.target.value)}
+                rows={4}
+                className="w-full p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+              />
+
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleSimulateConcurrentSave}
+                  disabled={saveStatus === "saving"}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-blue-600/30 flex items-center gap-2"
+                >
+                  {saveStatus === "saving" ? "Checking Server Version..." : "Commit Revisions (Simulate 409)"}
+                </button>
+                {saveStatus === "resolved" && (
+                  <span className="text-xs font-mono text-emerald-400">✅ Revisions merged to Version {version}</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl bg-purple-950/30 border border-purple-800/60 text-purple-200 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">⚡</span>
+                <div>
+                  <h3 className="font-bold text-white text-base">Concurrency Conflict Detected (HTTP 409)</h3>
+                  <p className="text-xs text-purple-300">Another attorney committed revisions while you were drafting.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-700 space-y-2">
+                  <div className="font-bold text-amber-400 flex items-center justify-between">
+                    <span>Your Local Draft</span>
+                    <span className="text-xs text-slate-400">v{version}</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-200 diff-deleted">
+                    {localDraft}
+                  </div>
+                  <button
+                    onClick={() => handleResolve(localDraft, "OVERWRITE_LOCAL")}
+                    className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold transition text-xs"
+                  >
+                    Keep My Local Draft
+                  </button>
+                </div>
+
+                <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-700 space-y-2">
+                  <div className="font-bold text-emerald-400 flex items-center justify-between">
+                    <span>Server Active Version</span>
+                    <span className="text-xs text-slate-400">v{version + 1}</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-200 diff-added">
+                    {serverDraft}
+                  </div>
+                  <button
+                    onClick={() => handleResolve(serverDraft, "ACCEPT_SERVER")}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition text-xs"
+                  >
+                    Accept Server Version
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT D: OPERATIONAL NETWORK TIMEOUT (504) & STALE DATA RETENTION
+    // =========================================================================
+    function ExperimentOperational({ onTelemetry }) {
+      const [status, setStatus] = useState("idle"); // idle | loading | stale_error | success
+      const [retryCount, setRetryCount] = useState(0);
+      const [cachedData, setCachedData] = useState({
+        balance: "$128,450.00",
+        lastUpdated: "2 mins ago",
+        status: "Healthy",
+      });
+
+      const handleSimulateTimeout = () => {
+        setStatus("loading");
+        setTimeout(() => {
+          setStatus("stale_error");
+          setRetryCount((r) => r + 1);
+          onTelemetry({
+            category: "OPERATIONAL_ASYNC_EVENT",
+            type: "HTTP_504_GATEWAY_TIMEOUT",
+            retryAttempt: retryCount + 1,
+            cachedDataRetained: true,
+            message: "504 Gateway Timeout. Preserved stale cache and mounted non-blocking warning banner.",
+          });
+        }, 1200);
+      };
+
+      const handleRecoverSuccess = () => {
+        setStatus("loading");
+        setTimeout(() => {
+          setStatus("success");
+          setRetryCount(0);
+          setCachedData({
+            balance: "$134,800.00",
+            lastUpdated: "Just now",
+            status: "Synchronized",
+          });
+          onTelemetry({
+            category: "BUSINESS_ANALYTICS_EVENT",
+            type: "GATEWAY_RECOVERY_SUCCESS",
+            message: "Operational timeout recovered via background revalidation.",
+          });
+        }, 800);
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800 text-blue-300">
+                EXPERIMENT D: OPERATIONAL RETRY
+              </span>
+              <h2 className="text-lg font-bold text-white mt-1">HTTP 504 Timeout & Stale Retention</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-slate-400">Retries: {retryCount}</span>
+            </div>
+          </div>
+
+          {/* Stale Warning Banner (Non-Blocking) */}
+          {status === "stale_error" && (
+            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-800 text-amber-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="animate-spin text-lg">⏳</span>
+                <div>
+                  <h4 className="font-bold text-xs">Gateway Timeout (HTTP 504)</h4>
+                  <p className="text-xs text-amber-300">Displaying cached snapshot from {cachedData.lastUpdated}. Retrying in background...</p>
+                </div>
+              </div>
+              <button
+                onClick={handleRecoverSuccess}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition"
+              >
+                Force Sync
+              </button>
+            </div>
+          )}
+
+          {/* Cached Data Container */}
+          <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-400 font-mono">Treasury Cash Reserves</p>
+                <h3 className="text-3xl font-extrabold text-white mt-1 font-mono">{cachedData.balance}</h3>
+              </div>
+              <span className="px-3 py-1 bg-slate-900 border border-slate-800 rounded-full text-xs font-mono text-slate-300">
+                {cachedData.status}
+              </span>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleSimulateTimeout}
+                disabled={status === "loading"}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition"
+              >
+                {status === "loading" ? "Contacting Gateway..." : "Simulate 504 Timeout"}
+              </button>
+              <button
+                onClick={handleRecoverSuccess}
+                disabled={status === "loading"}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition"
+              >
+                Simulate Successful Sync
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT E: GENUINE FIBER RUNTIME CRASH CAUGHT BY BULKHEAD BOUNDARY
+    // =========================================================================
+    function FlawedFinancialWidget({ shouldCrash }) {
+      if (shouldCrash) {
+        // 💥 Simulate genuine programming invariant defect
+        const brokenObject = null;
+        return <div>{brokenObject.renderPropertyBug()}</div>;
+      }
+
+      return (
+        <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-slate-200 font-mono text-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-400">
+            <span>Portfolio Alpha Index</span>
+            <span className="text-emerald-400">+14.8%</span>
+          </div>
+          <div className="h-16 bg-slate-900 rounded-lg flex items-center justify-center text-slate-500 text-xs">
+            [📈 Interactive Canvas Chart Rendering Normally]
+          </div>
+        </div>
+      );
+    }
+
+    function ExperimentFiberBug({ onTelemetry }) {
+      const [shouldCrash, setShouldCrash] = useState(false);
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-red-950/80 border border-red-800 text-red-300">
+                EXPERIMENT E: BULKHEAD CONTAINMENT
+              </span>
+              <h2 className="text-lg font-bold text-white mt-1">Unexpected Fiber Runtime Crash</h2>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400">
+            This experiment injects a real JavaScript null pointer exception into the child widget. Notice how the Bulkhead Error Boundary intercepts the crash and prevents the surrounding dashboard from failing!
+          </p>
+
+          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-400 font-mono border-b border-slate-900 pb-2">
+              <span>Financial Analytics Dashboard / Alpha Widget Pod</span>
+              <span className="text-emerald-400">Parent Shell Online</span>
+            </div>
+
+            <BulkheadErrorBoundary
+              boundaryName="AlphaAnalyticsBulkhead"
+              onTelemetry={onTelemetry}
+              fallback={(error, reset, errorId) => (
+                <div className="p-6 rounded-2xl bg-red-950/40 border border-red-800/60 text-red-200 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">💥</span>
+                    <div>
+                      <h3 className="font-bold text-white text-base">Bulkhead Intercepted Fatal Defect</h3>
+                      <p className="text-xs text-red-300 font-mono">Incident UUID: {errorId}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    A null pointer exception occurred in the financial chart component. Telemetry has logged the full component stack to Sentry.
+                  </p>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setShouldCrash(false);
+                        reset();
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-red-600/30"
+                    >
+                      Reset Component Pod
+                    </button>
+                  </div>
+                </div>
+              )}
+            >
+              <FlawedFinancialWidget shouldCrash={shouldCrash} />
+            </BulkheadErrorBoundary>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setShouldCrash(true)}
+                disabled={shouldCrash}
+                className="px-4 py-2 bg-red-600/80 hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-2"
+              >
+                <span>💥</span> Trigger Runtime Fiber Crash
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // EXPERIMENT F: FAILURE CLASSIFICATION MATRIX QUIZ
+    // =========================================================================
+    const QUIZ_SCENARIOS = [
+      { id: 1, text: "User enters wrong account password.", correct: "DOMAIN", explanation: "Expected auth failure; handled in login form state." },
+      { id: 2, text: "Component crashes on user.profile.name dereference.", correct: "BOUNDARY", explanation: "Unexpected programming bug; isolated by Bulkhead Boundary." },
+      { id: 3, text: "POST /checkout returns HTTP 402 Card Declined.", correct: "DOMAIN", explanation: "Expected business outcome; rendered in checkout state." },
+      { id: 4, text: "Network drops during document auto-save (504 Timeout).", correct: "OPERATIONAL", explanation: "Operational failure; non-blocking retry banner." },
+      { id: 5, text: "User lacks permission to inspect financial table (403).", correct: "DOMAIN", explanation: "Expected authorization state; render <AccessRestricted />." },
+      { id: 6, text: "WebGL shader crashes on mobile GPU memory limit.", correct: "BOUNDARY", explanation: "Runtime engine defect; bulkhead renders fallback SVG table." },
+    ];
+
+    function ExperimentClassificationQuiz({ onTelemetry }) {
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+
+      const handleSelect = (scenarioId, choice) => {
+        setAnswers((prev) => ({ ...prev, [scenarioId]: choice }));
+      };
+
+      const score = useMemo(() => {
+        return QUIZ_SCENARIOS.reduce((acc, sc) => (answers[sc.id] === sc.correct ? acc + 1 : acc), 0);
+      }, [answers]);
+
+      const handleSubmitQuiz = () => {
+        setSubmitted(true);
+        onTelemetry({
+          category: "LEARNING_ASSESSMENT_EVENT",
+          type: "CLASSIFICATION_QUIZ_COMPLETED",
+          score: `${score} / ${QUIZ_SCENARIOS.length}`,
+          percentage: `${Math.round((score / QUIZ_SCENARIOS.length) * 100)}%`,
+          message: "User completed the senior failure classification audit.",
+        });
+      };
+
+      return (
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div>
+              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-indigo-950/80 border border-indigo-800 text-indigo-300">
+                EXPERIMENT F: ARCHITECT AUDIT
+              </span>
+              <h2 className="text-lg font-bold text-white mt-1">Senior Failure Classification Matrix</h2>
+            </div>
+            {submitted && (
+              <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-indigo-900 border border-indigo-700 text-white">
+                Score: {score} / {QUIZ_SCENARIOS.length} ({Math.round((score / QUIZ_SCENARIOS.length) * 100)}%)
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {QUIZ_SCENARIOS.map((sc, idx) => {
+              const selected = answers[sc.id];
+              const isCorrect = selected === sc.correct;
+
+              return (
+                <div key={sc.id} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                  <p className="text-xs text-slate-200 font-bold">
+                    {idx + 1}. {sc.text}
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: "DOMAIN", label: "Expected Domain State" },
+                      { key: "OPERATIONAL", label: "Operational Retry State" },
+                      { key: "BOUNDARY", label: "Bulkhead Error Boundary" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => handleSelect(sc.id, opt.key)}
+                        className={`p-2 rounded-lg text-xs font-mono text-center transition border ${
+                          selected === opt.key
+                            ? "bg-blue-600 border-blue-400 text-white font-bold"
+                            : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {submitted && (
+                    <div
+                      className={`p-2.5 rounded-lg text-xs font-mono ${
+                        isCorrect ? "bg-emerald-950/50 border border-emerald-800 text-emerald-300" : "bg-red-950/50 border border-red-800 text-red-300"
+                      }`}
+                    >
+                      <strong>{isCorrect ? "✅ Correct:" : "❌ Incorrect:"}</strong> {sc.explanation}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={Object.keys(answers).length < QUIZ_SCENARIOS.length}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-indigo-600/30"
+              >
+                Submit Architectural Audit
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 3. TELEMETRY & EVENT STREAM VIEWER
+    // =========================================================================
+    function TelemetryStreamViewer({ logs }) {
+      return (
+        <div className="glass-panel p-5 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="font-bold text-white text-xs flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Live Observability Stream
+            </h3>
+            <span className="text-xs font-mono text-slate-400">{logs.length} Events</span>
+          </div>
+
+          <div className="h-72 overflow-y-auto space-y-2.5 scrollbar-thin pr-1">
+            {logs.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-500 font-mono">
+                Interact with experiments to observe real-time telemetry routing...
+              </div>
+            ) : (
+              logs.map((evt) => {
+                const isError = evt.category === "UNEXPECTED_FIBER_EXCEPTION";
+                const isDomain = evt.category === "EXPECTED_DOMAIN_EVENT";
+
+                return (
+                  <div
+                    key={evt.id}
+                    className={`p-3 rounded-xl border text-xs font-mono space-y-1 ${
+                      isError
+                        ? "bg-red-950/40 border-red-800 text-red-300"
+                        : isDomain
+                        ? "bg-amber-950/40 border-amber-800 text-amber-300"
+                        : "bg-blue-950/40 border-blue-800 text-blue-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span className="font-bold uppercase">{evt.category}</span>
+                      <span>{evt.timestamp ? evt.timestamp.split("T")[1].slice(0, 8) : "Live"}</span>
+                    </div>
+                    <div className="font-bold text-slate-200">{evt.type || evt.boundary}</div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">{evt.message}</p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // 4. ARCHITECTURAL RULE SUMMARY CARD
+    // =========================================================================
+    function ArchitecturalRuleCard({ activeTab }) {
+      return (
+        <div className="glass-panel p-5 rounded-2xl space-y-3 border-l-4 border-blue-500">
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Governing Architectural Rule</h4>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            {activeTab === "exp_a" && "Form validation errors must never throw exceptions. They are first-class domain feedback rendered inline."}
+            {activeTab === "exp_b" && "HTTP 403 Forbidden is an expected authorization state. It must be modeled in feature state without unmounting the surrounding workspace."}
+            {activeTab === "exp_c" && "HTTP 409 Concurrency Conflict must never throw fatal exceptions. Local draft text must be preserved for side-by-side merging."}
+            {activeTab === "exp_d" && "Transient HTTP 504 timeouts should display cached stale data with non-blocking revalidation banners."}
+            {activeTab === "exp_e" && "Genuine Fiber programming bugs must bubble to isolated Bulkhead Boundaries to contain blast radius."}
+            {activeTab === "exp_f" && "The senior architect partitions all system failures into Domain Data, Operational Lifecycle, and Bulkhead Containment."}
+          </p>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<DomainModelingLab />);
+  </script>
+</body>
+</html>
