@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 17 Lab 10 — Accessible React Testing & Interaction Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1f2937;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --border-color: #374151;
+      --border-focus: #38bdf8;
+      --accent-native: #10b981;
+      --accent-warn: #f59e0b;
+      --accent-danger: #ef4444;
+      --accent-info: #38bdf8;
+      --accent-purple: #a855f7;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 10% 20%, #0f172a 0%, #0a0e17 90%);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 4rem;
+    }
+
+    header.lab-header {
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lab-badge-group { display: flex; align-items: center; gap: 0.75rem; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-blue { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; }
+    .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    .badge-purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+
+    .header-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .header-subtitle { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* Diagnostic Testing HUD */
+    .telemetry-banner {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 2px solid var(--border-focus);
+      padding: 0.75rem 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1.25rem;
+      position: sticky;
+      top: 68px;
+      z-index: 45;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .telemetry-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .telemetry-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .telemetry-value { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-info); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Fault Injection Bar */
+    .fault-injection-bar {
+      background: rgba(30, 41, 59, 0.9);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.6rem 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: #fca5a5;
+    }
+    .fault-checkbox { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .container { max-width: 1400px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(620px, 1fr));
+      gap: 1.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
+    .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5; }
+
+    .btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #1d4ed8; }
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    .btn-secondary { background: #374151; color: #f3f4f6; }
+    .btn-secondary:hover { background: #4b5563; }
+    .btn-danger { background: #dc2626; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+
+    .input-control {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 100%;
+      font-family: var(--font-sans);
+    }
+    .input-control:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 1px;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .test-result-box {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      margin-top: 1rem;
+    }
+    .test-pass { color: #34d399; display: flex; align-items: center; gap: 0.4rem; }
+    .test-fail { color: #f87171; display: flex; align-items: center; gap: 0.4rem; }
+
+    .speech-bubble {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 3px solid var(--accent-info);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.825rem;
+      color: #e0f2fe;
+    }
+
+    .log-panel {
+      background: #030712;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+    .log-entry { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-time { color: var(--text-muted); margin-right: 0.5rem; }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.75rem;
+      width: 480px;
+      max-width: 90vw;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="lab-header">
+    <div>
+      <div class="header-title">KPI 17 Lab 10 — Accessible React Testing & Verification</div>
+      <div class="header-subtitle">Layered Verification: Semantic Contracts, Focus Invariants, Async Races & axe-core</div>
+    </div>
+    <div class="lab-badge-group">
+      <span class="badge badge-red">🔴 Staff Testing</span>
+      <span class="badge badge-blue">Testing Library + axe-core</span>
+      <span class="badge badge-green">Vitest Invariants</span>
+    </div>
+  </header>
+
+  <!-- Diagnostic Testing HUD -->
+  <div class="telemetry-banner" id="telemetry-hud">
+    <div class="telemetry-item">
+      <span class="telemetry-label">Active Element Tag/ID</span>
+      <span class="telemetry-value" id="hud-dom-focus" style="color:#38bdf8;">body</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Computed Role</span>
+      <span class="telemetry-value" id="hud-computed-role">none</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Accessible Name</span>
+      <span class="telemetry-value" id="hud-acc-name">none</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">axe-core Scanner Status</span>
+      <span class="telemetry-value" id="hud-axe-status" style="color:#34d399;">0 VIOLATIONS</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">Interaction Contract</span>
+      <span class="telemetry-value" id="hud-contract-status" style="color:#34d399;">VALID</span>
+    </div>
+  </div>
+
+  <!-- Fault Injection Control Bar -->
+  <div class="fault-injection-bar">
+    <span style="font-weight:700; color:#fff;">⚠️ Test Fault Injection:</span>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-strip-label" onchange="runLiveScan()" /> Strip Accessible Name (Icon Only)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-break-restore" /> Break Focus Restoration (Restore to Dead Node)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-async-race" /> Un-guarded Async Race (Stale Result Overwrites Active)
+    </label>
+    <label class="fault-checkbox">
+      <input type="checkbox" id="fault-duplicate-id" onchange="runLiveScan()" /> Inject Duplicate DOM IDs
+    </label>
+  </div>
+
+  <div class="container">
+
+    <!-- Row 1: Scenario 1 & 2 -->
+    <div class="grid-2">
+      <!-- Scenario 01: Scanner Pass vs Interaction Failure -->
+      <div class="card" id="card-scen-1">
+        <div class="card-header">
+          <span class="card-title">🔍 Scenario 01 — Scanner Pass vs Interaction Failure</span>
+          <span class="badge badge-blue">axe-core vs Keyboard</span>
+        </div>
+        <p class="card-desc">
+          This custom widget has perfect ARIA attributes (passes axe-core), but lacks an internal keyboard state machine. Click "Run Suite" to verify both layers.
+        </p>
+        <div style="display:flex; gap:0.6rem; align-items:center;">
+          <div
+            id="scanner-pass-widget"
+            role="menu"
+            aria-label="Export Actions"
+            tabindex="0"
+            style="background:#0f172a; border:1px solid #374151; padding:0.6rem 1rem; border-radius:6px; font-size:0.85rem;"
+          >
+            <span role="menuitem" tabindex="-1">Export PDF</span> | <span role="menuitem" tabindex="-1">Export CSV</span>
+          </div>
+          <button class="btn btn-secondary" onclick="testScannerVsInteraction()">Run Layered Test</button>
+        </div>
+        <div class="test-result-box" id="result-scen-1">
+          Click "Run Layered Test" to evaluate Scanner vs Interaction contracts.
+        </div>
+      </div>
+
+      <!-- Scenario 02: Semantic Query vs test-id Verification -->
+      <div class="card" id="card-scen-2">
+        <div class="card-header">
+          <span class="card-title">🛡️ Scenario 02 — Semantic Query vs data-testid</span>
+          <span class="badge badge-warn">Query Safety</span>
+        </div>
+        <p class="card-desc">
+          Toggle "Strip Accessible Name" above. A test checking <code>getByTestId('del-btn')</code> passes, while <code>getByRole('button', { name: 'Delete' })</code> immediately catches the regression.
+        </p>
+        <div style="display:flex; gap:0.6rem; align-items:center;">
+          <button id="del-target-btn" class="btn btn-danger" data-testid="del-btn" aria-label="Delete Record">
+            🗑️ <span id="del-btn-text">Delete</span>
+          </button>
+          <button class="btn btn-secondary" onclick="testTestIdVsSemantic()">Evaluate Queries</button>
+        </div>
+        <div class="test-result-box" id="result-scen-2">
+          Click "Evaluate Queries" to compare testId vs semantic query resilience.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Scenario 3 & 4 -->
+    <div class="grid-2">
+      <!-- Scenario 03: Dialog Focus & Restoration Invariant -->
+      <div class="card" id="card-scen-3">
+        <div class="card-header">
+          <span class="card-title">🔄 Scenario 03 — Dialog Focus & Restoration Suite</span>
+          <span class="badge badge-green">Lifecycle Contract</span>
+        </div>
+        <p class="card-desc">
+          Tests initial focus placement, Escape dismissal, and validated origin restoration.
+        </p>
+        <div style="display:flex; gap:0.6rem;">
+          <button id="btn-dialog-trigger" class="btn btn-success" onclick="openTestDialog()">Open Dialog</button>
+          <button class="btn btn-secondary" onclick="runDialogAutomatedTest()">Execute Automated Suite</button>
+        </div>
+        <div class="test-result-box" id="result-scen-3">
+          Click "Execute Automated Suite" to run automated Vitest assertions.
+        </div>
+      </div>
+
+      <!-- Scenario 04: Async Race & Stale Search Overwrite -->
+      <div class="card" id="card-scen-4">
+        <div class="card-header">
+          <span class="card-title">⚡ Scenario 04 — Async Race & Active ID Corruption</span>
+          <span class="badge badge-purple">Async Currentness</span>
+        </div>
+        <p class="card-desc">
+          Dispatches Query A (slow 600ms) followed by Query B (fast 150ms). Verifies that stale Query A cannot corrupt <code>aria-activedescendant</code>.
+        </p>
+        <div style="display:flex; gap:0.6rem;">
+          <button class="btn btn-secondary" onclick="simulateAsyncRaceTest()">Simulate Out-of-Order Responses</button>
+        </div>
+        <div class="test-result-box" id="result-scen-4">
+          Click to simulate async race condition.
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Event Telemetry Trace -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <span class="card-title">📜 Test Execution & Accessibility Assertion Telemetry</span>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="clearTestTelemetry()">Clear Trace</button>
+      </div>
+      <div class="log-panel" id="test-telemetry-log">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> Accessibility testing workbench initialized.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal for Scenario 03 -->
+  <div class="modal-overlay" id="test-dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="td-title">
+    <div class="modal-box" tabindex="-1">
+      <h3 id="td-title" style="font-size:1.15rem; color:#38bdf8; margin-bottom:0.75rem;">Account Settings Confirmation</h3>
+      <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1.25rem;">
+        Initial focus is placed onto the Cancel button to prevent accidental confirmation.
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+        <button class="btn btn-secondary" id="td-cancel-btn" onclick="closeTestDialog()">Cancel</button>
+        <button class="btn btn-danger" id="td-confirm-btn" onclick="closeTestDialog()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let savedOrigin = null;
+
+    // Focus Tracking
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      const desc = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`;
+      document.getElementById('hud-dom-focus').innerText = desc;
+      document.getElementById('hud-computed-role').innerText = el.getAttribute('role') || el.tagName.toLowerCase();
+      document.getElementById('hud-acc-name').innerText = el.getAttribute('aria-label') || el.innerText || el.placeholder || 'none';
+      logTestEvent(`[FOCUSIN] ${desc}`);
+    });
+
+    function logTestEvent(msg) {
+      const panel = document.getElementById('test-telemetry-log');
+      const time = new Date().toISOString().substring(14, 22);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span style="color:#38bdf8;">${msg}</span>`;
+      panel.prepend(entry);
+    }
+
+    function clearTestTelemetry() {
+      document.getElementById('test-telemetry-log').innerHTML = '<div class="log-entry"><span class="log-time">[00:00.00]</span> Trace cleared.</div>';
+    }
+
+    function runLiveScan() {
+      const stripLabel = document.getElementById('fault-strip-label').checked;
+      const dupId = document.getElementById('fault-duplicate-id').checked;
+
+      const delBtn = document.getElementById('del-target-btn');
+      const delText = document.getElementById('del-btn-text');
+
+      if (stripLabel) {
+        delBtn.removeAttribute('aria-label');
+        delText.style.display = 'none'; // Icon only, no label
+        document.getElementById('hud-axe-status').innerText = '1 VIOLATION (button-name)';
+        document.getElementById('hud-axe-status').style.color = '#ef4444';
+      } else {
+        delBtn.setAttribute('aria-label', 'Delete Record');
+        delText.style.display = 'inline';
+        document.getElementById('hud-axe-status').innerText = '0 VIOLATIONS';
+        document.getElementById('hud-axe-status').style.color = '#34d399';
+      }
+    }
+
+    // Scenario 1: Scanner vs Interaction
+    function testScannerVsInteraction() {
+      const widget = document.getElementById('scanner-pass-widget');
+      const out = document.getElementById('result-scen-1');
+
+      // 1. Scanner check
+      const hasRole = widget.getAttribute('role') === 'menu';
+      const hasLabel = widget.hasAttribute('aria-label');
+
+      // 2. Interaction check (does it have arrow key handler?)
+      const hasArrowHandler = typeof widget.onkeydown === 'function';
+
+      let html = '';
+      if (hasRole && hasLabel) {
+        html += '<div class="test-pass">✓ Layer 1 (Static axe-core Scan): PASS (Valid role="menu" and aria-label)</div>';
+      }
+      if (!hasArrowHandler) {
+        html += '<div class="test-fail">✗ Layer 2 (Interaction Contract): FAIL — No ArrowUp/ArrowDown key listener found on composite menu!</div>';
+        html += '<div style="color:#9ca3af; margin-top:0.4rem; font-size:0.75rem;">Lesson: A 100% axe-core scanner pass does NOT guarantee keyboard operability.</div>';
+      }
+      out.innerHTML = html;
+      logTestEvent('Evaluated Scanner vs Interaction on #scanner-pass-widget');
+    }
+
+    // Scenario 2: TestId vs Semantic
+    function testTestIdVsSemantic() {
+      const out = document.getElementById('result-scen-2');
+      const delBtn = document.getElementById('del-target-btn');
+
+      // Test 1: test-id
+      const testIdPass = delBtn !== null && delBtn.getAttribute('data-testid') === 'del-btn';
+
+      // Test 2: Semantic role & accessible name
+      const accName = delBtn.getAttribute('aria-label') || (delBtn.innerText && delBtn.innerText.trim());
+      const semanticPass = delBtn.tagName.toLowerCase() === 'button' && accName && accName.toLowerCase().includes('delete');
+
+      let html = '';
+      if (testIdPass) {
+        html += '<div class="test-pass">✓ getByTestId("del-btn"): PASS (DOM node exists)</div>';
+      }
+      if (semanticPass) {
+        html += '<div class="test-pass">✓ getByRole("button", { name: "Delete" }): PASS (Accessible name confirmed)</div>';
+      } else {
+        html += '<div class="test-fail">✗ getByRole("button", { name: "Delete" }): FAIL — Button lacks accessible name!</div>';
+        html += '<div style="color:#f87171; margin-top:0.4rem; font-size:0.75rem;">Regression Detected: data-testid masked the missing accessible name defect.</div>';
+      }
+      out.innerHTML = html;
+      logTestEvent('Evaluated getByTestId vs getByRole queries.');
+    }
+
+    // Scenario 3: Dialog Test Suite
+    function openTestDialog() {
+      savedOrigin = document.getElementById('btn-dialog-trigger');
+      document.getElementById('test-dialog-overlay').style.display = 'flex';
+      document.getElementById('td-cancel-btn').focus();
+      logTestEvent('Dialog opened; focus transferred to Cancel button.');
+    }
+
+    function closeTestDialog() {
+      document.getElementById('test-dialog-overlay').style.display = 'none';
+
+      const breakRestore = document.getElementById('fault-break-restore').checked;
+      if (breakRestore) {
+        // Blindly restore to dead / wrong node
+        document.body.focus();
+        logTestEvent('[BUG] Focus restoration broken; focus dropped to body.');
+      } else if (savedOrigin && document.body.contains(savedOrigin)) {
+        savedOrigin.focus();
+        logTestEvent('Focus restored to #btn-dialog-trigger');
+      }
+    }
+
+    function runDialogAutomatedTest() {
+      const out = document.getElementById('result-scen-3');
+      const trigger = document.getElementById('btn-dialog-trigger');
+
+      openTestDialog();
+      const cancelBtn = document.getElementById('td-cancel-btn');
+      const initialFocusPass = document.activeElement === cancelBtn;
+
+      closeTestDialog();
+      const restorePass = document.activeElement === trigger;
+
+      let html = '';
+      html += initialFocusPass
+        ? '<div class="test-pass">✓ Initial Focus Contract: PASS (Cancel button received focus)</div>'
+        : '<div class="test-fail">✗ Initial Focus Contract: FAIL</div>';
+
+      html += restorePass
+        ? '<div class="test-pass">✓ Focus Restoration Contract: PASS (Focus returned to trigger)</div>'
+        : '<div class="test-fail">✗ Focus Restoration Contract: FAIL (Focus lost to body)</div>';
+
+      out.innerHTML = html;
+      logTestEvent('Automated dialog suite completed.');
+    }
+
+    // Scenario 4: Async Race
+    function simulateAsyncRaceTest() {
+      const out = document.getElementById('result-scen-4');
+      const allowRace = document.getElementById('fault-async-race').checked;
+
+      out.innerHTML = '<div style="color:#38bdf8;">Dispatching Query A (600ms) and Query B (150ms)...</div>';
+      logTestEvent('[ASYNC] Query A dispatched (ID: req-1, slow).');
+      logTestEvent('[ASYNC] Query B dispatched (ID: req-2, fast).');
+
+      let currentRequestId = 2; // Query B is latest
+
+      setTimeout(() => {
+        // Query B returns first
+        logTestEvent('[ASYNC] Query B resolved (req-2). Active option set to "opt-b1"');
+
+        setTimeout(() => {
+          // Query A returns late
+          if (allowRace) {
+            // Bug: Stale response overwrites current state
+            out.innerHTML = `
+              <div class="test-pass">✓ Query B (req-2) resolved first (active = opt-b1)</div>
+              <div class="test-fail">✗ Stale Query A (req-1) OVERWROTE state! Active ID corrupted to non-existent option.</div>
+            `;
+            logTestEvent('[BUG] Stale query A overwrote current state!');
+          } else {
+            // Correct: requestIdRef drops stale response
+            out.innerHTML = `
+              <div class="test-pass">✓ Query B (req-2) resolved first (active = opt-b1)</div>
+              <div class="test-pass">✓ Stale Query A (req-1) DISCARDED by requestIdRef guard! Active ID preserved.</div>
+            `;
+            logTestEvent('[GUARD] Stale query A dropped by currentness check.');
+          }
+        }, 450);
+      }, 150);
+    }
+  </script>
+</body>
+</html>
