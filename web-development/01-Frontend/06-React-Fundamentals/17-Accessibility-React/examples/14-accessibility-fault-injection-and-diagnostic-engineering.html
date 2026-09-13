@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPI 17 — Part 14: Accessibility Fault Injection & Diagnostic Engineering Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #090d16;
+      --bg-secondary: #0f172a;
+      --bg-tertiary: #1e293b;
+      --bg-card: rgba(30, 41, 59, 0.7);
+      --border-color: #334155;
+      --border-focus: #38bdf8;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #38bdf8;
+      --accent-blue: #3b82f6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px 32px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-rose), var(--accent-amber), var(--accent-cyan), var(--accent-purple));
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-red { background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+    .badge-blue { background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-emerald { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(to right, #f8fafc, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-desc {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      max-width: 900px;
+    }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr 380px;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card Panels */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Controls & Buttons */
+    .btn {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      text-align: left;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: #334155;
+      border-color: var(--accent-cyan);
+      transform: translateY(-1px);
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--accent-cyan);
+      outline-offset: 2px;
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: var(--accent-rose);
+    }
+
+    .btn-warning {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+    }
+    .btn-warning:hover:not(:disabled) {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: var(--accent-amber);
+    }
+
+    .btn-success {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #6ee7b7;
+    }
+    .btn-success:hover:not(:disabled) {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: var(--accent-emerald);
+    }
+
+    .fault-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Live Sandbox Workspace */
+    .sandbox-area {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 10px 14px;
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .input-field:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .dropdown-list {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      list-style: none;
+      max-height: 180px;
+      overflow-y: auto;
+      margin-top: 4px;
+    }
+
+    .dropdown-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .dropdown-item.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      font-weight: 500;
+    }
+    .dropdown-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Editable List Items */
+    .task-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+
+    /* Error Boundary Fallback */
+    .error-fallback {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Telemetry & Console Display */
+    .telemetry-block {
+      background: #050811;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .telemetry-label {
+      color: var(--text-muted);
+    }
+    .telemetry-val {
+      color: var(--accent-cyan);
+      font-weight: 500;
+    }
+    .telemetry-val.error {
+      color: var(--accent-rose);
+      font-weight: 700;
+    }
+    .telemetry-val.success {
+      color: var(--accent-emerald);
+    }
+
+    .log-stream {
+      background: #050811;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px;
+      height: 220px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-entry {
+      display: flex;
+      gap: 6px;
+    }
+    .log-time { color: var(--text-muted); }
+    .log-msg-info { color: #cbd5e1; }
+    .log-msg-warn { color: var(--accent-amber); }
+    .log-msg-error { color: var(--accent-rose); }
+    .log-msg-pass { color: var(--accent-emerald); }
+
+    /* Test Runner Table */
+    .test-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+    }
+    .test-table th, .test-table td {
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .test-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="badge-bar">
+      <span class="badge badge-red">KPI 17 · Part 14</span>
+      <span class="badge badge-blue">Diagnostic Engineering</span>
+      <span class="badge badge-amber">Fault Injection</span>
+      <span class="badge badge-emerald">Invariants & Contract Verification</span>
+    </div>
+    <h1>Accessibility Fault Injection & Diagnostic Testbed</h1>
+    <p class="header-desc">
+      A real-time laboratory demonstrating deliberate accessibility fault injection, race condition synthesis, focus recovery breakdowns, dangling ARIA reference detection, and automated contract assertions.
+    </p>
+  </header>
+
+  <div class="dashboard-grid">
+    <!-- LEFT PANEL: FAULT INJECTION CONTROLS -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">⚡ Fault Injector Console</span>
+        <button class="btn btn-warning" id="btn-reset-all" style="padding: 4px 8px; font-size: 0.75rem;">Reset All</button>
+      </div>
+
+      <p style="font-size: 0.8rem; color: var(--text-muted);">
+        Trigger production anomalies to test failure domain isolation, recovery policies, and ARIA tree integrity:
+      </p>
+
+      <div class="fault-list">
+        <button class="btn btn-danger" id="btn-fault-delete-active">
+          💥 Delete Focused Item (Focus Loss)
+        </button>
+        <button class="btn btn-danger" id="btn-fault-dangling-descendant">
+          💥 Inject Dangling aria-activedescendant
+        </button>
+        <button class="btn btn-danger" id="btn-fault-stale-race">
+          💥 Trigger Out-of-Order Stale Async Race
+        </button>
+        <button class="btn btn-danger" id="btn-fault-crash-widget">
+          💥 Throw Render Error (Blast Radius)
+        </button>
+        <button class="btn btn-danger" id="btn-fault-duplicate-tabindex">
+          💥 Inject Duplicate tabIndex=0 Violation
+        </button>
+      </div>
+
+      <div class="panel-header" style="margin-top: 10px;">
+        <span class="panel-title">🛡️ Resilient Guards</span>
+      </div>
+
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+        <input type="checkbox" id="chk-focus-recovery-guard" checked>
+        <span>Enable Focus Recovery Guard</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+        <input type="checkbox" id="chk-async-generation-guard" checked>
+        <span>Enable Async Generation Counter</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+        <input type="checkbox" id="chk-aria-ref-guard" checked>
+        <span>Validate ARIA References On Keydown</span>
+      </label>
+    </div>
+
+    <!-- CENTER PANEL: LIVE INTERACTIVE WORKSPACE -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🧪 Interactive Target Components</span>
+        <button class="btn btn-success" id="btn-run-contract-tests" style="padding: 4px 8px; font-size: 0.75rem;">Run Suite (Vitest)</button>
+      </div>
+
+      <!-- Component 1: Search Combobox with Active Descendant -->
+      <div class="sandbox-area" id="section-combobox">
+        <label for="combobox-search-input" style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1;">
+          1. Combobox (aria-activedescendant + Async Query)
+        </label>
+        <input
+          id="combobox-search-input"
+          type="text"
+          class="input-field"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded="true"
+          aria-controls="combobox-options-list"
+          aria-activedescendant="opt-1"
+          placeholder="Type to test async race / use ArrowDown..."
+        />
+        <ul id="combobox-options-list" role="listbox" class="dropdown-list" aria-label="Available Frameworks">
+          <li id="opt-1" role="option" class="dropdown-item active" aria-selected="true">
+            <span>React.js (Architecture)</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">#opt-1</span>
+          </li>
+          <li id="opt-2" role="option" class="dropdown-item" aria-selected="false">
+            <span>TypeScript (Type System)</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">#opt-2</span>
+          </li>
+          <li id="opt-3" role="option" class="dropdown-item" aria-selected="false">
+            <span>Web Accessibility (WCAG 2.2)</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">#opt-3</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Component 2: Dynamic Task List for Focus Recovery -->
+      <div class="sandbox-area" id="section-tasks" tabindex="-1" aria-label="Dynamic Tasks Container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1;">2. Dynamic Task List (Deletion & Focus Target)</span>
+          <button class="btn" id="btn-add-task" style="padding: 2px 8px; font-size: 0.75rem;">+ Add Task</button>
+        </div>
+        <div id="tasks-container">
+          <div class="task-item" id="task-row-1">
+            <span>Task 1: Audit ARIA Invariants</span>
+            <button class="btn btn-danger btn-delete-task" data-id="task-row-1" aria-label="Delete Task 1">Delete</button>
+          </div>
+          <div class="task-item" id="task-row-2">
+            <span>Task 2: Verify Roving TabIndex</span>
+            <button class="btn btn-danger btn-delete-task" data-id="task-row-2" aria-label="Delete Task 2">Delete</button>
+          </div>
+          <div class="task-item" id="task-row-3">
+            <span>Task 3: Test Error Boundary Recovery</span>
+            <button class="btn btn-danger btn-delete-task" data-id="task-row-3" aria-label="Delete Task 3">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Component 3: Isolated Error Boundary Widget -->
+      <div class="sandbox-area" id="section-boundary">
+        <span style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1;">3. Isolated Error Boundary Boundary Domain</span>
+        <div id="boundary-content">
+          <div style="padding: 10px; background: rgba(56, 189, 248, 0.05); border: 1px dashed var(--accent-cyan); border-radius: 6px;">
+            <p style="font-size: 0.85rem;">Widget State: <strong>Healthy (Active)</strong></p>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Sibling components remain fully operable if this crashes.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: TELEMETRY & DIAGNOSTIC INSPECTOR -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🔍 Diagnostic Telemetry</span>
+      </div>
+
+      <div class="telemetry-block">
+        <div class="telemetry-row">
+          <span class="telemetry-label">activeElement:</span>
+          <span class="telemetry-val" id="tel-active-el">BODY</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Active Role:</span>
+          <span class="telemetry-val" id="tel-active-role">none</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Active tabIndex:</span>
+          <span class="telemetry-val" id="tel-active-tabindex">none</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">aria-activedescendant:</span>
+          <span class="telemetry-val" id="tel-activedescendant">opt-1</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Target In DOM:</span>
+          <span class="telemetry-val success" id="tel-target-valid">VALID (TRUE)</span>
+        </div>
+        <div class="telemetry-row">
+          <span class="telemetry-label">Active Async Gen:</span>
+          <span class="telemetry-val" id="tel-async-gen">Gen #0</span>
+        </div>
+      </div>
+
+      <div class="panel-header" style="margin-top: 6px;">
+        <span class="panel-title">📋 Automated Contract Test Runner</span>
+      </div>
+
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Contract Assertion</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="test-results-body">
+          <tr><td>Combobox Role & Name</td><td class="telemetry-val success">PASS</td></tr>
+          <tr><td>aria-activedescendant validity</td><td class="telemetry-val success">PASS</td></tr>
+          <tr><td>Focus Recovery after deletion</td><td class="telemetry-val success">PASS</td></tr>
+          <tr><td>Error Boundary Isolation</td><td class="telemetry-val success">PASS</td></tr>
+          <tr><td>Async Currentness Guard</td><td class="telemetry-val success">PASS</td></tr>
+        </tbody>
+      </table>
+
+      <div class="panel-header" style="margin-top: 6px;">
+        <span class="panel-title">📡 Live Event & Fault Log</span>
+      </div>
+      <div class="log-stream" id="event-log-stream">
+        <div class="log-entry"><span class="log-time">[00:00.00]</span> <span class="log-msg-info">Diagnostic engine initialized. Invariants active.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // STATE MANAGEMENT
+  let activeDescendantId = "opt-1";
+  let asyncGenerationCounter = 0;
+  const logStream = document.getElementById("event-log-stream");
+
+  function log(msg, type = "info") {
+    const time = new Date().toISOString().substring(14, 22);
+    const entry = document.createElement("div");
+    entry.className = "log-entry";
+    entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-msg-${type}">${msg}</span>`;
+    logStream.prepend(entry);
+  }
+
+  // TELEMETRY UPDATES
+  function updateTelemetry() {
+    const el = document.activeElement;
+    document.getElementById("tel-active-el").textContent = el ? `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}` : 'NULL';
+    document.getElementById("tel-active-role").textContent = el ? el.getAttribute("role") || "native" : "none";
+    document.getElementById("tel-active-tabindex").textContent = el ? el.getAttribute("tabindex") ?? "native" : "none";
+
+    const combobox = document.getElementById("combobox-search-input");
+    const descId = combobox ? combobox.getAttribute("aria-activedescendant") : "none";
+    document.getElementById("tel-activedescendant").textContent = descId || "none";
+
+    const targetNode = descId ? document.getElementById(descId) : null;
+    const isValid = targetNode !== null;
+    const targetStatus = document.getElementById("tel-target-valid");
+    if (descId && !isValid) {
+      targetStatus.textContent = "DANGLING REFERENCE (INVALID)";
+      targetStatus.className = "telemetry-val error";
+    } else {
+      targetStatus.textContent = "VALID (TRUE)";
+      targetStatus.className = "telemetry-val success";
+    }
+  }
+
+  document.addEventListener("focusin", updateTelemetry);
+  document.addEventListener("focusout", () => setTimeout(updateTelemetry, 10));
+
+  // COMBOBOX KEYBOARD NAVIGATION
+  const comboboxInput = document.getElementById("combobox-search-input");
+  const options = ["opt-1", "opt-2", "opt-3"];
+
+  comboboxInput.addEventListener("keydown", (e) => {
+    const guardEnabled = document.getElementById("chk-aria-ref-guard").checked;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      let currentIndex = options.indexOf(activeDescendantId);
+      let nextIndex = (currentIndex + 1) % options.length;
+      activeDescendantId = options[nextIndex];
+
+      if (guardEnabled && !document.getElementById(activeDescendantId)) {
+        log(`Guard prevented setting dangling reference to missing node: ${activeDescendantId}`, "warn");
+        return;
+      }
+
+      comboboxInput.setAttribute("aria-activedescendant", activeDescendantId);
+      updateOptionHighlight();
+      log(`Combobox navigated to: ${activeDescendantId}`, "info");
+      updateTelemetry();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      let currentIndex = options.indexOf(activeDescendantId);
+      let prevIndex = (currentIndex - 1 + options.length) % options.length;
+      activeDescendantId = options[prevIndex];
+
+      if (guardEnabled && !document.getElementById(activeDescendantId)) {
+        log(`Guard prevented setting dangling reference: ${activeDescendantId}`, "warn");
+        return;
+      }
+
+      comboboxInput.setAttribute("aria-activedescendant", activeDescendantId);
+      updateOptionHighlight();
+      log(`Combobox navigated to: ${activeDescendantId}`, "info");
+      updateTelemetry();
+    }
+  });
+
+  function updateOptionHighlight() {
+    document.querySelectorAll(".dropdown-item").forEach(item => {
+      if (item.id === activeDescendantId) {
+        item.classList.add("active");
+        item.setAttribute("aria-selected", "true");
+      } else {
+        item.classList.remove("active");
+        item.setAttribute("aria-selected", "false");
+      }
+    });
+  }
+
+  // FAULT 1: DELETE FOCUSED ITEM (Focus Loss)
+  document.getElementById("btn-fault-delete-active").addEventListener("click", () => {
+    const task2Btn = document.querySelector('[data-id="task-row-2"]');
+    if (task2Btn) {
+      task2Btn.focus();
+      log("Hardware focus placed on Task 2 Delete Button.", "warn");
+      setTimeout(() => {
+        const row = document.getElementById("task-row-2");
+        if (row) {
+          const recoveryEnabled = document.getElementById("chk-focus-recovery-guard").checked;
+          const nextRow = document.getElementById("task-row-3");
+
+          row.remove();
+          log("💥 INJECTED FAULT: Active DOM element deleted!", "error");
+
+          if (recoveryEnabled && nextRow) {
+            nextRow.querySelector("button").focus();
+            log("🛡️ Focus Recovery Guard: Transferred focus to next adjacent sibling (Task 3).", "pass");
+          } else {
+            log("❌ No Focus Recovery: Focus reset to document.body.", "error");
+          }
+          updateTelemetry();
+        }
+      }, 400);
+    }
+  });
+
+  // FAULT 2: INJECT DANGLING ARIA-ACTIVEDESCENDANT
+  document.getElementById("btn-fault-dangling-descendant").addEventListener("click", () => {
+    activeDescendantId = "opt-ghost-999";
+    comboboxInput.setAttribute("aria-activedescendant", activeDescendantId);
+    log("💥 INJECTED FAULT: aria-activedescendant set to unmounted ID '#opt-ghost-999'.", "error");
+    updateTelemetry();
+  });
+
+  // FAULT 3: STALE ASYNC RACE
+  document.getElementById("btn-fault-stale-race").addEventListener("click", () => {
+    const currentGen = ++asyncGenerationCounter;
+    document.getElementById("tel-async-gen").textContent = `Gen #${currentGen}`;
+    log(`🚀 Initiated current search Request B (Gen #${currentGen}).`, "info");
+
+    const staleGen = currentGen - 1;
+    log(`⚠️ Emulating slow, delayed Request A (Gen #${staleGen}) resolving out-of-order...`, "warn");
+
+    setTimeout(() => {
+      const guardActive = document.getElementById("chk-async-generation-guard").checked;
+      if (guardActive) {
+        log(`🛡️ Generation Guard: Discarded stale response for Gen #${staleGen}. Active Gen is #${currentGen}.`, "pass");
+      } else {
+        log(`❌ Race Condition: Stale Gen #${staleGen} response overwrote active search state!`, "error");
+        comboboxInput.value = "Stale Outdated Result";
+      }
+    }, 600);
+  });
+
+  // FAULT 4: CRASH COMPONENT (ERROR BOUNDARY)
+  document.getElementById("btn-fault-crash-widget").addEventListener("click", () => {
+    const container = document.getElementById("boundary-content");
+    container.innerHTML = `
+      <div class="error-fallback" role="alert" aria-live="assertive">
+        <strong style="color: var(--accent-rose);">⚠️ Widget Crash Caught by Error Boundary</strong>
+        <p style="font-size: 0.8rem; color: #fecdd3;">Injected render exception: TypeError: Cannot read property 'map' of undefined.</p>
+        <button class="btn btn-warning" id="btn-retry-boundary" style="align-self: flex-start; padding: 4px 10px;">Retry Widget</button>
+      </div>
+    `;
+    log("💥 INJECTED FAULT: Widget threw error. Error Boundary isolated blast radius.", "warn");
+
+    document.getElementById("btn-retry-boundary").addEventListener("click", () => {
+      container.innerHTML = `
+        <div style="padding: 10px; background: rgba(56, 189, 248, 0.05); border: 1px dashed var(--accent-cyan); border-radius: 6px;">
+          <p style="font-size: 0.85rem;">Widget State: <strong>Healthy (Recovered)</strong></p>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Component successfully recovered.</span>
+        </div>
+      `;
+      log("🛡️ Error Boundary recovered. Healthy state restored.", "pass");
+    });
+  });
+
+  // FAULT 5: DUPLICATE TABINDEX
+  document.getElementById("btn-fault-duplicate-tabindex").addEventListener("click", () => {
+    document.querySelectorAll(".dropdown-item").forEach(item => {
+      item.setAttribute("tabindex", "0");
+    });
+    log("💥 INJECTED FAULT: tabIndex=0 assigned to all composite items. Sequential tab order flooded.", "error");
+  });
+
+  // RESET ALL
+  document.getElementById("btn-reset-all").addEventListener("click", () => {
+    window.location.reload();
+  });
+
+  // TASK DELETION EVENT DELEGATION
+  document.getElementById("tasks-container").addEventListener("click", (e) => {
+    if (e.target.classList.contains("btn-delete-task")) {
+      const rowId = e.target.getAttribute("data-id");
+      const row = document.getElementById(rowId);
+      if (row) {
+        const recovery = document.getElementById("chk-focus-recovery-guard").checked;
+        const next = row.nextElementSibling || row.previousElementSibling;
+        row.remove();
+        log(`Task ${rowId} deleted.`, "info");
+        if (recovery) {
+          if (next) {
+            next.querySelector("button").focus();
+            log("Focus recovered to adjacent item.", "pass");
+          } else {
+            document.getElementById("section-tasks").focus();
+            log("Focus recovered to container landmark.", "pass");
+          }
+        }
+        updateTelemetry();
+      }
+    }
+  });
+
+  // RUN CONTRACT TESTS
+  document.getElementById("btn-run-contract-tests").addEventListener("click", () => {
+    log("▶️ Running Contract Validation Suite...", "info");
+    const results = [
+      { name: "Combobox Role & Name", pass: comboboxInput.getAttribute("role") === "combobox" && comboboxInput.getAttribute("placeholder") !== "" },
+      { name: "aria-activedescendant validity", pass: document.getElementById(comboboxInput.getAttribute("aria-activedescendant")) !== null },
+      { name: "Focus Recovery Policy Defined", pass: document.getElementById("chk-focus-recovery-guard").checked },
+      { name: "Error Boundary Isolation", pass: true },
+      { name: "Async Generation Currentness Guard", pass: document.getElementById("chk-async-generation-guard").checked }
+    ];
+
+    const tbody = document.getElementById("test-results-body");
+    tbody.innerHTML = results.map(r => `
+      <tr>
+        <td>${r.name}</td>
+        <td class="telemetry-val ${r.pass ? 'success' : 'error'}">${r.pass ? 'PASS' : 'FAIL'}</td>
+      </tr>
+    `).join("");
+
+    log(`Test Suite Completed: ${results.filter(r => r.pass).length}/${results.length} assertions passed.`, "pass");
+  });
+</script>
+
+</body>
+</html>

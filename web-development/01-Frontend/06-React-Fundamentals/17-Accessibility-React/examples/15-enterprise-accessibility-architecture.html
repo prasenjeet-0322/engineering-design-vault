@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Accessibility Architecture & Resilience Lab</title>
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-secondary: #111827;
+      --bg-card: #1f2937;
+      --bg-glass: rgba(31, 41, 55, 0.75);
+      --border-color: #374151;
+      --border-focus: #60a5fa;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: 1.5rem;
+      min-height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 9999px;
+      background: rgba(244, 63, 94, 0.2);
+      color: var(--accent-rose);
+      border: 1px solid var(--accent-rose);
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .layout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .domain-boundary {
+      border: 2px dashed #4b5563;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: rgba(17, 24, 39, 0.6);
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .domain-boundary.degraded {
+      border-color: var(--accent-amber);
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .domain-boundary.failed {
+      border-color: var(--accent-rose);
+      background: rgba(244, 63, 94, 0.08);
+    }
+
+    .domain-tag {
+      position: absolute;
+      top: -0.65rem;
+      right: 0.75rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      padding: 0.1rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+    }
+
+    /* Combobox Styles */
+    .combobox-container {
+      position: relative;
+    }
+
+    .combobox-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.375rem;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input[type="text"]:focus-visible, button:focus-visible {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.35);
+      outline: none;
+    }
+
+    .listbox {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 50;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+      list-style: none;
+    }
+
+    .option-item {
+      padding: 0.6rem 0.85rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.4);
+    }
+
+    .option-item:hover, .option-item.active-descendant {
+      background: rgba(59, 130, 246, 0.25);
+      color: #93c5fd;
+    }
+
+    .option-item.active-descendant {
+      border-left: 4px solid var(--accent-blue);
+    }
+
+    /* Button styles */
+    .btn {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      padding: 0.5rem 0.85rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn:hover {
+      background: #2563eb;
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: #374151;
+    }
+
+    .btn-danger {
+      background: var(--accent-rose);
+    }
+
+    .btn-danger:hover {
+      background: #e11d48;
+    }
+
+    .btn-warning {
+      background: var(--accent-amber);
+      color: #111827;
+      font-weight: 600;
+    }
+
+    .btn-warning:hover {
+      background: #d97706;
+    }
+
+    /* Telemetry & State Panel */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .telemetry-cell {
+      background: var(--bg-secondary);
+      padding: 0.65rem;
+      border-radius: 0.375rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .telemetry-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      margin-bottom: 0.25rem;
+    }
+
+    .telemetry-value {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-emerald);
+      word-break: break-all;
+    }
+
+    /* Fault Injection Buttons */
+    .fault-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    /* Console logs */
+    .log-box {
+      background: #000000;
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      height: 200px;
+      overflow-y: auto;
+      color: #34d399;
+    }
+
+    .log-entry {
+      margin-bottom: 0.35rem;
+      line-height: 1.4;
+    }
+
+    .log-entry.error {
+      color: #f87171;
+    }
+
+    .log-entry.warn {
+      color: #fbbf24;
+    }
+
+    .log-entry.info {
+      color: #60a5fa;
+    }
+
+    /* Modal Overlay */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-dialog {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      width: 90%;
+      max-width: 480px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .blast-meter {
+      height: 8px;
+      background: #374151;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.35rem;
+    }
+
+    .blast-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-emerald);
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <span class="badge">Staff-Level Lab</span>
+      <h1 style="font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem;">Enterprise Accessibility Architecture Lab</h1>
+      <p style="color: var(--text-secondary); font-size: 0.9rem;">
+        Resilience Boundaries, Async Currentness, Focus Ownership, and Failure Isolation Invariants
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <button class="btn btn-secondary" id="btn-open-dialog">⚙️ Global Settings Modal</button>
+      <button class="btn btn-warning" id="btn-reset-all">🔄 Reset System State</button>
+    </div>
+  </header>
+
+  <div class="layout-grid">
+    <!-- LEFT COLUMN: Enterprise Dashboard Failure Domains -->
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+      <!-- Domain 1: Search & Autocomplete Feature Domain -->
+      <div class="domain-boundary" id="domain-search">
+        <span class="domain-tag">Domain: Search & Autocomplete</span>
+        <h2 class="card-title">🔍 Enterprise Search Combobox</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Demonstrates single authoritative state, stable entity identity, and async currentness cancellation.
+        </p>
+
+        <div id="search-error-boundary-fallback" class="hidden" style="background: rgba(244,63,94,0.15); border: 1px solid var(--accent-rose); padding: 1rem; border-radius: 0.375rem; margin-bottom: 0.75rem;">
+          <h3 style="color: var(--accent-rose); font-size: 0.95rem; margin-bottom: 0.25rem;">⚠️ Search Component Crashed (Error Boundary Contained)</h3>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            A programming exception occurred in the rich combobox. Falling back to semantic plain search input.
+          </p>
+          <form onsubmit="event.preventDefault(); alert('Plain search submitted: ' + document.getElementById('fallback-input').value);">
+            <label for="fallback-input" style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Plain Search Query:</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="fallback-input" placeholder="Type query and press submit..." style="flex: 1;">
+              <button type="submit" class="btn btn-secondary">Submit</button>
+              <button type="button" class="btn btn-secondary" onclick="resetSearchBoundary()">Recover Widget</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="search-widget-root">
+          <div class="combobox-container">
+            <label for="search-input" id="search-label" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+              Search Enterprise Directory (ArrowDown / Enter / Esc)
+            </label>
+            <div class="combobox-input-wrapper">
+              <input 
+                type="text" 
+                id="search-input" 
+                role="combobox" 
+                aria-expanded="false" 
+                aria-autocomplete="list" 
+                aria-controls="search-listbox" 
+                aria-labelledby="search-label"
+                aria-activedescendant=""
+                placeholder="Search customers, services, or tools..."
+              />
+            </div>
+
+            <ul id="search-listbox" class="listbox hidden" role="listbox" aria-label="Search suggestions">
+              <!-- Dynamically rendered -->
+            </ul>
+          </div>
+
+          <div id="search-status-bar" style="margin-top: 0.5rem; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary);">
+            <span id="search-async-status">Status: Idle</span>
+            <span id="search-active-identity">Active: none</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Domain 2: Third-Party Analytics & Activity Feed -->
+      <div class="domain-boundary" id="domain-feed">
+        <span class="domain-tag">Domain: 3rd-Party Analytics & Feed</span>
+        <h2 class="card-title">📊 Isolated Activity Feed</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Isolated behind a Resilience Boundary. Third-party failures do not break navigation or search.
+        </p>
+
+        <div id="feed-error-boundary-fallback" class="hidden" style="background: rgba(245,158,11,0.15); border: 1px solid var(--accent-amber); padding: 0.85rem; border-radius: 0.375rem;">
+          <p style="color: var(--accent-amber); font-size: 0.85rem; font-weight: 600;">⚠️ Activity Feed Service Temporarily Unavailable</p>
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Cached data is displayed below. The main application is unaffected.
+          </p>
+          <button class="btn btn-secondary" style="margin-top: 0.5rem; font-size: 0.75rem;" onclick="recoverFeed()">Retry Service Connection</button>
+        </div>
+
+        <div id="feed-content" style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem; border: 1px solid var(--border-color);">
+          <ul id="feed-list" style="list-style: none; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.4rem;">
+            <li tabindex="0" style="padding: 0.4rem; border-radius: 0.25rem; background: rgba(55,65,81,0.5);">User #1043 updated authentication policy</li>
+            <li tabindex="0" style="padding: 0.4rem; border-radius: 0.25rem; background: rgba(55,65,81,0.5);">API Gateway provisioned 4 new edge clusters</li>
+            <li tabindex="0" style="padding: 0.4rem; border-radius: 0.25rem; background: rgba(55,65,81,0.5);">Security scan: 0 critical vulnerabilities detected</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Domain 3: Financial Mutation (Unknown Outcome vs Confirmed Failure) -->
+      <div class="domain-boundary" id="domain-payment">
+        <span class="domain-tag">Domain: Financial Mutation</span>
+        <h2 class="card-title">💳 Idempotent Mutation Boundary</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Epistemic certainty modeling: Distinguishing confirmed failure from unknown outcome timeout.
+        </p>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn" id="btn-submit-mutation">Execute $500 Payment Mutation</button>
+          <span id="mutation-status" style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-muted);">State: idle</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Diagnostics, Telemetry, Overlay Stack & Chaos Gauntlet -->
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+
+      <!-- Real-Time Architectural Telemetry -->
+      <div class="card">
+        <h2 class="card-title">📡 Real-Time A11y Telemetry</h2>
+        
+        <div class="telemetry-grid">
+          <div class="telemetry-cell">
+            <div class="telemetry-label">Active Focus Owner</div>
+            <div class="telemetry-value" id="tel-focus">BODY</div>
+          </div>
+          <div class="telemetry-cell">
+            <div class="telemetry-label">Logical Active ID</div>
+            <div class="telemetry-value" id="tel-active-id">null</div>
+          </div>
+          <div class="telemetry-cell">
+            <div class="telemetry-label">Topmost Overlay Stack</div>
+            <div class="telemetry-value" id="tel-overlay">[ ]</div>
+          </div>
+          <div class="telemetry-cell">
+            <div class="telemetry-label">Latest Operation ID</div>
+            <div class="telemetry-value" id="tel-op-id">op_init_000</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+            <span>Application Blast Radius:</span>
+            <span id="blast-percentage" style="font-family: var(--font-mono); color: var(--accent-emerald);">0% (Healthy)</span>
+          </div>
+          <div class="blast-meter">
+            <div class="blast-bar" id="blast-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chaos Fault Injection Gauntlet -->
+      <div class="card">
+        <h2 class="card-title">🧪 Chaos Fault Injection Gauntlet</h2>
+        <p style="font-size: 0.8rem; color: var(--text-secondary);">
+          Trigger real-world production concurrency, identity, and crash faults to test architectural resilience.
+        </p>
+
+        <div class="fault-controls">
+          <button class="btn btn-secondary" onclick="injectStaleAsyncRace()">1. Race: Req A Overrides Req B</button>
+          <button class="btn btn-secondary" onclick="injectDeleteActiveOption()">2. Delete Active Focused Option</button>
+          <button class="btn btn-danger" onclick="injectSearchComponentCrash()">3. Crash Combobox (Boundary Test)</button>
+          <button class="btn btn-warning" onclick="injectFeedFailure()">4. Fail 3rd-Party Analytics Service</button>
+          <button class="btn btn-secondary" onclick="injectUnknownPaymentOutcome()">5. Payment Timeout (Unknown Outcome)</button>
+          <button class="btn btn-secondary" onclick="injectCorruptedTelemetry()">6. Crash Telemetry Dispatcher</button>
+        </div>
+      </div>
+
+      <!-- Diagnostic Event Logger -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h2 class="card-title" style="margin-bottom: 0;">📜 Architectural Event Log</h2>
+          <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;" onclick="clearLogs()">Clear</button>
+        </div>
+        <div class="log-box" id="log-box">
+          <div class="log-entry info">[System] Enterprise A11y Architecture initialized. All invariants active.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Accessible Modal Dialog (Focus Trap & Restoration) -->
+  <div id="modal-backdrop" class="modal-backdrop hidden" role="presentation">
+    <div 
+      class="modal-dialog" 
+      role="dialog" 
+      aria-modal="true" 
+      aria-labelledby="modal-title" 
+      aria-describedby="modal-desc"
+      id="settings-dialog"
+    >
+      <h2 id="modal-title" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">⚙️ Enterprise A11y Settings</h2>
+      <p id="modal-desc" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Modal focus trap and LIFO Escape stack active. Closing restores focus to the trigger button.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+          <input type="checkbox" id="chk-sound" checked> Enable Screen-Reader Audio Pings
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+          <input type="checkbox" id="chk-telemetry" checked> Send Correlation IDs with Telemetry
+        </label>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button class="btn btn-secondary" id="btn-close-dialog">Cancel (Esc)</button>
+        <button class="btn" id="btn-save-dialog">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. Authoritative State & Overlay Stack Engine
+    // =========================================================================
+    const state = {
+      search: {
+        query: '',
+        options: [
+          { id: 'opt-customer-101', name: 'Acme Global Holdings (Enterprise)' },
+          { id: 'opt-customer-102', name: 'Beta Dynamics Inc (Healthcare)' },
+          { id: 'opt-customer-103', name: 'CyberShield Systems (Security)' },
+          { id: 'opt-customer-104', name: 'Delta Distributed Labs (Core)' },
+          { id: 'opt-customer-105', name: 'Echo Stream Media (Media)' }
+        ],
+        isOpen: false,
+        activeId: null, // Logical identity (NOT numeric index)
+        latestOperationId: 0,
+        isCrashed: false
+      },
+      feed: {
+        isFailed: false
+      },
+      overlays: [], // LIFO Overlay Stack
+      lastFocusedTrigger: null,
+      telemetryCrashed: false
+    };
+
+    // Logging helper
+    function log(msg, type = 'info') {
+      const box = document.getElementById('log-box');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const time = new Date().toISOString().substring(11, 19);
+      entry.textContent = `[${time}] ${msg}`;
+      box.appendChild(entry);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('log-box').innerHTML = '';
+    }
+
+    // Telemetry Update
+    function updateTelemetry() {
+      const activeEl = document.activeElement;
+      document.getElementById('tel-focus').textContent = activeEl ? (activeEl.id ? `#${activeEl.id}` : activeEl.tagName) : 'NONE';
+      document.getElementById('tel-active-id').textContent = state.search.activeId || 'null';
+      document.getElementById('tel-op-id').textContent = `op_${state.search.latestOperationId}`;
+      document.getElementById('tel-overlay').textContent = JSON.stringify(state.overlays.map(o => o.id));
+
+      // Calculate blast radius
+      let failedDomains = 0;
+      if (state.search.isCrashed) failedDomains += 50;
+      if (state.feed.isFailed) failedDomains += 25;
+      
+      const bar = document.getElementById('blast-bar');
+      const text = document.getElementById('blast-percentage');
+      bar.style.width = `${failedDomains}%`;
+      text.textContent = `${failedDomains}% (${failedDomains === 0 ? 'Healthy' : failedDomains > 40 ? 'Severe Degradation' : 'Partial Degradation'})`;
+      
+      if (failedDomains === 0) {
+        bar.style.backgroundColor = 'var(--accent-emerald)';
+        text.style.color = 'var(--accent-emerald)';
+      } else if (failedDomains < 40) {
+        bar.style.backgroundColor = 'var(--accent-amber)';
+        text.style.color = 'var(--accent-amber)';
+      } else {
+        bar.style.backgroundColor = 'var(--accent-rose)';
+        text.style.color = 'var(--accent-rose)';
+      }
+    }
+
+    document.addEventListener('focusin', updateTelemetry);
+
+    // =========================================================================
+    // 2. LIFO Overlay Stack & Global Escape Management
+    // =========================================================================
+    function pushOverlay(entry) {
+      state.overlays.push(entry);
+      log(`[OverlayStack] Pushed overlay: ${entry.id}. Depth: ${state.overlays.length}`, 'info');
+      updateTelemetry();
+    }
+
+    function popOverlay(id) {
+      const idx = state.overlays.findIndex(o => o.id === id);
+      if (idx !== -1) {
+        state.overlays.splice(idx, 1);
+        log(`[OverlayStack] Popped overlay: ${id}. Remaining: ${state.overlays.length}`, 'info');
+        updateTelemetry();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (state.overlays.length > 0) {
+          const topmost = state.overlays[state.overlays.length - 1];
+          log(`[OverlayStack] Escape intercepted by topmost owner: ${topmost.id}`, 'warn');
+          e.preventDefault();
+          topmost.onEscape();
+        }
+      }
+    });
+
+    // =========================================================================
+    // 3. Search Combobox with Stable Identity & Invariant Validation
+    // =========================================================================
+    const searchInput = document.getElementById('search-input');
+    const searchListbox = document.getElementById('search-listbox');
+    const searchStatusBar = document.getElementById('search-async-status');
+    const searchActiveIdentity = document.getElementById('search-active-identity');
+
+    function renderOptions() {
+      if (state.search.isCrashed) return;
+
+      searchListbox.innerHTML = '';
+      if (!state.search.isOpen || state.search.options.length === 0) {
+        searchListbox.classList.add('hidden');
+        searchInput.setAttribute('aria-expanded', 'false');
+        searchInput.removeAttribute('aria-activedescendant');
+        state.search.activeId = null;
+        updateTelemetry();
+        return;
+      }
+
+      searchListbox.classList.remove('hidden');
+      searchInput.setAttribute('aria-expanded', 'true');
+
+      // CRITICAL INVARIANT: activeId MUST exist in current options collection
+      if (state.search.activeId && !state.search.options.some(o => o.id === state.search.activeId)) {
+        log(`[Invariant Violation Prevented] activeId '${state.search.activeId}' no longer in options. Recovering to null.`, 'warn');
+        state.search.activeId = null;
+      }
+
+      if (state.search.activeId) {
+        searchInput.setAttribute('aria-activedescendant', state.search.activeId);
+      } else {
+        searchInput.removeAttribute('aria-activedescendant');
+      }
+
+      state.search.options.forEach(opt => {
+        const li = document.createElement('li');
+        li.id = opt.id;
+        li.role = 'option';
+        li.className = `option-item ${state.search.activeId === opt.id ? 'active-descendant' : ''}`;
+        li.setAttribute('aria-selected', state.search.activeId === opt.id ? 'true' : 'false');
+        li.textContent = opt.name;
+        li.onmousedown = (e) => {
+          e.preventDefault(); // Prevent blur
+          selectOption(opt);
+        };
+        searchListbox.appendChild(li);
+      });
+
+      searchActiveIdentity.textContent = `Active: ${state.search.activeId || 'none'}`;
+      updateTelemetry();
+    }
+
+    function selectOption(opt) {
+      searchInput.value = opt.name;
+      state.search.isOpen = false;
+      state.search.activeId = null;
+      renderOptions();
+      popOverlay('search-listbox');
+      log(`[Combobox] Option selected: ${opt.name} (${opt.id})`, 'info');
+      searchInput.focus();
+    }
+
+    searchInput.addEventListener('focus', () => {
+      if (!state.search.isOpen && searchInput.value.length > 0) {
+        state.search.isOpen = true;
+        pushOverlay({ id: 'search-listbox', onEscape: () => closeCombobox() });
+        renderOptions();
+      }
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value;
+      state.search.query = query;
+      const opId = ++state.search.latestOperationId;
+      searchStatusBar.textContent = `Status: Fetching (Op #${opId})...`;
+      log(`[Async Query] Dispatched Search Request Op #${opId} for query "${query}"`, 'info');
+
+      if (!state.search.isOpen) {
+        state.search.isOpen = true;
+        pushOverlay({ id: 'search-listbox', onEscape: () => closeCombobox() });
+      }
+
+      // Simulated Async Service with Currentness Check
+      setTimeout(() => {
+        if (opId < state.search.latestOperationId) {
+          log(`[Async Currentness Guard] Dropped stale response for Op #${opId}. Latest is Op #${state.search.latestOperationId}.`, 'warn');
+          return;
+        }
+
+        searchStatusBar.textContent = `Status: Resolved Op #${opId}`;
+        state.search.options = [
+          { id: `opt-${opId}-1`, name: `${query} — Enterprise Suite A` },
+          { id: `opt-${opId}-2`, name: `${query} — Integration Service B` },
+          { id: `opt-${opId}-3`, name: `${query} — Analytics Pipeline C` }
+        ];
+        renderOptions();
+      }, 300);
+    });
+
+    function closeCombobox() {
+      state.search.isOpen = false;
+      state.search.activeId = null;
+      renderOptions();
+      popOverlay('search-listbox');
+      log('[Combobox] Closed dropdown and cleared active descendant.', 'info');
+    }
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (!state.search.isOpen) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          state.search.isOpen = true;
+          pushOverlay({ id: 'search-listbox', onEscape: () => closeCombobox() });
+          renderOptions();
+          e.preventDefault();
+        }
+        return;
+      }
+
+      const opts = state.search.options;
+      if (opts.length === 0) return;
+
+      const currentIdx = opts.findIndex(o => o.id === state.search.activeId);
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIdx = currentIdx < opts.length - 1 ? currentIdx + 1 : 0;
+        state.search.activeId = opts[nextIdx].id;
+        renderOptions();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIdx = currentIdx > 0 ? currentIdx - 1 : opts.length - 1;
+        state.search.activeId = opts[prevIdx].id;
+        renderOptions();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (state.search.activeId) {
+          const selected = opts.find(o => o.id === state.search.activeId);
+          if (selected) selectOption(selected);
+        }
+      }
+    });
+
+    // =========================================================================
+    // 4. Modal Dialog Focus Trap & Focus Restoration
+    // =========================================================================
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const settingsDialog = document.getElementById('settings-dialog');
+    const btnOpenDialog = document.getElementById('btn-open-dialog');
+    const btnCloseDialog = document.getElementById('btn-close-dialog');
+    const btnSaveDialog = document.getElementById('btn-save-dialog');
+
+    function openModal() {
+      state.lastFocusedTrigger = document.activeElement;
+      modalBackdrop.classList.remove('hidden');
+      pushOverlay({ id: 'settings-dialog', onEscape: () => closeModal() });
+      
+      // Focus first interactive control in dialog
+      const firstFocusable = settingsDialog.querySelector('button, input, [tabindex="0"]');
+      if (firstFocusable) firstFocusable.focus();
+      log(`[Focus Ownership] Transferred focus to Modal Dialog. Saved trigger: #${state.lastFocusedTrigger?.id || 'button'}`, 'info');
+    }
+
+    function closeModal() {
+      modalBackdrop.classList.add('hidden');
+      popOverlay('settings-dialog');
+
+      // Focus restoration
+      if (state.lastFocusedTrigger && typeof state.lastFocusedTrigger.focus === 'function') {
+        state.lastFocusedTrigger.focus();
+        log(`[Focus Restoration] Successfully restored focus to #${state.lastFocusedTrigger.id || 'button'}`, 'info');
+      } else {
+        document.body.focus();
+      }
+    }
+
+    btnOpenDialog.addEventListener('click', openModal);
+    btnCloseDialog.addEventListener('click', closeModal);
+    btnSaveDialog.addEventListener('click', () => {
+      log('[Settings] Preferences saved successfully.', 'info');
+      closeModal();
+    });
+
+    // Modal Focus Trap
+    settingsDialog.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const focusables = settingsDialog.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex="0"]');
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    // =========================================================================
+    // 5. Payment Mutation: Confirmed Failure vs Unknown Outcome
+    // =========================================================================
+    const btnSubmitMutation = document.getElementById('btn-submit-mutation');
+    const mutationStatus = document.getElementById('mutation-status');
+
+    btnSubmitMutation.addEventListener('click', () => {
+      mutationStatus.textContent = 'State: Dispatching Mutation (Idempotency Key: IDEM-884)...';
+      btnSubmitMutation.disabled = true;
+
+      setTimeout(() => {
+        btnSubmitMutation.disabled = false;
+        mutationStatus.textContent = 'State: Confirmed Success ($500 Processed)';
+        log('[Mutation Complete] Confirmed operation success. No duplicate risk.', 'info');
+      }, 1000);
+    });
+
+    // =========================================================================
+    // 6. Chaos Fault Injections
+    // =========================================================================
+    function injectStaleAsyncRace() {
+      log('--- [CHAOS FAULT 1: Out-of-Order Async Race] ---', 'warn');
+      state.search.isOpen = true;
+      pushOverlay({ id: 'search-listbox', onEscape: () => closeCombobox() });
+
+      const opA = ++state.search.latestOperationId; // Op 1: query "Alpha"
+      log(`[Chaos] Dispatched slow request Op #${opA} ("Alpha") with 1200ms latency`, 'info');
+
+      setTimeout(() => {
+        const opB = ++state.search.latestOperationId; // Op 2: query "AlphaBeta"
+        log(`[Chaos] Dispatched fast request Op #${opB} ("AlphaBeta") with 200ms latency`, 'info');
+
+        // Op B resolves first
+        setTimeout(() => {
+          log(`[Chaos] Fast Op #${opB} resolved. Updating UI options.`, 'info');
+          state.search.options = [
+            { id: `opt-${opB}-1`, name: 'AlphaBeta - Result 1' },
+            { id: `opt-${opB}-2`, name: 'AlphaBeta - Result 2' }
+          ];
+          state.search.activeId = `opt-${opB}-1`;
+          renderOptions();
+        }, 200);
+
+        // Op A resolves later (stale)
+        setTimeout(() => {
+          log(`[Chaos] Slow Op #${opA} returned! Async currentness guard checking...`, 'warn');
+          if (opA < state.search.latestOperationId) {
+            log(`✅ [TEST PASSED] Guard intercepted and dropped stale Op #${opA}. Current state preserved!`, 'info');
+          } else {
+            log(`❌ [TEST FAILED] Stale response corrupted current search state!`, 'error');
+          }
+        }, 1200);
+      }, 100);
+    }
+
+    function injectDeleteActiveOption() {
+      log('--- [CHAOS FAULT 2: Dynamic Deletion of Active Option] ---', 'warn');
+      if (!state.search.isOpen || state.search.options.length === 0) {
+        state.search.isOpen = true;
+        renderOptions();
+      }
+
+      state.search.activeId = state.search.options[0].id;
+      renderOptions();
+      log(`[Chaos] Active option set to: ${state.search.activeId}`, 'info');
+
+      setTimeout(() => {
+        log(`[Chaos] Simulating background WebSocket deletion of option: ${state.search.activeId}`, 'warn');
+        state.search.options = state.search.options.slice(1);
+        renderOptions(); // Trigger invariant check
+        log(`[Invariant Result] Active ID safely reconciled to: ${state.search.activeId}`, 'info');
+      }, 500);
+    }
+
+    function injectSearchComponentCrash() {
+      log('--- [CHAOS FAULT 3: Combobox Programming Crash] ---', 'error');
+      state.search.isCrashed = true;
+      document.getElementById('search-widget-root').classList.add('hidden');
+      document.getElementById('search-error-boundary-fallback').classList.remove('hidden');
+      document.getElementById('domain-search').classList.add('failed');
+      log('[Resilience Boundary] Caught component exception. Rendered plain fallback form.', 'error');
+      updateTelemetry();
+    }
+
+    function resetSearchBoundary() {
+      state.search.isCrashed = false;
+      document.getElementById('search-widget-root').classList.remove('hidden');
+      document.getElementById('search-error-boundary-fallback').classList.add('hidden');
+      document.getElementById('domain-search').classList.remove('failed');
+      log('[Recovery] Combobox component restored to healthy state.', 'info');
+      updateTelemetry();
+    }
+
+    function injectFeedFailure() {
+      log('--- [CHAOS FAULT 4: 3rd-Party Feed Service Crash] ---', 'warn');
+      state.feed.isFailed = true;
+      document.getElementById('feed-content').classList.add('hidden');
+      document.getElementById('feed-error-boundary-fallback').classList.remove('hidden');
+      document.getElementById('domain-feed').classList.add('degraded');
+      log('[Isolation Invariant] Activity feed degraded without impacting Search or Dialog.', 'warn');
+      updateTelemetry();
+    }
+
+    function recoverFeed() {
+      state.feed.isFailed = false;
+      document.getElementById('feed-content').classList.remove('hidden');
+      document.getElementById('feed-error-boundary-fallback').classList.add('hidden');
+      document.getElementById('domain-feed').classList.remove('degraded');
+      log('[Recovery] Activity feed reconnected successfully.', 'info');
+      updateTelemetry();
+    }
+
+    function injectUnknownPaymentOutcome() {
+      log('--- [CHAOS FAULT 5: Mutation Network Timeout (Unknown Outcome)] ---', 'warn');
+      btnSubmitMutation.disabled = true;
+      mutationStatus.textContent = 'State: Request Timeout (Status Unknown)...';
+
+      setTimeout(() => {
+        btnSubmitMutation.disabled = false;
+        mutationStatus.textContent = '⚠️ Result Unconfirmed. Please check your bank before retrying.';
+        log('[Epistemic Honesty] Communicated uncertainty. Blind retry blocked to avoid duplicate charge.', 'warn');
+      }, 800);
+    }
+
+    function injectCorruptedTelemetry() {
+      log('--- [CHAOS FAULT 6: Telemetry Network Exception] ---', 'error');
+      try {
+        log('[Telemetry] Dispatching analytics payload with correlation ID: corr_a91f_883', 'info');
+        throw new Error('503 Service Unavailable: Analytics Collector Crashed');
+      } catch (err) {
+        log(`[Telemetry Isolation] Best-effort telemetry caught error: "${err.message}". Fallback UX untouched!`, 'info');
+      }
+    }
+
+    document.getElementById('btn-reset-all').addEventListener('click', () => {
+      resetSearchBoundary();
+      recoverFeed();
+      closeModal();
+      state.search.query = '';
+      searchInput.value = '';
+      closeCombobox();
+      mutationStatus.textContent = 'State: idle';
+      log('[System Reset] All domain boundaries restored to baseline.', 'info');
+      updateTelemetry();
+    });
+
+    // Initial render
+    renderOptions();
+    updateTelemetry();
+  </script>
+</body>
+</html>
