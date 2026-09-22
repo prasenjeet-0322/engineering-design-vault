@@ -2,164 +2,13 @@
 
 ## Runtime Lifecycle, Health Checks, Graceful Shutdown & Deployment-Safe Behavior
 
----
+### Part Objective
 
-## 1. Part Objective
+By the end of this part, you should be able to reason about the **entire lifecycle of a deployed Next.js/server runtime** and design deployment behavior that remains correct while instances start, become ready, receive traffic, drain, and shut down.
 
-A deployment is not complete when a process starts.
+This part is not about deployment strategy itself.
 
-A production runtime must correctly handle:
-
-```text
-START
-  ↓
-INITIALIZE
-  ↓
-READY
-  ↓
-SERVE TRAFFIC
-  ↓
-DRAIN
-  ↓
-SHUT DOWN
-```
-
-The senior-level problem is:
-
-> **How does an application enter service safely, remain observable, handle dependency failures, and leave service without corrupting requests or work?**
-
-The runtime lifecycle is therefore part of deployment architecture.
-
----
-
-# 2. Runtime Lifecycle Mental Model
-
-A useful model is:
-
-```text
-                DEPLOYMENT
-                    │
-                    ▼
-                 START
-                    │
-                    ▼
-               INITIALIZE
-                    │
-        ┌───────────┼───────────┐
-        ▼           ▼           ▼
-     Config      Runtime     Dependencies
-     Load        Setup        Connect
-        │           │           │
-        └───────────┼───────────┘
-                    ▼
-                  READY
-                    │
-                    ▼
-              RECEIVE TRAFFIC
-                    │
-          ┌─────────┴─────────┐
-          ▼                   ▼
-       HEALTHY              FAILURE
-          │                   │
-          ▼                   ▼
-        SERVE             RECOVER / RESTART
-          │
-          ▼
-        DRAIN
-          │
-          ▼
-       SHUTDOWN
-```
-
-The critical distinction is:
-
-```text
-process exists
-≠
-application is ready
-```
-
----
-
-# 3. Process Existence vs Readiness
-
-A process can be alive while the application is not capable of serving traffic.
-
-For example:
-
-```text
-Node process
-   ↓
-starts successfully
-   ↓
-database connection unavailable
-```
-
-The process exists.
-
-But the application may not be ready.
-
-Therefore production infrastructure often needs separate concepts for:
-
-```text
-Liveness
-Readiness
-```
-
----
-
-# 4. Liveness
-
-Liveness answers:
-
-> **Is this runtime instance still functioning enough that restarting it may be useful?**
-
-Conceptually:
-
-```text
-GET /health/live
-```
-
-might return:
-
-```text
-200 OK
-```
-
-when the process is operational.
-
-A liveness failure can cause the platform to restart the instance.
-
----
-
-# 5. Readiness
-
-Readiness answers:
-
-> **Should this instance receive production traffic right now?**
-
-Conceptually:
-
-```text
-GET /health/ready
-```
-
-may verify that the runtime has completed required initialization.
-
-An instance can therefore be:
-
-```text
-Alive = yes
-Ready = no
-```
-
-This distinction is fundamental.
-
----
-
-# 6. Startup State
-
-A runtime can be modeled as a state machine:
+It focuses on what happens **inside and around a running deployment instance during lifecycle transitions**:
 
 ```text
 STARTING
@@ -168,1932 +17,2946 @@ INITIALIZING
    ↓
 READY
    ↓
+SERVING
+   ↓
 DRAINING
    ↓
-STOPPED
+SHUTDOWN
 ```
 
-Failure can occur from multiple states.
+The senior-level problem is not merely:
 
-For example:
+> "How do I start the application?"
+
+It is:
+
+> "How does the application become safe to receive traffic, remain healthy under dependency failures, and stop serving traffic without corrupting requests, transactions, streams, or background work?"
+
+---
+
+# 1. Runtime Lifecycle Mental Model
+
+A deployed application is not simply:
 
 ```text
+process running = application healthy
+```
+
+A process can exist while:
+
+* dependencies are unavailable
+* configuration is invalid
+* database connections cannot be established
+* required initialization has not completed
+* the application cannot safely serve traffic
+* the process is shutting down
+* the instance is overloaded
+* critical internal state is unavailable
+
+Therefore distinguish:
+
+```text
+Process existence
+        ≠
+Application readiness
+        ≠
+Request-serving health
+```
+
+A useful lifecycle model is:
+
+```text
+STARTING
+   ↓
 INITIALIZING
-      │
-      └── dependency failure
-              ↓
-            FAILED
+   ↓
+READY
+   ↓
+SERVING
+   ↓
+DRAINING
+   ↓
+SHUTDOWN
 ```
 
-The state machine should be deliberate rather than accidental.
+Each state answers a different operational question.
+
+| State        | Primary question                          |
+| ------------ | ----------------------------------------- |
+| STARTING     | Has the runtime process started?          |
+| INITIALIZING | Is required initialization occurring?     |
+| READY        | Can this instance safely receive traffic? |
+| SERVING      | Is it actively processing requests?       |
+| DRAINING     | Should it stop accepting new work?        |
+| SHUTDOWN     | Has it stopped safely?                    |
+
+This distinction becomes critical during:
+
+* rolling deployments
+* autoscaling
+* container replacement
+* serverless initialization
+* platform restarts
+* regional failover
+* health-check failures
+* infrastructure maintenance
 
 ---
 
-# 7. Startup Work
+# 2. Process Existence vs Readiness
 
-Startup commonly includes:
-
-```text
-Load configuration
-Validate configuration
-Initialize application
-Initialize clients
-Connect to required dependencies
-Load critical metadata
-Register telemetry
-Start HTTP server
-```
-
-But startup work should be classified.
-
-Not every dependency needs to block readiness.
-
----
-
-# 8. Critical vs Non-Critical Dependencies
-
-Consider:
+A common deployment mistake is defining health as:
 
 ```text
-Database
-Payment provider
-Analytics
-Feature flag service
-Search service
-Logging backend
+HTTP 200 from /health
 ```
 
-They do not necessarily have equal criticality.
+without defining what "healthy" means.
 
 For example:
 
 ```text
-Database
+Application process starts
+        ↓
+/health → 200
+        ↓
+Traffic begins
+        ↓
+Database initialization fails
+        ↓
+Every request returns 500
 ```
 
-may be required for readiness.
+The process exists.
 
-But:
+The application is not ready.
+
+A readiness check should answer:
+
+> "Should the traffic router send normal production traffic to this instance?"
+
+That is different from:
+
+> "Is the process alive?"
+
+---
+
+# 3. Liveness vs Readiness
+
+Two common health concepts are:
+
+### Liveness
+
+Liveness asks:
+
+> Is the process/runtime still functioning sufficiently to remain alive?
+
+Conceptually:
 
 ```text
-Analytics
+liveness = process should remain running
 ```
 
-may be allowed to fail without preventing traffic.
+### Readiness
 
-Therefore:
+Readiness asks:
+
+> Can this instance safely receive production traffic?
+
+Conceptually:
+
+```text
+readiness = eligible to receive traffic
+```
+
+These should not automatically be identical.
+
+For example:
+
+```text
+Database temporarily unavailable
+```
+
+An application might be:
+
+```text
+Liveness: YES
+Readiness: NO
+```
+
+Killing the process because the database is temporarily unavailable could create:
 
 ```text
 dependency failure
-≠
-automatically application failure
+        ↓
+health failure
+        ↓
+process restart
+        ↓
+more startup work
+        ↓
+more dependency load
+        ↓
+more failures
 ```
+
+This can create a restart storm.
 
 ---
 
-# 9. Dependency Classification
+# 4. Health Checks Are Control Signals
 
-A useful classification is:
+Health checks are not merely monitoring endpoints.
 
-### Required for startup
+They participate in traffic-control decisions.
 
-Without it, the application cannot operate.
+A simplified topology:
 
-### Required for specific requests
+```text
+                    ┌───────────────┐
+                    │ Load Balancer │
+                    └───────┬───────┘
+                            │
+                  ┌─────────┼─────────┐
+                  ↓         ↓         ↓
+               Instance  Instance  Instance
+                  │         │         │
+              readiness  readiness readiness
+```
 
-The application can start, but some operations may fail.
+The health signal influences:
 
-### Optional
+```text
+traffic eligibility
+```
 
-The application remains useful without it.
+Therefore an incorrect health endpoint can cause:
 
-### Degraded-mode dependency
+* healthy instances to be removed
+* unhealthy instances to receive traffic
+* cascading failures
+* deployment failures
+* restart loops
+* capacity collapse
 
-Failure should activate fallback behavior.
-
-This classification makes health checks more meaningful.
+Health-check design is therefore part of application architecture.
 
 ---
 
-# 10. Health Checks Should Represent Reality
+# 5. Startup Architecture
 
-A bad health check:
-
-```text
-GET /health
-→ always 200
-```
-
-does not provide useful operational information.
-
-Another bad approach:
+Startup commonly contains:
 
 ```text
-GET /health
-→ checks every dependency
-→ fails if analytics is unavailable
-```
-
-This can cause healthy instances to be removed unnecessarily.
-
-Health checks should represent the intended operational contract.
-
----
-
-# 11. Health Check Depth
-
-Health checks can range from:
-
-```text
-Process check
-```
-
-to:
-
-```text
-Application check
-```
-
-to:
-
-```text
-Dependency check
-```
-
-to:
-
-```text
-Synthetic business transaction
-```
-
-The deeper the check, the more expensive and failure-sensitive it becomes.
-
----
-
-# 12. Shallow Liveness
-
-A liveness check should generally avoid making the application dependent on another system.
-
-For example:
-
-```text
-GET /health/live
-```
-
-can answer:
-
-```text
-process responsive?
-```
-
-without requiring:
-
-```text
-database
-redis
-external API
-```
-
-Why?
-
-Because if the database is down:
-
-```text
-database down
- ↓
-liveness fails
- ↓
-restart application
- ↓
-new process
- ↓
-database still down
- ↓
-liveness fails
-```
-
-This can create a restart loop without solving the underlying problem.
-
----
-
-# 13. Readiness Can Be Deeper
-
-Readiness can reasonably incorporate required initialization state.
-
-For example:
-
-```text
-configuration valid
-+
-required clients initialized
-+
-critical dependencies available
-```
-
-may be sufficient.
-
-But readiness should still be designed carefully to avoid unnecessary dependency coupling.
-
----
-
-# 14. Health Checks and Load Balancers
-
-A load balancer may route traffic only to ready instances.
-
-Conceptually:
-
-```text
-             Load Balancer
-              /         \
-             /           \
-         Ready A       Ready B
-             │             │
-          traffic        traffic
-```
-
-while:
-
-```text
-Instance C
-   │
-Not Ready
-   │
-No traffic
-```
-
-This enables safe startup and deployment.
-
----
-
-# 15. Deployment Startup Sequence
-
-A safe deployment can look like:
-
-```text
-Deploy new instance
-       ↓
-Start process
-       ↓
-Initialize
-       ↓
-Run readiness checks
-       ↓
-Ready = true
-       ↓
-Receive traffic
-```
-
-The critical property is:
-
-> **Traffic should not arrive before the application is ready to serve it.**
-
----
-
-# 16. Warm-Up
-
-Some applications need warm-up work:
-
-```text
-Load runtime
-Initialize libraries
-Establish connections
-Compile templates
-Prepare caches
-Initialize SDKs
-```
-
-If traffic arrives immediately, the first requests may experience high latency.
-
-A warm-up phase can reduce this effect.
-
----
-
-# 17. Cold Starts
-
-Short-lived compute models can create:
-
-```text
-No active runtime
+Process creation
       ↓
-Request arrives
+Configuration loading
+      ↓
+Configuration validation
       ↓
 Runtime initialization
       ↓
-Application starts
+Dependency initialization
       ↓
-Request executes
+Connection establishment
+      ↓
+Cache/client initialization
+      ↓
+Readiness
 ```
 
-This is a cold start.
+Not every initialization step belongs on the critical path.
 
-Cold-start cost may include:
+Classify initialization into:
 
-* runtime initialization
-* module loading
-* dependency initialization
-* connection setup
-* configuration loading
+### Critical startup dependencies
+
+Without these, the instance cannot safely serve requests.
+
+Examples:
+
+```text
+Required configuration
+Required secrets
+Required runtime initialization
+Mandatory security configuration
+```
+
+Potentially:
+
+```text
+database connectivity
+```
+
+depending on the application's architecture.
+
+### Non-critical startup work
+
+The application may safely begin serving while these initialize asynchronously.
+
+Examples:
+
+```text
+optional analytics client
+non-critical cache warming
+background telemetry initialization
+optional recommendation data
+```
+
+The key question is:
+
+> Does failure of this dependency make normal request processing unsafe or impossible?
 
 ---
 
-# 18. Warm Runtime
-
-A warm instance can process requests without recreating the entire runtime.
-
-```text
-Runtime exists
-     ↓
-Request
-     ↓
-Handler
-```
-
-This is generally faster than:
-
-```text
-Create runtime
-     ↓
-Initialize
-     ↓
-Handle request
-```
-
----
-
-# 19. Connection Initialization
-
-A common mistake is creating expensive clients on every request:
-
-```text
-Request
- ↓
-Create DB client
- ↓
-Query
- ↓
-Destroy
-```
-
-This can create:
-
-* connection overhead
-* latency
-* connection exhaustion
-* unnecessary resource usage
-
-A better architecture often reuses clients within the runtime lifecycle where the platform permits it.
-
----
-
-# 20. Runtime Instance Reuse
-
-A runtime may be reused:
-
-```text
-Instance
- ├── Request 1
- ├── Request 2
- ├── Request 3
- └── Request 4
-```
-
-But this does not mean the application can rely on the instance existing forever.
-
-The platform may terminate it at any time.
-
-Therefore:
-
-```text
-instance reuse
-≠
-durable state
-```
-
----
-
-# 21. In-Memory State
-
-In-memory state can be useful for:
-
-* caches
-* initialized clients
-* temporary computation
-* process-local memoization
-
-But it should not generally be treated as durable shared application state.
-
-For example:
-
-```text
-Instance A
-memory = user session
-```
-
-does not guarantee:
-
-```text
-Instance B
-memory = same session
-```
-
----
-
-# 22. Distributed State
-
-Durable shared state should normally live in external systems such as:
-
-```text
-Database
-Redis
-Object Storage
-Queue
-External State Store
-```
-
-The runtime process should be replaceable.
-
----
-
-# 23. Graceful Shutdown
-
-Graceful shutdown means:
-
-> **Stop accepting new work while allowing appropriate existing work to complete or terminate safely.**
-
-Conceptually:
-
-```text
-RUNNING
-   ↓
-DRAINING
-   ↓
-STOP ACCEPTING NEW WORK
-   ↓
-WAIT FOR ACTIVE WORK
-   ↓
-CLOSE RESOURCES
-   ↓
-EXIT
-```
-
----
-
-# 24. Why Immediate Termination Is Dangerous
-
-Suppose an instance is processing:
-
-```text
-POST /checkout
-```
-
-and is immediately terminated.
-
-Possible consequences include:
-
-* incomplete work
-* client-visible errors
-* partially completed external operations
-* abandoned transactions
-* lost telemetry
-* interrupted streams
-
-Shutdown therefore requires coordination.
-
----
-
-# 25. Deployment and Graceful Shutdown
+# 6. Startup Dependency Ordering
 
 Consider:
 
 ```text
-Old Instance
-      │
-      ├── active requests
-      │
-      ▼
-   DRAINING
-      │
-      ▼
-New Instance
-      │
-      ▼
-   READY
+Application
+    ↓
+Database
+    ↓
+Cache
 ```
 
-This allows traffic to transition between versions.
+But if the application starts the cache before the database when the cache is actually dependent on database-derived initialization, ordering matters.
 
----
-
-# 26. Connection Draining
-
-A load balancer should stop routing new requests to a draining instance.
-
-Conceptually:
+A stronger model is:
 
 ```text
-Load Balancer
-      │
-      ├── New requests → New Instance
-      │
-      └── Existing requests → Old Instance
+Configuration
+      ↓
+Security initialization
+      ↓
+Critical clients
+      ↓
+Required dependencies
+      ↓
+Readiness
 ```
 
-Once active work completes:
+Do not make startup dependencies unnecessarily sequential.
+
+Bad:
 
 ```text
-Old Instance → shutdown
-```
-
----
-
-# 27. Shutdown Signals
-
-Different hosting systems provide different lifecycle mechanisms.
-
-The application should understand the platform's termination semantics.
-
-Conceptually:
-
-```text
-Termination Signal
-       ↓
-Mark Not Ready
-       ↓
-Stop New Work
-       ↓
-Drain Existing Work
-       ↓
-Close Resources
-       ↓
-Exit
-```
-
-The exact signal and timeout vary by runtime.
-
----
-
-# 28. Shutdown Timeout
-
-Graceful shutdown cannot wait forever.
-
-Suppose:
-
-```text
-shutdown timeout = 30 seconds
-```
-
-and a request has been running for:
-
-```text
-120 seconds
-```
-
-The platform may eventually terminate the process.
-
-Therefore long-running work needs explicit architecture rather than relying indefinitely on request lifecycle.
-
----
-
-# 29. Request Timeout vs Shutdown Timeout
-
-These are different.
-
-### Request timeout
-
-Limits how long an individual operation may run.
-
-### Shutdown timeout
-
-Limits how long the runtime may remain alive while draining.
-
-For example:
-
-```text
-Request timeout = 10s
-Shutdown timeout = 30s
-```
-
-allows the runtime to drain several short requests.
-
----
-
-# 30. Long-Running Work
-
-Do not assume an HTTP request is the right place for:
-
-```text
-video processing
-large exports
-bulk imports
-long AI jobs
-large report generation
-```
-
-A stronger architecture is often:
-
-```text
-HTTP Request
-     ↓
-Create Job
-     ↓
-Queue
-     ↓
-Worker
-     ↓
-Persistent Result
-```
-
-The HTTP request becomes short-lived.
-
----
-
-# 31. Background Jobs
-
-A production deployment must consider what happens to background work during shutdown.
-
-For example:
-
-```text
-Worker
-  ↓
-Processing Job A
-  ↓
-Deployment
-  ↓
-Worker terminated
-```
-
-The job system needs a defined model for:
-
-* acknowledgement
-* retry
-* visibility timeout
-* idempotency
-* checkpointing
-* cancellation
-
----
-
-# 32. Idempotency During Lifecycle Events
-
-Deployment can create duplicate execution.
-
-For example:
-
-```text
-Request
- ↓
-External payment
- ↓
-Response lost
- ↓
-Client retries
-```
-
-or:
-
-```text
-Worker
- ↓
-Job executed
- ↓
-Worker crashes before acknowledgement
- ↓
-Job retried
-```
-
-Therefore lifecycle-safe systems often require idempotent operations.
-
----
-
-# 33. Shutdown and Transactions
-
-A shutdown during a database transaction must not leave inconsistent application state.
-
-The exact behavior depends on the database and transaction boundary.
-
-The principle is:
-
-```text
-application transaction
-+
-runtime lifecycle
-```
-
-must be designed together.
-
----
-
-# 34. Streaming Responses
-
-Streaming complicates shutdown.
-
-Suppose:
-
-```text
-Request
- ↓
-Streaming response
- ↓
-Instance begins draining
-```
-
-The application must understand how the hosting platform handles active streams.
-
-Possible outcomes include:
-
-* stream completion
-* stream termination
-* timeout
-* connection closure
-
-Streaming workloads therefore need explicit operational testing.
-
----
-
-# 35. WebSockets and Long-Lived Connections
-
-Long-lived connections are especially sensitive to deployment.
-
-For example:
-
-```text
-Client
-  │
-  │ WebSocket
-  ▼
-Instance A
-```
-
-When Instance A is replaced:
-
-```text
-connection
+initialize A
    ↓
-terminated
+initialize B
+   ↓
+initialize C
+   ↓
+initialize D
 ```
 
-The system may require:
+when they are independent.
 
-* reconnect logic
-* connection migration strategy
-* external session state
-* load-balancer awareness
+Potentially better:
+
+```text
+        ┌→ initialize A ─┐
+        ├→ initialize B ─┤
+START → ├→ initialize C ─┤ → READY
+        └→ initialize D ─┘
+```
+
+This reduces startup latency.
+
+But parallel initialization increases concurrency against dependencies.
+
+Therefore:
+
+```text
+startup latency
+        vs
+dependency load
+```
+
+must be considered together.
 
 ---
 
-# 36. Health Checks and Version Awareness
+# 7. Startup Budgets
 
-During deployment:
+Every startup operation contributes to the time before readiness.
+
+Conceptually:
+
+```text
+T_ready =
+  T_config
++ T_initialization
++ T_dependencies
++ T_runtime_setup
+```
+
+If readiness takes too long:
+
+* deployment rollout slows
+* autoscaling reacts slowly
+* cold starts become expensive
+* capacity replacement takes longer
+* traffic may remain concentrated on old instances
+
+A senior engineer therefore treats startup latency as an operational metric.
+
+---
+
+# 8. Cold Starts and Warm Starts
+
+Some deployment environments create execution instances only when needed.
+
+Conceptually:
+
+```text
+Request
+   ↓
+No warm runtime
+   ↓
+Create runtime
+   ↓
+Initialize
+   ↓
+Handle request
+```
+
+This introduces cold-start latency.
+
+Warm execution:
+
+```text
+Request
+   ↓
+Existing runtime
+   ↓
+Handle request
+```
+
+The architecture must therefore distinguish:
+
+```text
+startup cost
++
+request processing cost
+```
+
+A request that normally takes:
+
+```text
+100 ms
+```
+
+may experience:
+
+```text
+startup:       600 ms
+request:       100 ms
+--------------------
+total:         700 ms
+```
+
+Optimizing only request execution does not solve cold-start latency.
+
+---
+
+# 9. Readiness During Deployment
+
+Consider a rolling deployment:
 
 ```text
 Version A
+Version A
+Version A
+```
+
+New version starts:
+
+```text
 Version B
 ```
 
-may temporarily coexist.
+The correct sequence is generally:
 
-Health checks should verify that an instance can serve its intended workload.
+```text
+Start B
+  ↓
+Initialize B
+  ↓
+B becomes ready
+  ↓
+B receives traffic
+  ↓
+A begins draining
+```
 
-But application-level compatibility must also be considered.
+Not:
+
+```text
+Start B
+  ↓
+Immediately send traffic
+  ↓
+Initialization still running
+```
+
+Readiness therefore acts as a synchronization mechanism between:
+
+```text
+application lifecycle
+```
+
+and:
+
+```text
+traffic lifecycle
+```
 
 ---
 
-# 37. Mixed-Version Deployments
+# 10. Readiness Must Reflect Real Serving Capability
 
-During rolling deployments:
+A weak readiness check:
 
 ```text
-V1
-V1
-V2
-V2
+GET /health
+→ 200
 ```
 
-may coexist.
+might only prove:
 
-Requests can reach either version.
+```text
+HTTP server is listening
+```
 
-Therefore the system should tolerate temporary mixed-version operation.
+A stronger readiness check considers the application's actual serving requirements.
 
-This is especially important for:
+For example:
 
-* database schema changes
-* cache formats
-* queues
-* API contracts
-* session formats
+```text
+Configuration valid
+AND
+critical runtime initialized
+AND
+required dependency available
+```
+
+Conceptually:
+
+```text
+ready =
+  configValid
+  &&
+  runtimeInitialized
+  &&
+  requiredDependenciesAvailable
+```
+
+But do not blindly check every dependency.
+
+If an optional dependency fails:
+
+```text
+optional analytics unavailable
+```
+
+the application may still be capable of serving normal requests.
+
+Therefore:
+
+```text
+readiness ≠ every dependency must be perfect
+```
+
+Instead:
+
+```text
+readiness = sufficient conditions for safe serving
+```
 
 ---
 
-# 38. Database Migration Compatibility
+# 11. Dependency Failure During Runtime
 
-Suppose V2 expects:
+Suppose:
 
 ```text
-new_column
+Application → Database
 ```
 
-but V1 still runs.
+The database becomes temporarily unavailable.
 
-A safe migration sequence is often:
+Possible behaviors include:
+
+### Fail closed
 
 ```text
-1. Add compatible schema
-2. Deploy application
-3. Migrate reads/writes
-4. Remove old schema later
+request
+  ↓
+database unavailable
+  ↓
+request fails
+```
+
+### Degraded mode
+
+```text
+request
+  ↓
+database unavailable
+  ↓
+fallback/cache/default representation
+```
+
+### Partial functionality
+
+```text
+Read operations → cache
+Write operations → unavailable
+```
+
+The correct behavior depends on business semantics.
+
+The important architecture question is:
+
+> Which dependencies are required for which request classes?
+
+Do not reduce the entire application to one global health state if different capabilities have different dependency requirements.
+
+---
+
+# 12. Graceful Shutdown
+
+Graceful shutdown means:
+
+> Stop accepting new work while allowing in-flight work to finish safely within an operational deadline.
+
+Conceptually:
+
+```text
+SERVING
+   ↓
+stop accepting new traffic
+   ↓
+DRAINING
+   ↓
+finish in-flight work
+   ↓
+release resources
+   ↓
+SHUTDOWN
+```
+
+Without graceful shutdown:
+
+```text
+instance receives request
+        ↓
+deployment terminates instance
+        ↓
+request interrupted
+        ↓
+client receives error
+```
+
+This becomes especially important for:
+
+* mutations
+* database transactions
+* streaming responses
+* file operations
+* long-running requests
+* external API calls
+* background tasks
+
+---
+
+# 13. Draining
+
+Draining means:
+
+```text
+existing requests may continue
+new requests should stop arriving
+```
+
+A simplified lifecycle:
+
+```text
+SERVING
+   │
+   │ deployment/restart
+   ↓
+DRAINING
+   │
+   ├── existing request 1
+   ├── existing request 2
+   └── existing request 3
+   │
+   ↓
+SHUTDOWN
+```
+
+The important transition is:
+
+```text
+traffic eligibility → disabled
+```
+
+before:
+
+```text
+process termination
+```
+
+Otherwise new requests may arrive while the instance is shutting down.
+
+---
+
+# 14. Shutdown Deadlines
+
+Graceful shutdown cannot wait forever.
+
+A deployment platform generally has some termination deadline.
+
+Therefore:
+
+```text
+DRAINING
+   ↓
+wait
+   ↓
+deadline
+   ↓
+force termination
+```
+
+This produces a tradeoff:
+
+```text
+short drain timeout
+    → faster deployments
+    → more interrupted long requests
+
+long drain timeout
+    → fewer interruptions
+    → slower deployments
+    → slower capacity replacement
+```
+
+The correct timeout depends on workload characteristics.
+
+For example:
+
+```text
+normal API request: 50–500 ms
+```
+
+is very different from:
+
+```text
+streaming response: several minutes
+```
+
+---
+
+# 15. Long-Running Requests
+
+Long-running requests complicate shutdown.
+
+Examples:
+
+```text
+streaming response
+large export
+report generation
+long polling
+server-sent events
+```
+
+If shutdown occurs:
+
+```text
+request active
+     ↓
+instance draining
+     ↓
+request exceeds deadline
+     ↓
+forced termination
+```
+
+The architecture must decide whether such work should:
+
+* finish in-process
+* be moved to a background job
+* be resumable
+* be retried
+* be cancelled explicitly
+
+Long-running work should not automatically depend on process lifetime.
+
+---
+
+# 16. Background Jobs and Process Lifetime
+
+A dangerous architecture is:
+
+```text
+HTTP request
+   ↓
+start background job
+   ↓
+return response
+```
+
+while assuming:
+
+```text
+same application process
+```
+
+will remain alive long enough to finish the job.
+
+Deployment systems can:
+
+* restart the process
+* scale it down
+* replace the container
+* move traffic
+* terminate the runtime
+
+Therefore durable background work should generally use infrastructure designed for durable execution:
+
+```text
+Request
+  ↓
+enqueue job
+  ↓
+durable queue
+  ↓
+worker
+  ↓
+database/object storage
 ```
 
 rather than:
 
 ```text
-Drop old column
- ↓
-Deploy V2
+Request
+  ↓
+in-memory task
 ```
 
-which breaks V1 immediately.
+when completion is business-critical.
 
 ---
 
-# 39. Readiness During Deployment
+# 17. In-Memory State During Lifecycle Changes
 
-A new version should not become ready merely because its HTTP server started.
+In-memory state is tied to the runtime instance.
 
-Readiness may require:
+Example:
 
 ```text
-configuration valid
-+
-critical initialization complete
-+
-required dependencies reachable
+Instance A
+memory:
+  session = X
+  cache = Y
+  job = Z
 ```
 
-But avoid turning readiness into an exhaustive dependency test that creates cascading failure.
+When Instance A shuts down:
+
+```text
+memory disappears
+```
+
+Therefore:
+
+```text
+in-memory state ≠ durable application state
+```
+
+This matters for:
+
+* sessions
+* locks
+* caches
+* queues
+* pending jobs
+* counters
+* rate limits
+
+If the state must survive:
+
+```text
+deployment
+restart
+scaling
+failover
+```
+
+it needs an appropriate durable/distributed storage mechanism.
 
 ---
 
-# 40. Startup Failure
+# 18. Connection Lifecycle
 
-If initialization fails:
+Runtime lifecycle also affects connections.
 
-```text
-START
- ↓
-CONFIGURATION INVALID
-```
-
-the instance should not advertise readiness.
-
-Depending on platform architecture:
+Examples:
 
 ```text
-Not Ready
+database connections
+Redis connections
+HTTP keep-alive connections
+message broker connections
 ```
 
-may allow the deployment system to retain old healthy instances.
+During startup:
 
-This is safer than sending traffic to a broken instance.
+```text
+initialize connection/client
+```
+
+During runtime:
+
+```text
+reuse connection/client
+```
+
+During shutdown:
+
+```text
+stop accepting work
+finish active operations
+close resources
+```
+
+Connection management becomes particularly important in serverless environments because uncontrolled connection creation can produce:
+
+```text
+many runtime instances
+        ↓
+many DB connections
+        ↓
+database connection exhaustion
+```
+
+Therefore lifecycle architecture and capacity architecture are connected.
 
 ---
 
-# 41. Rolling Deployment Safety
+# 19. Deployment-Safe Database Changes
 
-A simplified rolling deployment:
+Application lifecycle cannot be separated from database lifecycle.
 
-```text
-Existing:
-A A A A
-
-Deploy:
-A A A B
-
-Continue:
-A A B B
-
-Continue:
-A B B B
-
-Complete:
-B B B B
-```
-
-At every stage:
+Suppose version A expects:
 
 ```text
-ready capacity
+users.name
 ```
 
-must remain sufficient.
+and version B expects:
+
+```text
+users.display_name
+```
+
+A deployment can temporarily contain:
+
+```text
+Version A
+Version A
+Version B
+Version B
+```
+
+If the database schema is immediately changed incompatibly:
+
+```text
+Version A → failure
+```
+
+Therefore deployment-safe schema evolution commonly follows:
+
+```text
+Expand
+  ↓
+Deploy compatible application
+  ↓
+Migrate/backfill
+  ↓
+Switch application behavior
+  ↓
+Contract
+```
+
+The critical invariant is:
+
+> During mixed-version deployment, all active application versions must remain compatible with the database schema.
 
 ---
 
-# 42. Deployment Capacity
+# 20. Mixed-Version Runtime
 
-Suppose a service has:
+During rolling deployment:
 
 ```text
-4 instances
+Version A
+Version A
+Version B
+Version B
 ```
 
-and removes two before two new instances are ready.
+A request may hit either version.
 
-Capacity temporarily becomes:
+Therefore temporary compatibility is required for:
+
+* database schema
+* cache entries
+* serialized data
+* cookies
+* sessions
+* API contracts
+* queues
+* events
+
+Do not assume:
 
 ```text
-2
+deployment completed atomically
 ```
 
-If traffic remains constant, latency may increase.
+unless the infrastructure explicitly guarantees it.
 
-Deployment strategy therefore interacts with:
+Most distributed deployments have transition periods.
+
+---
+
+# 21. Cache Compatibility During Deployment
+
+Suppose Version A writes:
 
 ```text
-capacity planning
-autoscaling
-health checks
-traffic load
+cache:v1:user:123
+```
+
+and Version B expects:
+
+```text
+cache:v2:user:123
+```
+
+During rollout:
+
+```text
+A → v1
+B → v2
+```
+
+The system must define how cache compatibility works.
+
+Possible strategies:
+
+### Versioned cache keys
+
+```text
+v1:user:123
+v2:user:123
+```
+
+### Backward-compatible serialization
+
+Both versions understand the same structure.
+
+### Explicit invalidation
+
+Deployment clears incompatible entries.
+
+The decision depends on:
+
+```text
+cache lifetime
+write/read compatibility
+deployment duration
+cost of recomputation
 ```
 
 ---
 
-# 43. Health Checks Can Amplify Failures
+# 22. Health Check Amplification
+
+Health checks themselves create traffic.
 
 Suppose:
 
 ```text
-Database unavailable
+1,000 instances
 ```
 
-and readiness checks every instance's database dependency.
+and each health checker probes every second.
 
-Then:
+That produces:
 
 ```text
-all instances → Not Ready
+1,000 health requests/second
 ```
 
-and the service disappears.
-
-If liveness also depends on the database:
+If the health endpoint performs expensive work:
 
 ```text
-all instances → restart
+/health
+   ↓
+database query
+   ↓
+cache query
+   ↓
+external API
 ```
 
-The database remains unavailable.
+the monitoring system can become a production load generator.
 
-The system has amplified a dependency failure into a complete application outage.
+Therefore health endpoints should be:
+
+* lightweight
+* deterministic
+* bounded
+* intentionally designed
+* protected against unnecessary expensive dependency checks
 
 ---
 
-# 44. Dependency Failure Design
+# 23. Health Checks and Caching
 
-A better model distinguishes:
+Health checks should normally represent current instance state.
+
+Caching a readiness response incorrectly can produce:
 
 ```text
-Can process request?
+Instance becomes unhealthy
+        ↓
+cached "healthy" response
+        ↓
+traffic continues
+```
+
+Similarly:
+
+```text
+Instance becomes ready
+        ↓
+cached "not ready"
+        ↓
+traffic unnecessarily withheld
+```
+
+Therefore health responses require deliberate cache behavior.
+
+The health endpoint is a control-plane signal, not a normal content resource.
+
+---
+
+# 24. Health Endpoint Security
+
+Health endpoints can expose operational information.
+
+Bad:
+
+```json
+{
+  "database": "postgres-prod-primary.internal",
+  "redis": "redis-prod.internal",
+  "version": "2026.09.22",
+  "environment": "production"
+}
+```
+
+This may reveal infrastructure details unnecessarily.
+
+Separate:
+
+### Internal operational health
+
+Detailed enough for infrastructure.
+
+### Public health
+
+Minimal information appropriate for external exposure.
+
+Do not expose secrets, internal hostnames, credentials, or sensitive dependency information merely for convenience.
+
+---
+
+# 25. Degraded Mode
+
+A production application should sometimes remain available even when non-critical dependencies fail.
+
+For example:
+
+```text
+Primary database
+       ↓
+Product page
+```
+
+If a recommendation system fails:
+
+```text
+Product page
+       ↓
+recommendations unavailable
+       ↓
+main product content still works
+```
+
+This is degraded operation.
+
+A useful model is:
+
+```text
+Critical path
+    +
+Optional capabilities
+```
+
+rather than:
+
+```text
+all dependencies are mandatory
+```
+
+This can improve resilience.
+
+But degraded mode must be explicitly designed.
+
+Otherwise fallback behavior can create incorrect data or security problems.
+
+---
+
+# 26. Deployment-Safe Request Semantics
+
+Consider a mutation:
+
+```text
+POST /orders
+```
+
+The server begins:
+
+```text
+create order
+```
+
+while deployment starts.
+
+If the process terminates midway, the client may retry.
+
+Potential result:
+
+```text
+Order #123 created
+client sees failure
+client retries
+Order #124 created
+```
+
+Now one logical user action produced two orders.
+
+This is why lifecycle behavior intersects with:
+
+* idempotency
+* transactions
+* request retries
+* durable state
+
+A deployment-safe mutation should be designed around the possibility that execution may be interrupted.
+
+---
+
+# 27. Idempotency and Shutdown
+
+For retryable operations:
+
+```text
+request
+   ↓
+processing
+   ↓
+shutdown
+   ↓
+client retry
+```
+
+the server should be able to determine:
+
+```text
+has this operation already been committed?
+```
+
+An idempotency key can establish a logical operation identity:
+
+```text
+Idempotency-Key: abc123
+```
+
+Conceptually:
+
+```text
+operation identity
+        ↓
+durable record
+        ↓
+commit/result
+```
+
+Then a retry can return the existing result rather than creating duplicate side effects.
+
+---
+
+# 28. Streaming and Shutdown
+
+Streaming changes the lifecycle model.
+
+For normal request/response:
+
+```text
+request
+   ↓
+compute
+   ↓
+response
+   ↓
+done
+```
+
+Streaming:
+
+```text
+request
+   ↓
+response begins
+   ↓
+chunk
+   ↓
+chunk
+   ↓
+chunk
+   ↓
+...
+```
+
+Shutdown can occur at any point.
+
+Therefore the architecture must account for:
+
+* connection termination
+* partial responses
+* client retry behavior
+* cancellation
+* resource cleanup
+* timeout boundaries
+
+Streaming work should not assume an infinite process lifetime.
+
+---
+
+# 29. Graceful Shutdown as a Protocol
+
+A strong shutdown sequence is:
+
+```text
+1. Receive termination signal
+2. Mark instance as draining
+3. Stop accepting new traffic
+4. Stop scheduling new background work
+5. Allow in-flight requests to finish
+6. Finish/abort active transactions safely
+7. Flush required telemetry
+8. Close connections/resources
+9. Exit
+```
+
+Conceptually:
+
+```text
+SIGTERM
+   ↓
+DRAIN
+   ↓
+WAIT
+   ↓
+CLEANUP
+   ↓
+EXIT
+```
+
+The exact implementation depends on the hosting platform.
+
+The architectural invariant remains:
+
+```text
+stop new work before destroying the runtime
+```
+
+---
+
+# 30. Shutdown Ordering
+
+Shutdown operations themselves may have dependencies.
+
+For example:
+
+```text
+stop accepting requests
+       ↓
+finish requests
+       ↓
+flush telemetry
+       ↓
+close telemetry client
+```
+
+If telemetry is closed before request completion:
+
+```text
+request finishes
+       ↓
+attempt to emit telemetry
+       ↓
+telemetry client unavailable
+```
+
+Therefore resource shutdown order matters.
+
+Think of shutdown as the reverse dependency graph of startup where appropriate:
+
+```text
+Startup:
+A → B → C
+
+Shutdown:
+C → B → A
+```
+
+But not every system is a perfect inverse.
+
+Explicit ownership and dependency relationships should determine the order.
+
+---
+
+# 31. Deployment Capacity During Drain
+
+Suppose:
+
+```text
+10 instances
+```
+
+and deployment drains:
+
+```text
+2 instances
+```
+
+Effective serving capacity temporarily becomes:
+
+```text
+8 instances
+```
+
+If traffic remains unchanged:
+
+```text
+load per remaining instance ↑
+```
+
+If capacity is already near saturation:
+
+```text
+draining
+   ↓
+capacity reduction
+   ↓
+higher utilization
+   ↓
+latency increase
+   ↓
+health failures
+   ↓
+more instances removed
+```
+
+This can become a cascading deployment failure.
+
+Therefore deployment capacity planning must account for:
+
+```text
+steady-state capacity
++
+draining capacity
++
+startup capacity
+```
+
+---
+
+# 32. Rolling Deployment Capacity Model
+
+A simplified rollout:
+
+```text
+Existing:
+A A A A A
+
+Start:
+A A A A A B
+
+Ready:
+A A A A B B
+
+Drain:
+A A A B B B
+
+Complete:
+B B B B B
+```
+
+During this process:
+
+* B consumes capacity while initializing
+* A loses capacity while draining
+* traffic distribution changes continuously
+
+The deployment system must therefore maintain enough headroom.
+
+A deployment that works at:
+
+```text
+40% utilization
+```
+
+may fail at:
+
+```text
+90% utilization
+```
+
+even though both use the same code.
+
+---
+
+# 33. Readiness Failure During Rollout
+
+Suppose version B repeatedly fails readiness:
+
+```text
+Start B
+  ↓
+Not ready
+  ↓
+Retry
+  ↓
+Not ready
+```
+
+A safe deployment system should avoid immediately replacing all healthy A instances.
+
+Desired state:
+
+```text
+A A A A
+  +
+B not ready
+```
+
+rather than:
+
+```text
+A removed
+B not ready
+```
+
+This is why readiness and rollout strategy must cooperate.
+
+---
+
+# 34. Health-Check Failure Modes
+
+Health checks can fail incorrectly because of:
+
+### False positive
+
+```text
+instance marked healthy
+but cannot serve real traffic
+```
+
+### False negative
+
+```text
+instance can serve traffic
+but health check fails
+```
+
+### Flapping
+
+```text
+healthy
+unhealthy
+healthy
+unhealthy
+```
+
+### Dependency cascade
+
+```text
+shared dependency fails
+        ↓
+all instances fail readiness
+```
+
+### Probe overload
+
+```text
+health checks
+        ↓
+dependency load
+        ↓
+dependency failure
+```
+
+Health architecture should therefore be treated as a distributed system.
+
+---
+
+# 35. Startup and Shutdown Observability
+
+Lifecycle transitions should be observable.
+
+Useful events include:
+
+```text
+runtime_start
+runtime_initialization_start
+runtime_ready
+runtime_not_ready
+runtime_draining
+runtime_shutdown
+```
+
+Useful measurements include:
+
+```text
+startup_duration
+readiness_duration
+drain_duration
+shutdown_duration
+forced_shutdown_count
+health_check_failures
+restart_count
+cold_start_count
+```
+
+These allow engineers to distinguish:
+
+```text
+application failure
 ```
 
 from:
 
 ```text
-Can process every possible request?
+deployment lifecycle failure
 ```
-
-The application may support degraded behavior.
-
-For example:
-
-```text
-Product browsing → available
-Checkout → unavailable
-Analytics → unavailable
-```
-
-This can be safer than declaring the entire application dead.
 
 ---
 
-# 45. Graceful Degradation
+# 36. Correlating Lifecycle Events With Deployments
 
-A dependency failure can produce:
+Suppose latency increases immediately after a deployment.
+
+Without release context:
 
 ```text
-Full outage
+Latency ↑
 ```
 
-or:
+With deployment-aware observability:
 
 ```text
-Reduced functionality
+10:00 deployment started
+10:01 new instances ready
+10:02 old instances draining
+10:02 latency ↑
+10:03 error rate ↑
 ```
 
-depending on architecture.
+This dramatically improves diagnosis.
 
-Examples:
+Deployment identity should therefore be associated with runtime telemetry.
 
-```text
-Recommendation service down
-→ product page still works
-
-Analytics down
-→ user transaction still works
-
-Search down
-→ cached results or alternate navigation
-```
-
-The runtime lifecycle should preserve useful behavior where possible.
-
----
-
-# 46. Startup Dependency Ordering
-
-Not every component needs to start in strict sequence.
-
-Avoid unnecessary:
+Conceptually:
 
 ```text
-A must start
- ↓
-B must start
- ↓
-C must start
- ↓
-D must start
-```
-
-when the system can initialize independently.
-
-Parallel initialization can reduce startup latency.
-
-But dependencies that genuinely require ordering must remain explicit.
-
----
-
-# 47. Initialization Time Budget
-
-Define an expected startup budget.
-
-For example:
-
-```text
-Target startup
-< 2 seconds
-```
-
-Then measure:
-
-```text
-configuration loading
-dependency initialization
-client construction
-module loading
-warm-up
-```
-
-A startup regression should be observable.
-
----
-
-# 48. Readiness Latency
-
-Measure:
-
-```text
-deployment start
-        ↓
-process started
-        ↓
-initialization complete
-        ↓
-ready
-```
-
-The difference between:
-
-```text
-process start
-```
-
-and:
-
-```text
-ready
-```
-
-is operationally meaningful.
-
----
-
-# 49. Health Check Observability
-
-Health events should be observable.
-
-Useful fields include:
-
-```text
+request
+  ↓
 instance
+  ↓
 version
-environment
-region
-ready state
-startup duration
-dependency status
-shutdown reason
-```
-
-Avoid logging sensitive configuration.
-
----
-
-# 50. Shutdown Observability
-
-Useful signals include:
-
-```text
-shutdown initiated
-reason
-active request count
-drain duration
-forced termination
-in-flight job count
-```
-
-This allows teams to determine whether deployments are actually graceful.
-
----
-
-# 51. Deployment Events
-
-Production observability should correlate:
-
-```text
+  ↓
 deployment
-+
-instance lifecycle
-+
-traffic
-+
-errors
-+
-latency
+```
+
+---
+
+# 37. Graceful Shutdown and Logging
+
+Shutdown logging should distinguish:
+
+```text
+normal shutdown
+```
+
+from:
+
+```text
+forced termination
 ```
 
 For example:
 
 ```text
-14:00 deployment started
-14:01 new version ready
-14:02 error rate increased
-14:03 rollback
+shutdown_started
+shutdown_completed
+shutdown_timeout
+forced_termination
 ```
 
-This dramatically improves incident analysis.
+A high count of:
+
+```text
+shutdown_timeout
+```
+
+indicates that the application is not completing lifecycle work within its operational budget.
 
 ---
 
-# 52. Health Endpoints and Security
+# 38. Production Failure Scenario — Readiness Too Early
 
-Health endpoints can expose sensitive information if they return:
+### Architecture
 
 ```text
-database hostname
-credentials
-internal topology
-dependency versions
-environment details
+Container starts
+      ↓
+HTTP server listening
+      ↓
+/ready → 200
+      ↓
+traffic
+      ↓
+database client still initializing
 ```
 
-Public health endpoints should expose only what is necessary.
+### Failure
+
+Requests begin arriving before the application can actually serve them.
+
+### Symptoms
+
+```text
+5xx spikes
+startup latency
+deployment instability
+```
+
+### Root cause
+
+Readiness represented:
+
+```text
+process listening
+```
+
+instead of:
+
+```text
+application ready
+```
+
+### Correct reasoning
+
+Define readiness around the minimum conditions required for safe request processing.
 
 ---
 
-# 53. Internal vs External Health Checks
+# 39. Production Failure Scenario — Shutdown Kills Requests
 
-You may have:
+### Architecture
 
 ```text
-External:
-GET /health
+Instance receives request
+       ↓
+deployment terminates process immediately
 ```
 
-and:
+### Failure
+
+In-flight request is interrupted.
+
+### Symptoms
 
 ```text
-Internal:
-GET /internal/health/deep
+connection reset
+5xx
+partial response
+client retries
 ```
 
-The deeper internal endpoint can expose more operational information under controlled access.
+### Secondary risk
 
----
-
-# 54. Health Check Caching
-
-Health endpoints should generally provide current state.
-
-Accidental caching can cause:
+If the request is a mutation:
 
 ```text
-instance failed
- ↓
-cached 200
- ↓
-traffic continues
+partial execution
++
+retry
+=
+duplicate side effect
 ```
 
-or:
+### Correct architecture
 
 ```text
-instance recovered
- ↓
-cached failure
- ↓
-traffic withheld
+remove from traffic
+      ↓
+drain
+      ↓
+finish safely
+      ↓
+shutdown
 ```
 
-Therefore health responses require deliberate cache semantics.
-
----
-
-# 55. Readiness During Shutdown
-
-A strong shutdown sequence is:
+combined with:
 
 ```text
-Running
-   ↓
-Mark Not Ready
-   ↓
-Load Balancer stops new traffic
-   ↓
-Drain active requests
-   ↓
-Finish/abort background work safely
-   ↓
-Close resources
-   ↓
-Exit
-```
-
-The crucial step is:
-
-> **Become unready before terminating.**
-
----
-
-# 56. Shutdown Race Conditions
-
-A subtle failure can occur when:
-
-```text
-shutdown begins
-```
-
-while:
-
-```text
-new request arrives
-```
-
-Therefore readiness and traffic routing must cooperate with shutdown.
-
-A process-level signal alone is insufficient if the infrastructure continues sending requests.
-
----
-
-# 57. Deployment-Safe Runtime Architecture
-
-A production deployment should support:
-
-```text
-Old version
-    │
-    │ serves traffic
-    ▼
-New version starts
-    │
-    ▼
-New version becomes ready
-    │
-    ▼
-Traffic shifts
-    │
-    ▼
-Old version drains
-    │
-    ▼
-Old version exits
-```
-
-This is the runtime counterpart of safe release architecture.
-
----
-
-# 58. Runtime Failure Taxonomy
-
-Important failure modes include:
-
-```text
-Startup failure
-Configuration failure
-Dependency initialization failure
-Readiness failure
-Liveness failure
-Cold-start latency
-Connection exhaustion
-Request timeout
-Shutdown timeout
-Forced termination
-Dropped requests
-Interrupted streams
-Duplicate jobs
-Mixed-version incompatibility
-Health-check amplification
-```
-
-Senior engineers should be able to reason about each independently.
-
----
-
-# 59. Production Scenario — Bad Liveness Probe
-
-Architecture:
-
-```text
-Liveness
- ↓
-Database query
-```
-
-Database goes down.
-
-Result:
-
-```text
-Application unhealthy
- ↓
-Restart
- ↓
-Database still down
- ↓
-Restart
- ↓
-Restart loop
-```
-
-Correct reasoning:
-
-> A liveness check should usually establish that the runtime itself is viable, not that every dependency is healthy.
-
----
-
-# 60. Production Scenario — Deployment Drops Requests
-
-Architecture:
-
-```text
-Old instance
- ↓
-Immediate termination
-```
-
-during active traffic.
-
-Result:
-
-```text
-requests terminated
-```
-
-Correct architecture:
-
-```text
-Mark unready
- ↓
-Drain
- ↓
-Shutdown
+idempotency
+transactions
+retry-safe semantics
 ```
 
 ---
 
-# 61. Production Scenario — Long Export
+# 40. Production Failure Scenario — Restart Storm
 
-A user requests:
+### Architecture
 
 ```text
-Generate 2 GB report
+database unavailable
+      ↓
+readiness fails
+      ↓
+liveness also fails
+      ↓
+instances restart
+      ↓
+instances reconnect
+      ↓
+database receives connection storm
 ```
 
-and the application performs the entire job inside one HTTP request.
+### Failure
+
+The recovery mechanism increases load on the failed dependency.
+
+### Lesson
+
+Do not automatically equate:
+
+```text
+dependency failure
+```
+
+with:
+
+```text
+process must restart
+```
+
+Separate:
+
+```text
+liveness
+readiness
+dependency health
+```
+
+and define each deliberately.
+
+---
+
+# 41. Production Failure Scenario — Deployment Capacity Collapse
+
+Suppose:
+
+```text
+20 instances
+90% utilization
+```
 
 Deployment begins.
 
-The runtime shuts down.
+Several old instances drain while new ones start.
 
-The export is lost.
-
-A stronger architecture is:
+Result:
 
 ```text
-Request
+available capacity ↓
+load per instance ↑
+latency ↑
+timeouts ↑
+health failures ↑
+```
+
+The deployment can destabilize the system even though the application itself is unchanged.
+
+The solution may involve:
+
+* additional temporary capacity
+* lower rollout batch size
+* faster startup
+* better readiness
+* lower steady-state utilization
+* progressive deployment
+* autoscaling headroom
+
+---
+
+# 42. Production Failure Scenario — Background Job Lost
+
+### Architecture
+
+```text
+request
+  ↓
+start in-memory task
+  ↓
+return 202
+  ↓
+deployment
+  ↓
+process terminated
+```
+
+The task disappears.
+
+### Correct architecture
+
+```text
+request
+  ↓
+durable job enqueue
+  ↓
+202
+  ↓
+worker
+  ↓
+durable result
+```
+
+The runtime lifecycle no longer determines whether the job survives.
+
+---
+
+# 43. Production Failure Scenario — Mixed-Version Schema Break
+
+Deployment:
+
+```text
+A A B B
+```
+
+Database migration:
+
+```text
+remove column immediately
+```
+
+Version A still reads the column.
+
+Result:
+
+```text
+A → database error
+```
+
+The deployment violates the mixed-version compatibility invariant.
+
+Correct sequence:
+
+```text
+expand schema
+   ↓
+deploy compatible versions
+   ↓
+migrate/backfill
+   ↓
+switch reads/writes
+   ↓
+remove obsolete schema
+```
+
+---
+
+# 44. Production Failure Scenario — Health Endpoint Becomes Dependency Amplifier
+
+Suppose:
+
+```text
+10,000 instances
+```
+
+and each health probe executes:
+
+```text
+DB query
+```
+
+at frequent intervals.
+
+The health system becomes:
+
+```text
+10,000 × probe frequency
+```
+
+additional database traffic.
+
+If the DB becomes slow:
+
+```text
+health probes become slow
+        ↓
+health checks timeout
+        ↓
+instances marked unhealthy
+        ↓
+traffic shifts
+        ↓
+remaining instances receive more traffic
+```
+
+This can amplify the outage.
+
+Health checks must therefore be designed with dependency load in mind.
+
+---
+
+# 45. Runtime Lifecycle and Next.js
+
+For a Next.js application, lifecycle concerns interact with:
+
+* server rendering
+* Route Handlers
+* Server Actions
+* streaming
+* data fetching
+* caching
+* external APIs
+* database connections
+* middleware/runtime boundaries
+* deployment platform behavior
+
+The important distinction is:
+
+```text
+Next.js application architecture
+        +
+hosting runtime lifecycle
+```
+
+Next.js does not eliminate infrastructure lifecycle semantics.
+
+A request still executes somewhere:
+
+```text
+CDN
  ↓
-Create export job
+runtime
  ↓
+application code
+ ↓
+dependencies
+```
+
+That runtime can be:
+
+* a long-lived server
+* a container
+* a serverless execution environment
+* an edge-oriented runtime
+
+The lifecycle guarantees differ by deployment model.
+
+---
+
+# 46. Runtime Lifecycle and Server Components
+
+Server Components execute on the server side.
+
+But:
+
+```text
+Server Component
+≠
+permanent server process
+```
+
+The execution environment may be ephemeral or distributed.
+
+Therefore Server Component code should not assume:
+
+```text
+global in-memory state
+```
+
+is durable.
+
+Similarly:
+
+```text
+module-level cache
+```
+
+may have instance-local semantics depending on the deployment model.
+
+Architecture should distinguish:
+
+```text
+request-scoped state
+instance-scoped state
+distributed state
+durable state
+```
+
+---
+
+# 47. Runtime Lifecycle and Server Actions
+
+Server Actions are mutations.
+
+Therefore lifecycle interruption can affect:
+
+```text
+database mutation
+external API mutation
+file/object operation
+cache invalidation
+```
+
+A robust mutation architecture considers:
+
+```text
+validation
+authorization
+transactionality
+idempotency
+retry semantics
+cache consistency
+shutdown behavior
+```
+
+The key principle:
+
+> A server-side mutation must remain correct even if its execution environment is interrupted.
+
+---
+
+# 48. Runtime Lifecycle and Route Handlers
+
+Route Handlers may perform:
+
+```text
+GET
+POST
+PUT
+PATCH
+DELETE
+```
+
+Each operation has different lifecycle implications.
+
+For example:
+
+```text
+GET
+```
+
+may be safely retried in many cases.
+
+But:
+
+```text
+POST /payment
+```
+
+requires stronger guarantees.
+
+Therefore lifecycle resilience should be analyzed by **operation semantics**, not merely endpoint existence.
+
+---
+
+# 49. Four-Pillar Engineering Matrix
+
+Every lifecycle decision should be evaluated through four dimensions.
+
+| Dimension    | Questions                                                               |
+| ------------ | ----------------------------------------------------------------------- |
+| Correctness  | Can lifecycle transitions corrupt requests, transactions, or state?     |
+| Performance  | What are startup, cold-start, drain, and shutdown costs?                |
+| Architecture | Where does state live and how do instances coordinate?                  |
+| Operability  | Can health, readiness, draining, and shutdown be observed and debugged? |
+
+Example:
+
+### Readiness
+
+**Correctness**
+
+* Does readiness accurately represent serving capability?
+
+**Performance**
+
+* Does readiness introduce expensive dependency checks?
+
+**Architecture**
+
+* Which dependencies are truly required?
+
+**Operability**
+
+* Can operators understand why an instance is not ready?
+
+---
+
+# 50. Senior-Level Decision Framework
+
+When designing runtime lifecycle behavior, ask:
+
+### Question 1
+
+What exactly does "ready" mean?
+
+### Question 2
+
+Which dependencies are critical to readiness?
+
+### Question 3
+
+Which failures should remove traffic?
+
+### Question 4
+
+Which failures should trigger process restart?
+
+### Question 5
+
+How are in-flight requests drained?
+
+### Question 6
+
+What happens to long-running requests?
+
+### Question 7
+
+What happens to background work?
+
+### Question 8
+
+Which state survives process termination?
+
+### Question 9
+
+Can retries create duplicate mutations?
+
+### Question 10
+
+Can mixed application versions coexist safely?
+
+### Question 11
+
+How much capacity is required during rollout?
+
+### Question 12
+
+What happens if health checks themselves fail?
+
+### Question 13
+
+How is lifecycle behavior observed?
+
+---
+
+# 51. Reference Runtime Architecture
+
+A production-oriented model:
+
+```text
+                    Deployment Controller
+                           │
+                           │
+                    ┌──────▼──────┐
+                    │ Load Balancer│
+                    └──────┬──────┘
+                           │
+                  readiness / liveness
+                           │
+             ┌─────────────┼─────────────┐
+             ↓             ↓             ↓
+         Runtime A     Runtime B     Runtime C
+             │             │             │
+       STARTING        SERVING        DRAINING
+             │             │             │
+             └───────┬─────┴─────┬───────┘
+                     │           │
+                     ↓           ↓
+                 Database      Cache
+                     │
+                     ↓
+                External APIs
+```
+
+Lifecycle control:
+
+```text
+START
+ ↓
+INITIALIZE
+ ↓
+READY
+ ↓
+SERVE
+ ↓
+DRAIN
+ ↓
+CLEANUP
+ ↓
+SHUTDOWN
+```
+
+Durable work:
+
+```text
+Application
+    ↓
 Queue
- ↓
+    ↓
 Worker
- ↓
-Object storage
- ↓
-Notification
+    ↓
+Durable storage
+```
+
+Observability:
+
+```text
+Runtime
+  ├── Logs
+  ├── Metrics
+  ├── Traces
+  └── Lifecycle events
 ```
 
 ---
 
-# 62. Production Scenario — Rolling Deployment + Schema Change
+# 52. Core Lifecycle Invariants
 
-Current:
+You should be able to state these without hesitation.
+
+### Invariant 1
 
 ```text
-V1 → schema V1
+process existence ≠ readiness
 ```
 
-New:
+### Invariant 2
 
 ```text
-V2 → schema V2
+readiness ≠ liveness
 ```
 
-Both versions temporarily run.
-
-Directly replacing schema V1 with incompatible schema V2 can break V1.
-
-The safer model is:
+### Invariant 3
 
 ```text
-Expand
- ↓
-Deploy compatible application
- ↓
-Migrate
- ↓
-Contract
+stop accepting traffic before terminating the runtime
+```
+
+### Invariant 4
+
+```text
+in-memory state is not durable state
+```
+
+### Invariant 5
+
+```text
+background work that must survive deployment needs durable execution semantics
+```
+
+### Invariant 6
+
+```text
+mixed-version deployments require temporary compatibility
+```
+
+### Invariant 7
+
+```text
+health checks are control signals, not ordinary application traffic
+```
+
+### Invariant 8
+
+```text
+dependency failure does not automatically imply process failure
+```
+
+### Invariant 9
+
+```text
+deployment capacity must include starting and draining instances
+```
+
+### Invariant 10
+
+```text
+mutation correctness must survive interruption and retry
 ```
 
 ---
 
-# 63. Production Scenario — Streaming Request During Shutdown
+# 53. Prediction Challenges
 
-A stream is active when:
-
-```text
-instance → draining
-```
-
-The architecture must define:
-
-```text
-complete stream?
-terminate stream?
-resume?
-client reconnect?
-```
-
-There is no universal answer.
-
-The correct design depends on the workload and platform.
-
----
-
-# 64. Four-Pillar Engineering Matrix
-
-## Mental Model
-
-Understand:
-
-* process lifecycle
-* readiness
-* liveness
-* draining
-* shutdown
-* cold starts
-* warm instances
-* durable vs in-memory state
-
-## Mechanics
-
-Understand:
-
-* health probes
-* startup initialization
-* connection reuse
-* shutdown signals
-* request draining
-* timeout behavior
-* worker lifecycle
-
-## Architecture
-
-Design:
-
-* safe startup
-* readiness gates
-* graceful shutdown
-* stateless runtime
-* durable background jobs
-* deployment-compatible migrations
-* degraded-mode behavior
-
-## Production
-
-Operate:
-
-* startup latency
-* readiness latency
-* shutdown duration
-* forced termination
-* health failures
-* restart loops
-* dropped requests
-* lifecycle-correlated incidents
-
----
-
-# 65. Prediction Challenges
+Before reading the answers, reason through these.
 
 ## Challenge 1
 
-A service is alive but cannot access its database.
+A server starts listening on port 3000, but database initialization has not completed.
 
-Should liveness necessarily fail?
+Should readiness be true?
 
-### Answer
+**Reasoning target:**
 
-No.
-
-Liveness and dependency readiness are different concepts.
+```text
+listening ≠ ready
+```
 
 ---
 
 ## Challenge 2
 
-A new instance starts but has not initialized its required clients.
+The database is temporarily unavailable. Should the process necessarily restart?
 
-Should it receive traffic?
+**Reasoning target:**
 
-### Answer
+Separate:
 
-No.
-
-It should remain not ready until the required initialization is complete.
+```text
+liveness
+readiness
+dependency availability
+```
 
 ---
 
 ## Challenge 3
 
-An instance receives a shutdown signal while serving requests.
+An instance is shutting down while processing a POST request.
 
-What should happen first?
+What prevents duplicate side effects if the client retries?
 
-### Answer
+**Reasoning target:**
 
-Stop advertising readiness so new traffic stops reaching it, then drain existing work.
+```text
+transactionality
++
+idempotency
++
+durable operation state
+```
 
 ---
 
 ## Challenge 4
 
-A deployment repeatedly restarts all instances because a shared dependency is unavailable.
+A deployment drains 20% of capacity while new instances start.
 
-What should you investigate?
+What happens if the system is already at 90% utilization?
 
-### Answer
+**Reasoning target:**
 
-Whether liveness is incorrectly coupled to the dependency.
+```text
+capacity ↓
+load per instance ↑
+latency ↑
+failure probability ↑
+```
 
 ---
 
 ## Challenge 5
 
-A background job may execute twice after a worker restart.
+A health endpoint queries the primary database every second.
 
-What architectural property becomes important?
+What happens when the database becomes slow?
 
-### Answer
+**Reasoning target:**
 
-Idempotency and durable job-state semantics.
+Health checks can amplify dependency load and create cascading failures.
 
 ---
 
-# 66. Senior Interview Gotchas
+## Challenge 6
+
+A background task starts after an HTTP request returns 202.
+
+The runtime is terminated 500 ms later.
+
+Does the task necessarily complete?
+
+**Reasoning target:**
+
+No. Process-local asynchronous work does not automatically have durable execution guarantees.
+
+---
+
+## Challenge 7
+
+Version A and Version B coexist during deployment.
+
+Version B writes a new cache format that Version A cannot understand.
+
+What can happen?
+
+**Reasoning target:**
+
+Mixed-version compatibility failure.
+
+---
+
+# 54. Senior Interview Gotchas
 
 ### Gotcha 1
 
-**Liveness means all dependencies are healthy.**
+**"If the process is alive, the application is healthy."**
 
-No.
+Incorrect.
 
 ---
 
 ### Gotcha 2
 
-**Readiness means the process exists.**
+**"Readiness and liveness are the same endpoint."**
 
-No.
+They may share implementation, but they represent different operational semantics.
 
 ---
 
 ### Gotcha 3
 
-**Graceful shutdown means waiting forever.**
+**"A deployment replaces all instances simultaneously."**
 
-No.
+Usually unsafe to assume.
 
-There must be bounded draining.
+Rolling/progressive transitions can produce mixed versions.
 
 ---
 
 ### Gotcha 4
 
-**An in-memory cache is durable because the server is long-lived.**
+**"Async work continues after the response."**
 
-No.
-
-Instances can disappear.
+Only if the runtime guarantees the execution lifetime required by that work.
 
 ---
 
 ### Gotcha 5
 
-**A successful startup means the application is ready.**
+**"Health checks should verify every dependency."**
 
 Not necessarily.
+
+The correct question is:
+
+> Which dependencies are required for safe serving?
 
 ---
 
 ### Gotcha 6
 
-**A deployment can safely kill the old process immediately after the new process starts.**
+**"Graceful shutdown means wait forever."**
 
-Only if traffic routing and active work are handled safely.
+No.
+
+Drain behavior requires bounded termination.
 
 ---
 
 ### Gotcha 7
 
-**Background work automatically survives deployment.**
+**"Database migrations happen independently from deployments."**
 
-No.
-
-Durability must come from the job architecture.
+They are coupled through application/schema compatibility.
 
 ---
 
-# 67. Production Runtime Reference Architecture
+### Gotcha 8
+
+**"Retrying a failed mutation is harmless."**
+
+Not necessarily.
+
+Retries can duplicate side effects.
+
+---
+
+### Gotcha 9
+
+**"In-memory cache survives deployment."**
+
+It may disappear when the runtime instance disappears.
+
+---
+
+### Gotcha 10
+
+**"Health checks are free."**
+
+They consume network, CPU, and potentially dependency capacity.
+
+---
+
+# 55. Architecture Exercise
+
+Design lifecycle behavior for this application:
 
 ```text
-                    Load Balancer
-                         │
-              ┌──────────┴──────────┐
-              ▼                     ▼
-          Instance A            Instance B
-              │                     │
-        ┌─────┴─────┐         ┌─────┴─────┐
-        │ Lifecycle │         │ Lifecycle │
-        │           │         │           │
-        │ Startup   │         │ Startup   │
-        │ Ready     │         │ Serving   │
-        │ Serving   │         │ Draining  │
-        │ Draining  │         │ Shutdown  │
-        │ Shutdown  │         │           │
-        └─────┬─────┘         └─────┬─────┘
-              │                     │
-              └──────────┬──────────┘
-                         ▼
-                  Shared Dependencies
-                  ├── Database
-                  ├── Cache
-                  ├── Queue
-                  └── External APIs
+Next.js application
+
+Features:
+- SSR product pages
+- authenticated dashboard
+- Server Actions for mutations
+- Route Handlers
+- PostgreSQL
+- Redis
+- external payment API
+- background report generation
+- streaming responses
 ```
 
-The runtime should be replaceable without destroying durable application state.
-
----
-
-# 68. Senior Decision Framework
-
-When designing runtime lifecycle behavior, ask:
+Your architecture should define:
 
 ### Startup
 
-1. What must initialize before traffic?
-2. What can initialize asynchronously?
-3. What happens when initialization fails?
+```text
+What must be initialized before READY?
+```
 
 ### Readiness
 
-4. What does “ready” actually mean?
-5. Which dependencies are required?
-6. Can the application operate in degraded mode?
+```text
+Which dependencies are required?
+```
 
 ### Liveness
 
-7. What proves that the process is viable?
-8. Could the health check create a restart loop?
+```text
+What constitutes a stuck runtime?
+```
 
 ### Shutdown
 
-9. How does the runtime stop receiving traffic?
-10. How are active requests drained?
-11. What is the maximum drain time?
+```text
+How are requests drained?
+```
 
-### Background Work
+### Background work
 
-12. What happens to jobs during termination?
-13. Are jobs durable?
-14. Are operations idempotent?
+```text
+How does report generation survive deployment?
+```
+
+### Mutations
+
+```text
+How do payment retries avoid duplication?
+```
+
+### Database
+
+```text
+How are schema changes made deployment-safe?
+```
+
+### Streaming
+
+```text
+What happens when a streaming response is interrupted?
+```
+
+### Observability
+
+```text
+How do you know whether lifecycle behavior is causing errors?
+```
+
+If you cannot answer these explicitly, the deployment architecture is incomplete.
+
+---
+
+# 56. Production Lifecycle Checklist
+
+Before considering a runtime deployment architecture production-ready, verify:
+
+### Startup
+
+* [ ] Configuration is validated.
+* [ ] Required secrets are available.
+* [ ] Critical dependencies are initialized.
+* [ ] Optional dependencies do not unnecessarily block startup.
+* [ ] Startup time is measurable.
+* [ ] Readiness is not declared prematurely.
+
+### Health
+
+* [ ] Liveness and readiness semantics are distinct.
+* [ ] Health checks are lightweight.
+* [ ] Health checks do not create excessive dependency load.
+* [ ] Health endpoints do not expose sensitive information.
+* [ ] Failure behavior is observable.
+
+### Runtime
+
+* [ ] In-memory state is understood.
+* [ ] Durable state is externalized where required.
+* [ ] Database connections are lifecycle-safe.
+* [ ] External dependencies have bounded timeouts.
+* [ ] Long-running operations have explicit lifecycle semantics.
+
+### Shutdown
+
+* [ ] New traffic stops before termination.
+* [ ] In-flight requests can drain.
+* [ ] Shutdown has a bounded timeout.
+* [ ] Resources are released correctly.
+* [ ] Required telemetry is flushed.
+* [ ] Forced termination is observable.
 
 ### Deployment
 
-15. Can old and new versions coexist?
-16. Are schema changes backward compatible?
-17. Can rollback occur safely?
+* [ ] Mixed versions are supported.
+* [ ] Database migrations are compatible.
+* [ ] Cache formats are compatible.
+* [ ] Capacity is sufficient during rollout.
+* [ ] Failed readiness does not destroy healthy capacity.
+* [ ] Rollback behavior is understood.
+
+### Reliability
+
+* [ ] Mutations are retry-safe where required.
+* [ ] Background jobs are durable.
+* [ ] Dependency failures have defined behavior.
+* [ ] Degraded modes are intentional.
+* [ ] Streaming interruption behavior is understood.
 
 ---
 
-# 69. Core Invariants
+# 57. Completion Criteria
 
-Memorize these:
+You have completed this part when you can independently explain:
 
-```text
-process exists ≠ process ready
-```
-
-```text
-liveness ≠ readiness
-```
-
-```text
-dependency failure ≠ automatically process failure
-```
-
-```text
-ready = safe to receive traffic
-```
-
-```text
-not ready = should stop receiving new traffic
-```
-
-```text
-draining ≠ immediate termination
-```
-
-```text
-in-memory state ≠ durable state
-```
-
-```text
-runtime reuse ≠ runtime persistence
-```
-
-```text
-long-running work ≠ automatically safe inside HTTP requests
-```
-
-```text
-shutdown must be bounded
-```
-
-```text
-deployment lifecycle + traffic routing must cooperate
-```
-
-```text
-mixed-version deployment requires compatibility
-```
-
-```text
-health checks can amplify dependency failures
-```
+1. The difference between process existence, readiness, and liveness.
+2. Why readiness is a traffic-control mechanism.
+3. How startup dependencies should be classified.
+4. Why startup work should not be unnecessarily sequential.
+5. How cold starts affect request latency.
+6. How readiness participates in rolling deployment.
+7. What graceful shutdown actually means.
+8. How draining works.
+9. Why shutdown must be bounded.
+10. How long-running requests complicate termination.
+11. Why durable background work should not depend on process lifetime.
+12. How in-memory state behaves during restart and deployment.
+13. Why connection lifecycle matters.
+14. Why database migrations must support mixed versions.
+15. How cache compatibility affects deployment.
+16. How health checks can amplify failures.
+17. Why health endpoints require deliberate caching/security behavior.
+18. How degraded mode can preserve partial availability.
+19. Why mutation idempotency matters during shutdown/retry.
+20. How streaming interacts with runtime lifecycle.
+21. How deployment capacity changes while instances start and drain.
+22. How lifecycle events should be observed.
+23. How to distinguish liveness failures from dependency failures.
+24. How Next.js runtime behavior interacts with hosting lifecycle.
+25. How to design a deployment-safe lifecycle architecture for a production system.
 
 ---
 
-# 70. Final Senior-Level Mental Model
+# 58. Final Mental Model
 
-A production runtime should be understood as a state machine:
-
-```text
-                     ┌───────────────┐
-                     │    STARTING   │
-                     └───────┬───────┘
-                             │
-                             ▼
-                     ┌───────────────┐
-                     │ INITIALIZING  │
-                     └───────┬───────┘
-                             │
-                    initialization OK
-                             │
-                             ▼
-                     ┌───────────────┐
-                     │     READY     │
-                     └───────┬───────┘
-                             │
-                             ▼
-                     ┌───────────────┐
-                     │    SERVING    │
-                     └───────┬───────┘
-                             │
-                  shutdown/deployment
-                             │
-                             ▼
-                     ┌───────────────┐
-                     │   DRAINING    │
-                     └───────┬───────┘
-                             │
-                       work complete
-                             │
-                             ▼
-                     ┌───────────────┐
-                     │   SHUTDOWN    │
-                     └───────────────┘
-```
-
-The deployment system should coordinate this lifecycle with:
+The complete runtime lifecycle should now be understood as:
 
 ```text
-Traffic Routing
-      +
-Health Checks
-      +
-Runtime Lifecycle
-      +
-Dependency State
-      +
-Deployment Version
-      +
-Durable Work
+                 DEPLOYMENT
+                     │
+                     ▼
+                 STARTING
+                     │
+                     ▼
+               INITIALIZING
+                     │
+             critical setup
+                     │
+                     ▼
+                   READY
+                     │
+             traffic eligible
+                     │
+                     ▼
+                  SERVING
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+      requests     state       dependencies
+        │            │            │
+        └────────────┼────────────┘
+                     │
+              deployment /
+              failure / scale-down
+                     │
+                     ▼
+                 DRAINING
+                     │
+          no new production work
+                     │
+          in-flight work completes
+                     │
+                     ▼
+                 CLEANUP
+                     │
+                     ▼
+                 SHUTDOWN
 ```
 
-That is what makes a deployment **operationally safe**, rather than merely successful at starting a process.
+The deeper architecture is:
+
+```text
+                 ┌─────────────────────┐
+                 │ Deployment Control  │
+                 └──────────┬──────────┘
+                            │
+                    lifecycle signal
+                            │
+                            ▼
+              ┌──────────────────────────┐
+              │     Runtime Instance     │
+              │                          │
+              │ START → READY → SERVE    │
+              │              ↓           │
+              │           DRAIN          │
+              │              ↓           │
+              │          SHUTDOWN        │
+              └─────────────┬────────────┘
+                            │
+             ┌──────────────┼──────────────┐
+             ↓              ↓              ↓
+          Database        Cache        External APIs
+             │
+             ↓
+        Durable State
+             │
+             ↓
+           Queue
+             │
+             ↓
+          Workers
+```
+
+The senior-level invariant is:
+
+> **A deployment is not safe merely because the new process starts. It is safe when runtime lifecycle, traffic eligibility, dependency behavior, state durability, request semantics, shutdown behavior, and mixed-version compatibility all remain correct during the transition.**
+
+And the central distinction is:
+
+```text
+STARTED
+   ≠
+READY
+   ≠
+SERVING
+   ≠
+DRAINING
+   ≠
+SHUTDOWN
+```
+
+Understanding these states lets you reason about deployments as a **distributed lifecycle system**, rather than treating deployment as a one-time build-and-release operation.
 
 ---
 
-# 71. Part Boundary
+## Part Boundary
 
-Part 07 established:
-
-> **How configuration, secrets, environments, and runtime inputs are controlled.**
-
-Part 08 establishes:
-
-> **How an application starts, becomes ready, serves traffic, drains work, and shuts down safely.**
-
-The next part moves into:
+### This part owns
 
 ```text
-Part 09
-Deployment Observability, Logging, Metrics,
-Tracing, SLOs & Production Verification
+Runtime lifecycle
+Startup
+Readiness
+Liveness
+Health checks
+Cold starts
+Draining
+Graceful shutdown
+Shutdown deadlines
+Lifecycle-safe requests
+Background work lifetime
+Connection lifecycle
+Deployment-safe runtime behavior
+Mixed-version runtime compatibility
+Lifecycle observability
 ```
 
-The KPI progression is now:
+### This part does not own
 
 ```text
-Part 01
-Deployment Mental Model
-        ↓
-Part 02
-Build Output & Artifacts
-        ↓
-Part 03
-CI/CD & Release Promotion
-        ↓
-Part 04
-Hosting & Runtime Models
-        ↓
-Part 05
-CDN / Regions / Traffic Routing
-        ↓
-Part 06
-Networking / Data Dependencies / Distributed State
-        ↓
-Part 07
-Configuration / Secrets / Environment Architecture
-        ↓
-Part 08
-Runtime Lifecycle / Health / Graceful Shutdown
-        ↓
-Part 09
-Deployment Observability & Production Verification
+Deployment strategy selection
+CI/CD pipeline design
+Global traffic routing
+CDN architecture
+Detailed networking topology
+Configuration/secrets architecture
+Deployment observability architecture
+Full deployment capstone
 ```
 
-**Part 08 complete.**
+Those concerns belong to the surrounding KPI parts.
+
+### Next canonical part
+
+**Part 09 — Deployment Observability, Logging, Metrics, Tracing, SLOs & Production Verification**
+
+That part moves from:
+
+```text
+runtime lifecycle correctness
+```
+
+to:
+
+```text
+how we measure, verify, detect, and operate deployment correctness in production.
+```

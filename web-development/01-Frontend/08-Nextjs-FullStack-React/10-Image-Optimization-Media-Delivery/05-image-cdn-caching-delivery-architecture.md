@@ -1,458 +1,323 @@
-# Level 08 — KPI 10 — Part 05
+# Level 08 — Next.js & Full-Stack React
 
-## Image CDN, Caching, Invalidation & Delivery Architecture
+## KPI 10 — Image Optimization
+
+# Part 05 — Image CDN, Caching, Invalidation & Delivery Architecture
 
 ---
 
 ## 1. Part Objective
 
-This part establishes the production architecture for delivering optimized images through **CDNs, caches, and globally distributed delivery infrastructure**.
+The objective of this part is to understand image delivery as a **distributed caching and content-delivery system**, rather than treating an image CDN as merely a faster URL.
 
-The central question is:
+At senior frontend/SDE-2 level, the important question is not:
 
-> Once an image representation has been selected and generated, how should that representation be delivered efficiently, safely, consistently, and predictably?
+> “Are our images behind a CDN?”
 
-The focus is not primarily on choosing JPEG vs WebP vs AVIF, compression quality, or transformation algorithms. Those were established in Part 04.
+The important questions are:
 
-The focus here is:
+* What is the image's origin?
+* Where is transformation performed?
+* What representation is being cached?
+* What makes two image requests the same or different?
+* How large can the cache become?
+* How are changed images invalidated?
+* What happens during a cache miss?
+* What happens when many users request the same uncached image?
+* Which images are public?
+* Which images are private or personalized?
+* Can one tenant receive another tenant's representation?
+* What happens when the origin is unavailable?
+* How do we know whether the CDN is actually reducing origin load?
+
+The central model is:
 
 ```text
-Origin
-   ↓
-Image Processing / Delivery Service
-   ↓
-CDN / Edge Cache
-   ↓
+Original Asset
+      ↓
+Image Transformation
+      ↓
+Delivery Representation
+      ↓
+Origin / Object Storage
+      ↓
+CDN Edge
+      ↓
 Browser Cache
-   ↓
-Rendered Image
+      ↓
+Decoded Image
 ```
 
-The senior engineer must understand:
-
-* where an image should be cached
-* what makes two image requests the same cache object
-* how cache keys are constructed
-* how variants affect cache cardinality
-* how image URLs become cache identities
-* how immutable assets eliminate invalidation complexity
-* how mutable assets require invalidation or revalidation
-* how CDN caching affects origin load
-* how cache misses behave
-* how cache stampedes happen
-* how multi-region delivery changes architecture
-* how personalized images interact with caching
-* how authorization interacts with shared caches
-* how tenants must remain isolated
-* how stale content is controlled
-* how image delivery behaves during failures
-* how to observe cache behavior in production
+The CDN is therefore one layer in a larger image-delivery architecture.
 
 ---
 
 # 2. The Core Image Delivery Mental Model
 
-A production image request is not simply:
-
-```text
-Browser → Server → Image
-```
-
-A more realistic architecture is:
+A production image request can be modeled as:
 
 ```text
 Browser
    ↓
-Browser Cache
-   ↓ miss
 CDN / Edge
-   ↓ miss
-Origin / Image Service
    ↓
-Transformation / Representation
+Cache Lookup
    ↓
-Origin Response
-   ↓
-CDN Stores Representation
-   ↓
-Browser Stores Representation
-   ↓
-Rendered Image
+ ┌───────────────┐
+ │ Cache Hit?    │
+ └───────┬───────┘
+         │
+    ┌────┴────┐
+    │         │
+   YES        NO
+    │         │
+    ↓         ↓
+Response   Origin
+              ↓
+        Transformation
+              ↓
+          Response
+              ↓
+          CDN Cache
+              ↓
+           Browser
 ```
 
-Every layer exists to prevent unnecessary work.
-
-The objective is therefore:
+The most important distinction is:
 
 ```text
-maximize cache reuse
-+
-minimize origin work
-+
-minimize network distance
-+
-preserve representation correctness
+cache hit
+≠
+image exists somewhere
+
+cache hit
+=
+the requested representation exists
+under the relevant cache identity
+and can be served from that cache layer.
 ```
 
-A useful abstraction is:
+Therefore:
 
 ```text
-Image Delivery =
-Representation Identity
-+
-Cache Policy
-+
-Distribution
-+
-Invalidation Strategy
-+
-Security Boundary
-+
-Observability
+same source asset
+≠
+same cached representation
 ```
+
+For example:
+
+```text
+/product.jpg?w=400
+/product.jpg?w=800
+/product.jpg?w=1200
+```
+
+may represent the same logical image while being three different delivery representations.
 
 ---
 
 # 3. CDN vs Origin Responsibilities
 
-A common architectural mistake is treating the CDN as simply a faster HTTP server.
+A senior engineer must understand which component owns which responsibility.
 
-The CDN is primarily a **distribution and caching layer**.
+## Origin
 
-The origin remains responsible for generating or retrieving the authoritative representation.
+The origin may be responsible for:
 
-### Origin responsibilities
+* storing original assets
+* generating transformed images
+* authenticating private image access
+* validating image requests
+* returning cache headers
+* managing content versions
+* enforcing transformation constraints
 
-The origin/image service may be responsible for:
-
-* retrieving the source image
-* validating the requested representation
-* transform the image
-* selecting output format
-* resizing
-* cropping
-* applying quality policy
-* enforcing authorization
-* generating response headers
-* providing cacheable representations
-
-### CDN responsibilities
+## CDN
 
 The CDN may be responsible for:
 
 * geographic distribution
 * edge caching
-* cache lookup
-* cache revalidation
 * request routing
-* bandwidth delivery
-* origin offload
+* bandwidth offload
+* reducing origin latency
+* absorbing repeated traffic
+* cache revalidation
+* stale serving policies
 * TLS termination
-* edge-level security policies
-* cache purge
-* traffic absorption
+* traffic protection
+
+## Browser
+
+The browser may provide another cache layer:
+
+```text
+Browser Cache
+      ↓
+CDN Cache
+      ↓
+Origin Cache
+      ↓
+Object Storage
+```
+
+This means image delivery can have multiple cache layers.
+
+---
+
+# 4. Cache Hierarchy
+
+A simplified production hierarchy is:
+
+```text
+User
+ ↓
+Browser Cache
+ ↓
+CDN Edge Cache
+ ↓
+CDN Regional / Shield Layer
+ ↓
+Image Service
+ ↓
+Object Storage / Origin
+```
+
+Each layer can reduce load on the next.
+
+The desired behavior is generally:
+
+```text
+Browser hit
+    ↓
+no network request
+
+CDN hit
+    ↓
+no origin request
+
+Origin cache hit
+    ↓
+no expensive transformation
+
+Origin miss
+    ↓
+transformation / storage access
+```
+
+The further upstream a request is satisfied, the less infrastructure work is required.
+
+---
+
+# 5. Cache Identity Is Critical
+
+A cache needs a key.
 
 Conceptually:
 
 ```text
-Origin = authoritative computation/source
-
-CDN = distributed delivery/cache layer
+Cache Key =
+    URL
+    + dimensions
+    + format
+    + quality
+    + transformation parameters
+    + relevant representation context
 ```
 
-This distinction matters when debugging.
-
-If the image is wrong:
+For example:
 
 ```text
-Could be origin generation.
+/image/product-123?w=800&format=webp&q=75
 ```
 
-If the image is correct but slow:
+may identify a different representation from:
 
 ```text
-Could be cache miss or CDN routing.
+/image/product-123?w=1200&format=webp&q=75
 ```
 
-If the wrong tenant receives an image:
+And:
 
 ```text
-Could be cache identity/security design.
+/image/product-123?w=800&format=avif&q=75
 ```
 
----
-
-# 4. The Three-Level Image Cache
-
-A production image system commonly has multiple cache layers.
-
-```text
-             ┌───────────────────────┐
-             │      Browser Cache    │
-             └───────────┬───────────┘
-                         │ miss
-             ┌───────────▼───────────┐
-             │      CDN / Edge       │
-             └───────────┬───────────┘
-                         │ miss
-             ┌───────────▼───────────┐
-             │ Origin / Image Cache  │
-             └───────────┬───────────┘
-                         │ miss
-             ┌───────────▼───────────┐
-             │ Source / Processing   │
-             └───────────────────────┘
-```
-
-Each layer has different characteristics.
-
-### Browser cache
-
-Optimizes repeat requests from the same client.
-
-### CDN cache
-
-Optimizes reuse across many clients and geographic locations.
-
-### Origin-side cache
-
-Optimizes repeated transformation or source retrieval work before reaching the underlying storage or processing system.
-
-The architectural goal is not simply:
-
-> Cache everything.
-
-The real question is:
-
-> Which layer should own which cacheable representation?
-
----
-
-# 5. Cache Identity Is the Central Problem
-
-An image URL may look simple:
-
-```text
-/image/product-123
-```
-
-But the actual representation may depend on:
-
-```text
-source
-width
-height
-format
-quality
-crop
-DPR
-tenant
-locale
-version
-```
+is also different.
 
 Therefore:
 
 ```text
-same source
-≠
-same representation
-```
-
-For example:
-
-```text
-product-123
-```
-
-might produce:
-
-```text
-product-123?w=320
-product-123?w=640
-product-123?w=1280
-```
-
-Those are different representations.
-
-Therefore the cache must distinguish them.
-
-A useful model is:
-
-```text
-Cache Identity =
-f(
-  source identity,
-  representation parameters,
-  delivery policy
-)
-```
-
----
-
-# 6. Cache Key Design
-
-A cache key must include every dimension that can change the resulting representation.
-
-For example:
-
-```text
-/source/123?w=640&format=webp&q=75
-```
-
-could represent:
-
-```text
-source = 123
-width = 640
-format = webp
-quality = 75
-```
-
-If changing a parameter changes the bytes returned to the client, that parameter potentially belongs in the representation identity.
-
-This produces an important invariant:
-
-> If two requests can produce different bytes, they must not accidentally resolve to the same cache object.
-
----
-
-# 7. The Dangerous Cache-Key Bug
-
-Imagine:
-
-```text
-/image/123?width=640&format=webp
+logical resource identity
 ```
 
 and:
 
 ```text
-/image/123?width=1280&format=webp
+delivery representation identity
 ```
 
-If the CDN ignores `width` when constructing the cache key:
-
-```text
-Cache Key = /image/123
-```
-
-then:
-
-```text
-640px request
-      ↓
-cache miss
-      ↓
-640px representation stored
-      ↓
-1280px request
-      ↓
-cache hit
-      ↓
-receives 640px image
-```
-
-The cache is fast.
-
-The system is still incorrect.
-
-This illustrates:
-
-```text
-cache hit rate ≠ correctness
-```
+must remain distinct.
 
 ---
 
-# 8. Cache Cardinality
+# 6. Cache Cardinality
 
-Every additional representation dimension can multiply the number of cache objects.
+One of the most important production concepts is **cache cardinality**.
 
-Suppose you have:
+Suppose an image supports:
 
 ```text
-5 widths
-×
+10 widths
 3 formats
-×
 3 quality levels
-×
-2 crop modes
+2 DPR variants
 ```
 
-That produces:
+A theoretical upper bound is:
 
 ```text
-5 × 3 × 3 × 2 = 90
+10 × 3 × 3 × 2
+= 180 representations
 ```
 
-potential representations per source image.
+for one logical asset.
 
-For:
+If a system has:
 
 ```text
 100,000 source images
 ```
 
-the theoretical representation space becomes:
-
-```text
-9,000,000 cache objects
-```
-
-This does not mean all objects will actually be generated.
-
-But it demonstrates the architectural problem:
-
-> Flexible image transformation creates cache cardinality.
+the representation space can become enormous.
 
 Therefore:
 
-```text
-more configurability
-→
-more representation variants
-→
-more cache objects
-→
-more cache churn
-→
-lower reuse probability
-```
-
-Senior architecture therefore controls the number of variants deliberately.
+> Image optimization can accidentally become a cache-cardinality problem.
 
 ---
 
-# 9. Variant Explosion
+# 7. More Variants Are Not Automatically Better
 
-A poorly designed image API might permit arbitrary:
+A naive architecture might generate arbitrary combinations:
 
 ```text
-width
-height
-quality
-format
-crop
-position
-blur
-sharpen
-background
-rotation
+width = any value
+quality = any value
+format = any value
+crop = any value
+DPR = any value
 ```
 
-This creates enormous cache cardinality.
+This can create a huge number of representations.
 
-Instead of allowing unlimited values:
+Instead, production systems usually constrain the representation space.
 
-```text
-width = any integer
-```
-
-the system can define approved widths:
+For example:
 
 ```text
+Allowed widths:
 320
 480
 640
@@ -460,2370 +325,1591 @@ the system can define approved widths:
 1024
 1280
 1536
+1920
 ```
 
-This creates a controlled representation space.
-
-Therefore:
+Rather than:
 
 ```text
-arbitrary transformation
+every possible width from 1 → 5000
 ```
 
-should generally be avoided when:
+The goal is:
 
 ```text
-predictable caching
-```
-
-is more valuable.
-
----
-
-# 10. Canonical Image URLs
-
-A production system should preferably generate deterministic image URLs.
-
-For example:
-
-```text
-/images/product-123/640.webp
-```
-
-is often easier to reason about than:
-
-```text
-/image?id=123&w=640&fmt=webp&q=74&crop=auto
-```
-
-Both can work.
-
-The important property is determinism.
-
-A canonical representation should map:
-
-```text
-same source
+sufficient visual fidelity
 +
-same representation policy
+reasonable cache cardinality
++
+predictable origin workload
 ```
-
-to:
-
-```text
-same delivery identity
-```
-
-This improves:
-
-* CDN reuse
-* browser reuse
-* observability
-* debugging
-* invalidation
-* reproducibility
 
 ---
 
-# 11. Immutable Image URLs
+# 8. Immutable Image URLs
 
-One of the strongest image caching strategies is **content/version-based identity**.
+One of the strongest caching strategies is content-addressed or versioned URLs.
 
-Instead of:
-
-```text
-/images/product-123.jpg
-```
-
-use something conceptually like:
+Example:
 
 ```text
-/images/product-123.v42.jpg
+/images/product-123.v7.webp
 ```
 
 or:
 
 ```text
-/images/abc123hash.jpg
+/images/8f3a1c/product-123.webp
 ```
 
-The URL changes whenever the underlying representation changes.
+The important property is:
 
-This produces:
-
-```text
-URL identity
-=
-content/version identity
-```
-
-Then the system can use long-lived caching.
-
-For example:
-
-```text
-Cache-Control: public, max-age=31536000, immutable
-```
-
-The exact policy depends on the infrastructure, but the architectural idea is:
-
-> Never mutate an object behind an immutable URL.
-
----
-
-# 12. Why Versioned URLs Reduce Invalidation Complexity
-
-Suppose:
-
-```text
-/image/product-123
-```
-
-currently represents:
-
-```text
-old image
-```
-
-and the source image changes.
-
-With a mutable URL:
-
-```text
-/image/product-123
-```
-
-you must consider:
-
-* browser caches
-* CDN caches
-* origin caches
-* stale clients
-* purge propagation
-* race conditions
-* TTL expiration
-
-With versioned identity:
-
-```text
-/image/product-123.v1
-```
-
-becomes:
-
-```text
-/image/product-123.v2
-```
-
-The old object can safely remain cached.
-
-The new object has a different identity.
-
-Therefore:
-
-```text
-versioning
-→
-new identity
-→
-no ambiguity
-→
-no global purge requirement
-```
-
-This is one of the most important cache architecture patterns in frontend infrastructure.
-
----
-
-# 13. Mutable vs Immutable Assets
-
-### Immutable
-
-```text
-URL changes when content changes
-```
-
-Advantages:
-
-* long TTL
-* high cache efficiency
-* simple deployment
-* simple rollback
-* minimal purge requirements
-
-### Mutable
-
-```text
-URL stays the same while content changes
-```
-
-Advantages:
-
-* stable URLs
-* easier external references
-
-Costs:
-
-* invalidation complexity
-* stale content risk
-* revalidation traffic
-* race conditions
-* more difficult debugging
-
-The decision should be explicit.
-
----
-
-# 14. TTL Architecture
-
-A CDN needs to know how long a representation can remain fresh.
-
-Conceptually:
-
-```text
-TTL = acceptable staleness window
-```
-
-A static versioned image may have:
-
-```text
-very long TTL
-```
-
-A frequently changing image may have:
-
-```text
-shorter TTL
-```
-
-A personalized image may require:
-
-```text
-private/no shared caching
-```
-
-The correct TTL depends on:
-
-```text
-content volatility
-+
-identity strategy
-+
-business freshness requirement
-+
-invalidation capability
-```
-
----
-
-# 15. TTL Is Not the Same as Invalidation
-
-These mechanisms solve different problems.
-
-### TTL
-
-Answers:
-
-> How long may this cached representation remain fresh?
-
-### Invalidation
-
-Answers:
-
-> How do we remove or supersede this representation before its normal expiry?
-
-For example:
-
-```text
-TTL = 7 days
-```
-
-does not mean:
-
-```text
-content cannot change for 7 days
-```
-
-It means the cache may continue serving the object according to its caching policy unless another mechanism causes revalidation or invalidation.
-
----
-
-# 16. Revalidation
-
-Instead of immediately downloading the complete representation again, a cache can sometimes ask the origin whether the object changed.
-
-Conceptually:
-
-```text
-Cache
-  ↓
-"Has this representation changed?"
-  ↓
-Origin
-  ↓
-"No"
-```
-
-The origin can indicate that the cached object remains valid.
-
-This reduces:
-
-* response bytes
-* transformation work
-* origin bandwidth
-
-The key concept is:
-
-```text
-freshness validation
-≠
-full object regeneration
-```
-
----
-
-# 17. Stale-While-Revalidate
-
-A useful caching pattern is:
-
-```text
-serve stale object
-+
-refresh in background
-```
-
-Conceptually:
-
-```text
-Client request
-      ↓
-stale cache object exists
-      ↓
-serve existing object immediately
-      ↓
-background revalidation
-      ↓
-new object stored
-```
-
-This can reduce latency while allowing eventual freshness.
-
-The tradeoff is explicit:
-
-```text
-lower latency
-vs
-temporary staleness
-```
-
-It is appropriate only when the product can tolerate that staleness.
-
----
-
-# 18. Stale-If-Error
-
-Another useful resilience strategy is allowing an already cached representation to remain usable when the origin becomes unavailable.
-
-Conceptually:
-
-```text
-Origin healthy
-    ↓
-fresh object
-
-Origin failure
-    ↓
-serve stale cached object
-```
-
-For static or semi-static images, this can provide significant resilience.
-
-An image that is slightly stale is often more useful than:
-
-```text
-broken image
-```
-
-during an origin outage.
-
-Again, this is a product decision rather than a universal rule.
-
----
-
-# 19. Cache Hit and Miss Architecture
-
-A request can follow:
-
-```text
-Browser HIT
-```
-
-or:
-
-```text
-Browser MISS
-      ↓
-CDN HIT
-```
-
-or:
-
-```text
-Browser MISS
-      ↓
-CDN MISS
-      ↓
-Origin HIT
-```
-
-or:
-
-```text
-Browser MISS
-      ↓
-CDN MISS
-      ↓
-Origin MISS
-      ↓
-Transformation
-      ↓
-Storage
-```
-
-These paths have dramatically different performance characteristics.
-
-A senior engineer should always ask:
-
-> Which layer is actually missing?
-
----
-
-# 20. Cache Hit Ratio
-
-A useful metric is:
-
-```text
-Cache Hit Ratio =
-cache hits / total cache requests
-```
-
-For example:
-
-```text
-900,000 hits
-100,000 misses
-```
-
-gives:
-
-```text
-90% hit ratio
-```
-
-But a single global hit ratio can be misleading.
-
-You may need:
-
-```text
-browser hit ratio
-CDN hit ratio
-origin cache hit ratio
-per-region hit ratio
-per-image-class hit ratio
-per-variant hit ratio
-```
-
-A 95% global hit ratio may hide:
-
-```text
-99% for thumbnails
-40% for hero images
-```
-
-which could create substantial origin load.
-
----
-
-# 21. Origin Offload
-
-The CDN's primary operational value is often reducing origin work.
-
-Suppose:
-
-```text
-10 million image requests
-```
-
-reach the CDN.
-
-If:
-
-```text
-95%
-```
-
-are cache hits, then approximately:
-
-```text
-9.5 million
-```
-
-requests do not require origin retrieval.
-
-Only:
-
-```text
-500,000
-```
-
-reach the origin layer.
-
-This reduces:
-
-* origin CPU
-* image transformation work
-* database/storage reads
-* network egress from origin
-* latency
-* infrastructure cost
-
----
-
-# 22. Cache Stampede
-
-A dangerous failure mode occurs when many requests simultaneously encounter an expired object.
-
-For example:
-
-```text
-popular-image
-```
-
-expires at:
-
-```text
-12:00:00
-```
-
-At:
-
-```text
-12:00:01
-```
-
-10,000 clients request it.
-
-Without coordination:
-
-```text
-10,000 cache misses
-→
-10,000 origin requests
-→
-10,000 transformations
-```
-
-This is a cache stampede.
-
-The cache did not merely miss.
-
-It amplified load.
-
----
-
-# 23. Request Coalescing / Single Flight
-
-A better architecture can coordinate concurrent misses.
-
-Instead of:
-
-```text
-Request A → origin
-Request B → origin
-Request C → origin
-Request D → origin
-```
-
-the system can perform:
-
-```text
-Request A ─┐
-Request B ─┤
-Request C ─┼→ one origin generation
-Request D ─┘
-                ↓
-             response
-                ↓
-        shared cache object
-```
-
-This is commonly called:
-
-* request coalescing
-* single flight
-* collapsed forwarding
-
-The principle is:
-
-> Concurrent requests for the same missing representation should ideally share one generation operation.
-
----
-
-# 24. Cache Warming
-
-For predictable traffic, caches can sometimes be warmed before users request an object.
-
-For example:
-
-```text
-new product launch
-```
-
-may be expected to receive:
-
-```text
-millions of requests
-```
-
-The system can pre-generate or prefetch high-value representations.
-
-Conceptually:
-
-```text
-Deploy
-  ↓
-Generate important image variants
-  ↓
-Populate CDN
-  ↓
-Traffic arrives
-  ↓
-High cache hit rate
-```
-
-This is useful when demand is predictable.
-
-It is not always worth doing.
-
-Cache warming itself consumes:
-
-* bandwidth
-* compute
-* storage
-* origin capacity
-
-Therefore it should be targeted.
-
----
-
-# 25. Origin Shielding
-
-Large CDN architectures may introduce an additional shielding layer between edge locations and the origin.
-
-Conceptually:
-
-```text
-Users
-  ↓
-Edge POPs
-  ↓
-Shield Layer
-  ↓
-Origin
-```
-
-Without shielding:
-
-```text
-many edge locations
-→
-origin
-```
-
-With shielding:
-
-```text
-many edge locations
-→
-smaller set of shield locations
-→
-origin
-```
-
-This can reduce origin request fan-out.
-
-The important mental model is:
-
-```text
-edge distribution
-≠
-origin protection
-```
-
-A globally distributed CDN can still create substantial origin load if cache misses propagate independently from many locations.
-
----
-
-# 26. Geographic Distribution
-
-A CDN can place image representations close to users.
-
-Conceptually:
-
-```text
-India user
-   ↓
-regional edge
-
-US user
-   ↓
-US edge
-
-Europe user
-   ↓
-European edge
-```
-
-This reduces network distance.
-
-However, global distribution creates additional considerations:
-
-* regional cache populations
-* cache fill duplication
-* invalidation propagation
-* routing
-* origin geography
-* consistency
-* regional outages
-
-A cache hit in one region does not necessarily imply a cache hit in another.
-
----
-
-# 27. Global Cache Warmth
-
-Consider:
-
-```text
-Image A
-```
-
-with:
-
-```text
-10 million requests in US
-1,000 requests in India
-```
-
-The US cache may be extremely warm.
-
-The India edge may remain cold.
-
-Therefore:
-
-```text
-global popularity
-≠
-regional cache popularity
-```
-
-Observability must account for geographic distribution.
-
----
-
-# 28. Browser Cache vs CDN Cache
-
-These are different scopes.
-
-### Browser cache
-
-Typically:
-
-```text
-one user/device
-```
-
-### CDN cache
-
-Typically:
-
-```text
-many users
-```
-
-Therefore a browser hit can hide CDN behavior.
-
-For example:
-
-```text
-User refreshes page
-```
-
-and sees:
-
-```text
-browser HIT
-```
-
-The CDN was never contacted.
-
-To diagnose CDN performance correctly, test with:
-
-* cache-busting where appropriate
-* controlled requests
-* DevTools cache settings
-* CDN response headers
-* repeated requests from multiple clients/regions
-
----
-
-# 29. Cache-Control Architecture
-
-HTTP caching policy should communicate intended cache behavior.
-
-Conceptually:
-
-```text
-public
-```
-
-means the representation may be shared by caches where appropriate.
-
-```text
-private
-```
-
-means the representation should be treated as user-specific.
-
-```text
-max-age
-```
-
-defines a freshness lifetime.
-
-```text
-s-maxage
-```
-
-can define shared-cache freshness separately from browser freshness.
-
-The important architectural principle is:
-
-> Browser caching and shared-cache caching can have different requirements.
-
----
-
-# 30. Public vs Personalized Images
-
-This is one of the most important boundaries in image delivery.
-
-A public image:
-
-```text
-/logo.png
-```
-
-may be safely shared.
-
-A personalized image:
-
-```text
-/avatar/generated-for-user-123
-```
-
-may contain user-specific information.
-
-The caching policy must therefore reflect representation privacy.
-
-A dangerous design is:
-
-```text
-personalized response
-+
-public shared cache
-```
-
-because another user could receive the cached representation.
-
----
-
-# 31. The Personalized Image Leakage Failure
-
-Imagine:
-
-```text
-GET /profile/header
-```
-
-for:
-
-```text
-User A
-```
-
-returns:
-
-```text
-Image containing User A's private information
-```
-
-If the CDN cache key is only:
-
-```text
-/profile/header
-```
-
-then:
-
-```text
-User A
-→ cache stores response
-
-User B
-→ same URL
-→ cache HIT
-→ receives User A's image
-```
-
-This is a catastrophic cache-boundary failure.
-
-The problem is not merely performance.
-
-It is:
-
-```text
-authorization failure
-+
-cache identity failure
-```
-
----
-
-# 32. Authentication and Shared Image Caches
-
-Authentication does not automatically mean:
-
-```text
-never cache
-```
-
-Instead ask:
-
-> Is the representation identical for all authorized users?
-
-If yes:
-
-```text
-public/shared cache may be possible
-```
-
-If no:
-
-```text
-representation identity must account for the user boundary
-```
-
-or the response should remain private.
-
-The key distinction is:
-
-```text
-authenticated request
-≠
-personalized representation
-```
-
----
-
-# 33. Tenant Isolation
-
-Multi-tenant systems require the same discipline.
-
-Suppose:
-
-```text
-Tenant A
-/image/logo
-```
-
-and:
-
-```text
-Tenant B
-/image/logo
-```
-
-produce different images.
-
-If the CDN key is:
-
-```text
-/image/logo
-```
-
-then the representations collide.
-
-A safer identity might conceptually be:
-
-```text
-tenant-A/image/logo
-tenant-B/image/logo
-```
-
-or use a tenant-specific hostname:
-
-```text
-tenant-a.example.com/image/logo
-tenant-b.example.com/image/logo
-```
-
-The important invariant is:
-
-> Cache identity must preserve tenant representation boundaries.
-
----
-
-# 34. Cache Poisoning
-
-A cache poisoning scenario occurs when an attacker causes an incorrect response to become cached and subsequently served to other users.
-
-Potential causes include:
-
-* untrusted cache-key parameters
-* host/header confusion
-* incorrect normalization
-* attacker-controlled transformation options
-* inconsistent origin/CDN cache interpretation
-
-The security model must therefore consider:
-
-```text
-request normalization
-+
-cache key construction
-+
-origin authorization
-+
-response caching policy
-```
-
-Caching is part of the security architecture.
-
----
-
-# 35. Signed Image URLs
-
-Private image delivery may use signed URLs.
-
-Conceptually:
-
-```text
-/image/private/123
-   +
-expiration
-   +
-signature
-```
-
-The server/CDN verifies:
-
-```text
-signature valid?
-not expired?
-allowed resource?
-allowed transformation?
-```
-
-This can allow controlled CDN delivery without making the underlying image publicly accessible.
-
-The architectural tradeoff is that signatures introduce another dimension into request authorization.
-
-The system must decide whether the signature itself belongs in the cache identity or can be normalized away safely.
-
----
-
-# 36. Tokenized URLs and Cache Efficiency
-
-Consider:
-
-```text
-/image/123?token=ABC
-/image/123?token=XYZ
-```
-
-If the CDN treats the entire query string as the cache key:
-
-```text
-different token
-→
-different cache object
-```
-
-This can destroy cache reuse.
-
-Therefore secure delivery requires careful separation between:
-
-```text
-authorization identity
-```
-
-and:
-
-```text
-representation identity
-```
-
-The CDN must not accidentally turn every authorization token into a unique representation unless that is intentional.
-
----
-
-# 37. Cache Invalidation
-
-Sometimes content must change immediately.
-
-For example:
-
-```text
-copyrighted image removed
-security-sensitive image removed
-incorrect image published
-tenant deleted
-content revoked
-```
-
-If the URL remains unchanged, the system may need explicit invalidation.
-
-Possible strategies include:
-
-```text
-purge by URL
-purge by prefix
-purge by tag
-short TTL
-revalidation
-versioned URL
-```
-
-The preferred mechanism depends on the architecture.
-
----
-
-# 38. Versioning vs Purging
-
-A useful decision framework:
-
-### Versioning
-
 ```text
-content changes
+new content
 →
 new URL
-```
-
-Best when:
-
-* assets are immutable
-* URL changes are acceptable
-* long-lived caching is valuable
-
-### Purging
-
-```text
-content changes
-→
-same URL
-→
-remove cached representation
-```
-
-Best when:
-
-* stable URLs are required
-* content must be replaced immediately
-* CDN supports reliable purge semantics
-
-### Short TTL
-
-```text
-content changes
-→
-wait for expiration
-```
-
-Best when:
-
-* some staleness is acceptable
-* operational simplicity matters
-
----
-
-# 39. Invalidation Race Conditions
-
-Suppose:
-
-```text
-Version A
-```
-
-is cached.
-
-The source changes to:
-
-```text
-Version B
-```
-
-An invalidation request is issued.
-
-But before all CDN regions receive the purge:
-
-```text
-Region 1 → B
-Region 2 → A
-Region 3 → A
-```
-
-Users can temporarily see different versions.
-
-This illustrates:
-
-```text
-invalidation is distributed
-```
-
-and therefore:
-
-```text
-purge request
-≠
-instantaneous global consistency
-```
-
-For systems requiring strict identity consistency, versioned URLs are often easier to reason about.
-
----
-
-# 40. Deployment and Image Cache Identity
-
-Application deployments can introduce new image processing behavior.
-
-For example:
-
-```text
-Deployment V1
-→ quality profile A
-```
-
-then:
-
-```text
-Deployment V2
-→ quality profile B
-```
-
-If the URL remains:
-
-```text
-/image/123?w=640
-```
-
-the CDN may continue serving the representation generated under V1.
-
-This may be correct or incorrect depending on the architecture.
-
-If the representation policy changes materially, consider versioning:
-
-```text
-/image/v2/123/640.webp
-```
-
-This makes representation policy changes explicit.
-
----
-
-# 41. Cache Invalidation Should Follow Ownership
-
-A useful architecture is:
-
-```text
-Source mutation
-      ↓
-Resource version change
-      ↓
-Representation identity changes
-      ↓
-New URL
-      ↓
-New cache object
 ```
 
 rather than:
 
 ```text
-Source mutation
-      ↓
-search every CDN
-      ↓
-purge every possible variant
-      ↓
-hope no stale representation survives
+same URL
+→
+different content
 ```
 
-The second approach becomes difficult as systems scale.
+This allows aggressive caching.
 
----
-
-# 42. Failure Mode: Stale Image
-
-Symptoms:
+Conceptually:
 
 ```text
-CMS shows new image
-but
-frontend shows old image
-```
-
-Possible causes:
-
-* browser cache
-* CDN cache
-* origin cache
-* missing invalidation
-* long TTL
-* immutable URL incorrectly reused
-* stale-while-revalidate behavior
-
-Debugging should trace:
-
-```text
-URL
-→ browser cache
-→ CDN status
-→ origin response
-→ source asset
-```
-
-Do not immediately blame the CDN.
-
----
-
-# 43. Failure Mode: Wrong Variant
-
-Symptoms:
-
-```text
-mobile receives desktop-sized image
-```
-
-Possible causes:
-
-* incorrect `sizes`
-* incorrect `srcset`
-* CDN cache-key collision
-* transformation parameter dropped
-* URL normalization bug
-
-Part 03 focused on responsive selection.
-
-Here the cache-specific question is:
-
-> Did different representation requests collapse into the same cache object?
-
----
-
-# 44. Failure Mode: Cache Miss Storm
-
-Symptoms:
-
-```text
-origin CPU spikes
-image transformation latency spikes
-CDN hit ratio falls
-```
-
-Potential causes:
-
-* mass expiration
-* deployment
-* cache purge
-* cache-key change
-* new image variant rollout
-* traffic surge
-* regional cache cold start
-
-A senior engineer should investigate the relationship:
-
-```text
-traffic
-+
-cache hit ratio
-+
-origin request rate
-+
-transformation rate
-```
-
-rather than looking at latency alone.
-
----
-
-# 45. Failure Mode: Origin Outage
-
-Suppose:
-
-```text
-origin unavailable
-```
-
-If the CDN has valid cached images:
-
-```text
-users may continue receiving cached content
-```
-
-If everything is uncached:
-
-```text
-images fail immediately
-```
-
-Therefore caching can act as a resilience layer.
-
-This is why:
-
-```text
-cache architecture
-```
-
-is also:
-
-```text
-availability architecture
-```
-
----
-
-# 46. Failure Mode: CDN Outage
-
-A CDN is itself an infrastructure dependency.
-
-If the CDN fails:
-
-```text
-Browser
+URL v1
   ↓
-CDN unavailable
+immutable
+  ↓
+cache for long duration
 ```
 
-Possible architecture responses include:
+When the asset changes:
 
-* alternate CDN
-* origin fallback
-* multi-CDN routing
-* regional failover
-* degraded image behavior
-* cached browser representations
+```text
+URL v2
+  ↓
+new representation
+```
 
-However, redundancy adds operational complexity.
-
-The correct architecture depends on business requirements.
+No global purge is necessarily required.
 
 ---
 
-# 47. Multi-CDN Architecture
+# 9. Why Content Versioning Helps
 
-Large systems may use:
+Consider:
 
 ```text
-Users
-  ↓
-Global routing
-  ↓
-CDN A / CDN B
-  ↓
-Origin
+/logo.png
 ```
 
-Benefits:
+If the content changes but the URL remains:
 
-* provider redundancy
-* geographic optimization
-* traffic steering
-* resilience
+```text
+/logo.png
+```
 
-Costs:
+different cache layers may disagree about the current representation.
 
-* duplicated configuration
-* inconsistent cache behavior
-* invalidation complexity
-* observability fragmentation
-* URL/signing differences
-* operational overhead
+Possible state:
 
-Multi-CDN should solve a real requirement rather than exist merely because redundancy sounds valuable.
+```text
+Browser → old logo
+CDN     → old logo
+Origin  → new logo
+```
+
+This creates cache inconsistency.
+
+With versioned identity:
+
+```text
+/logo.v1.png
+/logo.v2.png
+```
+
+the application explicitly moves to the new representation.
+
+This is often easier to reason about than invalidating every cache layer.
 
 ---
 
-# 48. Image Delivery Observability
+# 10. Cache-Control
 
-A production system should expose enough information to answer:
-
-> Why was this image slow?
-
-Useful dimensions include:
-
-```text
-request URL
-image ID
-variant
-width
-format
-quality
-CDN region
-cache status
-cache age
-origin latency
-transformation latency
-response size
-status code
-```
-
-Useful metrics:
-
-```text
-CDN hit ratio
-origin request rate
-origin bandwidth
-transformation count
-transformation latency
-image response latency
-error rate
-cache object count
-cache eviction rate
-regional hit ratio
-```
-
----
-
-# 49. Cache Headers as Debugging Evidence
-
-Response headers can reveal important information.
+HTTP cache policy determines how downstream caches treat the response.
 
 Conceptually:
 
 ```text
 Cache-Control
-Age
-ETag
-Last-Modified
-CDN-Cache-Status
-X-Cache
+    ↓
+how long may this response be reused?
 ```
 
-The exact header names depend on infrastructure.
+Important concepts include:
 
-The point is that cache behavior should be observable.
+* `max-age`
+* `s-maxage`
+* `public`
+* `private`
+* `no-store`
+* `stale-while-revalidate`
+* `stale-if-error`
 
-A senior engineer should be able to inspect:
+The exact policy depends on whether the representation is:
+
+* immutable
+* frequently changing
+* public
+* personalized
+* security-sensitive
+
+---
+
+# 11. Public vs Private Images
+
+Not every image should be publicly cacheable.
+
+### Public image
+
+Examples:
 
 ```text
-request
-→ response headers
-→ cache status
-→ origin path
+marketing hero
+product catalog image
+blog thumbnail
+public avatar
+documentation image
 ```
 
-and form a hypothesis.
+These may often be safely cached at CDN scale.
 
----
+### Private image
 
-# 50. Image Cache Architecture Matrix
-
-| Concern             | Decision                                     |
-| ------------------- | -------------------------------------------- |
-| Image identity      | What uniquely identifies the representation? |
-| Variant identity    | Which parameters affect bytes?               |
-| Cache key           | How are variants separated?                  |
-| Browser cache       | What should clients retain?                  |
-| CDN cache           | What can be shared globally?                 |
-| Origin cache        | What computation can be reused?              |
-| TTL                 | How long is staleness acceptable?            |
-| Revalidation        | How is freshness checked?                    |
-| Invalidation        | How are urgent changes propagated?           |
-| Versioning          | Can URL identity represent content identity? |
-| Personalization     | Is the representation user-specific?         |
-| Tenant isolation    | Can tenants share cache objects?             |
-| Security            | Can untrusted requests poison shared caches? |
-| Stampede protection | What happens during concurrent misses?       |
-| Geographic delivery | Where should representations be cached?      |
-| Observability       | How is cache behavior measured?              |
-
----
-
-# 51. Four-Pillar Engineering Matrix
-
-Every image CDN decision should be evaluated across four dimensions.
-
-## Pillar 1 — Correctness
-
-Ask:
-
-* Can the wrong image be served?
-* Can the wrong variant be served?
-* Can stale content violate product requirements?
-* Can tenants receive each other's images?
-* Can personalized content leak?
-
----
-
-## Pillar 2 — Performance
-
-Ask:
-
-* What is the browser hit rate?
-* What is the CDN hit rate?
-* How many requests reach origin?
-* How expensive are cache misses?
-* How much bandwidth is saved?
-* How close are users to the serving edge?
-
----
-
-## Pillar 3 — Maintainability
-
-Ask:
-
-* Is cache identity deterministic?
-* Can engineers reason about invalidation?
-* Are variants bounded?
-* Can deployments change representation safely?
-* Can cache failures be debugged?
-
----
-
-## Pillar 4 — Scalability
-
-Ask:
-
-* What happens with millions of assets?
-* What happens with millions of variants?
-* What happens during traffic spikes?
-* What happens when a popular image expires?
-* What happens during regional failure?
-* Can the origin survive a cold-cache event?
-
----
-
-# 52. Production Image Delivery Architecture
-
-A mature architecture can look like:
+Examples:
 
 ```text
-                    ┌───────────────────┐
-                    │      Browser      │
-                    └─────────┬─────────┘
+private invoice PDF preview
+medical document preview
+private dashboard screenshot
+organization-internal asset
+user-private upload
+```
+
+These require stronger cache isolation.
+
+The critical invariant is:
+
+```text
+private representation
+must never become a publicly reusable cache object.
+```
+
+---
+
+# 12. Personalized Images
+
+Personalization creates additional cache dimensions.
+
+Suppose:
+
+```text
+/image/avatar
+```
+
+depends on:
+
+```text
+user identity
+```
+
+Then:
+
+```text
+User A → personalized image A
+User B → personalized image B
+```
+
+A shared CDN cache can become dangerous if the cache key does not include the required identity boundary.
+
+Therefore:
+
+```text
+personalization
++
+shared cache
+```
+
+requires deliberate architecture.
+
+Often the safer design is:
+
+```text
+private image
+→ private delivery
+```
+
+rather than attempting to make the CDN understand arbitrary user identity.
+
+---
+
+# 13. Multi-Tenant Image Delivery
+
+Consider:
+
+```text
+Tenant A
+    /logo.png
+
+Tenant B
+    /logo.png
+```
+
+If the CDN cache key is only:
+
+```text
+/logo.png
+```
+
+then the representations may collide.
+
+A safer identity might include:
+
+```text
+tenant-a/logo.png
+tenant-b/logo.png
+```
+
+or an equivalent tenant-specific immutable asset identity.
+
+The core invariant is:
+
+```text
+tenant identity
+must participate in representation identity
+when the representation differs by tenant.
+```
+
+---
+
+# 14. Cache Invalidation
+
+There are three major strategies.
+
+## Strategy 1 — TTL expiration
+
+Allow the cached object to expire.
+
+```text
+cache
+ ↓
+TTL expires
+ ↓
+next request
+ ↓
+origin
+```
+
+Simple, but potentially stale.
+
+---
+
+## Strategy 2 — Explicit purge
+
+Invalidate cached representations.
+
+```text
+asset updated
+   ↓
+purge CDN cache
+   ↓
+new request
+   ↓
+origin
+```
+
+Useful when immediate propagation is required.
+
+But purging at large scale can become operationally expensive.
+
+---
+
+## Strategy 3 — Versioned URLs
+
+Change the resource identity.
+
+```text
+asset-v1
+   ↓
+asset-v2
+```
+
+This avoids dependence on immediate global cache invalidation.
+
+For immutable assets, this is often highly predictable.
+
+---
+
+# 15. Stale-While-Revalidate
+
+A stale-while-revalidate strategy allows a cached representation to be served while a background refresh occurs.
+
+Conceptually:
+
+```text
+Request
+  ↓
+stale-but-servable cache
+  ↓
+serve existing representation
+  +
+refresh asynchronously
+```
+
+This can reduce latency and prevent users from waiting for regeneration.
+
+The tradeoff is:
+
+```text
+lower latency
++
+temporary staleness
+```
+
+The architecture must decide whether that tradeoff is acceptable.
+
+---
+
+# 16. Stale-If-Error
+
+Another useful resilience mechanism is serving stale content when the origin fails.
+
+Conceptually:
+
+```text
+CDN has stale image
+        ↓
+origin unavailable
+        ↓
+serve stale representation
+```
+
+For public content this can provide graceful degradation.
+
+For sensitive or correctness-critical content, stale serving may be inappropriate.
+
+The decision is therefore a product and correctness decision, not merely a performance optimization.
+
+---
+
+# 17. Cache Warming
+
+Some images are known to be highly popular.
+
+Examples:
+
+```text
+homepage hero
+top products
+campaign banners
+popular article images
+```
+
+A deployment or campaign launch can cause an enormous request spike.
+
+Instead of waiting for the first users to generate the cache:
+
+```text
+deployment
+   ↓
+prewarm critical image URLs
+   ↓
+CDN populated
+   ↓
+traffic arrives
+```
+
+This is useful when transformation is expensive.
+
+---
+
+# 18. Request Coalescing / Single Flight
+
+Consider a cache miss for an expensive image.
+
+At the same moment:
+
+```text
+10,000 users
+      ↓
+same uncached image
+```
+
+Without coordination:
+
+```text
+10,000 cache misses
+      ↓
+10,000 origin requests
+      ↓
+10,000 transformations
+```
+
+This can overload the origin.
+
+A better architecture can coalesce requests:
+
+```text
+10,000 requests
+      ↓
+one origin generation
+      ↓
+shared result
+      ↓
+CDN
+      ↓
+10,000 responses
+```
+
+This pattern is commonly called:
+
+```text
+request coalescing
+single-flight
+cache stampede protection
+```
+
+---
+
+# 19. Cache Stampede
+
+A cache stampede occurs when many requests simultaneously encounter an expired or missing representation.
+
+Example:
+
+```text
+popular-image.webp
+```
+
+expires.
+
+Then:
+
+```text
+User 1 → miss
+User 2 → miss
+User 3 → miss
+...
+User 50,000 → miss
+```
+
+If all requests regenerate independently:
+
+```text
+origin CPU ↑
+transformation workload ↑
+latency ↑
+errors ↑
+```
+
+Mitigation strategies include:
+
+* request coalescing
+* stale-while-revalidate
+* prewarming
+* jittered expiration
+* background regeneration
+* bounded concurrency
+
+---
+
+# 20. Origin Shielding
+
+A CDN architecture may use an intermediate shield layer.
+
+Conceptually:
+
+```text
+Edge 1 ─┐
+Edge 2 ─┤
+Edge 3 ─┼→ Origin Shield → Origin
+Edge 4 ─┤
+Edge 5 ─┘
+```
+
+Instead of many geographically distributed edges independently hitting the origin, the shield absorbs some duplication.
+
+Benefits can include:
+
+* lower origin request volume
+* better cache consolidation
+* reduced origin bandwidth
+* protection against distributed misses
+
+---
+
+# 21. Global Delivery
+
+For globally distributed users:
+
+```text
+User
+ ↓
+Nearest edge
+ ↓
+Regional cache
+ ↓
+Origin
+```
+
+The CDN can reduce:
+
+```text
+network distance
+```
+
+between user and cached representation.
+
+But a CDN does not automatically solve all latency problems.
+
+You still need to consider:
+
+* origin location
+* cache hit rate
+* image transformation latency
+* cold cache behavior
+* network routing
+* payload size
+* browser decoding
+* connection characteristics
+
+Therefore:
+
+```text
+CDN ≠ automatically fast
+```
+
+The CDN must actually serve the relevant representation from an appropriate cache layer.
+
+---
+
+# 22. Image CDN Transformation Architecture
+
+A common architecture is:
+
+```text
+Request
+   ↓
+CDN
+   ↓
+Transformation Service
+   ↓
+Original Asset
+   ↓
+Resize / Crop / Format / Quality
+   ↓
+Generated Representation
+   ↓
+CDN Cache
+```
+
+The important observation is:
+
+> The transformation itself is a compute workload.
+
+Therefore cache misses can become expensive.
+
+For example:
+
+```text
+AVIF encoding
++
+large source image
++
+high resolution
+```
+
+may consume considerably more compute than serving an already-generated cached representation.
+
+---
+
+# 23. Cache the Transformation Result
+
+A useful architecture is:
+
+```text
+source
++
+transformation parameters
+        ↓
+deterministic representation
+        ↓
+cache
+```
+
+For example:
+
+```text
+source = product-123
+width = 800
+format = avif
+quality = 70
+crop = center
+```
+
+produces a representation identity.
+
+Repeated requests should reuse the same representation.
+
+This converts:
+
+```text
+expensive transformation
+```
+
+into:
+
+```text
+cheap cache lookup
+```
+
+for subsequent requests.
+
+---
+
+# 24. Cache Key Design
+
+A robust cache key must include every parameter that changes the representation.
+
+If:
+
+```text
+width
+format
+quality
+crop
+```
+
+change the output, they belong in the representation identity.
+
+Otherwise:
+
+```text
+Request A
+→ representation A
+
+Request B
+→ representation B
+
+but both map to same cache key
+```
+
+which can return incorrect content.
+
+The inverse problem also exists:
+
+```text
+parameters included unnecessarily
+```
+
+which can create excessive cache fragmentation.
+
+Therefore:
+
+```text
+cache key must be:
+complete enough for correctness
++
+minimal enough for efficient reuse.
+```
+
+---
+
+# 25. Cache Fragmentation
+
+Suppose these requests are semantically equivalent:
+
+```text
+?w=800
+?w=0800
+?width=800
+```
+
+If the system treats them as different identities, the cache can fragment.
+
+A normalization layer can canonicalize representation parameters.
+
+Conceptually:
+
+```text
+Raw Request
+   ↓
+Normalize
+   ↓
+Canonical Representation Identity
+   ↓
+Cache
+```
+
+This reduces unnecessary cache duplication.
+
+---
+
+# 26. Cache Poisoning Risks
+
+Image caches can also become security boundaries.
+
+Suppose user-controlled parameters influence cache identity incorrectly.
+
+An attacker may attempt to create:
+
+```text
+malicious representation
+```
+
+under a cache key that later users receive.
+
+Therefore the image pipeline must validate:
+
+* source URLs
+* transformation parameters
+* allowed formats
+* dimensions
+* tenant identity
+* authorization state
+* cacheability
+
+Security becomes part of cache architecture.
+
+---
+
+# 27. Image URL Design
+
+A strong image URL should communicate stable representation identity.
+
+For example:
+
+```text
+/images/product-123/800x600/webp-q75-v4
+```
+
+Conceptually:
+
+```text
+resource
++
+transformation
++
+format
++
+quality
++
+version
+```
+
+The exact URL syntax is less important than deterministic identity.
+
+The key requirement is:
+
+```text
+same representation
+→ same cache identity
+
+different representation
+→ different cache identity
+```
+
+---
+
+# 28. Deployment and Image Caching
+
+Deployment can create image consistency problems.
+
+Suppose deployment A references:
+
+```text
+hero-v1.webp
+```
+
+and deployment B references:
+
+```text
+hero-v2.webp
+```
+
+With immutable URLs:
+
+```text
+old deployment → v1
+new deployment → v2
+```
+
+both can safely coexist.
+
+This is particularly useful during:
+
+* rolling deployments
+* canary releases
+* blue-green deployments
+* rollback
+
+Avoid coupling deployment correctness to a fragile global image-cache purge.
+
+---
+
+# 29. Rollback Behavior
+
+Suppose:
+
+```text
+Release A
+  ↓
+image-v1
+
+Release B
+  ↓
+image-v2
+```
+
+Release B fails.
+
+Rollback:
+
+```text
+Release B
+   ↓
+rollback
+   ↓
+Release A
+   ↓
+image-v1
+```
+
+If `image-v1` remains cached, rollback can happen without regenerating the asset.
+
+This is one reason immutable asset URLs are operationally powerful.
+
+---
+
+# 30. Observability
+
+A production image CDN should expose at least:
+
+```text
+CDN cache hit rate
+CDN cache miss rate
+origin request rate
+transformation latency
+transformation error rate
+image response latency
+bandwidth
+cache object count
+cache eviction rate
+```
+
+Additional dimensions may include:
+
+```text
+format
+width bucket
+tenant
+region
+route
+device category
+status code
+```
+
+But high-cardinality dimensions must be handled carefully.
+
+---
+
+# 31. Important Metrics
+
+### Cache Hit Ratio
+
+Conceptually:
+
+```text
+cache hits
+──────────────
+total cache requests
+```
+
+Higher is often desirable, but not universally.
+
+A high hit ratio can still hide:
+
+```text
+wrong image
+stale content
+oversized representation
+poor LCP
+```
+
+Therefore:
+
+```text
+cache hit ratio
+≠
+complete image performance metric
+```
+
+---
+
+## Origin Offload
+
+Measure:
+
+```text
+requests reaching origin
+```
+
+before and after CDN caching.
+
+The goal is often:
+
+```text
+more traffic served at edge
+→
+less origin work
+```
+
+---
+
+## Transformation Cost
+
+Measure:
+
+```text
+transformations / second
+CPU time
+memory
+encoding latency
+failure rate
+```
+
+This tells you whether cache misses are creating expensive workloads.
+
+---
+
+# 32. Production Failure Scenario: CDN Outage
+
+Suppose the CDN becomes unavailable.
+
+Possible architecture:
+
+```text
+Browser
+ ↓
+CDN ❌
+```
+
+Potential consequences:
+
+* image requests fail
+* LCP images disappear
+* layouts may degrade
+* origin may suddenly receive direct traffic
+* bandwidth requirements may spike
+
+A resilient architecture considers:
+
+```text
+CDN failure
+→ origin protection
+→ fallback strategy
+→ stale serving where appropriate
+→ graceful UI behavior
+```
+
+---
+
+# 33. Production Failure Scenario: Origin Overload
+
+Suppose cache hit ratio falls dramatically after a deployment.
+
+Then:
+
+```text
+CDN misses ↑
+       ↓
+origin requests ↑
+       ↓
+transformations ↑
+       ↓
+CPU ↑
+       ↓
+latency ↑
+       ↓
+timeouts ↑
+```
+
+This is a feedback loop.
+
+Observability should allow engineers to detect:
+
+```text
+cache hit degradation
+```
+
+before it becomes:
+
+```text
+origin outage.
+```
+
+---
+
+# 34. Production Failure Scenario: Wrong Variant Served
+
+Suppose:
+
+```text
+800px request
+```
+
+receives:
+
+```text
+1200px representation
+```
+
+because the cache key ignored width.
+
+The CDN reports:
+
+```text
+cache HIT
+```
+
+but the system is still incorrect.
+
+This demonstrates an important principle:
+
+> Cache correctness matters more than cache hit rate.
+
+---
+
+# 35. Production Failure Scenario: Cross-Tenant Leakage
+
+Suppose:
+
+```text
+Tenant A → /logo.png
+Tenant B → /logo.png
+```
+
+and both map to:
+
+```text
+/logo.png
+```
+
+in the CDN cache.
+
+Tenant A's image can be cached and returned to Tenant B.
+
+This is not merely a performance bug.
+
+It is:
+
+```text
+data isolation failure
+```
+
+Therefore:
+
+```text
+cache identity
+must respect security boundaries.
+```
+
+---
+
+# 36. Production Failure Scenario: Cache Invalidation Race
+
+Suppose:
+
+```text
+Asset v1
+ ↓
+CDN cache
+```
+
+Then:
+
+```text
+asset updated
+ ↓
+purge requested
+```
+
+But one CDN region has not yet processed the purge.
+
+Users can temporarily see:
+
+```text
+Region A → v2
+Region B → v1
+```
+
+Therefore global cache invalidation is often eventually consistent.
+
+Versioned URLs reduce dependence on instantaneous global invalidation.
+
+---
+
+# 37. Production Reference Architecture
+
+A robust public image architecture can look like:
+
+```text
+                    ┌────────────────────┐
+                    │    Application     │
+                    └─────────┬──────────┘
                               │
-                       Browser Cache
-                              │ miss
-                              ▼
-                    ┌───────────────────┐
-                    │    CDN / Edge     │
-                    └─────────┬─────────┘
-                              │ miss
-                              ▼
-                    ┌───────────────────┐
-                    │  Origin Shield    │
-                    └─────────┬─────────┘
-                              │ miss
-                              ▼
-                    ┌───────────────────┐
-                    │ Image Delivery    │
-                    │     Service       │
-                    └─────────┬─────────┘
+                              ↓
+                    ┌────────────────────┐
+                    │ Image URL Builder  │
+                    └─────────┬──────────┘
                               │
-                       Origin Cache
-                              │ miss
-                              ▼
-                    ┌───────────────────┐
-                    │ Source / Storage  │
-                    └───────────────────┘
+                              ↓
+                    ┌────────────────────┐
+                    │ CDN / Edge Cache   │
+                    └─────────┬──────────┘
+                              │
+                       cache miss
+                              ↓
+                    ┌────────────────────┐
+                    │ Image Transformer  │
+                    └─────────┬──────────┘
+                              │
+                              ↓
+                    ┌────────────────────┐
+                    │ Original Storage   │
+                    └────────────────────┘
 ```
 
-The representation identity flows through the entire system:
+With observability surrounding:
 
 ```text
-Source Identity
-      ↓
-Representation Identity
-      ↓
-Cache Key
-      ↓
-CDN Object
-      ↓
-Browser Cache Object
-```
-
-That alignment is critical.
-
----
-
-# 53. The Most Important Invariants
-
-Memorize these.
-
-### Invariant 1
-
-```text
-same source ≠ same representation
-```
-
-### Invariant 2
-
-```text
-if bytes can differ, cache identity must be able to differ
-```
-
-### Invariant 3
-
-```text
-cache hit ≠ correctness
-```
-
-### Invariant 4
-
-```text
-TTL ≠ invalidation
-```
-
-### Invariant 5
-
-```text
-immutable URL → simpler invalidation
-```
-
-### Invariant 6
-
-```text
-personalized representation ≠ automatically shared cacheable
-```
-
-### Invariant 7
-
-```text
-authenticated request ≠ automatically private representation
-```
-
-### Invariant 8
-
-```text
-more variants → larger cache cardinality
-```
-
-### Invariant 9
-
-```text
-cache miss can become origin amplification
-```
-
-### Invariant 10
-
-```text
-cache architecture is part of security architecture
-```
-
-### Invariant 11
-
-```text
-global CDN ≠ globally warm cache
-```
-
-### Invariant 12
-
-```text
-cache architecture is also availability architecture
+CDN
+Transformer
+Origin
+Browser performance
 ```
 
 ---
 
-# 54. Prediction Challenges
+# 38. Senior-Level Architecture Decisions
 
-Before reading the answers, predict what should happen.
+When designing an image CDN architecture, evaluate:
+
+### 1. Representation identity
+
+What uniquely identifies the delivered image?
+
+### 2. Cache cardinality
+
+How many representations can one source asset produce?
+
+### 3. Cache lifetime
+
+How long can each representation safely remain cached?
+
+### 4. Invalidation
+
+How does updated content become visible?
+
+### 5. Security
+
+Can private or tenant-specific images cross cache boundaries?
+
+### 6. Transformation cost
+
+How expensive is a cache miss?
+
+### 7. Origin protection
+
+What happens during a traffic spike?
+
+### 8. Failure behavior
+
+What happens if the CDN, transformer, or origin fails?
+
+### 9. Deployment
+
+Can releases and rollbacks coexist safely with cached assets?
+
+### 10. Observability
+
+Can engineers distinguish:
+
+```text
+browser cache issue
+CDN cache issue
+origin issue
+transformation issue
+network issue
+```
+
+---
+
+# 39. Four-Pillar Engineering Matrix
+
+| Dimension    | Core Concern                  | Senior-Level Question                                  |
+| ------------ | ----------------------------- | ------------------------------------------------------ |
+| Mental Model | CDN + origin + browser cache  | Where is this representation actually served from?     |
+| Mechanics    | Cache keys, TTL, revalidation | What determines whether this request is a hit?         |
+| Architecture | Distribution + invalidation   | How does this scale globally and remain correct?       |
+| Operations   | Metrics + failures            | How do we detect cache degradation or origin overload? |
+
+---
+
+# 40. Prediction Challenges
+
+Before seeing the result, predict what will happen.
 
 ### Challenge 1
 
-A 640px WebP image is cached.
+A product image changes but keeps the same URL.
 
-A request arrives for:
-
-```text
-1280px WebP
-```
-
-but the CDN cache key ignores width.
-
-What happens?
-
-**Expected reasoning:**
-
-The 1280px request can incorrectly receive the cached 640px representation.
+What can users see across browser/CDN/origin caches?
 
 ---
 
 ### Challenge 2
 
-A product image uses:
+You increase supported widths from:
 
 ```text
-/image/product-123
+6 → 30
 ```
 
-The source changes but the URL does not.
-
-CDN TTL is:
-
-```text
-30 days
-```
-
-What can happen?
-
-**Expected reasoning:**
-
-The old representation can remain cached until expiration or explicit revalidation/invalidation.
+What happens to cache cardinality?
 
 ---
 
 ### Challenge 3
 
-A source image is versioned:
+A CDN cache key ignores image width.
+
+Two requests ask for:
 
 ```text
-/image/product-123.v1
+400px
+1200px
 ```
 
-It changes to:
-
-```text
-/image/product-123.v2
-```
-
-Does the CDN need to purge v1 before serving v2?
-
-**Expected reasoning:**
-
-No. The new URL creates a new cache identity.
+What failure can occur?
 
 ---
 
 ### Challenge 4
 
-100,000 clients request the same uncached image simultaneously.
+A popular image expires at exactly the same time for thousands of users.
 
-What should a robust image architecture avoid?
-
-**Expected reasoning:**
-
-100,000 independent origin transformations.
-
-Request coalescing/single-flight behavior should ideally collapse the work.
+What happens to the origin?
 
 ---
 
 ### Challenge 5
 
-Tenant A and Tenant B both request:
+Tenant ID is not part of a tenant-specific image cache key.
 
-```text
-/logo
-```
-
-but receive different logos.
-
-What must the cache architecture guarantee?
-
-**Expected reasoning:**
-
-The tenant dimension must be represented in the resource/cache identity or the assets must have tenant-isolated URLs/hosts.
+What class of failure can result?
 
 ---
 
 ### Challenge 6
 
-A private user-specific image is cached publicly using only its path as the cache key.
+The CDN hit ratio rises from:
 
-What is the risk?
+```text
+70% → 98%
+```
 
-**Expected reasoning:**
+but LCP becomes worse.
 
-Cross-user data leakage.
+Does that prove the image architecture improved?
+
+Why or why not?
 
 ---
 
 ### Challenge 7
 
-CDN hit ratio is 98%.
-
-Origin CPU is still extremely high.
-
-Is that impossible?
-
-**Expected reasoning:**
-
-No.
-
-The remaining 2% can still represent enormous absolute traffic, expensive transformations, or high-cardinality variants.
-
----
-
-### Challenge 8
-
-The CDN is healthy but users in one region experience slow image delivery.
+An image transformer becomes slow while CDN hit ratio remains high.
 
 What should you investigate?
 
-**Expected reasoning:**
+---
 
-Regional cache warmth, edge routing, regional hit ratio, origin distance, cache misses, and regional CDN behavior.
+# 41. Senior Interview Gotchas
+
+### Gotcha 1
+
+**“CDN caching makes images immutable.”**
+
+Incorrect.
+
+Caching policy and resource identity are separate concerns.
 
 ---
 
-# 55. Senior Interview Questions
+### Gotcha 2
 
-### Question 1
+**“A cache hit means the system is correct.”**
 
-> How would you design caching for a global image platform?
+Incorrect.
 
-A strong answer should discuss:
+The cache can return the wrong representation.
+
+---
+
+### Gotcha 3
+
+**“Higher cache hit ratio always means better performance.”**
+
+Incorrect.
+
+Representation size, browser decoding, LCP, latency, and correctness still matter.
+
+---
+
+### Gotcha 4
+
+**“Purging the CDN solves image versioning.”**
+
+Not necessarily.
+
+Global invalidation may be delayed or operationally expensive.
+
+---
+
+### Gotcha 5
+
+**“Private images can use the same public CDN cache.”**
+
+Only if the architecture provides strict authorization-aware isolation. Otherwise this can become a data leakage vulnerability.
+
+---
+
+### Gotcha 6
+
+**“An image URL identifies the source asset.”**
+
+Not necessarily.
+
+A delivery URL may identify:
 
 ```text
-browser cache
-CDN
-origin cache
-representation identity
-cache keys
-variant control
-TTL
-versioning
-invalidation
-origin protection
-regional distribution
-observability
-```
-
----
-
-### Question 2
-
-> Why are immutable image URLs useful?
-
-Expected concepts:
-
-```text
-URL = identity
-content change = new identity
-long TTL
-minimal invalidation
-better cache reuse
-simpler rollback
-```
-
----
-
-### Question 3
-
-> How can an image CDN accidentally serve the wrong image?
-
-Discuss:
-
-* cache-key collision
-* missing variant parameters
-* tenant collision
-* host normalization
-* authorization boundaries
-* stale representations
-
----
-
-### Question 4
-
-> How would you protect an image service from a cache stampede?
-
-Discuss:
-
-```text
-request coalescing
-single-flight
-TTL jitter
-stale-while-revalidate
-cache warming
-origin shielding
-bounded concurrency
+source
++
+transformation
++
+format
++
+quality
++
+version
 ```
 
 ---
 
-### Question 5
+# 42. Core Invariants
 
-> How do you cache private images?
-
-Discuss:
+Memorize these:
 
 ```text
-private caching
-signed URLs
-authorization
-cache identity
-token normalization
-expiration
-tenant isolation
+same source asset
+≠
+same delivery representation
 ```
 
----
-
-### Question 6
-
-> Why isn't a high CDN hit ratio enough?
-
-Because:
-
 ```text
-hit ratio alone
-does not reveal
-variant correctness,
-regional behavior,
-origin cost,
-transformation cost,
-or security boundaries.
+cache hit
+≠
+correct representation
 ```
 
----
-
-# 56. Production Debugging Sequence
-
-When an image is slow:
-
 ```text
-1. Identify the exact image URL.
-2. Identify the requested representation.
-3. Check browser cache behavior.
-4. Inspect CDN cache status.
-5. Determine cache HIT/MISS.
-6. Inspect response headers.
-7. Check CDN region.
-8. Check origin request rate.
-9. Check transformation latency.
-10. Check cache-key dimensions.
-11. Check whether a new variant was introduced.
-12. Check whether invalidation recently occurred.
+higher cache hit rate
+≠
+automatically better UX
 ```
 
-When an image is wrong:
-
 ```text
-1. Identify expected representation.
-2. Identify actual representation.
-3. Compare source identity.
-4. Compare transformation parameters.
-5. Compare cache key.
-6. Check tenant/user identity.
-7. Check stale cache state.
-8. Check deployment/version.
-9. Check CDN normalization.
-10. Verify origin output independently.
-```
-
----
-
-# 57. Anti-Patterns
-
-## Anti-Pattern 1 — One Mutable URL Forever
-
-```text
-/image/product-123
-```
-
-with:
-
-```text
-very long TTL
-```
-
-and:
-
-```text
-no invalidation strategy
-```
-
-creates stale-content problems.
-
----
-
-## Anti-Pattern 2 — Unlimited Variant Parameters
-
-```text
-width = arbitrary
-quality = arbitrary
-crop = arbitrary
-```
-
-creates cache explosion.
-
----
-
-## Anti-Pattern 3 — Ignoring Tenant Identity
-
-```text
-tenant + same path
+immutable URL
 →
-same CDN key
+simpler cache invalidation
 ```
 
-can cause cross-tenant leakage.
-
----
-
-## Anti-Pattern 4 — Treating Authentication as Sufficient Cache Isolation
-
 ```text
-authenticated request
+cache miss
 →
-public CDN cache
+potential transformation workload
 ```
-
-is unsafe when the response is personalized.
-
----
-
-## Anti-Pattern 5 — Assuming Purge Is Instantaneous
-
-Distributed invalidation can have propagation delays.
-
----
-
-## Anti-Pattern 6 — Looking Only at Global Hit Ratio
-
-Regional and variant-level behavior may be completely different.
-
----
-
-## Anti-Pattern 7 — No Stampede Protection
-
-A popular image expiration event can overwhelm the origin.
-
----
-
-## Anti-Pattern 8 — Making CDN Behavior Invisible
-
-If engineers cannot determine:
 
 ```text
-HIT?
-MISS?
-which region?
-which variant?
-which cache key?
+more variants
+→
+higher cache cardinality
 ```
 
-production debugging becomes unnecessarily difficult.
+```text
+private representation
+→
+must respect authorization boundaries
+```
+
+```text
+tenant-specific representation
+→
+tenant identity must participate in representation identity
+```
+
+```text
+deployment safety
+→
+should not depend on fragile cache state
+```
 
 ---
 
-# 58. Part Boundary
+# 43. Completion Checklist
 
-This part established:
+You should be able to explain:
+
+* [ ] What an image CDN actually does
+* [ ] CDN vs origin responsibilities
+* [ ] Browser cache vs CDN cache
+* [ ] Cache hierarchy
+* [ ] Representation identity
+* [ ] Cache-key design
+* [ ] Cache cardinality
+* [ ] Cache fragmentation
+* [ ] Immutable image URLs
+* [ ] Versioned assets
+* [ ] TTL-based invalidation
+* [ ] Explicit purge
+* [ ] Stale-while-revalidate
+* [ ] Stale-if-error
+* [ ] Cache warming
+* [ ] Request coalescing
+* [ ] Cache stampede
+* [ ] Origin shielding
+* [ ] Global image delivery
+* [ ] Transformation caching
+* [ ] Public vs private image caching
+* [ ] Personalized image risks
+* [ ] Multi-tenant cache isolation
+* [ ] Cache poisoning risks
+* [ ] CDN observability
+* [ ] Origin protection
+* [ ] Deployment and rollback interaction
+* [ ] CDN failure behavior
+* [ ] Cache invalidation races
+* [ ] Cache correctness vs cache hit rate
+
+---
+
+# 44. Part Boundary
+
+This part establishes:
 
 ```text
 Image CDN
-Cache Identity
-Cache Keys
-Cache Cardinality
-TTL
-Revalidation
++
+Caching
++
 Invalidation
-Versioning
-Origin Offload
-Stampede Protection
-Geographic Delivery
-Security Boundaries
-Observability
++
+Delivery
 ```
 
-The next part moves from **where and how images are cached** to **when images should be requested and how loading priority affects user-perceived performance**.
-
-Therefore:
+It does **not** deeply cover:
 
 ```text
+image loading priority
+lazy loading
+LCP optimization
+browser scheduling
+preloading
+critical image discovery
+```
+
+Those belong to:
+
+> **KPI 10 — Part 06: Image Loading, Priority, Lazy Loading & LCP Architecture**
+
+The progression is therefore:
+
+```text
+Part 01
+Image Optimization Mental Model
+        ↓
+Part 02
+Next.js <Image>
+        ↓
+Part 03
+Responsive Images
+        ↓
+Part 04
+Formats / Compression / Transformation
+        ↓
 Part 05
-Image CDN, Caching & Delivery
+CDN / Caching / Invalidation / Delivery
         ↓
 Part 06
-Image Loading, Priority, Lazy Loading & LCP
-```
-
-Do not duplicate Part 05 into Part 06.
-
-Part 06 should focus on:
-
-```text
-request timing
-+
-loading priority
-+
-lazy loading
-+
-eager loading
-+
-preload
-+
-LCP
-+
-critical image discovery
-+
-browser scheduling
-+
-loading behavior
+Loading / Priority / Lazy Loading / LCP
 ```
 
 ---
 
-# 59. Completion Checklist
+# Final Mental Model
 
-You should be able to explain all of the following without notes:
-
-### CDN Architecture
-
-* [ ] CDN vs origin responsibilities
-* [ ] edge caching
-* [ ] origin shielding
-* [ ] geographic distribution
-* [ ] browser vs CDN cache
-
-### Cache Identity
-
-* [ ] cache keys
-* [ ] representation identity
-* [ ] variant dimensions
-* [ ] cache cardinality
-* [ ] variant explosion
-
-### Freshness
-
-* [ ] TTL
-* [ ] revalidation
-* [ ] stale-while-revalidate
-* [ ] stale-if-error
-* [ ] invalidation
-
-### Immutability
-
-* [ ] versioned URLs
-* [ ] content identity
-* [ ] immutable assets
-* [ ] deployment-safe image URLs
-
-### Scalability
-
-* [ ] cache hit ratio
-* [ ] origin offload
-* [ ] cache warming
-* [ ] request coalescing
-* [ ] cache stampede
-* [ ] regional cache behavior
-
-### Security
-
-* [ ] public vs private images
-* [ ] personalized representations
-* [ ] tenant isolation
-* [ ] signed URLs
-* [ ] cache poisoning
-* [ ] authorization boundaries
-
-### Operations
-
-* [ ] CDN observability
-* [ ] cache status debugging
-* [ ] regional metrics
-* [ ] origin load monitoring
-* [ ] transformation monitoring
-* [ ] invalidation debugging
-* [ ] CDN failure handling
-
----
-
-# 60. Final Mental Model
-
-The complete image delivery model is:
+At senior level, think of image delivery as:
 
 ```text
-                    SOURCE
-                      │
-                      ▼
-              Representation
-                   Identity
-                      │
-                      ▼
-                Cache Key
-                      │
-        ┌─────────────┴─────────────┐
-        │                           │
-        ▼                           ▼
- Browser Cache                 CDN / Edge
-        │                           │
-        │                     cache HIT?
-        │                           │
-        │                    ┌──────┴──────┐
-        │                    │             │
-        │                   YES            NO
-        │                    │             │
-        │                    │             ▼
-        │                    │       Origin / Image
-        │                    │          Service
-        │                    │             │
-        │                    │        transform/
-        │                    │        retrieve
-        │                    │             │
-        │                    │             ▼
-        │                    │       Cache response
-        │                    │             │
-        └────────────────────┴─────────────┘
-                             │
-                             ▼
-                       Browser Decode
-```
-
-The senior-level principle is:
-
-> **An image CDN is not merely a faster place to store files. It is a distributed representation system whose correctness depends on identity, whose performance depends on cache reuse, whose scalability depends on bounded variants and origin protection, and whose security depends on separating shared representation identity from private authorization context.**
-
-The deepest invariant is:
-
-```text
+Logical Asset
+      ↓
 Representation Identity
-        ↓
+      ↓
+Transformation
+      ↓
 Cache Identity
-        ↓
-Delivery Identity
+      ↓
+CDN Distribution
+      ↓
+Browser Cache
+      ↓
+Network Transfer
+      ↓
+Decode
+      ↓
+Render
 ```
 
-When these three disagree, the system can become:
+The central engineering problem is:
 
 ```text
-slow
-stale
-incorrect
-expensive
-or insecure
+Deliver the correct representation
+to the correct user
+from the closest appropriate cache
+with bounded cache cardinality
+without excessive origin computation
+while preserving security,
+freshness,
+deployment safety,
+and observability.
 ```
 
-When they align, image delivery becomes:
-
-```text
-predictable
-cache-efficient
-globally scalable
-debuggable
-and resilient
-```
-
-**Part 05 complete.**
+That is the actual image-CDN architecture problem.

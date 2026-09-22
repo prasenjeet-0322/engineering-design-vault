@@ -1,686 +1,161 @@
-# Level 08 — KPI 10 — Part 10
+# Level 08 — Next.js & Full-Stack React
 
-## Production Image Optimization Architecture Capstone
+## KPI 10 — Image Optimization
+
+# Part 10 — Production Image Optimization Architecture Capstone
 
 ---
 
-# 1. Capstone Objective
+## 1. Capstone Objective
 
-This capstone integrates the complete image optimization architecture developed across KPI 10.
+This part integrates the complete image-optimization architecture developed across Parts 01–09.
 
-The objective is not to memorize individual framework APIs.
+The goal is no longer to understand isolated techniques such as:
 
-The objective is to demonstrate that you can design, reason about, implement, debug, and operate a production-grade image delivery system.
+* `<Image>`
+* `srcset`
+* `sizes`
+* AVIF/WebP
+* CDN caching
+* lazy loading
+* LCP
+* alt text
+* SSRF protection
+* RUM
 
-The complete architecture must connect:
+The goal is to reason about the **entire production image system as one architecture**.
+
+The complete model is:
 
 ```text
 Asset
-→ Semantics
-→ Representation
-→ Transformation
-→ Responsive Selection
-→ Delivery
-→ Caching
-→ Security
-→ Browser Rendering
-→ Observability
-→ Operations
+  ↓
+Semantic Model
+  ↓
+Representation Policy
+  ↓
+Transformation
+  ↓
+Responsive Selection
+  ↓
+Cache
+  ↓
+CDN
+  ↓
+Browser Request
+  ↓
+Decode
+  ↓
+Layout
+  ↓
+Paint
+  ↓
+User Experience
+  ↓
+Observability
+  ↓
+Testing
+  ↓
+Operations
 ```
 
-The senior-level question is:
+And the system must simultaneously satisfy:
 
-> **Can you design an image system that remains correct, fast, secure, observable, and maintainable as traffic, content, tenants, devices, and image volume scale?**
+```text
+Correctness
++
+Performance
++
+Security
++
+Operability
+```
 
 ---
 
-# 2. Complete KPI 10 Mental Model
+# 2. The Production Image System
 
-The entire image pipeline can be modeled as:
+A production image platform can be modeled as:
 
 ```text
-                    SOURCE ASSET
+                    CONTENT SOURCE
                          │
-                         ▼
-                Semantic Classification
+                         ↓
+                  Semantic Asset
                          │
-                         ▼
-                 Representation Model
+                         ↓
+               Representation Policy
                          │
-              ┌──────────┴──────────┐
-              ▼                     ▼
-         Format Policy         Accessibility
-              │                     │
-              └──────────┬──────────┘
-                         ▼
-                 Transformation
+            ┌────────────┴────────────┐
+            ↓                         ↓
+       Accessibility              Delivery
+          Metadata                Metadata
+            │                         │
+            └────────────┬────────────┘
+                         ↓
+                   Transformation
                          │
-                         ▼
-              Responsive Candidates
+                         ↓
+              Responsive Representation
                          │
-                         ▼
-                Browser Selection
+                         ↓
+                    CDN / Cache
                          │
-                         ▼
-                  CDN / Cache
+                         ↓
+                      Browser
                          │
-                         ▼
-                  HTTP Delivery
+          ┌──────────────┼──────────────┐
+          ↓              ↓              ↓
+        Decode         Layout         Paint
+          │              │              │
+          └──────────────┼──────────────┘
+                         ↓
+                       UX
                          │
-                         ▼
-                 Browser Decode
-                         │
-                         ▼
-                    Layout
-                         │
-                         ▼
-                     Paint
-                         │
-                         ▼
-                User Experience
-                         │
-                         ▼
+                         ↓
                   Observability
                          │
-                         ▼
-                Continuous Tuning
+                         ↓
+                    Operations
 ```
 
-Security applies across the entire pipeline.
+The important architectural insight is:
+
+> **The image is a resource with multiple representations, not merely a file.**
 
 ---
 
-# 3. KPI 10 Complete Architecture
+# 3. Resource Identity vs Representation Identity
 
-The complete system can also be represented as:
-
-```text
-Request
-  │
-  ▼
-Image Resource Identity
-  │
-  ├── Tenant
-  ├── Locale
-  ├── Asset
-  └── Content Version
-  │
-  ▼
-Representation Policy
-  │
-  ├── Width
-  ├── Height
-  ├── DPR
-  ├── Format
-  ├── Quality
-  └── Crop
-  │
-  ▼
-Security Policy
-  │
-  ├── Source Trust
-  ├── Authorization
-  ├── Transformation Bounds
-  └── Resource Limits
-  │
-  ▼
-Cache Identity
-  │
-  ▼
-Transformation
-  │
-  ▼
-CDN
-  │
-  ▼
-Browser
-  │
-  ├── Decode
-  ├── Layout
-  └── Paint
-  │
-  ▼
-User Experience
-  │
-  ▼
-Telemetry
-```
-
-This is the architecture you should be able to reason about independently of the framework.
-
----
-
-# 4. Part-by-Part Integration
-
-KPI 10 consists of ten parts.
+A product image might have one logical identity:
 
 ```text
-Part 01
-Image Optimization Mental Model & Delivery Architecture
-
-Part 02
-Next.js <Image> Architecture & Rendering Mechanics
-
-Part 03
-Responsive Images, srcset, sizes & Art Direction
-
-Part 04
-Image Formats, Compression, Quality & Transformation Architecture
-
-Part 05
-Image CDN, Caching, Invalidation & Delivery Architecture
-
-Part 06
-Image Loading, Priority, Lazy Loading & LCP Architecture
-
-Part 07
-Image Accessibility, Semantics & Content Architecture
-
-Part 08
-Image Security, Remote Sources & Abuse Prevention
-
-Part 09
-Image Observability, Testing & Production Performance
-
-Part 10
-Production Image Optimization Architecture Capstone
+product-123-primary
 ```
 
-The capstone must integrate all ten.
-
----
-
-# 5. The Core Production Problem
-
-Imagine an e-commerce application with:
-
-```text
-10 million products
-500 million image requests/day
-global users
-multiple tenants
-multiple locales
-mobile + desktop
-high-DPR devices
-remote CMS assets
-user uploads
-```
-
-The system must support:
-
-```text
-product images
-hero images
-thumbnails
-avatars
-logos
-marketing images
-user-generated images
-private images
-```
-
-The architecture must simultaneously optimize:
-
-```text
-UX
-Bandwidth
-CDN efficiency
-Origin load
-CPU
-Storage
-Security
-Accessibility
-SEO
-Reliability
-```
-
----
-
-# 6. Source Asset vs Delivery Representation
-
-A critical architectural distinction is:
-
-```text
-SOURCE ASSET
-```
-
-versus:
-
-```text
-DELIVERY REPRESENTATION
-```
-
-The source may be:
-
-```text
-4000 × 3000 JPEG
-```
-
-while the user receives:
-
-```text
-640 × 480 AVIF
-```
-
-These are not the same object.
-
-Therefore:
-
-```text
-asset identity
-≠
-representation identity
-```
-
-A representation is derived from the source.
-
----
-
-# 7. Representation Identity
-
-A useful model is:
-
-```text
-RepresentationIdentity =
-(
-    AssetVersion,
-    Width,
-    Height,
-    Format,
-    QualityProfile,
-    CropProfile
-)
-```
-
-Depending on the system, additional dimensions may include:
-
-```text
-Tenant
-Locale
-Color profile
-Animation state
-Content variant
-```
-
-The important principle is:
-
-> **Every dimension that can change the delivered bytes must be considered when designing representation identity and caching.**
-
----
-
-# 8. Resource Identity vs Representation Identity
-
-Do not confuse:
-
-```text
-resource identity
-```
-
-with:
-
-```text
-representation identity
-```
-
-For example:
-
-```text
-Product #123
-```
-
-is the resource.
-
-Its representations might be:
+but many delivery representations:
 
 ```text
 320w WebP
 640w WebP
-1280w AVIF
-1920w JPEG
+1024w WebP
+640w AVIF
+1024w AVIF
 ```
 
 Therefore:
 
 ```text
-Product #123
-        │
-        ├── 320 WebP
-        ├── 640 WebP
-        ├── 1280 AVIF
-        └── 1920 JPEG
-```
-
-This distinction is fundamental to scalable image architecture.
-
----
-
-# 9. Responsive Image Architecture
-
-The browser should be given enough information to select an appropriate representation.
-
-Conceptually:
-
-```text
-srcset
-+
-sizes
-+
-viewport
-+
-DPR
-+
-network conditions
-```
-
-lead to:
-
-```text
-browser-selected candidate
-```
-
-The application should not attempt to manually recreate the browser's selection algorithm with JavaScript unless there is a specific architectural reason.
-
----
-
-# 10. The `sizes` Contract
-
-The most important responsive-image contract is:
-
-```text
-sizes
-=
-expected rendered width
-```
-
-It should reflect actual layout behavior.
-
-For example:
-
-```text
-mobile:
-100vw
-
-tablet:
-50vw
-
-desktop:
-33vw
-```
-
-if that corresponds to the actual layout.
-
-A bad `sizes` value can cause:
-
-```text
-oversized downloads
-```
-
-or:
-
-```text
-undersized images
-```
-
----
-
-# 11. Candidate Design
-
-Candidate widths should balance:
-
-```text
-selection accuracy
-+
-cache cardinality
-+
-transformation cost
-```
-
-Too few candidates:
-
-```text
-poor fit
-```
-
-Too many candidates:
-
-```text
-cache fragmentation
-+
-storage
-+
-transformation complexity
-```
-
-Therefore:
-
-```text
-more variants
+resource identity
 ≠
-automatically better
+representation identity
 ```
 
----
-
-# 12. Art Direction
-
-Resolution switching answers:
-
-> Which resolution of the same visual representation should be delivered?
-
-Art direction answers:
-
-> Should a different composition be delivered?
-
-For example:
+A useful model is:
 
 ```text
-Desktop:
-wide landscape composition
-
-Mobile:
-tighter portrait composition
-```
-
-This may require:
-
-```text
-<picture>
-```
-
-or equivalent application-level image composition architecture.
-
----
-
-# 13. Transformation Pipeline
-
-A transformation request may conceptually be:
-
-```text
-source.jpg
-    ↓
-resize
-    ↓
-crop
-    ↓
-format conversion
-    ↓
-quality profile
-    ↓
-delivery representation
-```
-
-The pipeline should produce deterministic output.
-
-For example:
-
-```text
-source version = 17
-width = 640
-format = avif
-quality = balanced
-crop = product-square
-```
-
-should always identify the same representation.
-
----
-
-# 14. Transformation as Compute
-
-Transformation is not free.
-
-It consumes:
-
-```text
-CPU
-Memory
-Time
-Storage
-```
-
-Therefore the system must decide:
-
-```text
-precompute
-```
-
-versus:
-
-```text
-on-demand
-```
-
-versus:
-
-```text
-hybrid
-```
-
----
-
-# 15. Precomputed Transformation
-
-Precompute common representations:
-
-```text
-320
-640
-768
-1024
-1280
-1920
-```
-
-Advantages:
-
-```text
-predictable latency
-high cacheability
-reduced runtime compute
-```
-
-Tradeoffs:
-
-```text
-more storage
-more processing during ingestion
-potentially unused variants
-```
-
----
-
-# 16. On-Demand Transformation
-
-Generate representations when requested.
-
-Advantages:
-
-```text
-only generate what is requested
-lower initial storage
-flexible
-```
-
-Tradeoffs:
-
-```text
-runtime CPU
-cold-cache latency
-cache stampedes
-abuse potential
-```
-
----
-
-# 17. Hybrid Transformation Architecture
-
-A mature system may use:
-
-```text
-precomputed common variants
-+
-on-demand exceptional variants
-```
-
-For example:
-
-```text
-common product widths
-→ precompute
-
-unusual editorial crop
-→ generate on demand
-```
-
-This balances:
-
-```text
-cost
-+
-latency
-+
-flexibility
-```
-
----
-
-# 18. Image CDN Architecture
-
-A scalable delivery architecture may look like:
-
-```text
-                 USER
-                   │
-                   ▼
-               CDN EDGE
-                   │
-          ┌────────┴────────┐
-          │                 │
-       Cache Hit         Cache Miss
-                            │
-                            ▼
-                     Image Service
-                            │
-                            ▼
-                     Transformation
-                            │
-                            ▼
-                         Origin
-```
-
-The CDN should absorb as much repeat traffic as practical.
-
----
-
-# 19. Cache Identity
-
-A cache key must identify the representation.
-
-Conceptually:
-
-```text
-CacheKey =
-AssetVersion
+Representation =
+Resource
 +
 Width
 +
@@ -690,2057 +165,2185 @@ Format
 +
 Quality
 +
-Crop
+Transformation Version
+```
+
+Potentially also:
+
+```text
+Tenant
 +
-RelevantContext
+Content Version
 ```
 
-The exact dimensions depend on the application.
+where required by the security and caching architecture.
 
-The critical invariant is:
+---
+
+# 4. Source Asset vs Delivery Representation
+
+Never confuse:
 
 ```text
-same cache key
+original asset
+```
+
+with:
+
+```text
+delivery image.
+```
+
+The source may be:
+
+```text
+4000 × 3000 JPEG
+```
+
+while the browser receives:
+
+```text
+768 × 576 AVIF
+```
+
+The source is the canonical content.
+
+The delivery representation is an optimized projection.
+
+Therefore:
+
+```text
+Source Asset
+       ↓
+Representation Pipeline
+       ↓
+Delivery Representation
+```
+
+---
+
+# 5. Single Source of Truth
+
+A production system should have one authoritative content model.
+
+For example:
+
+```text
+Product
+ ├── id
+ ├── title
+ ├── primaryImage
+ │     ├── assetId
+ │     ├── width
+ │     ├── height
+ │     ├── alt
+ │     └── focalPoint
+```
+
+The application should derive:
+
+```text
+URL
+alt
+dimensions
+responsive candidates
+social image
+structured-data image
+```
+
+from the appropriate source models rather than independently hardcoding them.
+
+---
+
+# 6. Two Distinct Image Pipelines
+
+A mature system separates:
+
+### Semantic pipeline
+
+```text
+Asset
+ ↓
+Meaning
+ ↓
+Role
+ ↓
+Alt
+ ↓
+Caption
+ ↓
+Accessibility
+```
+
+### Delivery pipeline
+
+```text
+Asset
+ ↓
+Resize
+ ↓
+Format
+ ↓
+Compression
+ ↓
+CDN
+ ↓
+Browser
+```
+
+These pipelines interact but should not be conflated.
+
+This distinction prevents:
+
+```text
+performance optimization
+```
+
+from accidentally destroying:
+
+```text
+semantic correctness.
+```
+
+---
+
+# 7. Image Component Contract
+
+A design-system image component should establish explicit contracts.
+
+For example:
+
+```text
+<ImageComponent
+  asset
+  role
+  width
+  height
+  sizes
+  priority
+  loading
+/>
+```
+
+The component should determine or validate:
+
+* aspect ratio
+* intrinsic dimensions
+* accessibility semantics
+* responsive behavior
+* loading strategy
+* allowed transformations
+
+The goal is to prevent every product team from inventing its own image architecture.
+
+---
+
+# 8. Representation Selection
+
+The browser ultimately needs a representation appropriate for:
+
+```text
+viewport
+container
+DPR
+network
+format support
+```
+
+The conceptual pipeline is:
+
+```text
+Source
+ ↓
+Candidate Generation
+ ↓
+srcset
+ ↓
+sizes
+ ↓
+Browser Selection
+ ↓
+Downloaded Representation
+```
+
+The application should provide accurate candidates.
+
+The browser decides which candidate to fetch.
+
+---
+
+# 9. `srcset` and `sizes`
+
+Remember:
+
+```text
+srcset
+=
+available candidates
+```
+
+while:
+
+```text
+sizes
+=
+expected rendered width
+```
+
+The browser combines these with:
+
+```text
+viewport
++
+DPR
++
+network/browser heuristics
+```
+
+to choose a resource.
+
+Therefore:
+
+```text
+viewport width
+≠
+rendered image width
+```
+
+and:
+
+```text
+CSS width
+≠
+network candidate width
+```
+
+unless the architecture makes them equivalent.
+
+---
+
+# 10. Responsive Image Failure
+
+Consider:
+
+```text
+Image rendered:
+400px
+
+sizes says:
+100vw
+
+viewport:
+1440px
+```
+
+The browser may reasonably select a much larger resource than necessary.
+
+The page may therefore experience:
+
+```text
+unnecessary bytes
++
+higher decode cost
++
+higher memory use
+```
+
+The image itself is not necessarily broken.
+
+The responsive contract is broken.
+
+---
+
+# 11. Art Direction
+
+Resolution switching asks:
+
+> “How large should this image representation be?”
+
+Art direction asks:
+
+> “Which visual composition should be shown?”
+
+For example:
+
+```text
+Desktop:
+wide landscape crop
+
+Mobile:
+portrait crop
+```
+
+The architecture may require:
+
+```text
+<picture>
+```
+
+or equivalent image-CDN logic.
+
+This is different from simply requesting a smaller image.
+
+---
+
+# 12. Image Transformation Pipeline
+
+A production transformation system can be modeled as:
+
+```text
+Source Asset
+     ↓
+Decode
+     ↓
+Resize
+     ↓
+Crop
+     ↓
+Color / Processing
+     ↓
+Encode
+     ↓
+Cache
+```
+
+The exact order can vary by implementation.
+
+The important principle is that transformation is a **compute workload**.
+
+Therefore:
+
+```text
+cache miss
 →
-same response semantics
+potential CPU + memory cost.
 ```
 
 ---
 
-# 20. Cache Cardinality
+# 13. Transformation Policy
 
-Suppose:
+Do not expose unlimited transformation combinations.
 
-```text
-10,000 assets
-×
-10 widths
-×
-3 formats
-×
-3 quality profiles
-```
+Prefer a controlled representation space.
 
-The theoretical representation space is:
+For example:
 
 ```text
-900,000 representations
+Widths:
+320
+640
+960
+1280
+1536
+
+Formats:
+AVIF
+WebP
+JPEG
+
+Quality:
+controlled values
 ```
 
-If the application adds:
+This gives predictable:
 
 ```text
-20 crop variants
+cache cardinality
++
+compute demand
++
+storage requirements.
 ```
-
-the space becomes dramatically larger.
-
-Therefore transformation dimensions must be deliberately constrained.
 
 ---
 
-# 21. Versioned Image URLs
+# 14. Why Unlimited Variants Are Dangerous
 
-Content versioning can simplify invalidation.
-
-Conceptually:
+Suppose a system accepts:
 
 ```text
-/image/product-123.v17.avif
+width = any integer
+quality = any integer
+height = any integer
+crop = arbitrary
+```
+
+An attacker or buggy client can generate:
+
+```text
+millions of representations.
+```
+
+Consequences:
+
+```text
+cache fragmentation
++
+storage growth
++
+CPU growth
++
+origin traffic
+```
+
+Therefore representation space should be intentionally bounded.
+
+---
+
+# 15. Image Format Architecture
+
+Format selection depends on:
+
+```text
+content type
+browser support
+transparency
+animation
+quality
+encoding cost
+file size
+delivery requirements
+```
+
+A modern production architecture might support:
+
+```text
+AVIF
+WebP
+JPEG
+PNG
+SVG
+```
+
+but does not assume:
+
+```text
+modern format
+=
+always optimal.
+```
+
+---
+
+# 16. Quality Architecture
+
+Quality is not a universal percentage across codecs.
+
+Instead think:
+
+```text
+source
++
+codec
++
+content
++
+quality target
+```
+
+determines:
+
+```text
+visual result
++
+encoded size.
+```
+
+A photographic image and a flat illustration may respond very differently to the same compression strategy.
+
+---
+
+# 17. Cache Architecture
+
+A typical flow is:
+
+```text
+Browser
+  ↓
+CDN
+  ↓
+Edge Cache
+  ↓
+Origin / Transformer
+  ↓
+Source Asset
+```
+
+Cache identity must reflect the representation.
+
+For example:
+
+```text
+/image/123?w=640&format=avif
+```
+
+should not collide with:
+
+```text
+/image/123?w=1280&format=avif
+```
+
+---
+
+# 18. Immutable Image URLs
+
+A powerful architecture is versioned image identity.
+
+For example:
+
+```text
+/image/asset-123-v7/640.avif
 ```
 
 When the source changes:
 
 ```text
-v17
-→
-v18
+v7 → v8
 ```
 
 the URL changes.
 
-This enables:
+This provides:
 
 ```text
-long-lived caching
-+
-immutable representations
-+
-simple invalidation
-```
-
----
-
-# 22. Why Immutable URLs Matter
-
-With immutable URLs:
-
-```text
-URL
-→
-representation
-```
-
-remains stable.
-
-You can then safely use aggressive caching because the content does not need to change under the same identity.
-
-This is often easier to reason about than attempting to purge every cached representation after every source update.
-
----
-
-# 23. Cache Invalidation
-
-There are three broad approaches:
-
-```text
-TTL expiration
-purge/invalidation
-versioned identity
-```
-
-Versioned identity is particularly powerful because:
-
-```text
-new content
-→
 new identity
++
+old cache remains valid
++
+no global purge dependency.
 ```
 
-rather than:
+---
+
+# 19. Cache Invalidation
+
+There are three broad strategies:
+
+### TTL
 
 ```text
-same identity
+wait until expiration
+```
+
+### Purge
+
+```text
+invalidate cached representation
+```
+
+### Versioning
+
+```text
+change resource identity
+```
+
+Immutable/versioned URLs are often easier to reason about because:
+
+```text
+old URL
 →
-uncertain cache state
+old representation
+
+new URL
+→
+new representation
 ```
 
 ---
 
-# 24. Stale Content vs Incorrect Content
+# 20. CDN Delivery
 
-A cached image can be:
-
-```text
-stale
-```
-
-without being:
+The CDN should handle:
 
 ```text
-incorrect
+edge caching
+regional proximity
+bandwidth delivery
+origin shielding
+TLS termination
 ```
 
-For public content, short periods of staleness may be acceptable.
+where appropriate.
 
-For security-sensitive content:
-
-```text
-stale authorization
-```
-
-can be unacceptable.
-
-Therefore freshness policy depends on the image's semantic and security class.
+The application should not perform responsibilities that the CDN can execute more efficiently.
 
 ---
 
-# 25. Public Image Delivery
+# 21. Public vs Private Image Architecture
 
-A typical public image path:
+Public images:
 
 ```text
 Browser
-  ↓
+ ↓
 CDN
-  ↓
-Cache
-  ↓
-Origin
+ ↓
+Public cache
 ```
 
-can use:
+Private images:
 
 ```text
-long TTL
-immutable URLs
-shared caching
-aggressive edge distribution
+Browser
+ ↓
+Authorization / Signed Request
+ ↓
+Private CDN / Storage
+ ↓
+Resource
 ```
 
-This is ideal for:
-
-```text
-logos
-product images
-articles
-marketing assets
-```
-
-when content is public and versioned.
+Do not allow private images to accidentally enter a shared public cache.
 
 ---
 
-# 26. Private Image Delivery
+# 22. Multi-Tenant Image Architecture
 
-Private images require:
+For a SaaS platform:
 
 ```text
-authentication
+Tenant A
+ └── asset-123
+
+Tenant B
+ └── asset-123
+```
+
+Even if the local asset IDs overlap, the resource identities must remain isolated.
+
+A secure identity could conceptually be:
+
+```text
+Tenant
 +
+Asset ID
++
+Version
++
+Representation
+```
+
+This protects:
+
+```text
 authorization
 +
-controlled delivery
+storage
 +
-cache isolation
+cache
 ```
 
-A conceptual flow:
-
-```text
-User
- ↓
-Authenticate
- ↓
-Authorize asset
- ↓
-Signed delivery
- ↓
-Private CDN/object storage
-```
-
-The architecture must prevent private representations from becoming public shared cache objects.
+boundaries.
 
 ---
 
-# 27. Security Boundary
+# 23. Security Architecture
 
-Remote image sources create server-side network risk.
+Remote image processing should be treated as an untrusted-input pipeline:
+
+```text
+URL
+ ↓
+Scheme Validation
+ ↓
+Host Policy
+ ↓
+DNS/IP Validation
+ ↓
+Redirect Validation
+ ↓
+Network Isolation
+ ↓
+Timeout
+ ↓
+Size Limit
+ ↓
+Dimension Limit
+ ↓
+Content Validation
+ ↓
+Transformation
+```
+
+This prevents the optimizer from becoming:
+
+```text
+arbitrary proxy
+```
+
+or:
+
+```text
+resource-exhaustion endpoint.
+```
+
+---
+
+# 24. Resource Limits
+
+A production image processor should bound:
+
+```text
+request count
+download size
+pixel count
+dimensions
+CPU
+memory
+concurrency
+transformation variants
+storage
+bandwidth
+```
+
+Think:
+
+```text
+image request
+=
+resource budget.
+```
+
+---
+
+# 25. Image Loading Architecture
+
+Not all images have the same priority.
+
+Classify them:
+
+```text
+Critical
+Important
+Deferred
+Decorative
+```
+
+A page may contain:
+
+```text
+Hero image       → critical
+Product images   → important
+Below-fold cards → deferred
+Decorative icon  → low priority
+```
+
+The loading strategy should follow the role.
+
+---
+
+# 26. LCP Image Architecture
+
+If the hero image becomes LCP:
+
+```text
+HTML / RSC output
+        ↓
+Early discovery
+        ↓
+Appropriate priority
+        ↓
+Correct responsive candidate
+        ↓
+CDN hit
+        ↓
+Fast transfer
+        ↓
+Decode
+        ↓
+Paint
+```
+
+Every stage can affect LCP.
 
 Therefore:
 
 ```text
-remote URL
+LCP optimization
 ≠
-trusted URL
-```
-
-A production image system may need:
-
-```text
-source allowlist
-protocol restrictions
-redirect validation
-network egress controls
-resource limits
-rate limiting
+just compression.
 ```
 
 ---
 
-# 28. Image Processing Abuse
+# 27. Lazy Loading Architecture
 
-An attacker could attempt:
+Below-the-fold images can usually be deferred.
 
-```text
-many widths
-many qualities
-many formats
-huge dimensions
-many source URLs
-```
-
-This can cause:
+Conceptually:
 
 ```text
-cache explosion
-CPU exhaustion
-memory exhaustion
-bandwidth consumption
+Viewport
+ ↓
+Relevant image
+ ↓
+Request
 ```
 
-Therefore the transformation API must be bounded.
+while critical images should not be unnecessarily delayed.
+
+The system must avoid both:
+
+```text
+everything eager
+```
+
+and:
+
+```text
+everything lazy.
+```
 
 ---
 
-# 29. Image Resource Limits
+# 28. Layout Stability
 
-A secure processor may impose:
+Image dimensions should be known whenever practical.
+
+For example:
 
 ```text
-maximum source file size
-maximum width
-maximum height
-maximum decoded pixels
-maximum processing time
-maximum concurrency
+width
++
+height
+```
+
+or a stable aspect ratio.
+
+This allows the browser to reserve space.
+
+Without dimensions:
+
+```text
+Image loads
+ ↓
+layout changes
+ ↓
+content moves
+```
+
+which can increase CLS.
+
+---
+
+# 29. Accessibility Architecture
+
+Every image needs a semantic role.
+
+Examples:
+
+```text
+Informative
+Decorative
+Functional
+Complex
+```
+
+The correct `alt` behavior follows the role.
+
+For example:
+
+```text
+decorative image
+→
+empty alt
+```
+
+while:
+
+```text
+informative image
+→
+meaningful alternative text.
+```
+
+---
+
+# 30. Image + Link Semantics
+
+Suppose an image is inside a link.
+
+The image may contribute to the link's accessible name.
+
+Therefore:
+
+```text
+image alt
++
+visible link text
+```
+
+must not accidentally create redundant or confusing accessible names.
+
+This is a semantic architecture concern, not just an HTML detail.
+
+---
+
+# 31. Complex Images
+
+Charts, diagrams, and infographics may contain information that cannot reasonably fit in short alt text.
+
+A better architecture can provide:
+
+```text
+short alternative
++
+long description / equivalent data
 ```
 
 The objective is:
 
 ```text
-untrusted input
-→
-bounded computation
+information equivalence
+```
+
+rather than merely:
+
+```text
+alt attribute exists.
 ```
 
 ---
 
-# 30. SVG
+# 32. CMS Integration
 
-SVG should be treated separately from raster formats.
-
-Potential policy options include:
+A CMS image model should ideally contain:
 
 ```text
-reject
-sanitize
-rasterize
-serve under controlled conditions
-```
-
-The correct choice depends on the application.
-
-The architectural lesson is:
-
-```text
-image
-≠
-single security category
-```
-
----
-
-# 31. Accessibility Architecture
-
-The image pipeline must preserve semantic meaning.
-
-Image roles include:
-
-```text
-informative
-decorative
-functional
-complex
-```
-
-The delivery system should not determine semantics.
-
-Instead:
-
-```text
-Content Model
-      ↓
-Semantic Role
-      ↓
-Accessibility Representation
-      ↓
-Delivery Representation
-```
-
-This keeps:
-
-```text
-meaning
-```
-
-separate from:
-
-```text
-pixels
-```
-
----
-
-# 32. Alt Text Architecture
-
-Alt text should describe the image's role in context.
-
-The same image may require different descriptions depending on where it appears.
-
-For example:
-
-```text
-Product card:
-"Blue running shoes"
-```
-
-versus:
-
-```text
-Product detail:
-"Blue mesh running shoes with white sole"
-```
-
-The source asset alone cannot always determine the correct alt text.
-
----
-
-# 33. Complex Images
-
-Charts, diagrams, and infographics may require:
-
-```text
-short alternative
-+
-long-form equivalent
-```
-
-The architecture must preserve the information represented by the visual.
-
-Performance optimization must never remove essential information.
-
----
-
-# 34. Image Loading Architecture
-
-Not all images have equal priority.
-
-Classify images:
-
-```text
-Critical
-Important
-Non-critical
-Deferred
-```
-
-Typical examples:
-
-```text
-LCP hero
-→ critical
-
-above-the-fold supporting image
-→ important
-
-below-the-fold gallery
-→ deferred
-```
-
----
-
-# 35. Priority Is Not Visibility Alone
-
-An image may be:
-
-```text
-above the fold
-```
-
-but not:
-
-```text
-the primary content
-```
-
-Likewise, an image below the fold may become visible quickly on a particular device.
-
-Therefore loading strategy should consider:
-
-```text
-layout position
-viewport
-content importance
-LCP role
-interaction
-```
-
----
-
-# 36. Lazy Loading
-
-Lazy loading is useful for non-critical images.
-
-But blindly lazy-loading everything can delay:
-
-```text
-LCP
-above-the-fold content
-```
-
-Conversely, eagerly loading everything creates:
-
-```text
-network contention
-memory pressure
-unnecessary bytes
-```
-
-The correct architecture is selective.
-
----
-
-# 37. Image Loading and LCP
-
-For an image-based LCP element:
-
-```text
-HTML discovery
-+
-appropriate priority
-+
-appropriate representation
-+
-fast delivery
-```
-
-must work together.
-
-Optimizing only one dimension may produce little improvement.
-
----
-
-# 38. Browser Rendering
-
-Even after bytes arrive:
-
-```text
-download
-```
-
-is not the end.
-
-The browser still performs:
-
-```text
-decode
-→
-layout
-→
-paint
-```
-
-Therefore:
-
-```text
-network optimization
-≠
-complete rendering optimization
-```
-
----
-
-# 39. Aspect Ratio and CLS
-
-Image dimensions should establish stable layout.
-
-Without known dimensions:
-
-```text
-image placeholder
-      ↓
-content arrives
-      ↓
-layout expands
-```
-
-This can produce:
-
-```text
-Cumulative Layout Shift
-```
-
-Therefore image geometry is part of performance architecture.
-
----
-
-# 40. `<Image>` as an Application Abstraction
-
-The framework image component can help manage:
-
-```text
-dimensions
-responsive behavior
-loading
-optimization
-delivery
-```
-
-But the component does not eliminate architectural responsibility.
-
-The developer still must understand:
-
-```text
-source
-layout
-sizes
-priority
-cache
-security
-accessibility
-```
-
----
-
-# 41. Server Components and Images
-
-A Server Component can determine:
-
-```text
-which image
-which source
-which metadata
-```
-
-but the browser still performs the final image delivery and rendering.
-
-Therefore:
-
-```text
-server rendering
-```
-
-does not mean:
-
-```text
-server renders image pixels for the browser
-```
-
-The HTML establishes the image resource relationship.
-
----
-
-# 42. Metadata and Image Identity
-
-Image architecture also interacts with SEO and metadata.
-
-For example:
-
-```text
-canonical page
-      ↓
-product resource
-      ↓
-product image
-      ↓
-Open Graph image
-```
-
-The social image should represent the same resource identity as the page.
-
-Therefore:
-
-```text
-page identity
-↔
-image identity
-```
-
-must remain coherent.
-
----
-
-# 43. Multi-Tenant Architecture
-
-For a multi-tenant application:
-
-```text
-Tenant
-  ↓
-Resource
-  ↓
-Asset
-  ↓
-Representation
-```
-
-may affect:
-
-```text
-domain
-branding
-locale
-access
-cache
-```
-
-The cache architecture must prevent:
-
-```text
-Tenant A
-→
-Tenant B
-```
-
-representation leakage.
-
----
-
-# 44. Locale-Aware Images
-
-Some assets vary by locale:
-
-```text
-English banner
-French banner
-Japanese banner
-```
-
-Therefore:
-
-```text
-locale
-```
-
-may become part of representation identity.
-
-But if the image is actually identical across locales, unnecessarily including locale in the cache key creates fragmentation.
-
-The decision must follow actual representation variance.
-
----
-
-# 45. Do Not Add Context to Cache Keys Blindly
-
-A common mistake is:
-
-```text
-cache key =
-tenant
-+
-locale
-+
-user
-+
-device
-+
-everything
-```
-
-This can destroy cache efficiency.
-
-The correct question is:
-
-> **Does this dimension actually change the delivered representation?**
-
-Only relevant representation dimensions should participate in the shared representation identity.
-
----
-
-# 46. User-Specific Images
-
-If the representation depends on:
-
-```text
-user identity
-```
-
-then shared public caching may not be appropriate.
-
-Examples:
-
-```text
-private avatar
-personalized document preview
-account-specific image
-```
-
-The security model takes precedence over cache sharing.
-
----
-
-# 47. Observability Architecture
-
-Production telemetry should connect:
-
-```text
-Browser
-↓
-CDN
-↓
-Transformation
-↓
-Origin
-```
-
-Metrics include:
-
-```text
-LCP
-image latency
-transfer bytes
-cache hit rate
-origin requests
-transformation latency
-error rate
-```
-
-This allows end-to-end diagnosis.
-
----
-
-# 48. The Four-Pillar Production Matrix
-
-| Dimension   | Questions                                               |
-| ----------- | ------------------------------------------------------- |
-| Correctness | Is the right image and representation delivered?        |
-| Performance | Are bytes, latency, decode, and layout efficient?       |
-| Security    | Can the pipeline be abused or leak content?             |
-| Operability | Can failures and regressions be observed and diagnosed? |
-
-A production architecture is incomplete if one pillar is ignored.
-
----
-
-# 49. Reference Production Architecture
-
-A mature architecture may look like:
-
-```text
-                        USER
-                          │
-                          ▼
-                    NEXT.JS APP
-                          │
-                ┌─────────┴─────────┐
-                │                   │
-          Resource Model       Accessibility
-                │                   │
-                └─────────┬─────────┘
-                          ▼
-                  Image Component
-                          │
-                          ▼
-              Responsive Representation
-                          │
-               ┌──────────┴──────────┐
-               │                     │
-          Security Policy       Loading Policy
-               │                     │
-               └──────────┬──────────┘
-                          ▼
-                     Image CDN
-                          │
-                    ┌─────┴─────┐
-                    │           │
-                 Cache Hit   Cache Miss
-                                │
-                                ▼
-                       Image Transformation
-                                │
-                                ▼
-                              Origin
-```
-
-Observability surrounds the entire system:
-
-```text
-Browser
-  ↕
-CDN
-  ↕
-Transformation
-  ↕
-Origin
-```
-
----
-
-# 50. Production Decision Framework
-
-When designing an image system, answer these questions in order.
-
-## Step 1 — What is the asset?
-
-```text
-public
-private
-user-generated
-CMS
-tenant-specific
-```
-
-## Step 2 — What is the semantic role?
-
-```text
-informative
-decorative
-functional
-complex
-```
-
-## Step 3 — How is it displayed?
-
-```text
-fixed
-fluid
-responsive
-art-directed
-```
-
-## Step 4 — What representations are needed?
-
-```text
+asset ID
+source URL
 width
+height
 format
-quality
-crop
+alt text
+caption
+focal point
+content role
+version
 ```
 
-## Step 5 — Where is transformation performed?
+The application then derives delivery representations.
+
+This separates:
 
 ```text
-build
-ingestion
-request
+content ownership
+```
+
+from:
+
+```text
+delivery optimization.
+```
+
+---
+
+# 33. Image Observability Architecture
+
+A mature image platform measures:
+
+```text
+Browser
+ ├── Resource timing
+ ├── LCP
+ ├── transfer size
+ └── device/network
+
 CDN
-hybrid
+ ├── hit ratio
+ ├── latency
+ ├── bandwidth
+ └── origin requests
+
+Transformer
+ ├── CPU
+ ├── memory
+ ├── transformation latency
+ └── failures
+
+Origin
+ ├── source fetch latency
+ ├── errors
+ └── availability
 ```
 
-## Step 6 — What is the cache identity?
+---
+
+# 34. Performance Budgets
+
+Define explicit budgets for:
 
 ```text
-asset version
-+
-representation dimensions
-```
-
-## Step 7 — What security model applies?
-
-```text
-public
-authenticated
-private
-signed
-```
-
-## Step 8 — How is performance measured?
-
-```text
-bytes
-latency
+hero bytes
+initial image bytes
+image count
+transformation latency
 LCP
-cache
-transform
-errors
+CLS
+CDN origin traffic
+```
+
+Budgets turn:
+
+```text
+“images should be fast”
+```
+
+into:
+
+```text
+measurable engineering constraints.
 ```
 
 ---
 
-# 51. Scenario: Product Listing
+# 35. Testing Architecture
 
-Suppose a product listing displays:
-
-```text
-20 products
-```
-
-Each card contains an image.
-
-Requirements:
+A mature test strategy includes:
 
 ```text
-mobile
-tablet
-desktop
-high-DPR
-```
-
-A reasonable architecture is:
-
-```text
-Product
+Unit
  ↓
-Image resource
+Component
  ↓
-Responsive candidate set
+Integration
  ↓
-Browser selection
+E2E
  ↓
-CDN
+Visual Regression
  ↓
-Cached representation
+Synthetic Performance
+ ↓
+RUM
 ```
 
-The system should avoid downloading:
-
-```text
-full-resolution originals
-```
-
-for every card.
+Different layers validate different properties.
 
 ---
 
-# 52. Scenario: Product Detail Hero
+# 36. Image Contract Testing
 
-The product hero may be:
-
-```text
-LCP candidate
-```
-
-Therefore:
+For a shared component:
 
 ```text
-appropriate priority
-+
-accurate dimensions
-+
-accurate sizes
-+
-optimized representation
-+
-fast CDN delivery
+ResponsiveImage
 ```
 
-are important.
+the contract can specify:
 
-Lazy-loading the primary hero indiscriminately could create a performance regression.
+```text
+must have stable dimensions
+must provide appropriate alt semantics
+must generate responsive candidates
+must obey loading policy
+must use allowed transformations
+```
+
+This prevents regressions across teams.
 
 ---
 
-# 53. Scenario: Product Gallery
+# 37. Deployment Architecture
 
-A gallery may contain:
+Image behavior should be part of deployment verification.
+
+A production rollout can use:
 
 ```text
-1 primary image
-+
-10 secondary images
+Build
+ ↓
+Automated image tests
+ ↓
+Synthetic performance
+ ↓
+Canary
+ ↓
+RUM
+ ↓
+Compare
+ ↓
+Promote
 ```
 
-The primary image may be:
+Monitor:
 
 ```text
-high priority
-```
-
-while secondary images can be:
-
-```text
-lazy
-```
-
-until needed.
-
-Interaction can trigger higher-resolution requests.
-
----
-
-# 54. Scenario: User Avatar
-
-An avatar may be:
-
-```text
-small
-frequently repeated
-```
-
-A strong strategy may be:
-
-```text
-small fixed candidate set
-+
-long cache lifetime
-+
-versioned URLs
-```
-
-If avatars are private, authorization and cache isolation become more important.
-
----
-
-# 55. Scenario: User Upload
-
-A user uploads:
-
-```text
-large original image
-```
-
-A production pipeline might:
-
-```text
-upload
-→ validate
-→ inspect
-→ store original
-→ generate bounded variants
-→ publish safe representations
-```
-
-The original should not automatically become the public delivery representation.
-
----
-
-# 56. Scenario: Marketing Hero
-
-A marketing hero may require:
-
-```text
-desktop composition
-mobile composition
-```
-
-This is an art-direction problem.
-
-The architecture should not merely resize the desktop image down if that produces a poor composition.
-
----
-
-# 57. Scenario: Private Document Preview
-
-A document preview might be:
-
-```text
-user-specific
-```
-
-Therefore:
-
-```text
-authentication
-+
-authorization
-+
-private delivery
-+
-short-lived access
-```
-
-may take priority over maximum shared-cache efficiency.
-
----
-
-# 58. Scenario: Multi-Tenant SaaS
-
-Suppose:
-
-```text
-Tenant A
-Tenant B
-Tenant C
-```
-
-all use:
-
-```text
-/image/logo
-```
-
-If the response varies by tenant, tenant identity must be reflected in resource resolution and cache semantics.
-
-The system must not produce:
-
-```text
-Tenant A logo
-→
-Tenant B
-```
-
----
-
-# 59. Scenario: Global Traffic Spike
-
-A marketing campaign causes:
-
-```text
-10× image traffic
-```
-
-The architecture should rely on:
-
-```text
-CDN
-+
-high cacheability
-+
-immutable URLs
-+
-origin shielding
-+
-request coalescing
-```
-
-rather than scaling the origin blindly.
-
----
-
-# 60. Scenario: Origin Outage
-
-If the image origin becomes unavailable:
-
-```text
-CDN
-    ↓
-origin failure
-```
-
-the system should have an intentional resilience strategy.
-
-Depending on requirements:
-
-```text
-serve stale
-fallback representation
-placeholder
-degraded experience
-```
-
-may be appropriate.
-
-The choice depends on content criticality.
-
----
-
-# 61. Scenario: Cache Failure
-
-If cache efficiency suddenly collapses:
-
-```text
-cache hit rate
-99%
-→
-40%
-```
-
-investigate:
-
-```text
-URL changes
-cache-key changes
-TTL changes
-purges
-variant explosion
-CDN configuration
-```
-
-Do not immediately assume traffic increased.
-
----
-
-# 62. Scenario: Security Incident
-
-Suppose an image proxy begins receiving suspicious remote URLs.
-
-The response should include:
-
-```text
-source blocking
-rate limiting
-network egress controls
-logging
-incident investigation
-cache inspection
-```
-
-The image service should be treated as infrastructure, not merely UI code.
-
----
-
-# 63. Senior Architecture Tradeoffs
-
-## Build-Time vs Runtime
-
-| Build-Time           | Runtime                  |
-| -------------------- | ------------------------ |
-| predictable          | flexible                 |
-| higher build cost    | runtime CPU              |
-| less request latency | cold-cache latency       |
-| more storage         | less precomputed storage |
-
----
-
-## CDN vs Origin
-
-| CDN             | Origin               |
-| --------------- | -------------------- |
-| low latency     | authoritative source |
-| high scale      | expensive under load |
-| caching         | transformation       |
-| global delivery | storage              |
-
----
-
-## Shared Cache vs Private Cache
-
-| Shared                                | Private                     |
-| ------------------------------------- | --------------------------- |
-| efficient                             | isolated                    |
-| scalable                              | safer for personal data     |
-| low cost                              | lower reuse                 |
-| requires stable public representation | supports user-specific data |
-
----
-
-# 64. Senior Architecture Principle
-
-Do not optimize:
-
-```text
+LCP
 image bytes
+cache hit ratio
+5xx
+transformation latency
+origin load
 ```
 
-in isolation.
+---
 
-Optimize:
+# 38. Production Reference Architecture
+
+A complete architecture could look like:
 
 ```text
-user experience
+                    ┌─────────────────┐
+                    │      CMS        │
+                    │ Asset + Semantics│
+                    └────────┬────────┘
+                             │
+                             ↓
+                    ┌─────────────────┐
+                    │ Representation  │
+                    │     Policy      │
+                    └────────┬────────┘
+                             │
+                             ↓
+                    ┌─────────────────┐
+                    │ Image Transform │
+                    │  + Validation   │
+                    └────────┬────────┘
+                             │
+                             ↓
+                    ┌─────────────────┐
+                    │ CDN / Edge Cache│
+                    └────────┬────────┘
+                             │
+                             ↓
+                    ┌─────────────────┐
+                    │    Browser      │
+                    │ srcset / sizes  │
+                    └────────┬────────┘
+                             │
+                    ┌────────┴────────┐
+                    ↓                 ↓
+                  Decode            Layout
+                    │                 │
+                    └────────┬────────┘
+                             ↓
+                          Paint
+                             ↓
+                            UX
+                             ↓
+                     RUM / Monitoring
+                             ↓
+                     Alerts / Analysis
+```
+
+---
+
+# 39. Scenario — Product Catalog
+
+Suppose a product catalog contains:
+
+```text
+100,000 products
+```
+
+and each product has:
+
+```text
+5 images
+```
+
+That is:
+
+```text
+500,000 source images.
+```
+
+Each source may produce:
+
+```text
+5 widths
+×
+2 modern formats
+```
+
+Potentially:
+
+```text
+5,000,000 representations.
+```
+
+This demonstrates why:
+
+```text
+representation cardinality
+```
+
+is an architectural concern.
+
+You cannot casually create unlimited variants.
+
+---
+
+# 40. Scenario — Global SaaS
+
+Suppose the application serves:
+
+```text
+North America
+Europe
+Asia
+```
+
+The architecture should consider:
+
+```text
+regional CDN
+origin location
+cache warming
+tenant isolation
+image source latency
+```
+
+A centralized origin may create:
+
+```text
+high origin latency
+```
+
+even when application HTML is fast.
+
+Therefore image delivery needs its own global strategy.
+
+---
+
+# 41. Scenario — Personalized Image
+
+Suppose the image contains:
+
+```text
+user-specific information.
+```
+
+It cannot safely be treated as a generic public asset.
+
+The system must determine:
+
+```text
+public?
+private?
+session-bound?
+signed?
+tenant-scoped?
+```
+
+before selecting:
+
+```text
+cache policy.
+```
+
+---
+
+# 42. Scenario — Image Changes Frequently
+
+Suppose a CMS image is updated frequently.
+
+If the URL remains:
+
+```text
+/image/product-123
+```
+
+and the CDN caches aggressively, stale content may persist.
+
+Versioning can solve this:
+
+```text
+/image/product-123-v8
+```
+
+rather than requiring broad cache purges.
+
+---
+
+# 43. Scenario — Third-Party Image Source
+
+Suppose a product imports images from partner CDNs.
+
+The architecture should include:
+
+```text
+source allowlist
 +
-delivery cost
+timeout
 +
-processing cost
+response-size limit
 +
-cache efficiency
+content validation
 +
-security
+transformation limit
 +
-maintainability
+cache
++
+failure fallback
 ```
 
-The optimal representation is the one that balances the complete system.
+The partner becomes a controlled dependency rather than an unrestricted network source.
 
 ---
 
-# 65. Common Anti-Patterns
-
-## Anti-Pattern 1
-
-```text
-Serve original images everywhere.
-```
-
-Problem:
-
-```text
-unnecessary bytes
-slow LCP
-bandwidth cost
-```
-
----
-
-## Anti-Pattern 2
-
-```text
-Generate unlimited image variants.
-```
-
-Problem:
-
-```text
-cache explosion
-compute explosion
-```
-
----
-
-## Anti-Pattern 3
-
-```text
-Use arbitrary remote URLs.
-```
-
-Problem:
-
-```text
-SSRF
-abuse
-untrusted fetching
-```
-
----
-
-## Anti-Pattern 4
-
-```text
-Lazy-load every image.
-```
-
-Problem:
-
-```text
-critical content delayed
-LCP regression
-```
-
----
-
-## Anti-Pattern 5
-
-```text
-Use the same cache key for private and public images.
-```
-
-Problem:
-
-```text
-data leakage
-```
-
----
-
-## Anti-Pattern 6
-
-```text
-Treat alt text as an image-processing concern.
-```
-
-Problem:
-
-```text
-semantic responsibility becomes disconnected from content
-```
-
----
-
-## Anti-Pattern 7
-
-```text
-Measure only server latency.
-```
-
-Problem:
-
-```text
-real browser experience remains unknown
-```
-
----
-
-## Anti-Pattern 8
-
-```text
-Use image URLs as unrestricted metric labels.
-```
-
-Problem:
-
-```text
-telemetry cardinality explosion
-```
-
----
-
-# 66. Senior Prediction Challenge — Full System
-
-You deploy a new image pipeline.
+# 44. Scenario — Mobile Performance Regression
 
 After deployment:
 
 ```text
-CDN hit rate: 98% → 72%
-Origin traffic: +240%
-Transformation CPU: +310%
-LCP: +450ms
-Image bytes: +35%
+desktop LCP:
+stable
+
+mobile LCP:
++800ms
 ```
 
-What is the likely architectural investigation?
-
-Do not treat these as five unrelated incidents.
-
-Look for a shared cause.
-
-A likely reasoning path is:
+Investigate:
 
 ```text
-Representation / URL change
-        ↓
-Cache identity changed
-        ↓
-Cache reuse collapsed
-        ↓
-More transformations
-        ↓
-Origin load increased
-        ↓
-Transformation latency increased
-        ↓
-Image transfer/render latency increased
-        ↓
-LCP degraded
-```
-
-The senior engineer searches for causal relationships rather than fixing symptoms independently.
-
----
-
-# 67. Senior Prediction Challenge — Security
-
-A team adds:
-
-```text
-/image?url=<remote-url>
-```
-
-and sees a dramatic increase in traffic.
-
-What questions should you ask?
-
-```text
-Is the source allowlisted?
-Are redirects controlled?
-Are private destinations blocked?
-Are transformations bounded?
-Are requests rate-limited?
-Are cache keys canonical?
-Is origin protected?
-```
-
-The system must be evaluated as a server-side network service.
-
----
-
-# 68. Senior Prediction Challenge — Responsive Images
-
-A mobile performance regression occurs after changing `sizes`.
-
-You discover:
-
-```text
-mobile rendered width = 360px
-selected image width = 1200px
-```
-
-The investigation should focus on:
-
-```text
-sizes
-+
-candidate widths
-+
 DPR
-+
-layout behavior
-```
-
-rather than immediately changing compression quality.
-
----
-
-# 69. Senior Prediction Challenge — Accessibility
-
-A design-system image component is optimized and now requires:
-
-```text
-alt=""
-```
-
-for every image.
-
-Is that automatically correct?
-
-No.
-
-The semantic role determines whether the image is:
-
-```text
-decorative
-informative
-functional
-complex
-```
-
-Accessibility must be modeled as content semantics rather than a generic optimization rule.
-
----
-
-# 70. Senior Interview Exercise
-
-> Design an image architecture for a global multi-tenant e-commerce platform.
-
-Your answer should cover:
-
-### Asset
-
-```text
-CMS
-user upload
-product source
-```
-
-### Representation
-
-```text
-responsive widths
-formats
-quality
-art direction
-```
-
-### Delivery
-
-```text
-CDN
-cache
-versioned URLs
-origin
-```
-
-### Browser
-
-```text
+candidate selection
 sizes
-srcset
-loading
+transfer size
+decode cost
+network
+CPU
+```
+
+The issue may be that mobile users are downloading unnecessarily large images.
+
+---
+
+# 45. Scenario — Cache Hit Collapse
+
+After changing image URLs:
+
+```text
+CDN hit ratio:
+97% → 74%
+```
+
+Investigate:
+
+```text
+URL normalization
+query parameters
+versioning
+format negotiation
+responsive variants
+cache-key changes
+```
+
+A URL architecture change can become a performance incident.
+
+---
+
+# 46. Scenario — Image Security Incident
+
+Suppose the optimizer receives thousands of requests targeting internal IPs.
+
+The correct architecture should allow:
+
+```text
+validation
+→
+rejection
+→
+rate limiting
+→
+observability
+```
+
+without allowing those requests to reach internal services.
+
+The incident response system should be able to answer:
+
+```text
+Which source?
+Which tenant?
+Which endpoint?
+Which policy failed?
+How many attempts?
+```
+
+---
+
+# 47. Senior Tradeoff — Precompute vs Runtime
+
+### Precompute
+
+```text
+Upload
+ ↓
+Generate variants
+ ↓
+Store
+ ↓
+Serve
+```
+
+Advantages:
+
+* predictable serving latency
+* predictable compute
+* easier warm cache
+
+Costs:
+
+* storage
+* preprocessing time
+* potentially unused variants
+
+### Runtime
+
+```text
+Request
+ ↓
+Transform
+ ↓
+Cache
+ ↓
+Serve
+```
+
+Advantages:
+
+* demand-driven
+* fewer unused variants
+
+Costs:
+
+* cold-request latency
+* runtime compute
+* abuse risk
+* cache-miss cost
+
+---
+
+# 48. Senior Tradeoff — One Image Service vs Platform CDN
+
+A dedicated image service gives:
+
+```text
+custom control
+```
+
+but creates:
+
+```text
+operational complexity.
+```
+
+A managed image/CDN platform may provide:
+
+```text
+transformation
++
+optimization
++
+delivery
+```
+
+with less infrastructure ownership.
+
+The decision should consider:
+
+```text
+scale
+control
+security
+cost
+vendor dependency
+feature requirements
+```
+
+---
+
+# 49. Senior Tradeoff — Quality vs Bytes
+
+Reducing quality can reduce:
+
+```text
+transfer size
+```
+
+but can also reduce:
+
+```text
+visual fidelity.
+```
+
+The correct target is not:
+
+```text
+smallest possible image.
+```
+
+It is:
+
+```text
+small enough
++
+visually acceptable
++
+fast enough
+```
+
+for the product context.
+
+---
+
+# 50. Senior Tradeoff — Cache Aggressiveness
+
+Aggressive caching provides:
+
+```text
+high hit ratio
+low origin load
+```
+
+but can increase:
+
+```text
+staleness
+```
+
+if content changes.
+
+Versioned immutable URLs can often provide:
+
+```text
+long cache lifetime
++
+strong freshness guarantees.
+```
+
+---
+
+# 51. Senior Tradeoff — Responsive Candidate Count
+
+More candidates can improve selection granularity.
+
+But:
+
+```text
+more candidates
+→
+more cache objects
+→
+more storage
+→
+more complexity.
+```
+
+Therefore choose candidate widths based on actual layout distributions rather than arbitrary precision.
+
+---
+
+# 52. Senior Tradeoff — Security vs Open Remote Sources
+
+Allowing arbitrary remote image sources:
+
+```text
+more flexibility
+```
+
+but creates:
+
+```text
+larger SSRF surface
++
+larger failure domain
++
+larger abuse surface.
+```
+
+Restricting sources:
+
+```text
+smaller attack surface
+```
+
+but reduces integration flexibility.
+
+---
+
+# 53. Four-Pillar Architecture Matrix
+
+| Pillar       | Image Optimization Concern          | Senior Question                                              |
+| ------------ | ----------------------------------- | ------------------------------------------------------------ |
+| Mental Model | Resource vs representation          | What exactly is being optimized?                             |
+| Mechanics    | Browser/CDN/transformation behavior | Why did this representation get delivered?                   |
+| Architecture | End-to-end image platform           | Where should transformation, caching and authorization live? |
+| Operations   | Monitoring/testing/incidents        | How do we know the system remains correct at scale?          |
+
+---
+
+# 54. Prediction Challenge — Full Pipeline
+
+A product page contains:
+
+```text
+Hero
+Product gallery
+Reviews
+Recommendations
+Footer
+```
+
+The hero is LCP.
+
+The browser downloads:
+
+```text
+Hero: 1.8 MB
+Gallery: 400 KB
+Recommendations: 1.2 MB
+```
+
+CDN hit ratio is 98%.
+
+Yet LCP is poor.
+
+What should you investigate first?
+
+A senior investigation should trace:
+
+```text
+LCP element
+ ↓
+discovery
+ ↓
 priority
-LCP
-CLS
+ ↓
+candidate selection
+ ↓
+transfer
+ ↓
+decode
+ ↓
+paint
 ```
 
-### Security
+rather than assuming:
 
 ```text
-source trust
-private assets
-tenant isolation
-transformation limits
-```
-
-### Accessibility
-
-```text
-semantic role
-alt
-complex images
-```
-
-### Observability
-
-```text
-RUM
-LCP
-cache
-transform
-errors
-origin
-```
-
-### Operations
-
-```text
-SLO
-alerts
-canary
-rollback
-incident response
-```
-
-If you can explain these layers and their interactions, you understand image optimization at SDE-2 architecture depth.
-
----
-
-# 71. Complete KPI 10 Engineering Matrix
-
-| Area              | Core Responsibility                             |
-| ----------------- | ----------------------------------------------- |
-| Mental Model      | Understand the complete image pipeline          |
-| `<Image>`         | Understand framework image delivery abstraction |
-| Responsive Images | Select appropriate representations              |
-| Formats           | Balance quality, bytes, and processing          |
-| CDN               | Deliver efficiently at scale                    |
-| Cache             | Preserve representation identity                |
-| Loading           | Optimize critical-path behavior                 |
-| Accessibility     | Preserve semantic meaning                       |
-| Security          | Protect remote fetching and delivery            |
-| Observability     | Measure and diagnose production behavior        |
-
----
-
-# 72. Complete KPI 10 Invariants
-
-```text
-source asset ≠ delivery representation
-```
-
-```text
-resource identity ≠ representation identity
-```
-
-```text
-srcset = candidate representations
-```
-
-```text
-sizes = expected rendered width
-```
-
-```text
-browser = final responsive candidate selector
-```
-
-```text
-resolution switching ≠ art direction
-```
-
-```text
-format selection ≠ quality selection
-```
-
-```text
-resize ≠ compression
-```
-
-```text
-transformation = compute workload
-```
-
-```text
-cache identity = representation identity
-```
-
-```text
-immutable URL = powerful cache invalidation strategy
-```
-
-```text
-remote URL ≠ trusted source
-```
-
-```text
-authentication ≠ cache isolation
-```
-
-```text
-tenant identity matters when representation varies by tenant
-```
-
-```text
-semantic meaning ≠ pixel representation
-```
-
-```text
-network bytes ≠ total browser cost
-```
-
-```text
-cache hit rate ≠ complete performance
-```
-
-```text
-HTML success ≠ image success
-```
-
-```text
-image optimization ≠ compression alone
+CDN hit ratio
+=
+good image performance.
 ```
 
 ---
 
-# 73. The Complete Production Image Pipeline
+# 55. Prediction Challenge — Cache vs Security
 
-The final model is:
+A private tenant image is being served from a shared CDN.
+
+Two tenants use:
 
 ```text
-                         CONTENT
-                            │
-                            ▼
-                      SOURCE ASSET
-                            │
-                            ▼
-                   RESOURCE IDENTITY
-                            │
-                            ▼
-                  SEMANTIC CLASSIFICATION
-                            │
-                ┌───────────┴───────────┐
-                ▼                       ▼
-          Accessibility            Security
-                │                       │
-                └───────────┬───────────┘
-                            ▼
-                  REPRESENTATION POLICY
-                            │
-             ┌──────────────┼──────────────┐
-             ▼              ▼              ▼
-           Width          Format         Quality
-             │              │              │
-             └──────────────┼──────────────┘
-                            ▼
-                     TRANSFORMATION
-                            │
-                            ▼
-                   RESPONSIVE CANDIDATES
-                            │
-                            ▼
-                      CACHE IDENTITY
-                            │
-                            ▼
-                           CDN
-                            │
-                 ┌──────────┴──────────┐
-                 ▼                     ▼
-              CACHE HIT            CACHE MISS
-                                       │
-                                       ▼
-                                  ORIGIN /
-                                IMAGE SERVICE
-                                       │
-                                       ▼
-                                  TRANSFORM
-                                       │
-                                       ▼
-                                      CDN
-                                       │
-                                       ▼
-                                    BROWSER
-                                       │
-                            ┌──────────┼──────────┐
-                            ▼          ▼          ▼
-                          Decode     Layout      Paint
-                            │          │          │
-                            └──────────┼──────────┘
-                                       ▼
-                                 USER EXPERIENCE
-                                       │
-                                       ▼
-                                OBSERVABILITY
-                                       │
-                                       ▼
-                              CONTINUOUS OPTIMIZATION
+/logo
+```
+
+What must you inspect?
+
+```text
+resource identity
+cache key
+authorization
+tenant context
+CDN cache policy
+URL versioning
+```
+
+The critical question is:
+
+> Can two security contexts produce the same cache representation?
+
+---
+
+# 56. Prediction Challenge — Transformation Cost
+
+A sudden traffic spike causes:
+
+```text
+CPU ↑
+memory ↑
+p99 ↑
+```
+
+while cache hit ratio falls.
+
+The likely investigation path is:
+
+```text
+traffic
+ ↓
+cache misses
+ ↓
+new representation cardinality
+ ↓
+transformation demand
+ ↓
+CPU/memory
+```
+
+This is more informative than simply scaling the transformer.
+
+---
+
+# 57. Prediction Challenge — Mobile Only
+
+Suppose:
+
+```text
+Desktop LCP:
+1.8s
+
+Mobile LCP:
+4.2s
+```
+
+Check:
+
+```text
+responsive candidate
+sizes
+DPR
+transfer bytes
+decode
+CPU
+network
+```
+
+A common architectural error is treating:
+
+```text
+desktop image configuration
+```
+
+as sufficient for:
+
+```text
+mobile performance.
 ```
 
 ---
 
-# 74. What SDE-2 Ownership Looks Like
+# 58. Senior Interview Exercise
 
-At SDE-2 level, you should be able to take ownership of an image architecture and answer:
+### Design an Image Platform
 
-### Design
+You are building a global e-commerce platform with:
 
 ```text
-Why this architecture?
+50 million images
+100 million monthly users
+multiple regions
+multi-tenant seller accounts
+user-uploaded images
+product images
+private seller assets
+public product assets
 ```
+
+Requirements:
+
+* responsive images
+* modern formats
+* CDN delivery
+* strong cacheability
+* tenant isolation
+* secure uploads
+* LCP optimization
+* observability
+* production rollback
+
+Explain:
+
+### A. Asset Model
+
+How do you model:
+
+```text
+asset
+resource
+representation
+version?
+```
+
+### B. Transformation
+
+Where does transformation occur?
+
+```text
+build
+upload
+request
+CDN edge
+```
+
+Why?
+
+### C. Cache
+
+What is the cache key?
+
+### D. Security
+
+How do you prevent:
+
+```text
+SSRF
+malicious uploads
+resource exhaustion
+cross-tenant leakage?
+```
+
+### E. Browser Delivery
+
+How do you determine:
+
+```text
+srcset
+sizes
+priority
+lazy loading?
+```
+
+### F. Operations
+
+Which metrics and SLOs do you monitor?
+
+### G. Deployment
+
+How do you detect image-performance regressions before full rollout?
+
+A senior answer should connect all seven rather than solving each independently.
+
+---
+
+# 59. Production Readiness Checklist
+
+### Asset Architecture
+
+* [ ] Source assets have stable identity
+* [ ] Asset versions are defined
+* [ ] Semantic metadata is separated from delivery metadata
+* [ ] Dimensions are known
+* [ ] Focal points are supported where necessary
+
+### Responsive Delivery
+
+* [ ] Candidate widths are intentional
+* [ ] `srcset` is correct
+* [ ] `sizes` matches layout
+* [ ] Art direction is handled separately
+* [ ] Candidate cardinality is bounded
+
+### Transformation
+
+* [ ] Formats are intentionally selected
+* [ ] Quality is bounded
+* [ ] Dimensions are bounded
+* [ ] Pixel counts are bounded
+* [ ] Transformation compute is controlled
+
+### Caching
+
+* [ ] Cache keys represent delivery identity
+* [ ] Immutable URLs/versioning are considered
+* [ ] Public/private caching is explicit
+* [ ] Tenant boundaries are protected
+* [ ] Cache cardinality is monitored
 
 ### Performance
 
-```text
-Where is the bottleneck?
-```
-
-### Correctness
-
-```text
-Which representation should be delivered?
-```
-
-### Security
-
-```text
-What can an attacker control?
-```
+* [ ] Critical images are discovered early
+* [ ] LCP images are prioritized appropriately
+* [ ] Below-fold images are deferred
+* [ ] Layout dimensions are stable
+* [ ] Performance budgets exist
 
 ### Accessibility
 
-```text
-What semantic information must survive?
-```
+* [ ] Image roles are explicit
+* [ ] Alt semantics are correct
+* [ ] Functional images have correct accessible names
+* [ ] Complex images have equivalent information
+* [ ] CMS content supports semantic ownership
 
-### Scalability
+### Security
 
-```text
-What happens at 10× traffic?
-```
-
-### Reliability
-
-```text
-What happens when the CDN/origin fails?
-```
+* [ ] Remote sources are controlled
+* [ ] SSRF protections exist
+* [ ] Redirects are validated
+* [ ] Network access is restricted
+* [ ] Response size is bounded
+* [ ] Pixel dimensions are bounded
+* [ ] SVG policy is explicit
+* [ ] Private resources are authorized
+* [ ] Rate limiting exists
+* [ ] Transformation abuse is controlled
 
 ### Observability
 
-```text
-How will we know?
-```
+* [ ] Browser metrics exist
+* [ ] CDN metrics exist
+* [ ] Transformer metrics exist
+* [ ] Origin metrics exist
+* [ ] Cache hit ratio is monitored
+* [ ] Transformation latency is monitored
+* [ ] LCP is monitored
+* [ ] Errors are classified
+* [ ] Deployment correlation exists
 
-### Operations
+### Testing
 
-```text
-How do we roll it out and recover?
-```
-
-### Tradeoffs
-
-```text
-What are we optimizing, and what are we giving up?
-```
-
-That is the difference between knowing an image component and owning an image platform.
-
----
-
-# 75. KPI 10 Completion Checklist
-
-You can consider **KPI 10 — Image Optimization** complete when you can independently explain and implement:
-
-## Architecture
-
-* [ ] Image delivery pipeline
-* [ ] Source vs representation
-* [ ] Resource identity
-* [ ] Representation identity
-* [ ] CDN architecture
-* [ ] Origin architecture
-
-## Framework
-
-* [ ] Next.js `<Image>`
-* [ ] Local images
-* [ ] Remote images
-* [ ] Image URL generation
-* [ ] Optimizer behavior
-* [ ] `fill`
-* [ ] dimensions
-* [ ] loading behavior
-
-## Responsive Delivery
-
-* [ ] `srcset`
-* [ ] `sizes`
-* [ ] DPR
-* [ ] candidate selection
-* [ ] art direction
-* [ ] `<picture>`
-
-## Transformation
-
-* [ ] resize
-* [ ] crop
-* [ ] format conversion
-* [ ] compression
-* [ ] quality profiles
-* [ ] transformation caching
-* [ ] precompute vs on-demand
-
-## CDN and Cache
-
-* [ ] cache keys
-* [ ] cache cardinality
-* [ ] immutable URLs
-* [ ] versioning
-* [ ] invalidation
-* [ ] stale content
-* [ ] origin shielding
-* [ ] request coalescing
-
-## Loading and UX
-
-* [ ] lazy loading
-* [ ] critical image priority
-* [ ] LCP
-* [ ] decode
-* [ ] CLS
-* [ ] layout stability
-
-## Accessibility
-
-* [ ] informative images
-* [ ] decorative images
-* [ ] functional images
-* [ ] complex images
-* [ ] alt text
-* [ ] captions
-* [ ] semantic ownership
-
-## Security
-
-* [ ] SSRF
-* [ ] source allowlists
-* [ ] redirect validation
-* [ ] network egress
-* [ ] private images
-* [ ] signed URLs
-* [ ] tenant isolation
-* [ ] transformation abuse
-* [ ] resource limits
-* [ ] SVG security
-
-## Observability
-
-* [ ] RUM
-* [ ] Resource Timing
-* [ ] LCP measurement
-* [ ] cache metrics
-* [ ] transformation metrics
-* [ ] origin metrics
-* [ ] error taxonomy
-* [ ] tracing
-* [ ] performance budgets
-* [ ] regression detection
+* [ ] Unit tests
+* [ ] Component tests
+* [ ] Integration tests
+* [ ] E2E tests
+* [ ] Responsive image tests
+* [ ] Accessibility tests
+* [ ] Security tests
+* [ ] Visual regression tests
+* [ ] Synthetic performance tests
+* [ ] RUM verification
 
 ---
 
-# 76. Final Senior-Level Mental Model
+# 60. Core Invariants
 
-The most important conclusion of KPI 10 is:
-
-> **An image is not merely a file rendered by the browser. In a production application, it is a derived representation of a content resource that passes through semantic, transformation, responsive-selection, caching, security, delivery, rendering, and observability systems.**
-
-Therefore:
+These are the invariants you should be able to recall during an SDE-2 interview.
 
 ```text
-Image Optimization
-        ↓
-not merely
-        ↓
-"make images smaller"
+image resource
+≠
+image representation
 ```
 
-Instead:
+```text
+source asset
+≠
+delivery asset
+```
 
 ```text
-Image Optimization
+resource identity
+≠
+representation identity
+```
+
+```text
+srcset
 =
-Representation Engineering
-+
-Delivery Engineering
-+
-Browser Performance
-+
-Accessibility
-+
-Security
-+
-Observability
-+
-Operational Scalability
+candidate representations
 ```
 
-The final architecture should preserve this chain:
-
 ```text
-CONTENT
-  ↓
-RESOURCE
-  ↓
-SEMANTIC MEANING
-  ↓
-REPRESENTATION
-  ↓
-TRANSFORMATION
-  ↓
-CACHE
-  ↓
-DELIVERY
-  ↓
-BROWSER
-  ↓
-USER EXPERIENCE
-  ↓
-TELEMETRY
-  ↓
-ENGINEERING DECISION
-```
-
-And the ultimate invariant is:
-
-```text
-Correct representation
-+
-correct semantics
-+
-correct security boundary
-+
-appropriate delivery
-+
-measurable performance
+sizes
 =
-production-grade image architecture
+expected rendered width
 ```
 
-**KPI 10 — Image Optimization is complete.**
+```text
+browser
+=
+final responsive candidate selector
+```
+
+```text
+resolution switching
+≠
+art direction
+```
+
+```text
+resize
+≠
+compression
+```
+
+```text
+format selection
+≠
+quality selection
+```
+
+```text
+cache hit
+≠
+complete performance
+```
+
+```text
+CDN latency
+≠
+browser rendering latency
+```
+
+```text
+compressed bytes
+≠
+decoded memory
+```
+
+```text
+HTTPS
+≠
+trusted remote destination
+```
+
+```text
+private image
+→
+authorization + cache isolation
+```
+
+```text
+more variants
+→
+more cache cardinality
+```
+
+```text
+transformation
+=
+compute workload
+```
+
+```text
+image security
+=
+network security
++
+content security
++
+resource security
+```
+
+```text
+visual correctness
+≠
+semantic correctness
+```
+
+```text
+synthetic performance
+≠
+real-user performance
+```
+
+```text
+optimization
+without observability
+=
+unverified optimization
+```
+
+---
+
+# 61. Final Senior-Level Mental Model
+
+The entire KPI can now be represented as:
+
+```text
+                         IMAGE ASSET
+                              │
+                              ↓
+                       SEMANTIC MODEL
+                              │
+              ┌───────────────┴───────────────┐
+              ↓                               ↓
+       ACCESSIBILITY                     DELIVERY
+          SEMANTICS                       POLICY
+              │                               │
+              └───────────────┬───────────────┘
+                              ↓
+                        REPRESENTATION
+                              │
+                              ↓
+                       TRANSFORMATION
+                              │
+                ┌─────────────┴─────────────┐
+                ↓                           ↓
+           FORMAT/QUALITY              DIMENSIONS
+                │                           │
+                └─────────────┬─────────────┘
+                              ↓
+                      RESPONSIVE SYSTEM
+                       srcset + sizes
+                              │
+                              ↓
+                         CACHE / CDN
+                              │
+                              ↓
+                           BROWSER
+                              │
+                 ┌────────────┼────────────┐
+                 ↓            ↓            ↓
+              REQUEST       DECODE       LAYOUT
+                 │            │            │
+                 └────────────┼────────────┘
+                              ↓
+                            PAINT
+                              │
+                              ↓
+                         USER EXPERIENCE
+                              │
+              ┌───────────────┼───────────────┐
+              ↓               ↓               ↓
+          PERFORMANCE      SECURITY      ACCESSIBILITY
+              │               │               │
+              └───────────────┼───────────────┘
+                              ↓
+                       OBSERVABILITY
+                              │
+                              ↓
+                           TESTING
+                              │
+                              ↓
+                         OPERATIONS
+```
+
+The senior-level abstraction is:
+
+> **An image system is a representation platform that transforms canonical assets into context-appropriate, secure, cacheable, accessible and performant delivery representations, while providing enough observability and testing to continuously verify that those representations remain correct in production.**
+
+---
+
+# 62. KPI 10 Completion
+
+With this capstone, the complete KPI 10 architecture is:
+
+```text
+Part 01
+Image Optimization Mental Model & Delivery Architecture
+        ↓
+Part 02
+Next.js <Image> Architecture & Rendering Mechanics
+        ↓
+Part 03
+Responsive Images, srcset, sizes & Art Direction
+        ↓
+Part 04
+Image Formats, Compression, Quality & Transformation
+        ↓
+Part 05
+Image CDN, Caching, Invalidation & Delivery
+        ↓
+Part 06
+Image Loading, Priority, Lazy Loading & LCP
+        ↓
+Part 07
+Image Accessibility, Semantics & Content Architecture
+        ↓
+Part 08
+Image Security, Remote Sources & Abuse Prevention
+        ↓
+Part 09
+Image Observability, Testing & Production Performance
+        ↓
+Part 10
+Production Image Optimization Architecture Capstone
+```
+
+**KPI 10 is now complete.**

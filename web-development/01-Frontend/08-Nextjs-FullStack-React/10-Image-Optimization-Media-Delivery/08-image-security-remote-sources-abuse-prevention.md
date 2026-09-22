@@ -1,2325 +1,2151 @@
-# Level 08 — KPI 10 — Part 08
+# Level 08 — Next.js & Full-Stack React
 
-## Image Security, Remote Sources & Abuse Prevention
+## KPI 10 — Image Optimization
+
+# Part 08 — Image Security, Remote Sources & Abuse Prevention
 
 ---
 
-# 1. Part Objective
+## 1. Part Objective
 
-Image optimization is not only a performance problem.
-
-Once an application accepts images from:
-
-* remote domains
-* users
-* third-party systems
-* CMS platforms
-* tenant-controlled sources
-* dynamically generated URLs
-
-the image pipeline becomes a **security-sensitive resource delivery system**.
-
-The core question is:
-
-> **How do you allow useful image sources and transformations without allowing the image system to become an SSRF, abuse, data-leakage, bandwidth-exhaustion, or cross-tenant security boundary failure?**
-
-The architecture must protect:
+Image optimization systems frequently introduce a server-side image-fetching and transformation pipeline:
 
 ```text
-Remote Fetching
-Image Transformation
-CDN Delivery
-Authorization
-Tenant Isolation
-Resource Consumption
-Content Integrity
+User Request
+    ↓
+Image URL
+    ↓
+Image Optimizer / Proxy
+    ↓
+Remote Source
+    ↓
+Fetch
+    ↓
+Transform
+    ↓
+Cache
+    ↓
+Response
 ```
 
-The central model is:
+That architecture creates a security boundary.
+
+The central senior-level question is not:
+
+> “Can we optimize remote images?”
+
+It is:
+
+> **Which image sources are trusted, which requests are allowed, what resources may the image service access, and how do we prevent image processing from becoming an SSRF, resource-exhaustion, data-leakage, or cache-abuse primitive?**
+
+The core model is:
 
 ```text
-User / CMS / Application
-        ↓
-Image Source
-        ↓
-Source Validation
-        ↓
-Authorization / Trust Boundary
-        ↓
-Image Fetch / Transformation
-        ↓
-Caching
-        ↓
-CDN Delivery
-        ↓
+Remote Image Optimization
+=
+Input Validation
++
+Source Trust
++
+Network Isolation
++
+Resource Limits
++
+Content Validation
++
+Cache Isolation
++
+Abuse Prevention
++
+Observability
+```
+
+---
+
+# 2. Image Optimization Is a Server-Side Security Boundary
+
+A browser normally fetches:
+
+```text
 Browser
+   ↓
+Image CDN
 ```
 
----
-
-# 2. The Fundamental Security Mental Model
-
-An image URL may look like ordinary content:
+But an image optimization service can instead perform:
 
 ```text
-https://cdn.example.com/photo.jpg
+Browser
+   ↓
+Your Image Service
+   ↓
+Remote URL
 ```
 
-but if the server or image optimizer fetches that URL, the URL becomes an instruction to perform a network request.
+The server is now making a network request based partly on user-controlled input.
 
-Therefore:
+That changes the threat model.
+
+The system must treat:
 
 ```text
 remote image URL
-=
-potential server-side network operation
 ```
 
-This changes the security model.
-
-A frontend engineer must distinguish:
-
-```text
-browser fetch
-```
-
-from:
-
-```text
-server-side image fetch
-```
-
-because the latter introduces server-side trust and network-security concerns.
+as **untrusted input**.
 
 ---
 
-# 3. Browser Fetch vs Server Fetch
+# 3. Remote Image Threat Model
 
-Consider:
-
-```text
-<img src="https://external.example/image.jpg">
-```
-
-The browser requests the resource.
-
-The server does not necessarily fetch it.
-
-Now consider an image optimization system that receives:
+A remote image request can potentially involve:
 
 ```text
-/image-proxy?url=https://external.example/image.jpg
+User-controlled URL
+        ↓
+Image Optimizer
+        ↓
+Server-side HTTP client
+        ↓
+Internet / private network / internal service
 ```
 
-The server may perform:
+Potential threats include:
 
-```text
-Server
-  ↓
-external.example
-```
-
-That means the image optimizer becomes a network client.
-
-This distinction is fundamental.
-
----
-
-# 4. The Image Optimizer as a Trust Boundary
-
-A remote image optimization service may perform:
-
-```text
-URL parsing
-DNS resolution
-HTTP connection
-redirect handling
-content download
-image decoding
-image transformation
-cache storage
-response delivery
-```
-
-Each operation introduces potential attack surface.
+* SSRF
+* internal network access
+* metadata-service access
+* port scanning
+* DNS rebinding
+* redirect abuse
+* excessive downloads
+* oversized images
+* decompression bombs
+* malicious file formats
+* malicious SVG content
+* cache poisoning
+* bandwidth abuse
+* transformation CPU exhaustion
+* cross-tenant data leakage
 
 Therefore:
 
 ```text
-Image Optimizer
-=
-performance infrastructure
+image optimization
+≠
+just media processing
+```
+
+It is also:
+
+```text
+network security
 +
-security-sensitive network service
+resource security
++
+content security
 ```
 
 ---
 
-# 5. SSRF Risk
+# 4. SSRF
 
-One of the most important risks is **Server-Side Request Forgery (SSRF)**.
-
-An attacker may attempt to cause the image service to request an internal resource.
+**Server-Side Request Forgery (SSRF)** occurs when an attacker can cause a server to make a request to an unintended destination.
 
 Conceptually:
 
 ```text
 Attacker
    ↓
-malicious image URL
+Image URL
    ↓
-Image optimizer
+Image Optimizer
    ↓
-Internal network
+Internal Resource
 ```
 
-The attacker may try to reach:
+Potential targets could include:
 
 ```text
 localhost
 private IP ranges
-internal services
+internal DNS names
 cloud metadata endpoints
-administrative interfaces
+internal administrative services
 ```
 
-The exact exploit depends on infrastructure, but the architectural problem is general:
+The dangerous assumption is:
 
-> **A server-side URL fetcher must not treat arbitrary user-controlled URLs as trusted network destinations.**
+> “It is only an image URL.”
+
+The image service is still a server-side HTTP client.
 
 ---
 
-# 6. Remote Source Allowlisting
+# 5. Why SSRF Is Especially Relevant to Image Optimizers
 
-A safer architecture begins with explicit source policy.
-
-Instead of:
+Suppose an endpoint conceptually accepts:
 
 ```text
-accept any URL
+/image?url=<remote-url>
 ```
 
-use:
+The attacker controls:
 
 ```text
-accepted image sources
-=
-approved domains / patterns
+<remote-url>
 ```
 
-For example:
+If the optimizer blindly performs:
 
 ```text
-cdn.example.com
-images.partner.example
-media.example.org
+fetch(url)
 ```
 
-The principle is:
+then the optimizer becomes a proxy for arbitrary network access.
+
+The correct architecture is closer to:
 
 ```text
-remote image source
-→
-trusted-source policy
-→
-fetch
-```
-
-rather than:
-
-```text
-remote image source
-→
-blind fetch
-```
-
----
-
-# 7. Why Domain Validation Alone Can Be Insufficient
-
-A naive check might be:
-
-```text
-URL hostname endsWith("example.com")
-```
-
-This can be dangerous if implemented incorrectly.
-
-For example:
-
-```text
-attacker-example.com
-```
-
-might accidentally satisfy a poorly designed suffix check.
-
-Validation must operate on parsed URL components and exact trust rules.
-
-Conceptually:
-
-```text
+Request
+  ↓
 Parse URL
-   ↓
-Validate protocol
-   ↓
+  ↓
+Validate scheme
+  ↓
 Validate hostname
-   ↓
+  ↓
 Validate port
-   ↓
-Validate path/policy
-   ↓
+  ↓
+Resolve DNS
+  ↓
+Validate resolved address
+  ↓
+Apply redirect policy
+  ↓
 Fetch
 ```
 
 ---
 
-# 8. Protocol Restrictions
+# 6. URL Scheme Validation
 
-An image pipeline should generally define which protocols are acceptable.
+Do not automatically allow arbitrary schemes.
 
-The security boundary should not simply accept arbitrary schemes.
-
-The application should explicitly determine:
-
-```text
-Allowed protocol
-Allowed hostname
-Allowed port
-Allowed path
-```
-
-The important principle is:
-
-> **Input validation should be based on an explicit allowlist rather than accepting whatever URL representation happens to parse.**
-
----
-
-# 9. Redirect Security
-
-Even if the initial URL is trusted:
-
-```text
-https://trusted.example/image.jpg
-```
-
-the server may receive:
-
-```text
-302 → https://untrusted.example/image.jpg
-```
-
-Therefore remote fetching must consider redirect behavior.
-
-The effective destination is not necessarily the initial destination.
-
-Architecture:
-
-```text
-Initial URL
-    ↓
-Redirect
-    ↓
-Final URL
-```
-
-The system must decide whether redirects are:
-
-```text
-allowed
-restricted
-revalidated
-disabled
-```
-
----
-
-# 10. Redirect Revalidation
-
-A particularly important rule is:
-
-```text
-trusted initial host
-≠
-automatically trusted final host
-```
-
-If redirects are allowed, the destination should continue to satisfy the source security policy.
-
-Otherwise:
-
-```text
-trusted.example
-       ↓
-attacker.example
-```
-
-could bypass the initial hostname restriction.
-
----
-
-# 11. Private Network Access
-
-An image service should be careful about fetching resources from private or internal network locations.
-
-Conceptually:
-
-```text
-Public Internet
-      ↓
-Image Fetcher
-      ↓
-Private Network
-```
-
-can create an unintended bridge.
-
-The system should establish explicit network egress policy.
-
-This is an infrastructure concern as much as an application concern.
-
----
-
-# 12. DNS Rebinding Considerations
-
-Hostname validation and network destination validation can become complicated when DNS is involved.
-
-Conceptually:
-
-```text
-trusted.example
-      ↓
-DNS resolution
-      ↓
-IP address
-```
-
-The security decision should not assume that a hostname's meaning is permanently fixed.
-
-Production systems may need controls around:
-
-```text
-DNS resolution
-private IP ranges
-redirects
-connection establishment
-network egress
-```
-
-The exact implementation depends on the image service and infrastructure.
-
----
-
-# 13. Resource Exhaustion
-
-Security is not only about unauthorized access.
-
-An attacker may attempt to consume:
-
-```text
-CPU
-Memory
-Bandwidth
-Storage
-Transformation capacity
-Connection pools
-CDN capacity
-```
+An image fetcher should generally establish an explicit allowlist of supported schemes.
 
 For example:
 
 ```text
-Attacker
-  ↓
-millions of unique image URLs
-  ↓
-cache misses
-  ↓
-image transformations
-  ↓
-origin CPU exhaustion
+Allowed:
+https
+
+Potentially allowed depending on architecture:
+http
 ```
 
-This is an image-specific denial-of-service pattern.
+Anything outside the intended scheme set should be rejected.
+
+The important principle is:
+
+```text
+allowlist
+>
+blocklist
+```
+
+when defining acceptable remote sources.
 
 ---
 
-# 14. Transformation Abuse
+# 7. Host Allowlisting
 
-Suppose an image endpoint supports:
+One strong architecture is to permit only known image hosts.
+
+For example:
 
 ```text
-width
-height
-quality
-format
-crop
-fit
+images.example.com
+cdn.example.com
+media.partner.com
 ```
 
-An attacker may generate many unique combinations:
+Conceptually:
 
 ```text
-width=101
-width=102
-width=103
-...
+Remote Host
+    ↓
+Allowed?
+ ┌──┴──┐
+YES    NO
+ ↓      ↓
+Fetch  Reject
+```
+
+This dramatically reduces the SSRF attack surface.
+
+A broad policy such as:
+
+```text
+any HTTPS URL
+```
+
+creates a much larger security boundary.
+
+---
+
+# 8. Hostname Validation Is Not Enough
+
+Checking the hostname string alone may not be sufficient.
+
+Consider:
+
+```text
+attacker.example
+```
+
+resolving to:
+
+```text
+private IP
+```
+
+or a hostname whose DNS result changes after validation.
+
+Therefore the system may need to validate:
+
+```text
+hostname
++
+DNS resolution
++
+resolved IP
+```
+
+The security decision must apply to the actual network destination.
+
+---
+
+# 9. Private and Loopback Addresses
+
+Image fetchers should generally prevent access to unintended internal address ranges.
+
+Examples of sensitive destinations include:
+
+```text
+127.0.0.1
+localhost
+private RFC1918 ranges
+link-local addresses
+internal service ranges
+cloud metadata endpoints
+```
+
+The exact blocked ranges depend on the network architecture.
+
+The principle is:
+
+```text
+public image fetcher
+→
+should not become internal network proxy.
+```
+
+---
+
+# 10. DNS Rebinding
+
+A more sophisticated attack involves changing DNS resolution.
+
+Conceptually:
+
+```text
+Step 1
+attacker-domain.com
+→ public IP
+
+Step 2
+validation passes
+
+Step 3
+DNS changes
+→ private IP
+
+Step 4
+server connects
+→ internal resource
+```
+
+Therefore security cannot always depend on a single superficial hostname check.
+
+A production design must consider:
+
+```text
+DNS resolution
++
+connection destination
++
+redirect behavior
++
+network isolation
+```
+
+---
+
+# 11. Redirect Abuse
+
+Suppose:
+
+```text
+Allowed URL
+   ↓
+302 redirect
+   ↓
+Internal URL
+```
+
+If the optimizer follows redirects blindly, an apparently valid initial URL can lead to an unintended destination.
+
+Therefore redirect handling must be part of the trust model.
+
+Possible policies include:
+
+```text
+no redirects
 ```
 
 or:
 
 ```text
-quality=1
-quality=2
-quality=3
-...
-```
-
-Each combination can create a distinct transformation.
-
-Therefore:
-
-```text
-transformation flexibility
-↑
-cache cardinality
-↑
-compute cost
-```
-
----
-
-# 15. Constrain Transformation Parameters
-
-Production systems should define supported transformation values.
-
-For example:
-
-```text
-Allowed widths:
-320
-640
-768
-1024
-1280
-1536
-1920
-```
-
-rather than accepting every integer.
-
-Similarly:
-
-```text
-Allowed quality profiles:
-low
-medium
-high
-```
-
-may be preferable to:
-
-```text
-quality=0...100
-```
-
-when the application does not need arbitrary quality control.
-
----
-
-# 16. Transformation Identity
-
-A transformed image can be modeled as:
-
-```text
-Representation =
-(
-  source,
-  width,
-  height,
-  format,
-  quality,
-  crop,
-  version
-)
-```
-
-Every additional dimension can multiply the number of possible cached representations.
-
-Therefore:
-
-```text
-variant dimensions
-→
-cache cardinality
-```
-
-This is both a performance and security consideration.
-
----
-
-# 17. Cache Cardinality as an Attack Surface
-
-Suppose:
-
-```text
-1 source image
-×
-1000 widths
-×
-100 formats
-×
-100 qualities
-```
-
-creates a huge theoretical representation space.
-
-Even if most combinations are never used, an attacker can intentionally request unusual variants.
-
-The result can be:
-
-```text
-cache fragmentation
+limited redirects
 +
-transformation work
-+
-storage growth
-+
-origin load
+revalidate every destination
 ```
 
-Therefore transformation APIs should expose only necessary dimensions.
-
----
-
-# 18. Cache Key Poisoning
-
-An image system must ensure that the cache key accurately represents the response.
-
-Suppose:
+The key invariant is:
 
 ```text
-same cache key
-```
-
-can produce different responses based on:
-
-```text
-authentication
-tenant
-locale
-format negotiation
-authorization
-```
-
-then one user may receive content generated for another context.
-
-This is a severe correctness and security failure.
-
-The invariant is:
-
-```text
-same cache key
-→
-same representation semantics
-```
-
----
-
-# 19. Tenant Isolation
-
-Consider a multi-tenant application:
-
-```text
-tenant-a.example
-tenant-b.example
-```
-
-Both request:
-
-```text
-/image?id=123
-```
-
-If the cache key is only:
-
-```text
-id=123
-```
-
-then the cache may accidentally share representations between tenants.
-
-A safer model may include:
-
-```text
-tenant identity
-+
-asset identity
-+
-representation identity
-```
-
-when tenant context actually affects the response.
-
----
-
-# 20. Cross-Tenant Leakage
-
-A dangerous flow:
-
-```text
-Tenant A
-  ↓
-image request
-  ↓
-cache
-  ↓
-Tenant B
-  ↓
-same cache key
-```
-
-Potential result:
-
-```text
-Tenant B receives Tenant A's asset
-```
-
-This is not merely a cache bug.
-
-It is a data-isolation failure.
-
-Therefore:
-
-```text
-cache architecture
-=
-security architecture
-```
-
-when protected or tenant-specific content is involved.
-
----
-
-# 21. Public vs Private Images
-
-Not every image should be treated as public.
-
-Useful classifications include:
-
-```text
-Public
-Authenticated
-Tenant-private
-User-private
-Temporary
-Sensitive
-```
-
-The delivery architecture should know which class applies.
-
-For example:
-
-```text
-public marketing image
-```
-
-can generally use aggressive shared caching.
-
-A:
-
-```text
-private user document preview
-```
-
-requires a very different security model.
-
----
-
-# 22. Authentication Does Not Automatically Make an Image Safe
-
-A common mistake is:
-
-```text
-request requires authentication
-→
-therefore cache is safe
-```
-
-Not necessarily.
-
-If an authenticated image response is stored in a shared cache without proper cache isolation, another authenticated user could potentially receive it.
-
-The important distinction is:
-
-```text
-authentication
+trusted initial URL
 ≠
-cache isolation
+automatically trusted redirect target
 ```
 
 ---
 
-# 23. Personalized Images
+# 12. Port Restrictions
 
-Consider:
+A URL can specify a port:
 
 ```text
-/avatar/current
+https://example.com:8443/image.jpg
 ```
 
-where the response depends on:
+If arbitrary ports are allowed, the optimizer may become a network probing mechanism.
+
+Therefore a production image fetcher should explicitly define:
 
 ```text
-user identity
-```
-
-A shared cache must not accidentally serve:
-
-```text
-User A avatar
-```
-
-to:
-
-```text
-User B
-```
-
-The cache key and caching policy must reflect the response's privacy model.
-
----
-
-# 24. Authorization Before Transformation
-
-A secure flow for private images is often conceptually:
-
-```text
-Request
-  ↓
-Authenticate
-  ↓
-Authorize asset access
-  ↓
-Resolve source
-  ↓
-Transform
-  ↓
-Deliver
-```
-
-not:
-
-```text
-Request
-  ↓
-Transform public-looking URL
-  ↓
-Authorize later
-```
-
-Authorization must protect access to the underlying resource.
-
----
-
-# 25. Signed URLs
-
-For private or controlled image delivery, systems may use signed URLs.
-
-Conceptually:
-
-```text
-asset
+allowed schemes
 +
-expiration
+allowed hosts
 +
-policy
-+
-signature
+allowed ports
 ```
 
-produces:
-
-```text
-temporary authorized URL
-```
-
-The server or CDN verifies:
-
-```text
-signature valid?
-not expired?
-resource allowed?
-transformation allowed?
-```
-
-This allows controlled delivery without exposing permanent authorization credentials.
+rather than accepting arbitrary combinations.
 
 ---
 
-# 26. Signed URL Design
+# 13. Network Isolation
 
-A signature may conceptually cover:
+Application-level validation should not be the only security layer.
 
-```text
-path
-expiry
-transformation parameters
-tenant
-resource ID
-```
-
-This matters because otherwise an attacker might take a valid signed URL and alter:
+A stronger architecture adds network controls:
 
 ```text
-width
-format
-resource
-tenant
-```
-
-without invalidating the signature.
-
-The security invariant is:
-
-```text
-authorization covers the representation being requested
-```
-
----
-
-# 27. Expiration
-
-Temporary image URLs should have explicit lifetime semantics.
-
-For example:
-
-```text
-issued:
-12:00
-
-expires:
-13:00
-```
-
-After expiration:
-
-```text
-request
-→
-authorization failure
-```
-
-The appropriate duration depends on:
-
-```text
-security sensitivity
-user experience
-caching strategy
-sharing requirements
-```
-
----
-
-# 28. Signed URLs and Caching
-
-Signed URLs create an architectural interaction with caching.
-
-Suppose every URL contains:
-
-```text
-timestamp
-signature
-```
-
-Then:
-
-```text
-same image
-→
-many URLs
-→
-many cache keys
-```
-
-This can reduce cache reuse.
-
-Therefore secure delivery must balance:
-
-```text
-authorization
-+
-URL stability
-+
-cache efficiency
-```
-
----
-
-# 29. Do Not Put Sensitive Data in Image URLs
-
-URLs can appear in:
-
-```text
-browser history
-logs
-analytics
-referrer data
-CDN logs
-monitoring systems
-```
-
-Therefore sensitive information should not casually be encoded into image URLs.
-
-Avoid putting secrets directly into query parameters.
-
-For example, an authorization design should avoid treating:
-
-```text
-?token=long-lived-secret
-```
-
-as a harmless image parameter.
-
----
-
-# 30. Origin Protection
-
-An image CDN should protect the origin from direct abuse where appropriate.
-
-Conceptually:
-
-```text
+Image Worker
+     ↓
+Restricted Network
+     ↓
 Internet
+```
+
+The image-processing environment should have limited access to:
+
+* internal services
+* databases
+* control planes
+* metadata endpoints
+* private network segments
+
+This creates defense in depth.
+
+---
+
+# 14. Least-Privilege Network Architecture
+
+The image processor should not need:
+
+```text
+full internal network access
+```
+
+if its actual responsibility is:
+
+```text
+fetch public images
+transform images
+store/cache results
+```
+
+Therefore:
+
+```text
+minimum network access
+```
+
+is preferable.
+
+This follows the same principle as application authorization:
+
+```text
+least privilege
+```
+
+---
+
+# 15. Request Timeouts
+
+A remote server may accept a connection and respond extremely slowly.
+
+Without timeouts:
+
+```text
+Image Request
    ↓
-CDN
+Remote server hangs
    ↓
-Image Origin
+Worker remains occupied
+   ↓
+Concurrency consumed
 ```
 
-The goal may be:
+Eventually:
 
 ```text
-public users → CDN
+worker pool exhausted
 ```
 
-rather than:
+Therefore remote image fetching should have bounded:
 
-```text
-public users → origin directly
-```
+* connection timeout
+* response timeout
+* total request timeout
 
-This improves:
-
-```text
-security
-+
-origin protection
-+
-traffic control
-```
+The exact values depend on the workload and infrastructure.
 
 ---
 
-# 31. Origin Access Controls
+# 16. Response Size Limits
 
-Depending on architecture, the origin may accept requests only from:
+An attacker can provide a URL that returns enormous content.
 
-```text
-trusted CDN
-private network
-specific service identity
-authenticated backend
-```
-
-This reduces bypass opportunities.
-
-Otherwise an attacker might bypass:
+For example:
 
 ```text
-CDN rate limits
-WAF
-authentication
-caching policy
+/image?url=attacker.example/huge-file
 ```
 
-by calling the origin directly.
+Even if the file eventually turns out not to be an image, downloading gigabytes before rejecting it is already an abuse problem.
+
+Therefore enforce:
+
+```text
+maximum response bytes
+```
+
+before allowing unbounded download.
 
 ---
 
-# 32. Rate Limiting
+# 17. Content-Type Validation
 
-Image endpoints are attractive abuse targets because they can consume substantial resources.
-
-Rate limiting may be applied at several layers:
+Do not trust only:
 
 ```text
-Edge
- ↓
-API
- ↓
-Image optimizer
- ↓
-Origin
-```
-
-Possible dimensions include:
-
-```text
-IP
-user
-tenant
-API key
-asset
-endpoint
-transformation profile
-```
-
----
-
-# 33. Rate Limiting Alone Is Not Enough
-
-Suppose an attacker rotates IP addresses.
-
-IP-based rate limiting alone may be ineffective.
-
-A more complete strategy may combine:
-
-```text
-IP limits
-+
-identity limits
-+
-tenant limits
-+
-request complexity limits
-+
-cache controls
-+
-origin protection
-```
-
-Security is a system, not one middleware check.
-
----
-
-# 34. Request Complexity Limits
-
-A useful concept for transformation APIs is:
-
-```text
-request cost
+URL extension
 ```
 
 For example:
 
 ```text
-4000 × 4000 AVIF conversion
+image.jpg
 ```
 
-may be substantially more expensive than:
+does not prove that the response is actually a JPEG.
+
+The server should consider:
 
 ```text
-320 × 320 JPEG
+HTTP Content-Type
++
+actual file signature / parsing
 ```
 
-A system can therefore classify transformations by computational cost.
+where appropriate.
 
-Conceptually:
-
-```text
-cheap
-medium
-expensive
-```
-
-and enforce policies accordingly.
-
----
-
-# 35. Pixel Bomb / Decompression Risk
-
-An image can have relatively small compressed size but expand into a huge in-memory representation when decoded.
-
-Conceptually:
+The principle is:
 
 ```text
-small compressed file
-       ↓
-decode
-       ↓
-massive pixel buffer
-```
-
-This can create:
-
-```text
-memory exhaustion
-CPU exhaustion
-```
-
-Therefore secure image processing should impose limits on:
-
-```text
-maximum dimensions
-maximum decoded pixels
-maximum file size
-maximum processing time
+filename
+≠
+trusted content identity
 ```
 
 ---
 
-# 36. File Size Limits
+# 18. MIME Type Confusion
 
-Upload pipelines should not assume:
-
-```text
-"image"
-=
-safe file
-```
-
-A production upload service may enforce:
-
-```text
-maximum compressed bytes
-maximum dimensions
-maximum pixel count
-allowed formats
-maximum animation complexity
-```
-
-These constraints protect downstream processors.
-
----
-
-# 37. MIME Type Validation
-
-A request may claim:
+A malicious response could claim:
 
 ```text
 Content-Type: image/jpeg
 ```
 
-but the actual content may not be JPEG.
+while containing something else.
 
-Therefore security-sensitive systems should distinguish:
+Therefore image processing should validate the actual content before processing or serving it.
 
-```text
-declared MIME type
-```
+This is especially important when handling:
 
-from:
-
-```text
-actual file characteristics
-```
-
-Where appropriate, content inspection should validate that the file is compatible with the processing pipeline.
+* SVG
+* user uploads
+* third-party sources
+* dynamically generated content
 
 ---
 
-# 38. File Extension Is Not Trust
+# 19. Oversized Dimensions
 
-This is unsafe as a security boundary:
-
-```text
-filename.endsWith(".jpg")
-```
-
-An extension is metadata supplied by the client.
-
-Security decisions should be based on validated content and controlled processing.
-
----
-
-# 39. SVG Security
-
-SVG deserves special treatment because it is not merely a raster image.
-
-SVG can contain:
-
-```text
-XML structure
-links
-metadata
-scripts in some contexts
-external references
-```
-
-The security policy should determine whether SVG is:
-
-```text
-allowed
-sanitized
-restricted
-converted
-served with appropriate headers
-```
-
-Do not assume:
-
-```text
-.svg
-=
-harmless static bitmap
-```
-
-It is a different content type with a different threat model.
-
----
-
-# 40. User-Uploaded SVG
-
-A particularly sensitive architecture is:
-
-```text
-User
- ↓
-uploads SVG
- ↓
-application
- ↓
-serves SVG
-```
-
-If the application does not safely handle SVG, user-controlled markup may create security problems.
-
-Therefore a system may choose to:
-
-```text
-reject SVG
-```
-
-or:
-
-```text
-sanitize SVG
-```
-
-or:
-
-```text
-rasterize SVG
-```
-
-depending on requirements.
-
----
-
-# 41. Content Security Policy
-
-When image content can come from multiple sources, the application should define explicit content-loading policy.
-
-Conceptually:
-
-```text
-Browser
-  ↓
-Content Security Policy
-  ↓
-approved image sources
-```
-
-This can reduce unintended resource loading.
-
-The exact policy depends on application architecture.
-
----
-
-# 42. Remote Image Source Governance
-
-A mature system should maintain a source registry.
-
-Conceptually:
-
-```text
-ImageSourceRegistry
-├── hostname
-├── protocol
-├── trust level
-├── allowed paths
-├── tenant scope
-├── transformation policy
-└── expiration/review metadata
-```
-
-This is stronger than scattering domain strings throughout application code.
-
----
-
-# 43. Multi-Tenant Remote Sources
-
-Imagine:
-
-```text
-Tenant A → partner-a.example
-Tenant B → partner-b.example
-```
-
-The system should ensure:
-
-```text
-Tenant A cannot arbitrarily configure
-Tenant B's trusted source policy.
-```
-
-Therefore tenant configuration itself becomes security-sensitive data.
-
-The architecture must validate:
-
-```text
-tenant ownership
-+
-source authorization
-+
-domain policy
-```
-
----
-
-# 44. Custom Domains
-
-Custom domains create another trust challenge.
-
-Suppose a tenant configures:
-
-```text
-images.tenant-custom-domain.com
-```
-
-The platform should not automatically assume every tenant-controlled domain is safe to use as a server-side fetch target.
-
-Domain ownership and source policy may need explicit verification.
-
----
-
-# 45. Image Proxy Abuse
-
-A generic endpoint such as:
-
-```text
-/image-proxy?url=...
-```
-
-can accidentally become a general-purpose HTTP proxy.
-
-That is dangerous.
-
-A secure image proxy should remain constrained to:
-
-```text
-approved image sources
-approved transformations
-approved protocols
-approved content types
-```
-
-The endpoint should not become:
-
-```text
-arbitrary URL fetcher
-```
-
----
-
-# 46. Cache Poisoning
-
-Suppose an attacker causes:
-
-```text
-malicious response
-```
-
-to be cached under a key later used by legitimate users.
-
-Potential consequences include:
-
-```text
-wrong image
-malicious content
-cross-user response
-```
-
-Therefore cache architecture must validate:
-
-```text
-cache key correctness
-response content
-source trust
-variation dimensions
-```
-
-before shared caching.
-
----
-
-# 47. Content-Type Safety
-
-The delivery system should ensure that the response is served with an appropriate content type.
+A compressed image can contain enormous dimensions.
 
 For example:
 
 ```text
-JPEG → image/jpeg
-PNG → image/png
-WebP → image/webp
-AVIF → image/avif
+20000 × 20000 pixels
 ```
 
-A server should not blindly preserve attacker-controlled content types when they can alter browser interpretation.
+even if the compressed file appears relatively small.
 
----
+Decoding such an image can consume huge amounts of memory.
 
-# 48. Content-Disposition
-
-For downloadable user-controlled content, response behavior may differ from inline rendering.
-
-The application should intentionally decide whether a resource should be:
+Therefore image processing should enforce:
 
 ```text
-inline
-downloaded
+maximum width
+maximum height
+maximum pixel count
 ```
 
-This becomes particularly relevant when serving files that may contain active or unexpected content.
-
----
-
-# 49. Authorization and Cache Layers
-
-The complete security model should be:
+not merely:
 
 ```text
-                 REQUEST
-                    │
-                    ▼
-             Authentication
-                    │
-                    ▼
-              Authorization
-                    │
-                    ▼
-             Source Resolution
-                    │
-                    ▼
-          Transformation Policy
-                    │
-                    ▼
-               Cache Policy
-                    │
-                    ▼
-               CDN Delivery
-```
-
-The important principle is:
-
-> **A cache must not silently bypass the authorization model.**
-
----
-
-# 50. Public Image Architecture
-
-For public images:
-
-```text
-User
- ↓
-CDN
- ↓
-Cache
- ↓
-Image Origin
-```
-
-Typical characteristics:
-
-```text
-shared cache
-long TTL
-versioned URLs
-broad geographic distribution
-high origin offload
-```
-
-Security focus:
-
-```text
-source integrity
-abuse prevention
-cache poisoning
-origin protection
+maximum compressed file size
 ```
 
 ---
 
-# 51. Private Image Architecture
+# 20. Decompression Bombs
 
-For private images:
+A decompression bomb exploits the difference between:
 
 ```text
-User
- ↓
-Authentication
- ↓
+compressed representation
+```
+
+and:
+
+```text
+decoded representation
+```
+
+For example:
+
+```text
+small compressed file
+        ↓
+massive decoded pixel buffer
+```
+
+The result can be:
+
+```text
+memory exhaustion
+CPU exhaustion
+worker crashes
+```
+
+Therefore resource limits must apply to the decoded representation as well.
+
+---
+
+# 21. CPU Exhaustion
+
+Some transformations are computationally expensive.
+
+Examples include:
+
+```text
+large resize
+AVIF encoding
+complex image processing
+animated-image processing
+multiple format conversions
+```
+
+An attacker could intentionally request expensive transformations.
+
+For example:
+
+```text
+width=8000
+format=expensive-format
+quality=maximum
+```
+
+If accepted without limits:
+
+```text
+CPU usage ↑
+```
+
+Therefore transformation parameters must be constrained.
+
+---
+
+# 22. Transformation Allowlisting
+
+Instead of accepting arbitrary transformations:
+
+```text
+width=1237
+height=928
+quality=93
+rotation=37
+filter=...
+```
+
+a production system can define allowed transformations.
+
+For example:
+
+```text
+width:
+320
+640
+1024
+1536
+
+quality:
+60
+75
+85
+
+format:
+webp
+avif
+```
+
+This provides:
+
+```text
+predictability
++
+cache efficiency
++
+resource control
+```
+
+---
+
+# 23. Cache Cardinality and Abuse
+
+Part 05 established:
+
+```text
+more variants
+→
+higher cache cardinality
+```
+
+An attacker can exploit this by generating many unique image URLs:
+
+```text
+?w=1
+?w=2
+?w=3
+...
+?w=100000
+```
+
+Each request can create:
+
+```text
+cache miss
++
+transformation
++
+new cache object
+```
+
+This becomes an application-layer resource exhaustion attack.
+
+Therefore:
+
+```text
+transformation validation
++
+rate limiting
++
+variant allowlists
+```
+
+should work together.
+
+---
+
+# 24. Rate Limiting
+
+Image transformation endpoints can be expensive.
+
+Rate limiting can be applied by:
+
+```text
+IP
+API identity
+user
+tenant
+source host
+route
+transformation type
+```
+
+For example:
+
+```text
+anonymous user
+→
+limited transformations/minute
+
+authenticated tenant
+→
+higher quota
+
+trusted internal service
+→
+different policy
+```
+
+The exact model depends on the product.
+
+---
+
+# 25. Quotas
+
+Rate limiting controls request frequency.
+
+Quotas control aggregate consumption.
+
+Examples:
+
+```text
+maximum image transformations/day
+maximum generated bytes
+maximum storage
+maximum bandwidth
+maximum CPU time
+```
+
+This is particularly relevant in:
+
+* multi-tenant SaaS
+* user-upload platforms
+* image-heavy applications
+
+---
+
+# 26. Signed URLs
+
+Private image systems may use signed URLs.
+
+Conceptually:
+
+```text
+Image Request
+    ↓
+Signed URL
+    ↓
+Signature validation
+    ↓
 Authorization
- ↓
-Signed/controlled delivery
- ↓
-Private CDN/object storage
+    ↓
+Serve image
 ```
 
-The system must preserve:
+A signature can encode constraints such as:
 
 ```text
-identity
-+
-resource authorization
-+
-cache isolation
-```
-
-Private content should not accidentally become a shared public representation.
-
----
-
-# 52. Temporary Image Architecture
-
-For temporary images:
-
-```text
-Upload
- ↓
-processing
- ↓
-temporary storage
- ↓
-signed URL
- ↓
+resource
 expiration
- ↓
-deletion
+tenant
+allowed transformation
 ```
 
-This is useful for:
-
-```text
-previews
-exports
-temporary uploads
-verification documents
-generated assets
-```
-
-The lifecycle should be explicit.
+The goal is to prevent arbitrary access to private resources.
 
 ---
 
-# 53. Image Security Lifecycle
+# 27. Signed URL Leakage
 
-A production image can move through:
+A signed URL can function like a credential.
+
+Therefore it should not be casually exposed in:
 
 ```text
-Upload
-  ↓
-Validation
-  ↓
-Scanning / inspection
-  ↓
-Transformation
-  ↓
-Storage
-  ↓
-Authorization
-  ↓
-CDN delivery
-  ↓
-Expiration / deletion
+logs
+analytics
+referrer headers
+error messages
+screenshots
 ```
 
-Each stage has different security responsibilities.
+depending on the system.
+
+The security model should assume:
+
+```text
+signed URL
+≈
+temporary capability
+```
+
+and protect it accordingly.
 
 ---
 
-# 54. Threat Model
+# 28. Private Images and CDN Caching
 
-A useful threat model is:
-
-| Threat                 | Primary control                          |
-| ---------------------- | ---------------------------------------- |
-| SSRF                   | Source allowlist + network egress policy |
-| Open proxy abuse       | Restrict remote sources                  |
-| Cache poisoning        | Correct cache identity                   |
-| Cross-tenant leakage   | Tenant-aware authorization/cache         |
-| Resource exhaustion    | Limits + rate limiting                   |
-| Huge image decode      | Pixel/dimension limits                   |
-| Malicious SVG          | Sanitize/restrict/rasterize              |
-| Origin bypass          | CDN/origin access control                |
-| URL abuse              | Validation + signed policies             |
-| Cache explosion        | Constrained transformations              |
-| Private image exposure | Authorization + private caching          |
-| Bandwidth abuse        | Rate limiting + CDN                      |
-| Stale authorization    | Expiring/signed delivery                 |
-
----
-
-# 55. Security and Performance Are Interdependent
-
-Many image security controls also improve performance.
-
-For example:
+Private images require careful interaction between:
 
 ```text
-constrained widths
-```
-
-reduces:
-
-```text
-cache cardinality
+authorization
 +
-transformation cost
-+
-attack surface
-```
-
-Similarly:
-
-```text
 CDN
++
+cache
 ```
 
-provides:
+A dangerous architecture is:
 
 ```text
-origin offload
-+
-traffic absorption
-+
-centralized controls
+User A authorized
+ ↓
+CDN caches response publicly
+ ↓
+User B requests same URL
+ ↓
+User B receives User A's image
 ```
 
 Therefore:
 
 ```text
-security architecture
-↔
-performance architecture
+private representation
+→
+private cache policy
 ```
 
-should not be designed independently.
+must be deliberate.
+
+---
+
+# 29. Tenant Isolation
+
+For multi-tenant systems:
+
+```text
+Tenant A
+   ↓
+Image Service
+   ↓
+Cache
+```
+
+must not collide with:
+
+```text
+Tenant B
+   ↓
+Image Service
+   ↓
+same cache key
+```
+
+Tenant identity may need to participate in:
+
+```text
+authorization
+resource identity
+cache identity
+storage identity
+observability
+```
+
+The core invariant is:
+
+```text
+security boundary
+must align with cache boundary.
+```
+
+---
+
+# 30. SVG Security
+
+SVG is structurally different from ordinary raster images.
+
+SVG can contain:
+
+```text
+XML
+elements
+references
+styles
+potentially active content depending on handling
+```
+
+Therefore arbitrary SVG should not automatically be treated as equivalent to:
+
+```text
+JPEG
+PNG
+WebP
+```
+
+A production architecture should explicitly decide:
+
+```text
+Are user-uploaded SVGs allowed?
+Are they sanitized?
+Are they rasterized?
+Are they served with safe headers?
+```
+
+---
+
+# 31. User-Uploaded Images
+
+User uploads create another trust boundary:
+
+```text
+User
+ ↓
+Upload
+ ↓
+Storage
+ ↓
+Validation
+ ↓
+Processing
+ ↓
+Delivery
+```
+
+Validation may include:
+
+* file size
+* MIME type
+* file signature
+* dimensions
+* pixel count
+* format
+* animation properties
+* malicious content checks
+
+Do not rely solely on:
+
+```text
+filename extension.
+```
+
+---
+
+# 32. Remote Third-Party Sources
+
+A system may allow:
+
+```text
+partner CDN
+CMS
+social platform
+external image host
+```
+
+These sources can fail or behave unexpectedly.
+
+Possible failures:
+
+```text
+slow response
+404
+redirect loop
+invalid MIME type
+huge file
+rate limiting
+TLS problems
+malformed image
+origin outage
+```
+
+Therefore external image sources should be treated as dependencies.
+
+---
+
+# 33. Failure Containment
+
+A remote source should not be able to bring down the application.
+
+For example:
+
+```text
+External Image Host
+       ↓
+timeout
+       ↓
+Image Worker
+       ↓
+fails request
+```
+
+rather than:
+
+```text
+External Image Host
+       ↓
+hangs
+       ↓
+all image workers blocked
+       ↓
+application degradation
+```
+
+This requires:
+
+* bounded timeouts
+* concurrency limits
+* circuit breakers where appropriate
+* retries with care
+* failure isolation
+
+---
+
+# 34. Retries Can Become an Amplifier
+
+Suppose a remote image source is unavailable.
+
+If every failed request is retried three times:
+
+```text
+1000 requests
+×
+3 retries
+=
+3000 upstream requests
+```
+
+Retries can therefore amplify an outage.
+
+Image fetching should use bounded, carefully justified retries.
+
+For many image requests:
+
+```text
+fast failure
+```
+
+may be better than repeated expensive retries.
+
+---
+
+# 35. Concurrency Limits
+
+Suppose the transformer allows:
+
+```text
+1000 concurrent remote fetches
+```
+
+and all fetches become slow.
+
+Then:
+
+```text
+1000 workers
+→
+blocked
+```
+
+The service can become saturated.
+
+Concurrency limits create a bounded failure domain:
+
+```text
+maximum remote fetch concurrency
+```
+
+This protects the rest of the application.
+
+---
+
+# 36. Transformation Worker Isolation
+
+For high-risk or high-cost image processing, consider separating:
+
+```text
+Application Runtime
+```
+
+from:
+
+```text
+Image Processing Workers
+```
+
+Conceptually:
+
+```text
+Application
+    ↓
+Image Job / Request
+    ↓
+Image Worker Pool
+    ↓
+Sandboxed Processing
+```
+
+This limits the blast radius of:
+
+* crashes
+* memory exhaustion
+* CPU exhaustion
+* malformed image processing
+
+---
+
+# 37. Image Processing as a Resource Budget
+
+Every image transformation consumes resources.
+
+Think in terms of:
+
+```text
+Request
+ ↓
+Network budget
+ ↓
+CPU budget
+ ↓
+Memory budget
+ ↓
+Storage budget
+ ↓
+Bandwidth budget
+```
+
+A production system should bound each where practical.
+
+This is more robust than thinking only in terms of:
+
+```text
+HTTP request succeeded
+```
+
+---
+
+# 38. Abuse Through Width and Height
+
+Suppose an attacker requests:
+
+```text
+/image?id=123&w=50000&h=50000
+```
+
+Even if the source image is normal, the requested transformation may be extremely expensive.
+
+Therefore:
+
+```text
+requested dimensions
+```
+
+must be validated before transformation.
+
+Possible policies:
+
+```text
+maximum width
+maximum height
+maximum pixel count
+allowed aspect ratios
+allowed resize modes
+```
+
+---
+
+# 39. Abuse Through Quality
+
+Quality settings can also affect compute and output size.
+
+Instead of:
+
+```text
+quality=0..100
+```
+
+the system can expose:
+
+```text
+quality=low
+quality=medium
+quality=high
+```
+
+mapped internally to bounded codec settings.
+
+This reduces:
+
+```text
+cache cardinality
++
+resource variability
++
+abuse surface
+```
+
+---
+
+# 40. Abuse Through Format Selection
+
+Allowing arbitrary output formats may create additional processing paths.
+
+A controlled system may support:
+
+```text
+AVIF
+WebP
+JPEG
+PNG
+```
+
+only where required.
+
+Unsupported or expensive formats should be rejected rather than passed through to an unrestricted transformation engine.
+
+---
+
+# 41. Cache Poisoning
+
+Image caches should validate that:
+
+```text
+cache key
+```
+
+is derived from trusted, normalized representation parameters.
+
+If untrusted input can influence the cache identity incorrectly, an attacker may attempt to cause:
+
+```text
+unexpected representation
+```
+
+to be stored under:
+
+```text
+shared cache identity
+```
+
+Therefore cache correctness and input validation are security concerns.
+
+---
+
+# 42. Host Header and Origin Trust
+
+Multi-tenant or host-based image architectures should not blindly trust arbitrary host information.
+
+If image URLs or tenant resolution depend on:
+
+```text
+Host
+X-Forwarded-Host
+X-Forwarded-Proto
+```
+
+the deployment must know which proxy layers are trusted.
+
+Incorrect trust configuration can result in:
+
+* wrong tenant resolution
+* wrong asset origin
+* cache collisions
+* malicious URL generation
+
+---
+
+# 43. Authentication and Image Delivery
+
+Authentication can exist at multiple layers:
+
+```text
+Application
+ ↓
+Image authorization
+ ↓
+CDN
+ ↓
+Storage
+```
+
+Do not assume that because the page is authenticated, the image is automatically protected.
+
+An image URL may be:
+
+```text
+public
+private
+signed
+session-bound
+tenant-scoped
+```
+
+The resource policy must be explicit.
+
+---
+
+# 44. Authorization Must Be Enforced at the Resource Boundary
+
+A common anti-pattern:
+
+```text
+User can access /dashboard
+```
+
+therefore:
+
+```text
+User can access /images/private-file
+```
+
+Not necessarily.
+
+The image endpoint or storage layer must independently enforce the appropriate resource authorization.
+
+This follows the broader principle:
+
+```text
+page authorization
+≠
+resource authorization
+```
+
+---
+
+# 45. Security Headers and Content Handling
+
+Image responses should be delivered with appropriate response metadata.
+
+Depending on the architecture, consider:
+
+* correct `Content-Type`
+* appropriate cache directives
+* safe content-disposition behavior where relevant
+* content-sniffing protections where appropriate
+* CSP implications for image sources
+* CORS policy where relevant
+
+The exact configuration depends on how images are consumed.
+
+---
+
+# 46. Image Source Trust Levels
+
+A useful architecture is to classify sources:
+
+```text
+Tier 1 — First-party
+Tier 2 — Trusted partner
+Tier 3 — User-uploaded
+Tier 4 — Arbitrary external
+```
+
+Each tier can have different policies.
+
+For example:
+
+```text
+First-party
+→
+broad optimization capability
+
+Trusted partner
+→
+allowlisted hosts
+
+User-uploaded
+→
+validated + sandboxed
+
+Arbitrary external
+→
+possibly prohibited
+```
+
+This is stronger than treating all remote images equally.
+
+---
+
+# 47. Security and Performance Are Connected
+
+Security controls can affect performance.
+
+For example:
+
+```text
+strict validation
++
+DNS checks
++
+content scanning
++
+sandboxing
+```
+
+can add latency.
+
+But removing all validation to reduce latency creates unacceptable risk.
+
+The architecture must optimize within:
+
+```text
+security requirements
++
+performance requirements
+```
+
+rather than treating security as an optional feature.
+
+---
+
+# 48. Observability for Image Security
+
+Monitor security-relevant signals such as:
+
+```text
+rejected remote hosts
+SSRF validation failures
+blocked private IP attempts
+oversized image rejections
+dimension-limit violations
+transformation-limit violations
+rate-limit events
+cache anomalies
+malformed image failures
+SVG policy violations
+remote source timeouts
+```
+
+This helps distinguish:
+
+```text
+normal user error
+```
+
+from:
+
+```text
+abuse pattern.
+```
+
+---
+
+# 49. High-Cardinality Security Logging
+
+Be careful about logging raw attacker-controlled URLs.
+
+A URL can contain:
+
+```text
+tokens
+credentials
+personal data
+very long query strings
+```
+
+Instead, logging can use:
+
+```text
+normalized host
+path classification
+request ID
+tenant ID where appropriate
+validation result
+reason code
+```
+
+while avoiding sensitive query parameters.
+
+---
+
+# 50. Incident Response
+
+Suppose the image optimizer is under attack.
+
+A useful response sequence is:
+
+```text
+Detect
+  ↓
+Classify
+  ↓
+Rate-limit / block
+  ↓
+Protect origin
+  ↓
+Protect image workers
+  ↓
+Preserve service for legitimate traffic
+  ↓
+Investigate source
+  ↓
+Remediate vulnerability
+```
+
+The goal is not merely:
+
+```text
+stop the attack
+```
+
+but:
+
+```text
+stop the attack
+without unnecessarily taking down legitimate image delivery.
+```
+
+---
+
+# 51. Production Failure Scenario — SSRF
+
+### Situation
+
+An attacker supplies a URL pointing to an internal service.
+
+### Weak architecture
+
+```text
+URL
+ ↓
+fetch()
+ ↓
+internal service
+```
+
+### Stronger architecture
+
+```text
+URL
+ ↓
+scheme validation
+ ↓
+host policy
+ ↓
+DNS/IP validation
+ ↓
+redirect validation
+ ↓
+network isolation
+ ↓
+bounded fetch
+```
+
+The lesson:
+
+> SSRF prevention requires multiple layers.
+
+---
+
+# 52. Production Failure Scenario — Memory Exhaustion
+
+### Situation
+
+An attacker supplies a compressed image with enormous dimensions.
+
+Pipeline:
+
+```text
+small file
+ ↓
+decode
+ ↓
+huge pixel buffer
+ ↓
+memory exhaustion
+```
+
+Mitigations:
+
+```text
+maximum compressed size
++
+maximum dimensions
++
+maximum pixel count
++
+worker memory limits
++
+sandboxing
+```
+
+---
+
+# 53. Production Failure Scenario — Transformation Abuse
+
+Attacker sends:
+
+```text
+100,000 unique image transformations
+```
+
+Result:
+
+```text
+cache misses ↑
+CPU ↑
+storage ↑
+bandwidth ↑
+```
+
+Mitigations:
+
+```text
+allowed transformation variants
++
+rate limits
++
+quotas
++
+cache controls
++
+concurrency limits
+```
+
+---
+
+# 54. Production Failure Scenario — Cross-Tenant Leakage
+
+Tenant A requests:
+
+```text
+/logo
+```
+
+and the CDN caches:
+
+```text
+Tenant A logo
+```
+
+under a globally shared key.
+
+Tenant B then requests:
+
+```text
+/logo
+```
+
+and receives Tenant A's image.
+
+This demonstrates:
+
+```text
+cache correctness
++
+authorization
++
+tenant isolation
+```
+
+must be designed together.
+
+---
+
+# 55. Production Failure Scenario — Remote Source Outage
+
+A partner CDN becomes unavailable.
+
+A naive image optimizer retries every request.
+
+Result:
+
+```text
+partner outage
+ ↓
+retries
+ ↓
+worker saturation
+ ↓
+application image failures
+```
+
+A resilient architecture uses:
+
+```text
+timeouts
++
+bounded retries
++
+concurrency limits
++
+fallback/caching where appropriate
+```
 
 ---
 
 # 56. Four-Pillar Engineering Matrix
 
-## Pillar 1 — Correctness
-
-Ask:
-
-* Is the source actually an image?
-* Is the requested representation authorized?
-* Is the cache key correct?
-* Is tenant identity preserved?
-* Are redirects validated?
-* Are transformations deterministic?
+| Dimension    | Core Concern                               | Senior-Level Question                                                   |
+| ------------ | ------------------------------------------ | ----------------------------------------------------------------------- |
+| Mental Model | Images as untrusted network/content inputs | What can this image request cause the server to access or consume?      |
+| Mechanics    | Validation, limits, sandboxing             | Which controls execute before expensive processing?                     |
+| Architecture | Trust boundaries + isolation               | Can image processing affect internal systems or other tenants?          |
+| Operations   | Detection + containment                    | Can we detect and contain abuse without taking down legitimate traffic? |
 
 ---
 
-## Pillar 2 — Performance
-
-Ask:
-
-* Are transformations bounded?
-* Is CDN caching effective?
-* Can attackers generate unlimited variants?
-* Is origin load protected?
-* Are hot objects handled efficiently?
-
----
-
-## Pillar 3 — Maintainability
-
-Ask:
-
-* Are remote sources centrally governed?
-* Are transformation limits centralized?
-* Is security policy explicit?
-* Are private/public image classes documented?
-* Are signed URL rules standardized?
-
----
-
-## Pillar 4 — Scalability
-
-Ask:
-
-* Can millions of image requests be handled?
-* Can many tenants safely configure sources?
-* Can global traffic be absorbed by the CDN?
-* Can abuse be isolated?
-* Can origin infrastructure survive cache misses?
-
----
-
-# 57. Production Architecture
-
-A mature image security system can look like:
-
-```text
-                    USER
-                      │
-                      ▼
-               CDN / EDGE
-                      │
-              ┌───────┴───────┐
-              │               │
-              ▼               ▼
-         Public Image     Authenticated
-           Policy           Policy
-              │               │
-              └───────┬───────┘
-                      ▼
-              Image Gateway
-                      │
-        ┌─────────────┼─────────────┐
-        │             │             │
-        ▼             ▼             ▼
-   Rate Limit     Authorization   Source Policy
-        │             │             │
-        └─────────────┼─────────────┘
-                      ▼
-              Transformation
-                      │
-                      ▼
-                Cache / CDN
-                      │
-                      ▼
-                  Origin
-```
-
----
-
-# 58. Production Failure Scenarios
-
-## Failure 1 — Arbitrary Remote URL
-
-A developer exposes:
-
-```text
-/image?url=<anything>
-```
-
-Result:
-
-```text
-server becomes generic URL fetcher
-```
-
-Lesson:
-
-```text
-remote image proxy
-≠
-generic proxy
-```
-
----
-
-## Failure 2 — Cross-Tenant Cache
-
-Two tenants request:
-
-```text
-/image?id=42
-```
-
-Cache key ignores tenant.
-
-Result:
-
-```text
-tenant leakage
-```
-
-Lesson:
-
-```text
-cache identity must reflect security identity
-```
-
-when the response varies by tenant.
-
----
-
-## Failure 3 — Redirect Bypass
-
-Trusted URL:
-
-```text
-trusted.example/image
-```
-
-redirects to:
-
-```text
-attacker.example/payload
-```
-
-Initial hostname passes validation.
-
-Final destination does not.
-
-Lesson:
-
-```text
-redirect chain is part of the trust boundary
-```
-
----
-
-## Failure 4 — Transformation Explosion
-
-An attacker requests thousands of unique:
-
-```text
-width
-quality
-crop
-```
-
-combinations.
-
-Result:
-
-```text
-cache fragmentation
-+
-CPU exhaustion
-```
-
-Lesson:
-
-```text
-transformation API must be bounded
-```
-
----
-
-## Failure 5 — Private Image Cached Publicly
-
-An authenticated endpoint returns:
-
-```text
-User A private image
-```
-
-but shared CDN caching ignores authorization.
-
-Result:
-
-```text
-privacy breach
-```
-
-Lesson:
-
-```text
-authentication
-≠
-safe shared caching
-```
-
----
-
-## Failure 6 — Malicious SVG
-
-User uploads SVG containing unsafe content.
-
-Application serves it directly.
-
-Result:
-
-```text
-unexpected active content
-```
-
-Lesson:
-
-```text
-SVG requires its own security policy
-```
-
----
-
-# 59. Senior Prediction Challenges
+# 57. Prediction Challenges
 
 ### Challenge 1
 
-A remote image optimizer accepts any HTTPS URL.
+An image endpoint accepts arbitrary HTTPS URLs.
 
-Is HTTPS sufficient?
+The URL points to:
 
-**Expected reasoning:**
+```text
+http://127.0.0.1:8080
+```
 
-No.
-
-HTTPS protects transport but does not establish that the destination is trustworthy or that the server should be allowed to access it.
+What security class of problem should you investigate?
 
 ---
 
 ### Challenge 2
 
-A trusted image URL redirects to an internal address.
+The hostname is public, but it resolves to a private IP.
 
-Should the original hostname being trusted be enough?
-
-**Expected reasoning:**
-
-No. Redirect destinations remain part of the server-side fetch trust boundary.
+Is hostname validation alone sufficient?
 
 ---
 
 ### Challenge 3
 
-A private image endpoint requires authentication but uses a shared CDN cache.
+An allowed remote image redirects to an internal address.
 
-Is that automatically safe?
-
-**Expected reasoning:**
-
-No. Authorization context must be compatible with the cache model.
+What additional control is required?
 
 ---
 
 ### Challenge 4
 
-A transformation endpoint allows arbitrary widths.
+A 50 KB image expands to hundreds of millions of pixels.
 
-What security problem can this create?
-
-**Expected reasoning:**
-
-Attackers can generate many unique representations, increasing compute cost, cache cardinality, storage, and origin load.
+What resource is likely to become the limiting factor?
 
 ---
 
 ### Challenge 5
 
-Why can a small image file still be dangerous to process?
+An attacker generates thousands of unique width parameters.
 
-**Expected reasoning:**
+What happens to:
 
-Compressed data can expand into a very large decoded pixel buffer and consume substantial memory/CPU.
+```text
+cache cardinality
++
+transformation cost
+```
 
 ---
 
 ### Challenge 6
 
-A tenant can configure arbitrary remote image domains.
+A private image is cached publicly by the CDN.
 
-What should you investigate?
-
-**Expected reasoning:**
-
-Tenant source ownership, server-side fetching, SSRF, DNS, redirects, private networks, and cross-tenant policy isolation.
+What class of failure can result?
 
 ---
 
 ### Challenge 7
 
-Why can signed URLs hurt caching?
+A remote image host becomes slow and every request is retried three times.
 
-**Expected reasoning:**
-
-If every authorization token changes the URL/cache key, the same underlying representation can produce many cache entries.
+What happens to your image workers?
 
 ---
 
-# 60. Senior Interview Questions
+# 58. Senior Interview Gotchas
 
-### Question 1
+### Gotcha 1
 
-> How would you securely implement remote image optimization?
+**“HTTPS URLs are safe.”**
 
-Expected areas:
-
-```text
-allowlist
-URL parsing
-protocol restrictions
-redirect validation
-network egress controls
-resource limits
-rate limiting
-cache isolation
-observability
-```
+No. HTTPS says nothing about whether the destination is trusted.
 
 ---
 
-### Question 2
+### Gotcha 2
 
-> Why is an image proxy potentially an SSRF vulnerability?
+**“Allowlisting the hostname completely solves SSRF.”**
 
-Because the server performs a network request based on input supplied by a client.
-
----
-
-### Question 3
-
-> How do you secure private images behind a CDN?
-
-Discuss:
-
-```text
-authentication
-authorization
-signed URLs/cookies
-cache policy
-tenant isolation
-origin protection
-expiration
-```
+Not necessarily. DNS resolution, redirects, ports, and network isolation also matter.
 
 ---
 
-### Question 4
+### Gotcha 3
 
-> How do you prevent transformation abuse?
+**“File size limits prevent image-processing DoS.”**
 
-Discuss:
-
-```text
-bounded dimensions
-bounded quality
-bounded formats
-canonical transformation profiles
-rate limits
-cost controls
-cache strategy
-```
+Not alone. Pixel dimensions and decoded memory can be much larger than compressed file size.
 
 ---
 
-### Question 5
+### Gotcha 4
 
-> How do you prevent cross-tenant image leakage?
+**“The URL ends in `.jpg`, so it is a JPEG.”**
 
-Discuss:
-
-```text
-tenant-aware resource identity
-authorization
-tenant-aware cache identity
-origin isolation
-signed delivery
-tests
-```
+The filename is not sufficient evidence of content type.
 
 ---
 
-### Question 6
+### Gotcha 5
 
-> Why is SVG different from JPEG from a security perspective?
+**“Private image means authenticated page.”**
 
-Because SVG is structured markup rather than merely decoded raster pixels and can carry additional browser-interpreted capabilities depending on how it is served.
+No. Resource authorization must be enforced at the image boundary.
 
 ---
 
-# 61. Security Invariants
+### Gotcha 6
 
-### Invariant 1
+**“Rate limiting solves transformation abuse.”**
 
-```text
-remote URL ≠ trusted destination
+Rate limits help, but quotas, bounded transformations, cache controls, and resource limits may also be necessary.
+
+---
+
+### Gotcha 7
+
+**“Caching makes remote image optimization safe.”**
+
+Caching can actually amplify security mistakes if cache identity crosses authorization or tenant boundaries.
+
+---
+
+# 59. Core Invariants
+
+Memorize these:
+
+```text id="sj5g3c"
+remote URL
+=
+untrusted input
 ```
 
-### Invariant 2
-
-```text
-HTTPS ≠ authorization
+```text id="0edxdi"
+HTTPS
+≠
+trusted destination
 ```
 
-### Invariant 3
-
-```text
-trusted initial URL ≠ trusted redirect destination
+```text id="4a1c8s"
+trusted hostname
+≠
+trusted redirect target
 ```
 
-### Invariant 4
-
-```text
-authentication ≠ cache isolation
+```text id="5qg1x6"
+compressed size
+≠
+decoded resource cost
 ```
 
-### Invariant 5
-
-```text
-same cache key → same security-relevant representation
+```text id="wh7q4f"
+file extension
+≠
+trusted content type
 ```
 
-### Invariant 6
-
-```text
-transformation flexibility → attack surface
+```text id="l1khz8"
+public image optimizer
+≠
+unrestricted network proxy
 ```
 
-### Invariant 7
-
-```text
-cache cardinality is a security consideration
+```text id="n1e0u4"
+private resource
+→
+private authorization + cache policy
 ```
 
-### Invariant 8
-
-```text
-compressed size ≠ processing cost
+```text id="w1lphx"
+more transformation variants
+→
+more cache cardinality + more abuse surface
 ```
 
-### Invariant 9
-
-```text
-tenant identity can be part of resource identity
+```text id="2exy8a"
+image processing
+→
+bounded CPU + memory + network resources
 ```
 
-### Invariant 10
-
-```text
-image proxy ≠ generic HTTP proxy
-```
-
-### Invariant 11
-
-```text
-private image ≠ publicly cacheable image
-```
-
-### Invariant 12
-
-```text
-authorization must cover the delivered representation
+```text id="3k9x8v"
+security boundary
+must align with
+cache boundary
 ```
 
 ---
 
-# 62. Completion Checklist
+# 60. Completion Checklist
 
 You should be able to explain:
 
-### Remote Sources
-
-* [ ] server-side image fetching
-* [ ] trusted source allowlists
-* [ ] URL parsing
-* [ ] protocol restrictions
-* [ ] hostname validation
-* [ ] redirect validation
-* [ ] DNS considerations
-* [ ] network egress controls
-
-### Abuse Prevention
-
+* [ ] Why remote image optimization is a security boundary
 * [ ] SSRF
-* [ ] proxy abuse
-* [ ] transformation abuse
-* [ ] cache explosion
-* [ ] rate limiting
-* [ ] request complexity
-* [ ] resource limits
-
-### Private Content
-
-* [ ] public vs private images
-* [ ] authentication
-* [ ] authorization
-* [ ] signed URLs
-* [ ] expiration
-* [ ] cache isolation
-* [ ] tenant isolation
-
-### Image Processing
-
-* [ ] maximum dimensions
-* [ ] maximum pixel count
-* [ ] file-size limits
-* [ ] MIME validation
-* [ ] malicious content
+* [ ] URL scheme validation
+* [ ] Host allowlisting
+* [ ] DNS validation
+* [ ] DNS rebinding
+* [ ] Private IP protection
+* [ ] Redirect validation
+* [ ] Port restrictions
+* [ ] Network isolation
+* [ ] Least-privilege networking
+* [ ] Fetch timeouts
+* [ ] Response-size limits
+* [ ] Content-Type validation
+* [ ] MIME confusion
+* [ ] Maximum dimensions
+* [ ] Maximum pixel count
+* [ ] Decompression bombs
+* [ ] CPU exhaustion
+* [ ] Transformation allowlists
+* [ ] Cache-cardinality abuse
+* [ ] Rate limiting
+* [ ] Quotas
+* [ ] Signed URLs
+* [ ] Signed URL leakage
+* [ ] Private image caching
+* [ ] Multi-tenant isolation
 * [ ] SVG security
-
-### Infrastructure
-
-* [ ] CDN/origin separation
-* [ ] origin protection
-* [ ] cache poisoning
-* [ ] cache-key security
-* [ ] observability
-* [ ] failure handling
+* [ ] User-upload validation
+* [ ] Third-party source failures
+* [ ] Retry amplification
+* [ ] Concurrency limits
+* [ ] Worker isolation
+* [ ] Cache poisoning
+* [ ] Host/proxy trust
+* [ ] Resource-level authorization
+* [ ] Security observability
+* [ ] Incident response
+* [ ] Production abuse scenarios
 
 ---
 
-# 63. Final Mental Model
+# 61. Part Boundary
 
-The image pipeline should now be understood as:
+This part establishes:
 
 ```text
-                    IMAGE REQUEST
-                          │
-                          ▼
-                  Input Validation
-                          │
-                          ▼
-                Source Trust Policy
-                          │
-                    ┌─────┴─────┐
-                    │           │
-                 Public       Private
-                    │           │
-                    │      Authentication
-                    │           │
-                    │      Authorization
-                    │           │
-                    └─────┬─────┘
-                          ▼
-                Transformation Policy
-                          │
-                          ▼
+Image Security
++
+Remote Sources
++
+SSRF Prevention
++
+Resource Limits
++
+Abuse Prevention
++
+Cache Security
+```
+
+It does **not** deeply cover:
+
+```text
+Image Observability
+Testing
+Performance Regression Detection
+Production Image SLOs
+```
+
+Those belong to:
+
+> **KPI 10 — Part 09: Image Observability, Testing & Production Performance**
+
+The remaining KPI 10 sequence is therefore:
+
+```text
+Part 08
+Security / Remote Sources / Abuse Prevention
+        ↓
+Part 09
+Observability / Testing / Production Performance
+        ↓
+Part 10
+Production Image Optimization Architecture Capstone
+```
+
+---
+
+# Final Mental Model
+
+A production image optimizer should be treated as:
+
+```text
+                    Untrusted Input
+                          ↓
+                    URL Validation
+                          ↓
+                 Network Destination
+                     Validation
+                          ↓
+                    Access Policy
+                          ↓
                   Resource Limits
-                          │
-                          ▼
-                    Cache Policy
-                          │
-                          ▼
-                         CDN
-                          │
-                          ▼
-                       Origin
+                          ↓
+                   Image Validation
+                          ↓
+                    Transformation
+                          ↓
+                    Cache Identity
+                          ↓
+                   CDN / Delivery
+                          ↓
+                    Observability
 ```
 
-The senior-level model is:
+The senior-level objective is:
 
-> **An image optimization system is also a network client, content processor, cache, and resource-consumption surface. Once remote or user-controlled images enter the architecture, security must be designed alongside performance rather than added afterward.**
-
-The key relationship is:
-
-```text
-Source Trust
-      ↓
-Authorization
-      ↓
-Transformation Bounds
-      ↓
-Cache Identity
-      ↓
-Resource Protection
-      ↓
-Safe Delivery
-```
-
-And the most important production invariant is:
-
-```text
-The system must never allow image optimization
-to bypass the application's security boundaries.
-```
-
-**Part 08 complete.**
+> **Allow legitimate image optimization while ensuring that remote image requests cannot become arbitrary network access, unbounded resource consumption, cache-boundary violations, cross-tenant data leaks, or an uncontrolled abuse surface.**

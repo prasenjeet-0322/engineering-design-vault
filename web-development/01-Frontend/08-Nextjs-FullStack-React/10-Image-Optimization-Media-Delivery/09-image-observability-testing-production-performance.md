@@ -1,2340 +1,1947 @@
-# Level 08 — KPI 10 — Part 09
+# Level 08 — Next.js & Full-Stack React
 
-## Image Observability, Testing & Production Performance
+## KPI 10 — Image Optimization
 
----
-
-# 1. Part Objective
-
-A production image system cannot be considered complete merely because images render correctly.
-
-At scale, you need to answer:
-
-* Are images actually loading?
-* Which images are slow?
-* Which images affect LCP?
-* Are users receiving unnecessarily large representations?
-* Are cache hits working?
-* Is the image optimizer consuming excessive CPU?
-* Are remote sources failing?
-* Are transformation requests exploding?
-* Are image failures correlated with particular devices, routes, tenants, or regions?
-* Did a deployment improve or regress image performance?
-
-The central principle is:
-
-> **Image optimization is successful only when the production system can measure whether its decisions actually improve user experience and infrastructure efficiency.**
-
-The production model becomes:
-
-```text
-Image Architecture
-       ↓
-Instrumentation
-       ↓
-Telemetry
-       ↓
-Analysis
-       ↓
-Diagnosis
-       ↓
-Optimization
-       ↓
-Regression Prevention
-```
+# Part 09 — Image Observability, Testing & Production Performance
 
 ---
 
-# 2. The Image Observability Mental Model
+## 1. Part Objective
 
-Image observability should connect four layers:
+A production image system is not complete when the images are optimized.
+
+It is complete when the team can answer:
+
+* Are the right image representations being delivered?
+* Are critical images discovered early?
+* Are images affecting LCP?
+* Are CDN caches behaving correctly?
+* Are transformations consuming excessive CPU?
+* Are image failures increasing?
+* Are responsive candidates correct?
+* Are accessibility regressions occurring?
+* Are security controls rejecting malicious inputs?
+* Did a deployment make image performance worse?
+
+The core production model is:
 
 ```text
-User Experience
-      ↓
-Browser Behavior
-      ↓
-Delivery Infrastructure
-      ↓
-Image Processing Pipeline
-```
-
-A useful end-to-end model is:
-
-```text
-Source Asset
+Image System
     ↓
+Measure
+    ↓
+Detect
+    ↓
+Diagnose
+    ↓
+Remediate
+    ↓
+Verify
+    ↓
+Prevent Regression
+```
+
+The central senior-level principle is:
+
+> **Image optimization is an operational system, not a one-time configuration exercise.**
+
+---
+
+# 2. Image Observability Mental Model
+
+The image pipeline established in previous parts is:
+
+```text
+Asset
+ ↓
+Representation
+ ↓
 Transformation
-    ↓
-CDN / Cache
-    ↓
-HTTP Delivery
-    ↓
-Browser Request
-    ↓
+ ↓
+Responsive Selection
+ ↓
+CDN
+ ↓
+Browser
+ ↓
 Decode
-    ↓
-Layout
-    ↓
+ ↓
 Paint
-    ↓
-LCP / Visual Experience
+ ↓
+User Experience
 ```
 
-If you measure only one layer, you cannot reliably explain the complete outcome.
+Observability should exist across the same pipeline:
+
+```text
+Asset
+ ↓
+Transformation Metrics
+ ↓
+CDN Metrics
+ ↓
+Browser Resource Timing
+ ↓
+LCP / UX Metrics
+ ↓
+RUM
+```
+
+This allows engineering teams to correlate:
+
+```text
+backend behavior
+```
+
+with:
+
+```text
+frontend user experience.
+```
 
 ---
 
-# 3. Four Pillars of Image Production Engineering
+# 3. Three Observability Layers
 
-This part focuses on four dimensions:
+A useful production model is:
 
 ```text
-Correctness
-Performance
-Observability
-Reliability
+1. Browser
+2. CDN / Edge
+3. Origin / Image Processing
 ```
 
-The system must answer:
+### Browser
+
+Measures:
+
+* request timing
+* selected resource
+* transfer size
+* LCP
+* layout behavior
+* device/network context
+
+### CDN
+
+Measures:
+
+* cache hits
+* cache misses
+* edge latency
+* response status
+* bandwidth
+* origin fetches
+
+### Origin / Transformer
+
+Measures:
+
+* transformation latency
+* CPU
+* memory
+* source fetch latency
+* failures
+* queue depth
+* concurrency
+
+The senior engineer connects these layers rather than looking at only one dashboard.
+
+---
+
+# 4. Browser Resource Timing
+
+The browser exposes timing information for resources.
+
+Conceptually:
 
 ```text
-Did the correct image render?
-        +
-Did it render efficiently?
-        +
-Can we explain its behavior?
-        +
-Does the system remain reliable under production load?
+Navigation
+   ↓
+Image request
+   ↓
+DNS
+   ↓
+Connection
+   ↓
+Request
+   ↓
+Response
+   ↓
+Transfer
+```
+
+This can help answer:
+
+```text
+When was the image requested?
+How long did it take?
+How large was the response?
+```
+
+This is particularly useful when diagnosing real-user performance.
+
+---
+
+# 5. Discovery Time vs Request Time
+
+One important distinction is:
+
+```text
+Image exists in DOM
+```
+
+versus:
+
+```text
+Image request starts
+```
+
+A performance investigation should determine:
+
+```text
+image discovery
+→
+request start
+→
+response
+→
+render
+```
+
+If request start is unexpectedly late, the problem may be:
+
+* rendering architecture
+* JavaScript execution
+* streaming order
+* resource priority
+* lazy-loading configuration
+* client-side data dependency
+
+rather than image compression.
+
+---
+
+# 6. Transfer Size
+
+Measure:
+
+```text
+encoded response size
+```
+
+for important images.
+
+This allows teams to identify:
+
+```text
+oversized hero
+oversized thumbnail
+unexpected high-resolution candidate
+wrong format
+missing transformation
+```
+
+But transfer size must not be treated as the only performance metric.
+
+Remember:
+
+```text
+small bytes
+≠
+fast LCP
 ```
 
 ---
 
-# 4. Why Image Performance Must Be Measured in the Browser
+# 7. Selected Image Representation
 
-Server-side metrics can tell you:
+Responsive image systems can select different candidates depending on:
 
 ```text
-image transformation = 120ms
+viewport
+DPR
+network conditions
+sizes
+browser behavior
 ```
 
-but the user may experience:
+Production observability should therefore help identify which representation was actually delivered.
+
+For example:
+
+```text
+Expected:
+640px
+
+Actual:
+2048px
+```
+
+This may indicate a problem with:
+
+```text
+sizes
+layout assumptions
+candidate generation
+browser selection
+```
+
+---
+
+# 8. Image Request Failure Taxonomy
+
+Do not collapse all image failures into:
+
+```text
+image failed
+```
+
+Classify failures.
+
+For example:
+
+```text
+4xx
+→ invalid / unavailable resource
+
+5xx
+→ server / infrastructure failure
+
+timeout
+→ dependency / network failure
+
+transformation error
+→ processing failure
+
+validation rejection
+→ security / input policy
+
+cache failure
+→ delivery issue
+
+decode failure
+→ invalid image representation
+```
+
+Failure taxonomy makes debugging actionable.
+
+---
+
+# 9. HTTP Status Monitoring
+
+Track image response status by category:
+
+```text
+2xx
+3xx
+4xx
+5xx
+```
+
+A sudden increase in:
+
+```text
+404
+```
+
+may indicate:
+
+* broken asset references
+* deployment mismatch
+* deleted content
+* stale CMS data
+
+A sudden increase in:
+
+```text
+5xx
+```
+
+may indicate:
+
+* transformer failure
+* origin outage
+* CDN/origin connectivity
+* resource exhaustion
+
+---
+
+# 10. CDN Cache Hit Ratio
+
+Part 05 established cache architecture.
+
+Now observability must verify it.
+
+Track:
+
+```text
+cache hits
+cache misses
+hit ratio
+origin fetches
+```
+
+For example:
+
+```text
+Requests = 1,000,000
+Hits = 950,000
+Misses = 50,000
+```
+
+Then:
+
+```text
+Hit Ratio = 95%
+```
+
+But aggregate hit ratio is not sufficient.
+
+Break it down by:
+
+* image family
+* route
+* tenant where appropriate
+* region
+* format
+* transformation
+* cache key version
+
+---
+
+# 11. Cache Hit Ratio Can Hide Problems
+
+Suppose overall hit ratio is:
+
+```text
+99%
+```
+
+but the hero image has:
+
+```text
+50%
+```
+
+hit ratio.
+
+The aggregate metric hides a critical-path problem.
+
+Therefore metrics should be segmented by important resource classes.
+
+A senior dashboard might include:
+
+```text
+LCP images
+Product images
+User avatars
+Generated thumbnails
+Other assets
+```
+
+---
+
+# 12. Cache Miss Latency
+
+A cache miss is not simply:
+
+```text
+MISS = bad
+```
+
+The important question is:
+
+```text
+What does a miss cost?
+```
+
+For example:
+
+```text
+Cache hit:
+50ms
+
+Cache miss:
+900ms
+```
+
+Then misses are materially affecting UX.
+
+Track:
+
+```text
+hit latency
+miss latency
+origin latency
+transformation latency
+```
+
+---
+
+# 13. Transformation Latency
+
+Image transformations can involve:
+
+```text
+decode
+resize
+crop
+encode
+```
+
+Measure transformation duration.
+
+For example:
+
+```text
+p50 = 20ms
+p95 = 80ms
+p99 = 600ms
+```
+
+A high tail may indicate:
+
+* unusually large source images
+* expensive codecs
+* uncommon dimensions
+* resource contention
+* malformed inputs
+* cache misses
+
+---
+
+# 14. Percentiles Matter
+
+Average latency can hide tail behavior.
+
+Consider:
+
+```text
+Requests:
+20ms
+20ms
+20ms
+20ms
+1000ms
+```
+
+Average:
+
+```text
+216ms
+```
+
+but most requests are actually fast.
+
+Therefore production image systems should use:
+
+```text
+p50
+p75
+p90
+p95
+p99
+```
+
+where useful.
+
+This is particularly important for:
+
+```text
+transformation latency
+origin latency
+CDN latency
+image request latency
+```
+
+---
+
+# 15. Origin Load
+
+Track how much image traffic reaches the origin.
+
+For example:
+
+```text
+Total image requests
+        ↓
+CDN
+ ├── cache hit
+ └── origin request
+```
+
+A healthy caching system should reduce origin load significantly.
+
+Unexpected origin growth can indicate:
+
+```text
+cache invalidation
+cache-key explosion
+TTL changes
+URL changes
+deployment behavior
+new transformation variants
+```
+
+---
+
+# 16. Cache Cardinality Observability
+
+A system can have a high cache hit ratio while still creating too many unique objects.
+
+Monitor:
+
+```text
+unique image URLs
+unique transformation variants
+unique dimensions
+unique quality settings
+unique format combinations
+```
+
+If cardinality grows unexpectedly:
+
+```text
+cache storage ↑
+misses ↑
+transformation work ↑
+```
+
+This is a strong signal of architecture or abuse problems.
+
+---
+
+# 17. Cache Key Diagnostics
+
+When debugging cache behavior, record a safe representation of:
+
+```text
+source identity
+width
+height
+format
+quality
+tenant
+version
+```
+
+Avoid logging sensitive raw URLs unnecessarily.
+
+The objective is to determine:
+
+```text
+Why did two requests produce different cache keys?
+```
+
+---
+
+# 18. Correlation IDs
+
+A production request may pass through:
+
+```text
+Browser
+ ↓
+CDN
+ ↓
+Image service
+ ↓
+Remote origin
+```
+
+A correlation identifier can help connect the stages.
+
+Conceptually:
+
+```text
+Request ID: abc123
+
+Browser
+  ↓
+CDN
+  ↓
+Transformer
+  ↓
+Origin
+```
+
+This makes distributed debugging substantially easier.
+
+---
+
+# 19. Logging Strategy
+
+Useful structured fields can include:
+
+```text
+request_id
+route
+image_family
+source_type
+status
+cache_status
+transform_duration
+source_fetch_duration
+output_bytes
+width
+height
+format
+error_code
+```
+
+Avoid excessive raw URL logging.
+
+Logs should be:
+
+```text
+structured
+searchable
+privacy-aware
+bounded
+```
+
+---
+
+# 20. Avoid High-Cardinality Explosions
+
+A dangerous logging pattern is:
+
+```text
+logger.info({
+  fullImageUrl
+})
+```
+
+for every request.
+
+If URLs contain unique IDs and query parameters:
+
+```text
+cardinality ↑
+storage ↑
+query cost ↑
+```
+
+and sensitive information may leak.
+
+Prefer normalized dimensions such as:
+
+```text
+image_type=product
+width_bucket=1024
+format=avif
+cache_status=hit
+```
+
+when exact URL identity is unnecessary.
+
+---
+
+# 21. RUM — Real User Monitoring
+
+Synthetic performance tests are controlled.
+
+RUM measures actual users.
+
+This allows segmentation by:
+
+```text
+device
+browser
+network
+region
+viewport
+DPR
+connection quality
+```
+
+For image performance, this is extremely valuable.
+
+A desktop lab test may report:
+
+```text
+LCP = 1.5s
+```
+
+while real mobile users may experience:
 
 ```text
 LCP = 3.8s
 ```
 
-because additional time is spent on:
-
-```text
-network transfer
-queueing
-browser scheduling
-image decode
-layout
-rendering
-```
-
-Therefore:
-
-```text
-server latency
-≠
-user-perceived image latency
-```
-
-Both must be observed.
+RUM exposes the difference.
 
 ---
 
-# 5. Browser-Level Image Lifecycle
+# 22. LCP Monitoring
 
-A browser image can be modeled as:
-
-```text
-HTML discovered
-      ↓
-request scheduled
-      ↓
-DNS / connection
-      ↓
-request sent
-      ↓
-response begins
-      ↓
-bytes transferred
-      ↓
-decode
-      ↓
-layout
-      ↓
-paint
-```
-
-Performance instrumentation should help identify where the delay occurs.
-
----
-
-# 6. Resource Timing
-
-Browser resource timing can provide information about image requests such as:
-
-```text
-request start
-response start
-response end
-transfer size
-encoded body size
-decoded body size
-```
-
-These measurements help distinguish:
-
-```text
-network problem
-```
-
-from:
-
-```text
-image-size problem
-```
-
-from:
-
-```text
-server/transformation problem
-```
-
----
-
-# 7. Transfer Size vs Decoded Size
-
-Consider:
-
-```text
-encoded size = 80 KB
-decoded pixels = 3 MB
-```
-
-The network cost may look excellent.
-
-But the browser still needs to decode the image into memory.
-
-Therefore:
-
-```text
-network bytes
-≠
-browser memory cost
-```
-
-Both dimensions matter.
-
----
-
-# 8. Image Intrinsic Size vs Rendered Size
-
-Suppose:
-
-```text
-image source:
-2400 × 1600
-
-rendered:
-400 × 267
-```
-
-The system may be delivering substantially more pixels than necessary.
-
-A useful diagnostic relationship is:
-
-```text
-delivered pixels
-----------------
-rendered pixels
-```
-
-A large ratio may indicate:
-
-```text
-oversized source
-incorrect sizes
-missing responsive variants
-poor transformation selection
-```
-
----
-
-# 9. DPR Complication
-
-Suppose the image is rendered at:
-
-```text
-400 CSS pixels
-```
-
-on a device with:
-
-```text
-DPR = 3
-```
-
-The browser may legitimately request a representation around:
-
-```text
-1200 physical pixels
-```
-
-Therefore:
-
-```text
-rendered width
-```
-
-alone cannot determine whether an image is oversized.
-
-You must consider:
-
-```text
-CSS dimensions
-+
-DPR
-+
-browser selection
-+
-available candidates
-```
-
----
-
-# 10. Core Image Performance Metrics
-
-Useful metrics include:
-
-### User Experience
-
-```text
-LCP
-CLS
-INP context
-image load delay
-image render timing
-```
-
-### Network
-
-```text
-request duration
-TTFB
-transfer bytes
-response size
-connection reuse
-```
-
-### Image Processing
-
-```text
-transformation latency
-transformation errors
-CPU time
-queue time
-```
-
-### Cache
-
-```text
-hit rate
-miss rate
-stale responses
-evictions
-```
-
-### Infrastructure
-
-```text
-origin requests
-bandwidth
-CPU
-memory
-concurrency
-```
-
----
-
-# 11. LCP and Images
-
-Images are frequently responsible for the Largest Contentful Paint element.
-
-For an image-based LCP:
-
-```text
-HTML discovery
-    ↓
-request scheduling
-    ↓
-network
-    ↓
-download
-    ↓
-decode
-    ↓
-render
-    ↓
-LCP
-```
-
-Improving any relevant stage may improve LCP.
-
-But the optimization must target the actual bottleneck.
-
----
-
-# 12. LCP Request Delay
-
-An image may be slow because the browser discovers it late.
+Track LCP distributions rather than only averages.
 
 For example:
 
 ```text
-JavaScript executes
-      ↓
-component appears
-      ↓
-image discovered
-      ↓
-image request
+p50 LCP
+p75 LCP
+p90 LCP
 ```
 
-The image itself may download quickly.
-
-The problem is:
+Segment by:
 
 ```text
-late discovery
-```
-
-This is different from:
-
-```text
-slow image server
-```
-
----
-
-# 13. LCP Download Time
-
-Another case:
-
-```text
-image discovered early
-      ↓
-request starts
-      ↓
-huge response
-      ↓
-long transfer
-```
-
-Here the bottleneck is representation size or network conditions.
-
-Potential causes:
-
-```text
-oversized image
-poor compression
-wrong format
-incorrect responsive selection
-slow connection
-```
-
----
-
-# 14. LCP Render Delay
-
-A third case:
-
-```text
-image downloaded
-      ↓
-browser processing
-      ↓
-render delayed
-```
-
-Potential contributors include:
-
-```text
-decode
-main-thread contention
-layout work
-rendering dependencies
-```
-
-Therefore an image optimization investigation should not assume:
-
-```text
-slow LCP
-=
-large image
-```
-
----
-
-# 15. Image Error Rate
-
-A production image pipeline should measure failures.
-
-Useful dimensions:
-
-```text
-HTTP errors
-fetch failures
-decode failures
-transformation failures
-timeout failures
-authorization failures
-source failures
-```
-
-A single aggregate error rate is often insufficient.
-
----
-
-# 16. Error Taxonomy
-
-A useful taxonomy is:
-
-```text
-4xx
-5xx
-timeout
-source unavailable
-unsupported format
-decode failure
-transformation failure
-authorization failure
-configuration failure
-```
-
-This allows operators to distinguish:
-
-```text
-application bug
-```
-
-from:
-
-```text
-upstream problem
-```
-
-from:
-
-```text
-user/content problem
-```
-
----
-
-# 17. Observability Dimensions
-
-Image metrics should be sliced by relevant dimensions:
-
-```text
+page
 route
-image type
-format
-width
-DPR
-device class
-browser
+device
 region
-CDN POP
-tenant
-source domain
-cache status
+connection
+LCP element type
 ```
 
-However, excessive cardinality can itself create observability problems.
+If the LCP element is an image, image architecture becomes a direct investigation area.
 
 ---
 
-# 18. Cardinality Tradeoff
+# 23. LCP Element Identification
 
-Consider:
-
-```text
-image URL
-```
-
-as a metric label.
-
-If every image URL is unique:
+A useful RUM system should help identify:
 
 ```text
-millions of unique labels
+Which element became LCP?
 ```
 
-can create a telemetry explosion.
-
-Therefore avoid blindly using:
+If:
 
 ```text
-full URL
-user ID
-request ID
-asset ID
+LCP = hero image
 ```
 
-as high-cardinality metric dimensions.
-
-Prefer bounded dimensions such as:
+investigate:
 
 ```text
-format
-width bucket
-route family
-status class
-cache outcome
-device class
+hero discovery
+hero request
+hero transfer
+hero decode
+hero rendering
 ```
+
+If:
+
+```text
+LCP = heading
+```
+
+then the image may not be the dominant LCP bottleneck.
 
 ---
 
-# 19. Logs vs Metrics vs Traces
+# 24. Image-Specific Performance Budgets
 
-Each telemetry type serves a different purpose.
-
-## Metrics
-
-Best for:
-
-```text
-trends
-rates
-percentiles
-alerts
-dashboards
-```
-
-## Logs
-
-Best for:
-
-```text
-individual failures
-configuration details
-specific source errors
-```
-
-## Traces
-
-Best for:
-
-```text
-end-to-end request causality
-```
-
-The architecture should use all three intentionally.
-
----
-
-# 20. Image Request Tracing
-
-A trace can conceptually look like:
-
-```text
-Page Request
-   │
-   ├── HTML generation
-   │
-   └── Image Request
-          │
-          ├── CDN lookup
-          │
-          ├── Origin request
-          │
-          └── Transformation
-```
-
-This helps connect:
-
-```text
-page performance
-```
-
-to:
-
-```text
-image infrastructure behavior
-```
-
----
-
-# 21. Cache Observability
-
-Image delivery depends heavily on caching.
-
-Important measurements include:
-
-```text
-cache hit ratio
-cache miss ratio
-stale ratio
-revalidation rate
-origin fetch rate
-eviction rate
-```
-
-But:
-
-```text
-high cache hit rate
-```
-
-does not automatically mean:
-
-```text
-good image performance
-```
-
-because the cached representation itself may be oversized.
-
----
-
-# 22. Cache Hit Rate vs User Performance
-
-Consider:
-
-```text
-cache hit rate = 99%
-```
-
-but:
-
-```text
-average image = 4 MB
-```
-
-The CDN may be efficient from an infrastructure perspective while the user still receives excessive bytes.
-
-Therefore measure both:
-
-```text
-cache efficiency
-```
-
-and:
-
-```text
-representation efficiency
-```
-
----
-
-# 23. Representation Efficiency
-
-Useful metrics include:
-
-```text
-bytes per rendered pixel
-bytes per image
-delivered width / rendered width
-delivered height / rendered height
-format distribution
-```
-
-The goal is not:
-
-```text
-smallest possible file
-```
-
-but:
-
-```text
-appropriate representation for actual use
-```
-
----
-
-# 24. Transformation Observability
-
-An image transformation pipeline should expose metrics such as:
-
-```text
-transform requests
-transform latency
-transform failures
-transform cache hits
-transform cache misses
-CPU time
-memory usage
-```
-
-These metrics help identify whether:
-
-```text
-image optimization
-```
-
-is itself becoming:
-
-```text
-application bottleneck
-```
-
----
-
-# 25. Transformation Cache Misses
-
-Consider:
-
-```text
-100 requests
-```
-
-for the same image representation.
-
-Ideal behavior:
-
-```text
-1 transformation
-99 cache hits
-```
-
-Poor behavior:
-
-```text
-100 transformations
-```
-
-This indicates:
-
-```text
-cache-key instability
-cache eviction
-poor cacheability
-variant explosion
-```
-
----
-
-# 26. Single-Flight / Request Coalescing
-
-A particularly important production optimization is preventing simultaneous cache misses from triggering duplicate work.
-
-Without coalescing:
-
-```text
-Request A ─┐
-Request B ─┼→ transformation
-Request C ─┤
-Request D ─┘
-```
-
-With request coalescing:
-
-```text
-Request A ─┐
-Request B ─┼→ one transformation → shared result
-Request C ─┤
-Request D ─┘
-```
-
-This protects transformation infrastructure during traffic spikes.
-
----
-
-# 27. Hot Image Detection
-
-Some assets receive enormous traffic:
-
-```text
-logo
-hero image
-popular product
-viral article
-campaign image
-```
-
-These are hot objects.
-
-Metrics should identify:
-
-```text
-request frequency
-cache hit rate
-origin fetches
-bandwidth
-regions
-```
-
-A hot image should generally be highly cacheable.
-
----
-
-# 28. Thundering Herd
-
-Suppose a popular image expires from cache:
-
-```text
-10:00:00
-cache expires
-```
-
-Thousands of requests arrive immediately.
-
-Without protection:
-
-```text
-thousands of origin requests
-```
-
-With:
-
-```text
-request coalescing
-stale serving
-origin shielding
-```
-
-the system can substantially reduce the burst.
-
----
-
-# 29. Image Availability SLO
-
-A production system can define an availability objective such as:
-
-```text
-successful image delivery rate
-```
-
-rather than relying only on page availability.
-
-This matters because:
-
-```text
-HTML success
-≠
-complete visual experience
-```
-
-A page can return HTTP 200 while important images fail.
-
----
-
-# 30. Image Performance SLOs
-
-Possible service objectives include:
-
-```text
-image request success rate
-p95 image TTFB
-p95 image transfer duration
-p95 LCP image delay
-cache hit ratio
-transformation error rate
-```
-
-The exact thresholds depend on system requirements.
-
-The important architectural point is:
-
-> **Performance should be expressed as measurable service behavior rather than vague goals.**
-
----
-
-# 31. Synthetic Monitoring
-
-Real-user monitoring tells you:
-
-```text
-what users actually experience
-```
-
-Synthetic monitoring tells you:
-
-```text
-what controlled environments experience
-```
-
-A useful system may test:
-
-```text
-desktop
-mobile
-slow network
-different regions
-different routes
-```
-
-This helps identify regressions before they become widespread.
-
----
-
-# 32. Real User Monitoring
-
-RUM can capture:
-
-```text
-actual device
-actual network
-actual geography
-actual browser
-actual page
-actual LCP
-```
-
-This reveals distributions rather than a single laboratory environment.
+Define budgets appropriate to your application.
 
 For example:
 
 ```text
-desktop p75 LCP = 1.8s
-mobile p75 LCP = 3.4s
+Hero:
+maximum encoded bytes
+
+Thumbnail:
+maximum encoded bytes
+
+Initial image payload:
+maximum aggregate bytes
+
+LCP image:
+maximum request latency
+
+Transformation:
+maximum p95 latency
 ```
 
-may reveal a problem hidden by desktop-only testing.
+The actual thresholds should be determined from product requirements and user populations.
 
----
-
-# 33. Lab vs Field Data
-
-Lab data:
+The important principle is:
 
 ```text
-controlled
-repeatable
-diagnostic
-```
-
-Field data:
-
-```text
-real-world
-variable
-representative
-production-specific
-```
-
-Neither fully replaces the other.
-
-A senior engineer uses:
-
-```text
-lab
-+
-synthetic
-+
-RUM
-+
-server telemetry
-```
-
-to build the complete picture.
-
----
-
-# 34. Testing Strategy
-
-Image systems require multiple test layers.
-
-```text
-Unit Tests
-Integration Tests
-Component Tests
-Browser Tests
-Performance Tests
-Production Monitoring
-```
-
-Each catches different classes of failure.
-
----
-
-# 35. Unit Testing
-
-Unit tests can verify:
-
-```text
-image URL generation
-transformation parameters
-source policy
-alt-text generation
-canonical image identity
-variant selection logic
-```
-
-Example conceptual assertion:
-
-```text
-given source X
-and width 640
-and format WebP
-
-produce deterministic representation Y
+budget
+→
+explicit constraint
 ```
 
 ---
 
-# 36. Integration Testing
+# 25. Automated Performance Regression Testing
 
-Integration tests should validate:
-
-```text
-application
-→ image optimizer
-→ cache
-→ source
-```
-
-Important scenarios:
+A deployment should not silently increase:
 
 ```text
-remote image
-invalid source
-missing image
-unsupported format
-cache miss
-cache hit
-transformation failure
+hero image bytes
 ```
+
+by 3×.
+
+Automated tests can compare:
+
+```text
+baseline
+vs
+current build
+```
+
+for:
+
+* image transfer size
+* number of images
+* selected candidate
+* LCP
+* layout stability
+* image format
+* image dimensions
 
 ---
 
-# 37. Component Testing
+# 26. Golden Image Tests
 
-Image components should test contracts such as:
-
-```text
-alt
-dimensions
-fill behavior
-responsive sizes
-priority behavior
-loading behavior
-fallback
-```
-
-The objective is not to test the framework itself.
-
-It is to test:
-
-```text
-application-level image contracts
-```
-
----
-
-# 38. Browser Testing
-
-Browser tests should verify actual behavior:
-
-```text
-correct image rendered
-correct candidate requested
-no layout shift
-hero image loads appropriately
-lazy images are not unnecessarily eager
-broken image behavior works
-```
-
-This is especially important for responsive image architecture.
-
----
-
-# 39. Responsive Image Regression Testing
-
-A change to:
-
-```text
-sizes
-```
-
-can dramatically alter network behavior.
-
-Therefore test across:
-
-```text
-mobile
-tablet
-desktop
-high-DPR
-low-DPR
-```
-
-The goal is to ensure the browser selects appropriate candidates.
-
----
-
-# 40. Accessibility Regression Testing
-
-Image testing must also preserve:
-
-```text
-alt text
-accessible names
-decorative semantics
-figure/caption relationships
-functional image semantics
-```
-
-Performance optimization must never silently remove accessibility semantics.
-
----
-
-# 41. Visual Regression Testing
-
-Visual tests can detect:
-
-```text
-cropping changes
-aspect-ratio changes
-unexpected stretching
-layout shifts
-broken placeholders
-wrong art direction
-```
-
-This is especially useful after modifying:
-
-```text
-image transformation
-CSS
-responsive breakpoints
-design-system components
-```
-
----
-
-# 42. Performance Regression Testing
-
-A performance test should establish a baseline.
+For important components, maintain expected rendering cases.
 
 Example:
 
 ```text
-Before:
-LCP = 2.1s
-
-After:
-LCP = 2.8s
+ProductCard
+ ├── mobile
+ ├── tablet
+ ├── desktop
+ ├── DPR 1
+ └── DPR 2
 ```
 
-This should trigger investigation.
-
-Similarly:
+Verify:
 
 ```text
-average image bytes
-cache hit rate
-transform latency
+correct image candidate
+correct dimensions
+correct aspect ratio
+correct alt
 ```
 
-should be tracked over releases.
+This prevents regressions when layout changes.
 
 ---
 
-# 43. Performance Budgets
+# 27. Responsive Image Tests
 
-A team may establish budgets for:
+A responsive image component should be tested across:
 
 ```text
-hero image bytes
-page image bytes
-image count
-largest image dimensions
-LCP
-CLS
+viewport widths
+DPR values
+container widths
 ```
-
-Budgets turn performance expectations into engineering constraints.
-
----
-
-# 44. Image Budget by Context
-
-Not every page needs the same budget.
 
 For example:
 
 ```text
-marketing landing page
-product listing
-article page
-dashboard
-admin application
+320px
+768px
+1024px
+1440px
 ```
 
-may have different image requirements.
-
-Therefore budgets should be contextual rather than blindly global.
-
----
-
-# 45. Deployment Regression Detection
-
-A deployment may accidentally change:
+The test should validate:
 
 ```text
-format
-quality
+candidate set
++
 sizes
-image URL generation
-cache headers
-transformation behavior
-```
-
-The resulting regression may appear as:
-
-```text
-higher bytes
-lower cache hit rate
-higher origin traffic
-higher LCP
-```
-
-Observability should make these changes visible.
-
----
-
-# 46. Canary Releases
-
-For high-scale image infrastructure, changes can be gradually exposed:
-
-```text
-1%
- ↓
-5%
- ↓
-25%
- ↓
-50%
- ↓
-100%
-```
-
-Monitor:
-
-```text
-error rate
-latency
-cache behavior
-origin load
-user performance
-```
-
-before full rollout.
-
----
-
-# 47. Correlating Frontend and Backend Metrics
-
-Suppose:
-
-```text
-LCP worsened
-```
-
-at the same time as:
-
-```text
-image transformation latency increased
-```
-
-That correlation is useful.
-
-But correlation alone does not prove causation.
-
-A complete investigation should examine:
-
-```text
-deployment
-route
-device
-region
-image size
-cache state
-network conditions
-```
-
----
-
-# 48. Production Debugging Workflow
-
-A useful sequence is:
-
-```text
-1. Identify affected user population
-2. Identify affected routes
-3. Identify image/LCP relationship
-4. Check browser request timing
-5. Check image representation size
-6. Check CDN cache behavior
-7. Check transformation latency
-8. Check origin load
-9. Compare deployment versions
-10. Reproduce under controlled conditions
-```
-
-This prevents random optimization.
-
----
-
-# 49. Debugging Oversized Images
-
-If users receive oversized images:
-
-```text
-Check:
-```
-
-```text
-rendered CSS width
-DPR
-sizes
-srcset candidates
-selected resource
-transformation width
-format
-quality
-```
-
-Do not immediately assume the image optimizer is broken.
-
-Often the problem is:
-
-```text
-incorrect layout information
-```
-
----
-
-# 50. Debugging High Origin Load
-
-If origin image traffic suddenly increases:
-
-```text
-Check:
-```
-
-```text
-cache hit rate
-cache-key changes
-URL versioning
-variant cardinality
-TTL changes
-purges
-deployment changes
-request coalescing
-hot objects
-```
-
-A high origin load event is often a cache architecture problem.
-
----
-
-# 51. Debugging High Transformation CPU
-
-If image-processing CPU rises:
-
-```text
-Investigate:
-```
-
-```text
-new formats
-quality settings
-new dimensions
-variant explosion
-cache misses
-uncached transformations
-traffic growth
-large source images
-```
-
-The goal is to determine whether the workload increase is:
-
-```text
-legitimate traffic
-```
-
-or:
-
-```text
-architectural inefficiency
-```
-
-or:
-
-```text
-abuse
-```
-
----
-
-# 52. Debugging Image Failures
-
-A useful decision tree:
-
-```text
-Image failed
-    ↓
-Did request leave browser?
-    ↓
-Did CDN receive it?
-    ↓
-Did CDN hit cache?
-    ↓
-Did origin respond?
-    ↓
-Was transformation successful?
-    ↓
-Did browser decode?
-    ↓
-Did layout/render occur?
-```
-
-This narrows the failure domain.
-
----
-
-# 53. Image Observability Dashboard
-
-A production dashboard might contain:
-
-## User Experience
-
-```text
-LCP
-image load delay
-image render delay
-CLS
-```
-
-## Delivery
-
-```text
-request count
-bytes
-TTFB
-latency
-error rate
-```
-
-## Cache
-
-```text
-hit ratio
-miss ratio
-stale responses
-origin fetches
-```
-
-## Processing
-
-```text
-transform count
-transform latency
-CPU
-memory
-failures
-```
-
-## Security
-
-```text
-blocked sources
-rejected transformations
-rate-limit events
-authorization failures
-```
-
----
-
-# 54. Alerts
-
-Alerts should target meaningful failures.
-
-Examples:
-
-```text
-image error rate > threshold
-```
-
-```text
-LCP regression > threshold
-```
-
-```text
-origin image traffic unexpectedly increases
-```
-
-```text
-transformation CPU saturates
-```
-
-```text
-cache hit ratio collapses
-```
-
-```text
-remote source failures spike
-```
-
-Avoid alerting on every individual image failure.
-
-The objective is:
-
-```text
-actionable signal
-```
-
-rather than:
-
-```text
-alert noise
-```
-
----
-
-# 55. Observability and Cardinality
-
-A dangerous telemetry design might record:
-
-```text
-metric:
-image_request{url="<unique URL>"}
-```
-
-This can create unbounded cardinality.
-
-Prefer dimensions such as:
-
-```text
-image_request{
-  format="avif",
-  width_bucket="768-1024",
-  route="/products/[id]",
-  cache="hit"
-}
-```
-
-The principle is:
-
-> **Observe enough dimensions to diagnose the system without turning telemetry itself into an unbounded data system.**
-
----
-
-# 56. Image Performance Scorecards
-
-A team can maintain a production scorecard:
-
-| Dimension      | Measurement                  |
-| -------------- | ---------------------------- |
-| UX             | LCP / image render delay     |
-| Network        | bytes / latency              |
-| Representation | rendered vs delivered pixels |
-| Cache          | hit ratio                    |
-| Processing     | transform latency            |
-| Reliability    | image success rate           |
-| Security       | blocked/invalid requests     |
-| Cost           | bandwidth / compute          |
-
-The scorecard should be used for diagnosis, not as a simplistic single-number ranking.
-
----
-
-# 57. Cost Observability
-
-Image systems can create significant infrastructure costs through:
-
-```text
-bandwidth
-storage
-transformation CPU
-CDN requests
-origin requests
-observability
-```
-
-A useful model is:
-
-```text
-Image Cost
-=
-Delivery
 +
-Storage
-+
-Transformation
-+
-Origin
-+
-Operational Overhead
+actual rendered dimensions
 ```
-
-Optimization should consider total system cost, not only browser bytes.
 
 ---
 
-# 58. Cost vs Performance Tradeoff
+# 28. `sizes` Regression
 
-For example:
-
-```text
-more pre-generated variants
-```
-
-may reduce transformation latency but increase:
+Suppose a component originally renders:
 
 ```text
-storage
+50vw
 ```
 
-While:
+but a design change makes it:
 
 ```text
-on-demand transformation
+33vw
 ```
 
-may reduce storage but increase:
+If `sizes` remains:
 
 ```text
-compute
+50vw
 ```
+
+the browser may select larger candidates than necessary.
+
+This can silently increase:
+
+```text
+transfer size
+```
+
+without causing a functional test failure.
+
+Therefore image performance tests should include responsive sizing assumptions.
+
+---
+
+# 29. Art Direction Tests
+
+For art-directed images:
+
+```text
+Desktop
+→ wide crop
+
+Mobile
+→ portrait crop
+```
+
+tests should verify:
+
+```text
+correct source
+correct breakpoint
+correct crop
+correct focal point
+```
+
+This is especially important for CMS-driven content.
+
+---
+
+# 30. Accessibility Regression Testing
+
+Image tests should also verify:
+
+```text
+alt behavior
+accessible names
+decorative image semantics
+link/button semantics
+captions
+```
+
+A visually correct image can still be an accessibility regression.
 
 Therefore:
 
 ```text
-precompute vs on-demand
+visual correctness
+≠
+semantic correctness
 ```
-
-is a workload decision.
 
 ---
 
-# 59. Production Experimentation
+# 31. Security Regression Testing
 
-Image changes should ideally be measurable.
+Security tests should include:
+
+```text
+disallowed host
+private IP
+invalid scheme
+oversized file
+oversized dimensions
+invalid format
+malicious SVG
+invalid transformation
+rate-limit behavior
+```
+
+The objective is to verify that security controls remain active after deployments.
+
+---
+
+# 32. Synthetic vs RUM
+
+| Dimension            | Synthetic     | RUM                 |
+| -------------------- | ------------- | ------------------- |
+| Environment          | Controlled    | Real users          |
+| Repeatability        | High          | Lower               |
+| Regression detection | Excellent     | Moderate            |
+| Device diversity     | Limited       | High                |
+| Network diversity    | Limited       | High                |
+| Production reality   | Approximation | Direct              |
+| Debugging            | Easier        | More representative |
+
+The production strategy should generally use both.
+
+---
+
+# 33. CDN Monitoring
+
+Important CDN metrics include:
+
+```text
+cache hit ratio
+origin request rate
+edge latency
+response status
+bandwidth
+regional performance
+cache eviction
+```
+
+Break down by:
+
+```text
+asset class
+region
+format
+transformation
+```
+
+when useful.
+
+---
+
+# 34. Regional Performance
+
+A global application can show:
+
+```text
+Region A
+LCP = 1.8s
+
+Region B
+LCP = 3.9s
+```
+
+Possible causes:
+
+```text
+CDN coverage
+origin distance
+cache state
+routing
+network quality
+image source location
+```
+
+Therefore image performance should sometimes be geographically segmented.
+
+---
+
+# 35. Device Segmentation
+
+Mobile devices may differ substantially from desktops.
+
+Segment by:
+
+```text
+device class
+CPU capability
+memory
+viewport
+DPR
+network
+```
+
+A high-resolution image that works well on desktop may be expensive to decode on a low-end mobile device.
+
+---
+
+# 36. Error Budgets
+
+Image systems can have service-level objectives such as:
+
+```text
+image request success rate
+transformation success rate
+critical image availability
+CDN availability
+```
+
+An error budget allows teams to balance:
+
+```text
+reliability
+```
+
+against:
+
+```text
+feature velocity
+```
+
+without relying on subjective judgments.
+
+---
+
+# 37. Image SLO Example
+
+A production system might define:
+
+```text
+Critical image availability
+≥ target
+
+Transformation p95 latency
+≤ target
+
+Image 5xx rate
+≤ target
+
+LCP for key routes
+≤ target
+```
+
+The exact values should come from the product's requirements.
+
+The important principle is:
+
+```text
+performance
++
+reliability
+→
+measurable operational objectives
+```
+
+---
+
+# 38. Alerting
+
+Good alerts should identify meaningful degradation.
+
+Examples:
+
+```text
+LCP p75 exceeds threshold
+```
+
+```text
+Image 5xx rate increases
+```
+
+```text
+Transformation p95 doubles
+```
+
+```text
+CDN hit ratio drops sharply
+```
+
+```text
+Origin image traffic spikes
+```
+
+```text
+Image bandwidth exceeds budget
+```
+
+Alerts should avoid excessive noise.
+
+---
+
+# 39. Deployment Correlation
+
+When an image metric changes, correlate it with:
+
+```text
+deployment
+configuration change
+CDN rule change
+image pipeline change
+CMS migration
+design-system release
+```
 
 For example:
 
 ```text
-Experiment:
-AVIF quality profile A
-vs
-AVIF quality profile B
+10:00 deployment
+10:07 hero bytes ↑ 40%
 ```
 
-Measure:
+This correlation can dramatically shorten diagnosis time.
+
+---
+
+# 40. Observability During Rollouts
+
+During a canary deployment:
 
 ```text
-bytes
+Old version
+    ↓
+95% traffic
+
+New version
+    ↓
+5% traffic
+```
+
+Compare:
+
+```text
+image bytes
 LCP
-visual quality
-decode behavior
-conversion cost
-cache behavior
+cache hit ratio
+error rate
+transformation latency
 ```
 
-Do not optimize one metric while silently degrading another.
+between versions.
+
+This makes image regressions detectable before broad rollout.
 
 ---
 
-# 60. Image Quality Validation
+# 41. Production Incident — LCP Regression
 
-A smaller image is not automatically better.
-
-Quality evaluation may consider:
+### Observation
 
 ```text
-visual artifacts
-text readability
-faces
-fine detail
-edges
-gradients
-transparency
+LCP:
+2.0s → 3.4s
 ```
 
-For automated pipelines, objective image-quality metrics can be useful, but visual validation remains important for perceptually sensitive assets.
-
----
-
-# 61. Regression Prevention in Design Systems
-
-If an application has a shared image component:
+### Investigation
 
 ```text
-<AppImage />
-```
+LCP element
+→ hero image
 
-it should encode production defaults.
+Discovery time
+→ unchanged
 
-Possible responsibilities:
+Candidate
+→ 2× larger
 
-```text
 sizes
-alt requirements
-loading behavior
-aspect-ratio behavior
-allowed variants
-observability hooks
+→ stale after layout change
 ```
 
-This prevents each feature team from independently reinventing image architecture.
+Root cause:
+
+```text
+responsive image contract regression
+```
+
+Not:
+
+```text
+CDN outage.
+```
+
+This is why multiple observability layers matter.
 
 ---
 
-# 62. Image Component as a Platform Boundary
+# 42. Production Incident — Cache Hit Drop
 
-A mature design system can treat image rendering as:
-
-```text
-application primitive
-```
-
-rather than:
+Observation:
 
 ```text
-ordinary HTML element
+Image cache hit:
+96% → 72%
 ```
 
-The component can establish:
+Investigate:
 
 ```text
-semantic contract
-delivery contract
-performance contract
-security contract
+URL changes
+cache-key changes
+format changes
+query parameters
+version changes
+TTL
+purges
 ```
+
+Possible root cause:
+
+```text
+new transformation dimension
+```
+
+creating cache fragmentation.
 
 ---
 
-# 63. Production Image Contract
+# 43. Production Incident — Transformation CPU Spike
 
-A reusable image component may conceptually require:
+Observation:
 
 ```text
-ImageInput
-├── source
-├── semantic role
-├── rendered dimensions
-├── responsive behavior
-├── loading priority
-├── transformation profile
-└── accessibility metadata
+CPU ↑
+transformation p99 ↑
 ```
 
-This produces predictable behavior across the application.
+Investigate:
+
+```text
+new format
+new dimensions
+new quality
+new source image sizes
+cache misses
+traffic pattern
+abuse
+```
+
+The correct response is not automatically:
+
+```text
+add more servers.
+```
+
+First identify why transformation demand changed.
 
 ---
 
-# 64. End-to-End Observability Model
+# 44. Production Incident — Broken Images After Deployment
 
-The complete pipeline becomes:
+Symptoms:
 
 ```text
-                 USER EXPERIENCE
-                       │
-                       ▼
-                     LCP
-                       │
-                       ▼
-                Browser Request
-                       │
-                       ▼
-                 CDN / Cache
-                       │
-              ┌────────┴────────┐
-              ▼                 ▼
-           Cache Hit         Cache Miss
-                                │
-                                ▼
-                         Transformation
-                                │
-                                ▼
-                              Origin
+4xx ↑
 ```
 
-Telemetry should connect all these layers.
+Potential causes:
+
+```text
+asset path changed
+image URL builder changed
+CDN origin path changed
+static asset missing
+CMS IDs changed
+deployment artifact mismatch
+```
+
+A good observability system should make the failure class obvious.
 
 ---
 
-# 65. Production Incident Example
-
-Imagine:
-
-```text
-09:00 deployment
-```
-
-At:
-
-```text
-09:10
-```
-
-you observe:
-
-```text
-LCP +600ms
-origin traffic +300%
-transform CPU +250%
-```
-
-A useful investigation is:
-
-```text
-Deployment
-   ↓
-image URL generation changed
-   ↓
-cache keys changed
-   ↓
-cache hit rate collapsed
-   ↓
-more transformations
-   ↓
-origin/CPU load increased
-   ↓
-image latency increased
-   ↓
-LCP degraded
-```
-
-This is the type of causal chain observability should make discoverable.
-
----
-
-# 66. Another Production Incident
+# 45. Production Incident — Security Rejections Increase
 
 Suppose:
 
 ```text
-image error rate = 5%
+SSRF rejection rate ↑
 ```
 
-but only in:
+Possible explanations:
 
 ```text
-one region
+attack
+misconfigured partner
+new legitimate image host
+proxy/DNS change
+application bug
 ```
 
-and only for:
+Do not immediately classify all rejections as attacks.
+
+Use:
 
 ```text
-one remote image provider
+source
+pattern
+tenant
+time
+request shape
 ```
 
-The likely investigation path becomes:
-
-```text
-region
-+
-source domain
-+
-status code
-+
-fetch latency
-+
-DNS/connectivity
-```
-
-This is much more actionable than:
-
-```text
-"images are broken."
-```
+to investigate.
 
 ---
 
-# 67. Production Architecture Principles
+# 46. Testing Pyramid for Images
 
-### Principle 1
+A useful test architecture is:
 
-Measure the user's experience.
+```text
+                 E2E / RUM
+                    ↑
+              Integration
+                    ↑
+           Component Tests
+                    ↑
+           Transformation Tests
+                    ↑
+              Unit Tests
+```
 
-### Principle 2
-
-Measure infrastructure behavior.
-
-### Principle 3
-
-Connect browser and server telemetry.
-
-### Principle 4
-
-Track representation efficiency.
-
-### Principle 5
-
-Track cache efficiency separately.
-
-### Principle 6
-
-Bound metric cardinality.
-
-### Principle 7
-
-Test responsive behavior.
-
-### Principle 8
-
-Test accessibility semantics.
-
-### Principle 9
-
-Monitor image failures independently from page failures.
-
-### Principle 10
-
-Treat image performance as a release-quality concern.
+Different layers answer different questions.
 
 ---
 
-# 68. Senior Prediction Challenges
+# 47. Unit Tests
+
+Test deterministic logic such as:
+
+```text
+URL construction
+variant generation
+sizes calculation
+alt generation
+transformation normalization
+cache-key generation
+```
+
+These should be fast.
+
+---
+
+# 48. Integration Tests
+
+Test:
+
+```text
+image optimizer
+CDN behavior
+remote source validation
+transformation pipeline
+authorization
+cache policy
+```
+
+Integration tests verify component boundaries.
+
+---
+
+# 49. End-to-End Tests
+
+E2E tests verify user-visible behavior:
+
+```text
+page loads
+image appears
+responsive representation works
+layout remains stable
+critical image is available
+```
+
+These are more expensive but validate the entire system.
+
+---
+
+# 50. Visual Regression Testing
+
+Visual snapshots can detect:
+
+```text
+incorrect crop
+aspect-ratio changes
+broken object-fit
+missing images
+layout shifts
+wrong art direction
+```
+
+However visual tests alone cannot measure:
+
+```text
+network cost
+cache efficiency
+RUM LCP
+```
+
+Therefore combine visual and performance testing.
+
+---
+
+# 51. Image Contract Testing
+
+Design-system components should define contracts.
+
+For example:
+
+```text
+ProductImage
+```
+
+may guarantee:
+
+```text
+aspect ratio
+responsive sizes
+alt requirement
+allowed variants
+loading behavior
+```
+
+A component contract prevents each feature team from independently inventing image behavior.
+
+---
+
+# 52. Production Performance Architecture
+
+A mature system can look like:
+
+```text
+                ┌───────────────┐
+                │   Browser     │
+                │ RUM + Timing  │
+                └───────┬───────┘
+                        │
+                        ↓
+                ┌───────────────┐
+                │     CDN       │
+                │ Cache Metrics │
+                └───────┬───────┘
+                        │
+                        ↓
+              ┌───────────────────┐
+              │ Image Transformer │
+              │ CPU / Memory      │
+              │ Transform Latency │
+              └─────────┬─────────┘
+                        │
+                        ↓
+                ┌───────────────┐
+                │ Image Origin  │
+                │ Fetch Metrics │
+                └───────────────┘
+```
+
+All layers should be correlated.
+
+---
+
+# 53. Performance Regression Workflow
+
+A mature workflow is:
+
+```text
+Change
+ ↓
+Build
+ ↓
+Automated tests
+ ↓
+Synthetic performance
+ ↓
+Canary
+ ↓
+RUM
+ ↓
+Compare against baseline
+ ↓
+Promote / rollback
+```
+
+This converts performance into a deployment discipline.
+
+---
+
+# 54. Four-Pillar Engineering Matrix
+
+| Dimension    | Core Concern                         | Senior-Level Question                                         |
+| ------------ | ------------------------------------ | ------------------------------------------------------------- |
+| Mental Model | Measure the full image lifecycle     | Which stage is actually slow?                                 |
+| Mechanics    | Timing, bytes, cache, transformation | Can the bottleneck be localized to a layer?                   |
+| Architecture | Testing + observability contracts    | Can regressions be detected before broad rollout?             |
+| Operations   | RUM, SLOs, alerts, incident response | Can production degradation be detected and diagnosed quickly? |
+
+---
+
+# 55. Prediction Challenges
 
 ### Challenge 1
 
-A CDN has a 99% cache hit ratio, but LCP worsened.
+CDN hit ratio remains constant, but LCP increases.
 
-What should you investigate?
-
-Expected reasoning:
-
-```text
-representation size
-selected image width
-DPR
-format
-quality
-network
-decode
-late discovery
-```
-
-Cache efficiency alone does not guarantee good UX.
+What browser-side metrics should you inspect?
 
 ---
 
 ### Challenge 2
 
-Origin traffic increased 5× after a frontend deployment.
+Image transfer bytes increase by 40% after a design-system change.
 
-What image-specific causes would you inspect?
-
-Expected reasoning:
-
-```text
-cache-key changes
-URL changes
-variant explosion
-TTL changes
-purge behavior
-responsive candidate changes
-```
+What should you investigate?
 
 ---
 
 ### Challenge 3
 
-Transformation CPU increased while traffic remained constant.
+Transformation p95 remains stable but p99 increases dramatically.
 
-What could explain it?
-
-Expected reasoning:
-
-```text
-cache hit-rate regression
-larger transformations
-new format
-higher quality
-new dimensions
-variant explosion
-```
+What does that suggest about the workload?
 
 ---
 
 ### Challenge 4
 
-Mobile LCP regressed but desktop did not.
+Only one geographic region shows image latency regression.
 
-What should you inspect first?
-
-Expected reasoning:
-
-```text
-mobile sizes
-DPR
-selected candidate
-mobile art direction
-network conditions
-mobile image priority
-```
+Which infrastructure dimensions should you investigate?
 
 ---
 
 ### Challenge 5
 
-The image server reports low latency but users still experience slow image rendering.
+Image 5xx rate is normal, but images visually appear too large.
 
-What could be happening?
+Which layer may be wrong?
 
-Expected reasoning:
+---
+
+### Challenge 6
+
+The selected image candidate is consistently much larger than the rendered width.
+
+Which responsive-image contract should you inspect?
+
+---
+
+### Challenge 7
+
+RUM LCP worsens but synthetic tests remain unchanged.
+
+What does that tell you?
+
+---
+
+# 56. Senior Interview Gotchas
+
+### Gotcha 1
+
+**“Cache hit ratio is the image performance metric.”**
+
+No. It is one delivery metric.
+
+---
+
+### Gotcha 2
+
+**“Average image latency is sufficient.”**
+
+Tail latency can be much more important.
+
+---
+
+### Gotcha 3
+
+**“Synthetic tests represent production users.”**
+
+They provide controlled measurements, not complete production representation.
+
+---
+
+### Gotcha 4
+
+**“If an image is visually correct, the component is correct.”**
+
+Not necessarily.
+
+It may still have:
+
+* incorrect alt
+* oversized candidate
+* poor LCP
+* cache fragmentation
+* security issues
+
+---
+
+### Gotcha 5
+
+**“A CDN dashboard tells you why LCP is slow.”**
+
+It tells you about delivery, not necessarily browser discovery, decode, layout, or paint.
+
+---
+
+### Gotcha 6
+
+**“RUM replaces synthetic testing.”**
+
+No. The two systems solve different problems.
+
+---
+
+# 57. Core Invariants
 
 ```text
-late discovery
-network transfer
-large representation
-browser decode
-main-thread contention
-render delay
+observability
+=
+browser
++
+edge
++
+origin
 ```
 
----
-
-# 69. Senior Interview Questions
-
-### Question 1
-
-> How would you monitor a production image optimization system?
-
-Discuss:
-
 ```text
-RUM
-resource timing
-LCP
-CDN metrics
-cache metrics
-transformation metrics
-origin metrics
-errors
-tracing
+cache hit ratio
+≠
+complete image performance
 ```
 
----
-
-### Question 2
-
-> Why isn't cache hit rate enough?
-
-Because a cache hit can still return:
-
 ```text
-oversized
-wrong
-slow-to-decode
-inefficient
+average latency
+≠
+tail latency
 ```
 
-representations.
-
----
-
-### Question 3
-
-> How would you diagnose an LCP regression caused by images?
-
-Trace:
-
 ```text
-discovery
-→ request scheduling
-→ network
-→ transfer
-→ decode
-→ render
+transfer completion
+≠
+visual completion
 ```
 
-and correlate browser telemetry with delivery infrastructure.
-
----
-
-### Question 4
-
-> How do you prevent image telemetry from creating a cardinality problem?
-
-Avoid unbounded identifiers in metric dimensions and use bounded categories/buckets.
-
----
-
-### Question 5
-
-> What should be tested when changing responsive image behavior?
-
-Test:
+```text
+synthetic testing
+≠
+real-user experience
+```
 
 ```text
-viewport
-DPR
-candidate selection
-rendered dimensions
-bytes
-LCP
 visual correctness
+≠
+performance correctness
+```
+
+```text
+performance metric
+without segmentation
+→
+can hide critical regressions
+```
+
+```text
+deployment
+→
+must be observable as a performance event
 ```
 
 ---
 
-# 70. Core Invariants
+# 58. Completion Checklist
 
-```text
-user experience ≠ server latency
-```
+You should be able to explain:
 
-```text
-cache hit rate ≠ image efficiency
-```
-
-```text
-small bytes ≠ low total processing cost
-```
-
-```text
-HTML success ≠ image success
-```
-
-```text
-image request success ≠ image render success
-```
-
-```text
-rendered width ≠ delivered width
-```
-
-```text
-desktop behavior ≠ mobile behavior
-```
-
-```text
-synthetic performance ≠ field performance
-```
-
-```text
-metrics without dimensions ≠ diagnosis
-```
-
-```text
-unbounded dimensions ≠ safe observability
-```
-
-```text
-optimization without measurement ≠ reliable optimization
-```
-
----
-
-# 71. Completion Checklist
-
-You should now be able to:
-
-### Browser Performance
-
-* [ ] Explain image request lifecycle
-* [ ] Understand Resource Timing
-* [ ] Connect images to LCP
-* [ ] Distinguish discovery delay from download delay
-* [ ] Distinguish download delay from render delay
-* [ ] Understand encoded vs decoded size
-
-### Delivery
-
-* [ ] Measure CDN performance
-* [ ] Measure cache hit/miss behavior
-* [ ] Measure origin load
-* [ ] Measure transformation latency
-* [ ] Detect cache-key regressions
-* [ ] Identify hot objects
-* [ ] Understand request coalescing
-
-### Testing
-
-* [ ] Unit test image contracts
-* [ ] Integration test image pipelines
-* [ ] Browser test responsive selection
-* [ ] Visual regression test image rendering
-* [ ] Accessibility regression test semantics
-* [ ] Performance regression test budgets
-
-### Production
-
-* [ ] Use RUM
-* [ ] Use synthetic monitoring
-* [ ] Use metrics
-* [ ] Use logs
-* [ ] Use traces
-* [ ] Design useful alerts
-* [ ] Avoid high-cardinality telemetry
-* [ ] Correlate deployments with regressions
-
-### Senior-Level Reasoning
-
-* [ ] Diagnose image-related LCP regressions
-* [ ] Diagnose cache regressions
-* [ ] Diagnose transformation CPU spikes
-* [ ] Diagnose regional image failures
-* [ ] Connect frontend and backend telemetry
-* [ ] Define meaningful image SLOs
+* [ ] Image observability architecture
+* [ ] Browser metrics
+* [ ] CDN metrics
+* [ ] Origin metrics
+* [ ] Resource Timing
+* [ ] Image discovery timing
+* [ ] Transfer size
+* [ ] Candidate observability
+* [ ] Error taxonomy
+* [ ] HTTP status monitoring
+* [ ] Cache hit ratio
+* [ ] Cache miss latency
+* [ ] Transformation latency
+* [ ] Percentiles
+* [ ] Origin load
+* [ ] Cache cardinality
+* [ ] Cache-key diagnostics
+* [ ] Correlation IDs
+* [ ] Structured image logging
+* [ ] High-cardinality logging risks
+* [ ] RUM
+* [ ] LCP monitoring
+* [ ] LCP element identification
+* [ ] Performance budgets
+* [ ] Regression testing
+* [ ] Responsive image testing
+* [ ] Art-direction testing
+* [ ] Accessibility regression testing
+* [ ] Security regression testing
+* [ ] Synthetic testing
+* [ ] CDN monitoring
+* [ ] Regional segmentation
+* [ ] Device segmentation
+* [ ] Image SLOs
+* [ ] Alerting
+* [ ] Deployment correlation
+* [ ] Canary verification
+* [ ] Incident diagnosis
+* [ ] Unit testing
+* [ ] Integration testing
+* [ ] E2E testing
+* [ ] Visual regression testing
+* [ ] Image contracts
+* [ ] Production verification
 
 ---
 
-# 72. Final Mental Model
+# 59. Part Boundary
 
-The production image system should now be understood as:
-
-```text
-                    USER
-                     │
-                     ▼
-              Browser Experience
-                     │
-            ┌────────┴────────┐
-            ▼                 ▼
-          LCP              Resource
-            │               Timing
-            └────────┬────────┘
-                     ▼
-                 CDN / Cache
-                     │
-            ┌────────┴────────┐
-            ▼                 ▼
-        Cache Hit          Cache Miss
-                                │
-                                ▼
-                         Transformation
-                                │
-                                ▼
-                              Origin
-```
-
-Every important transition should be observable.
-
-The senior-level mental model is:
-
-> **Image optimization is not complete when an image is technically delivered. It is complete when the system can continuously demonstrate that the correct representation is delivered, efficiently, reliably, securely, and with measurable user impact.**
-
-The final engineering loop is:
+This part establishes:
 
 ```text
-Measure
-  ↓
-Diagnose
-  ↓
-Change
-  ↓
-Validate
-  ↓
-Observe
-  ↓
-Prevent Regression
+Image Observability
++
+Testing
++
+Performance Budgets
++
+RUM
++
+Synthetic Testing
++
+Production Verification
 ```
 
-That is what turns image optimization from a framework feature into a production engineering discipline.
+The next and final part of KPI 10 is:
 
-**Part 09 complete.**
+> **Part 10 — Production Image Optimization Architecture Capstone**
+
+Part 10 will integrate:
+
+```text
+Part 01 → Mental Model
+Part 02 → <Image> Mechanics
+Part 03 → Responsive Images
+Part 04 → Formats / Compression / Transformation
+Part 05 → CDN / Cache / Delivery
+Part 06 → Loading / Priority / LCP
+Part 07 → Accessibility / Semantics
+Part 08 → Security / Abuse Prevention
+Part 09 → Observability / Testing
+```
+
+into one production-grade architecture.
+
+---
+
+# Final Mental Model
+
+A senior engineer should view image optimization as:
+
+```text
+                    IMAGE SYSTEM
+                         │
+        ┌────────────────┼────────────────┐
+        ↓                ↓                ↓
+    Correctness      Performance       Security
+        │                │                │
+        ↓                ↓                ↓
+ Responsive          LCP/RUM          SSRF
+ Formats             CDN              Limits
+ Semantics            Decode           Isolation
+ Accessibility        Cache            Authorization
+        │                │                │
+        └────────────────┼────────────────┘
+                         ↓
+                   Observability
+                         ↓
+                     Testing
+                         ↓
+                 Production Ops
+```
+
+The objective is not merely:
+
+> **“Serve optimized images.”**
+
+It is:
+
+> **Build an image delivery system whose representations are correct, whose critical resources arrive efficiently, whose untrusted inputs are bounded and isolated, and whose production behavior can be measured, tested, diagnosed, and continuously improved.**
